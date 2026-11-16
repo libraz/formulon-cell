@@ -39,12 +39,10 @@ import {
   type DemoReviewDialogState,
   demoCommandText,
   type DemoBackstageAction,
-  type DemoF6Toolbar,
   type DemoLocale,
   demoUiStringsForLocale,
   formatLoadError,
   FORMATTERS,
-  installDemoF6Navigation,
   normalizeDemoLocale,
   type PresetKey,
   refreshDemoPrinterProfiles,
@@ -63,12 +61,6 @@ import DemoTitleBar from './DemoTitleBar.vue';
 
 const UI = createDemoStrings('Vue');
 
-/** The ribbon as F6 navigation reads it: the wrapper element around it and its tab focus. */
-const f6ToolbarOf = (toolbar: Toolbar | null, host: HTMLElement | null): DemoF6Toolbar | null =>
-  host ? { host, focusActiveTab: () => toolbar?.focusActiveTab() ?? false } : null;
-
-let disposeF6Navigation: (() => void) | undefined;
-
 const theme = ref<ThemeName>('paper');
 const locale = ref<DemoLocale>(resolveInitialLocale());
 const platform = ref<DemoPlatform>(resolveInitialPlatform());
@@ -77,11 +69,9 @@ const workbook = shallowRef<Workbook | null>(null);
 // holds a canvas + many internal refs that should not be reactivified.
 const instance = shallowRef<SpreadsheetInstance | null>(null);
 const toolbar = shallowRef<Toolbar | null>(null);
-const ribbonHost = ref<HTMLDivElement | null>(null);
 const log = ref<ChangeLogEntry[]>([]);
 const formatters = ref({ uppercase: false, arrows: false });
 const fileInput = ref<HTMLInputElement | null>(null);
-const titleBar = ref<InstanceType<typeof DemoTitleBar> | null>(null);
 const preset = ref<PresetKey>('full');
 const overrides = ref<FeatureFlags>({});
 const showRibbon = ref(true);
@@ -391,14 +381,6 @@ const onToolbarReady = (next: Toolbar | null): void => {
   (window as unknown as { __fcToolbar?: Toolbar | null }).__fcToolbar = next;
 };
 
-onMounted(() => {
-  disposeF6Navigation = installDemoF6Navigation({
-    getQuickAccess: () => titleBar.value?.quickAccess ?? null,
-    getToolbar: () => f6ToolbarOf(toolbar.value, ribbonHost.value),
-    getInstance: () => instance.value,
-  });
-});
-
 onBeforeUnmount(() => {
   demoAlive = false;
   // Dispose the instance first, then the workbook the demo owns.
@@ -411,8 +393,6 @@ onBeforeUnmount(() => {
     workbookOwner?.dispose();
     workbookOwner = null;
   }
-  disposeF6Navigation?.();
-  disposeF6Navigation = undefined;
   delete (window as unknown as { __fcInst?: SpreadsheetInstance | null }).__fcInst;
 });
 </script>
@@ -428,7 +408,6 @@ onBeforeUnmount(() => {
   </div>
   <div v-else class="demo" :data-fc-theme="theme" :data-fc-platform="platform">
     <DemoTitleBar
-      ref="titleBar"
       :ui="ui"
       :platform="platform"
       :book-name="bookName"
@@ -448,15 +427,14 @@ onBeforeUnmount(() => {
 
     <main :class="['demo__body', { 'demo__body--panel': showPanel }]">
       <div class="fc-tb__sheet-col">
-        <div v-if="resolvedUi.ribbon" ref="ribbonHost" style="display: contents">
-          <SpreadsheetToolbar
-            v-model:activeTab="ribbonTab"
-            :spreadsheet="instance"
-            :ribbon-tabs="ribbonTabs"
-            :hooks="ribbonHooks"
-            @ready="onToolbarReady"
-          />
-        </div>
+        <SpreadsheetToolbar
+          v-if="resolvedUi.ribbon"
+          v-model:activeTab="ribbonTab"
+          :spreadsheet="instance"
+          :ribbon-tabs="ribbonTabs"
+          :hooks="ribbonHooks"
+          @ready="onToolbarReady"
+        />
         <Spreadsheet
           class="demo__sheet"
           :ui="resolvedUi"

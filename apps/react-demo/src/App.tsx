@@ -24,7 +24,6 @@ import {
   DEMO_PRINTER_PROFILES,
   DEMO_RIBBON_TABS,
   type DemoBackstageAction,
-  type DemoF6Toolbar,
   type DemoLocale,
   type DemoPlatform,
   type DemoReviewDialogState,
@@ -34,7 +33,6 @@ import {
   demoUiStringsForLocale,
   FORMATTERS,
   formatLoadError,
-  installDemoF6Navigation,
   nextDemoFeatureOverrides,
   normalizeDemoLocale,
   openDemoWorkbookFile,
@@ -53,10 +51,6 @@ import { DemoReviewDialog } from './DemoReviewDialog.js';
 import { DemoTitleBar } from './DemoTitleBar.js';
 
 const UI = createDemoStrings('React');
-
-/** The ribbon as F6 navigation reads it: the wrapper element around it and its tab focus. */
-const f6ToolbarOf = (toolbar: Toolbar | null, host: HTMLElement | null): DemoF6Toolbar | null =>
-  host ? { host, focusActiveTab: () => toolbar?.focusActiveTab() ?? false } : null;
 
 export const App = (): ReactElement => {
   const [theme, setTheme] = useState<ThemeName>('paper');
@@ -82,7 +76,6 @@ export const App = (): ReactElement => {
   const [bookName, setBookName] = useState('Book1');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const quickAccessRef = useRef<HTMLDivElement | null>(null);
-  const ribbonHostRef = useRef<HTMLDivElement | null>(null);
   const toolbarRef = useRef<Toolbar | null>(null);
   const workbookOwnerRef = useRef<Workbook | null>(null);
   const instanceRef = useRef<SpreadsheetInstance | null>(null);
@@ -167,16 +160,6 @@ export const App = (): ReactElement => {
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
-
-  useEffect(
-    () =>
-      installDemoF6Navigation({
-        getQuickAccess: () => quickAccessRef.current,
-        getToolbar: () => f6ToolbarOf(toolbarRef.current, ribbonHostRef.current),
-        getInstance: () => instance,
-      }),
-    [instance],
-  );
 
   // Expose the live instance on `window.__fcInst` so cross-demo E2E scenarios
   // can drive imperative paths (named-range, paste-special, etc.) without
@@ -409,19 +392,17 @@ export const App = (): ReactElement => {
       <main className={`demo__body${showPanel ? ' demo__body--panel' : ''}`}>
         <div className="fc-tb__sheet-col">
           {resolvedUi.ribbon ? (
-            <div ref={ribbonHostRef} style={{ display: 'contents' }}>
-              <SpreadsheetToolbar
-                spreadsheet={instance}
-                activeTab={ribbonTab}
-                onTabChange={setRibbonTab}
-                ribbonTabs={ribbonTabs}
-                hooks={ribbonHooks}
-                onReady={(toolbar) => {
-                  toolbarRef.current = toolbar;
-                  (window as unknown as { __fcToolbar?: Toolbar | null }).__fcToolbar = toolbar;
-                }}
-              />
-            </div>
+            <SpreadsheetToolbar
+              spreadsheet={instance}
+              activeTab={ribbonTab}
+              onTabChange={setRibbonTab}
+              ribbonTabs={ribbonTabs}
+              hooks={ribbonHooks}
+              onReady={(toolbar) => {
+                toolbarRef.current = toolbar;
+                (window as unknown as { __fcToolbar?: Toolbar | null }).__fcToolbar = toolbar;
+              }}
+            />
           ) : null}
           <Spreadsheet
             className="demo__sheet"

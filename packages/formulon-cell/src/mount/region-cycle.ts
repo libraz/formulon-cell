@@ -12,6 +12,45 @@ export interface RegionCycleInput {
   focusRibbonTab: () => boolean;
 }
 
+/** A ribbon mounted outside the sheet's host element that takes part in the host's ring. */
+interface ExternalRibbon {
+  root: HTMLElement;
+  /** Moves focus to the ribbon's active tab; false when it cannot take focus. */
+  focusTab: () => boolean;
+}
+
+interface RingState {
+  ribbons: Set<ExternalRibbon>;
+  /** The ring's key handler once attached; external ribbons listen with it too. */
+  onKeydown?: (event: KeyboardEvent) => void;
+}
+
+const rings = new WeakMap<HTMLElement, RingState>();
+
+const ringOf = (host: HTMLElement): RingState => {
+  let state = rings.get(host);
+  if (!state) {
+    state = { ribbons: new Set() };
+    rings.set(host, state);
+  }
+  return state;
+};
+
+/**
+ * Joins a ribbon mounted outside `host` to the host's ring as its first stop. Returns the function
+ * that removes it. A ribbon inside `host` is already found by the ring and is not registered.
+ */
+export function registerExternalRibbon(host: HTMLElement, ribbon: ExternalRibbon): () => void {
+  if (host.contains(ribbon.root)) return () => undefined;
+  const state = ringOf(host);
+  state.ribbons.add(ribbon);
+  if (state.onKeydown) ribbon.root.addEventListener('keydown', state.onKeydown);
+  return () => {
+    state.ribbons.delete(ribbon);
+    if (state.onKeydown) ribbon.root.removeEventListener('keydown', state.onKeydown);
+  };
+}
+
 interface Region {
   /** The element that makes a focus inside it belong to this region. */
   root: HTMLElement;
@@ -35,11 +74,13 @@ const focusElement = (el: HTMLElement | null): boolean => {
 };
 
 const regionsOf = (host: HTMLElement, focusRibbonTab: () => boolean): Region[] => {
+  const external = rings.get(host)?.ribbons ?? [];
   const find = (selector: string): HTMLElement | null => host.querySelector<HTMLElement>(selector);
   const regions: Region[] = [];
   const add = (root: HTMLElement | null, enter: (root: HTMLElement) => boolean, isGrid = false) => {
     if (root && isShown(root, host)) regions.push({ root, enter: () => enter(root), isGrid });
   };
+  for (const ribbon of external) add(ribbon.root, ribbon.focusTab);
   add(find('.fc-host__ribbon'), focusRibbonTab);
   add(find('.fc-host__formulabar'), () => {
     const nameBox = find('.fc-host__formulabar-tag') as HTMLInputElement | null;
@@ -92,6 +133,13 @@ export function attachRegionCycle(input: RegionCycleInput): () => void {
       }
     }
   };
+  const state = ringOf(host);
+  state.onKeydown = onKeydown;
   host.addEventListener('keydown', onKeydown);
-  return () => host.removeEventListener('keydown', onKeydown);
+  for (const ribbon of state.ribbons) ribbon.root.addEventListener('keydown', onKeydown);
+  return () => {
+    host.removeEventListener('keydown', onKeydown);
+    for (const ribbon of state.ribbons) ribbon.root.removeEventListener('keydown', onKeydown);
+    state.onKeydown = undefined;
+  };
 }

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { Spreadsheet } from '../../../src/mount.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
 import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
@@ -22,7 +23,7 @@ const f6 = (target: Element, shiftKey = false): KeyboardEvent => {
 const stopOf = (host: HTMLElement): string => {
   const active = document.activeElement;
   if (!active) return 'none';
-  if (active.closest('.fc-host__ribbon')) return 'ribbon';
+  if (active.closest('.fc-host__ribbon, [data-external-ribbon]')) return 'ribbon';
   if (active.matches('.fc-host__formulabar-tag')) return 'nameBox';
   if (active === sheetFocusTarget(host)) return 'grid';
   if (active.closest('.fc-host__sheetbar-tabs')) return 'sheetTab';
@@ -110,5 +111,76 @@ describe.each(['default', 'mac'] as const)('F6 region cycling on the %s profile'
     const event = f6(active);
     expect(event.defaultPrevented).toBe(false);
     expect(document.activeElement).toBe(active);
+  });
+
+  describe('with the ribbon mounted outside the sheet', () => {
+    let ribbonHost: HTMLElement;
+    let toolbar: ReturnType<typeof Spreadsheet.mountToolbar>;
+    const mountExternal = async () => {
+      await mountFull(false);
+      ribbonHost = document.createElement('div');
+      ribbonHost.dataset.externalRibbon = '';
+      sheet.host.before(ribbonHost);
+      toolbar = Spreadsheet.mountToolbar(ribbonHost, sheet.instance, {});
+      sheetFocusTarget(sheet.host).focus();
+    };
+
+    it('walks the same ring as an in-mount ribbon, forward', async () => {
+      await mountExternal();
+      expect(ring(sheet.host, false, 7)).toEqual([
+        'sheetTab',
+        'statusBar',
+        'pane',
+        'ribbon',
+        'nameBox',
+        'grid',
+        'sheetTab',
+      ]);
+    });
+
+    it('walks the same ring in reverse', async () => {
+      await mountExternal();
+      expect(ring(sheet.host, true, 7)).toEqual([
+        'nameBox',
+        'ribbon',
+        'pane',
+        'statusBar',
+        'sheetTab',
+        'grid',
+        'nameBox',
+      ]);
+    });
+
+    it('moves on from inside the external ribbon in both directions', async () => {
+      await mountExternal();
+      expect(toolbar.focusActiveTab()).toBe(true);
+      f6(document.activeElement as Element);
+      expect(stopOf(sheet.host)).toBe('nameBox');
+      expect(toolbar.focusActiveTab()).toBe(true);
+      f6(document.activeElement as Element, true);
+      expect(stopOf(sheet.host)).toBe('pane');
+    });
+
+    it('enters at the active ribbon tab', async () => {
+      await mountExternal();
+      toolbar.setActiveTab('view');
+      f6(sheetFocusTarget(sheet.host), true);
+      f6(document.activeElement as Element, true);
+      expect(stopOf(sheet.host)).toBe('ribbon');
+      expect((document.activeElement as HTMLElement).dataset.ribbonTab).toBe('view');
+    });
+
+    it('skips a hidden external ribbon', async () => {
+      await mountExternal();
+      ribbonHost.hidden = true;
+      expect(ring(sheet.host, true, 2)).toEqual(['nameBox', 'pane']);
+    });
+
+    it('drops the stop once the toolbar is disposed', async () => {
+      await mountExternal();
+      toolbar.dispose();
+      expect(ring(sheet.host, false, 4)).toEqual(['sheetTab', 'statusBar', 'pane', 'nameBox']);
+      expect(ring(sheet.host, true, 1)).toEqual(['pane']);
+    });
   });
 });

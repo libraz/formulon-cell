@@ -102,6 +102,7 @@ import {
   toolbarText,
 } from '../toolbar/ribbon-model.js';
 import { openTableStyleEditor } from './dynamic-dropdown-defaults/styles.js';
+import { registerExternalRibbon } from './region-cycle.js';
 import { attachTableStyleContextMenu } from './table-style-context-menu.js';
 import {
   createDefaultRibbonHelpers,
@@ -1218,6 +1219,7 @@ export function mountToolbar(
   let unsubPolicy: (() => void) | null = null;
   let unsubFunctionHistory: (() => void) | null = null;
   let unsubLocale: (() => void) | null = null;
+  let unregisterRing: (() => void) | null = null;
   let subscribedInstance: SpreadsheetInstance | null = null;
   let subscribedInteractionController: InteractionController | undefined;
   let interactionPolicyEpoch = 0;
@@ -1245,6 +1247,10 @@ export function mountToolbar(
     syncInteractionSubscription(null);
     unsubFunctionHistory?.();
     unsubLocale?.();
+    unregisterRing?.();
+    unregisterRing = current
+      ? registerExternalRibbon(current.host, { root: host, focusTab: focusActiveTab })
+      : null;
     subscribedInstance = current;
     publishFormulaBarVisible();
     syncInheritedPlatform(current);
@@ -1373,6 +1379,8 @@ export function mountToolbar(
       unsubFunctionHistory = null;
       unsubLocale?.();
       unsubLocale = null;
+      unregisterRing?.();
+      unregisterRing = null;
       unsubStore = null;
       subscribedInstance = null;
       cancelOpenAppDialogs();
