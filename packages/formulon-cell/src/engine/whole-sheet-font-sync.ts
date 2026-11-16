@@ -4,6 +4,11 @@ import type { SheetViewMemo } from '../store/types.js';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from './address.js';
 import { type AxisStructureShift, remapAxisSnapshot } from './axis-structure-remap.js';
 import { fontCssPxToPoints } from './font-units.js';
+import {
+  mapIndexForStructureEvent,
+  type SheetIndexMapper,
+  type SheetStructureEvent,
+} from './sheet-index-map.js';
 import type {
   Addr,
   CellXf,
@@ -40,30 +45,6 @@ interface StructureEventBinding {
 }
 
 const structureEventBindings = new WeakMap<WorkbookHandle, StructureEventBinding>();
-
-export type SheetIndexMapper = (index: number) => number | null;
-
-const mapIndexForStructureEvent = (
-  event:
-    | { kind: 'sheet-remove'; index: number }
-    | { kind: 'sheet-move'; from: number; to: number }
-    | { kind: 'sheet-copy'; index: number },
-): SheetIndexMapper => {
-  // A copy is inserted at its index; every sheet from there on moves up one place.
-  if (event.kind === 'sheet-copy') return (index) => (index >= event.index ? index + 1 : index);
-  if (event.kind === 'sheet-remove') {
-    return (index) => {
-      if (index === event.index) return null;
-      return index > event.index ? index - 1 : index;
-    };
-  }
-  return (index) => {
-    if (index === event.from) return event.to;
-    if (event.from < event.to && index > event.from && index <= event.to) return index - 1;
-    if (event.from > event.to && index >= event.to && index < event.from) return index + 1;
-    return index;
-  };
-};
 
 interface RemappedAddressMap<T> {
   readonly map: Map<string, T>;
@@ -170,12 +151,22 @@ const remapAddrKeySet = (
   return changed ? next : null;
 };
 
-/** Session-only objects hold a sheet index but are not re-read from the
- *  engine, so a sheet move, removal or copy has to carry them along. Returns the
- *  same state when nothing refers to a moved or removed sheet. */
+/** Session objects and drawing projections hold a sheet index, so a sheet
+ *  move, removal or copy has to carry them along: a drawing re-read afterwards
+ *  is then found on its sheet under its id. Returns the same state when nothing
+ *  refers to a moved or removed sheet. */
 const remapSessionObjects = (state: State, mapIndex: SheetIndexMapper): State => {
   let next = state;
   const moved = (sheet: number): boolean => mapIndex(sheet) !== sheet;
+
+  if (state.charts.charts.some((chart) => moved(chart.sheet))) {
+    const charts = state.charts.charts.flatMap((chart) => {
+      const sheet = mapIndex(chart.sheet);
+      if (sheet === null) return [];
+      return [sheet === chart.sheet ? chart : { ...chart, sheet }];
+    });
+    next = { ...next, charts: { charts } };
+  }
 
   if (state.illustrations.illustrations.some((item) => moved(item.sheet))) {
     const illustrations = state.illustrations.illustrations.flatMap((item) => {
@@ -296,20 +287,34 @@ const ensureStructureEventBinding = (wb: WorkbookHandle): StructureEventBinding 
     unsubscribe: () => undefined,
   };
   binding.unsubscribe = wb.subscribe((event) => {
-    if (event.kind !== 'sheet-remove' && event.kind !== 'sheet-move' && event.kind !== 'sheet-copy')
-      return;
-    const mapIndex = mapIndexForStructureEvent(event);
-    const remap = (): void => {
-      remapActiveWholeSheetFontOverrides(wb, mapIndex);
-      for (const store of stores) {
-        beforeStoreRemap.get(store)?.(mapIndex);
-        remapStoreSheetStateForStructureEvent(store, mapIndex);
-      }
-    };
-    wb.withEngineSyncMuted(remap);
+    if (event.kind === 'sheet-remove' || event.kind === 'sheet-move' || event.kind === 'sheet-copy')
+      applySheetStructureEvent(wb, event);
   });
   structureEventBindings.set(wb, binding);
   return binding;
+};
+
+/** Sheet edits whose remap has run, so each runs once whichever listener of the
+ *  edit reaches it first. */
+const appliedEvents = new WeakSet<SheetStructureEvent>();
+
+/**
+ * Remap the workbook-local caches and every bound store's sheet indexes for
+ * `event`, once. A listener that re-reads sheet objects calls this first, so it
+ * reads them on their new sheets whatever order the listeners run in.
+ */
+export const applySheetStructureEvent = (wb: WorkbookHandle, event: SheetStructureEvent): void => {
+  const binding = structureEventBindings.get(wb);
+  if (!binding || appliedEvents.has(event)) return;
+  appliedEvents.add(event);
+  const mapIndex = mapIndexForStructureEvent(event);
+  wb.withEngineSyncMuted(() => {
+    remapActiveWholeSheetFontOverrides(wb, mapIndex);
+    for (const store of binding.stores) {
+      binding.beforeStoreRemap.get(store)?.(mapIndex);
+      remapStoreSheetStateForStructureEvent(store, mapIndex);
+    }
+  });
 };
 
 const activeFor = (wb: WorkbookHandle): Map<number, ActiveWholeSheetFont> => {

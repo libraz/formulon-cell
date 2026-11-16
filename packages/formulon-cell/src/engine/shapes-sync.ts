@@ -8,6 +8,7 @@ import {
   shapeOutlineWeight,
   shapeStoredWeight,
 } from '../commands/shape-format.js';
+import { writeDrawingOrder } from '../store/drawing-order.js';
 import type {
   SessionIllustration,
   SessionShapeKind,
@@ -294,6 +295,8 @@ export class ShapeMirror {
     }
     // null drops the item: the engine refused it.
     const patches = new Map<string, Partial<SessionIllustration> | null>();
+    // Sheets where a shape gained an engine object, which takes its slot from the store order.
+    const placed = new Set<number>();
     for (const item of slice.illustrations) {
       const old = before.get(item.id);
       if (old === item || item.kind !== 'shape' || !shapeIsSaved(item)) continue;
@@ -302,6 +305,7 @@ export class ShapeMirror {
         if (objectId !== undefined && old) this.forget(old.id, old.sheet, objectId);
         const tied = this.insert(store, item);
         patches.set(item.id, tied && { ...tied, ...unsaveable(item) });
+        if (tied) placed.add(item.sheet);
       } else if (old?.kind === 'shape') {
         const patch = { ...this.update(store, objectId, old, item), ...unsaveable(item) };
         if (Object.keys(patch).length > 0) patches.set(item.id, patch);
@@ -318,6 +322,7 @@ export class ShapeMirror {
       this.last = next.illustrations;
       return next;
     });
+    for (const sheet of placed) writeDrawingOrder(wb, store.getState(), sheet);
   }
 
   /** Remove the engine shape of an overlay item, keeping its description. */

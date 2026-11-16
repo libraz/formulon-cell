@@ -118,6 +118,7 @@ export const createSpreadsheetStore = () =>
     sparkline: { sparklines: new Map(), groups: new Map() },
     charts: { charts: [] },
     illustrations: { illustrations: [] },
+    drawings: { order: [] },
     threadedComments: { bySheet: new Map(), persons: [] },
     watch: { watches: [] },
     traces: { items: [] },

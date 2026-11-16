@@ -1,4 +1,4 @@
-import { AnchorEditAs } from '@libraz/formulon';
+import { AnchorEditAs, DrawingObjectKind } from '@libraz/formulon';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import {
   type ActiveAxisFormatSnapshot,
@@ -13,13 +13,13 @@ import {
   remapAxisFormatOverride,
   remapSheetFontOverride,
 } from '../engine/axis-structure-remap.js';
-import { hydrateChartsFromEngine } from '../engine/charts-sync.js';
+import { hydrateChartsFromEngine, hydrateRestoredCharts } from '../engine/charts-sync.js';
 import {
   type FormatHistoryTrackingSnapshot,
   formatHistoryBridgeFor,
   type NativeFormatSnapshot,
 } from '../engine/format-history-bridge.js';
-import { hydrateImagesFromEngine } from '../engine/images-sync.js';
+import { hydrateImagesFromEngine, hydrateRestoredImages } from '../engine/images-sync.js';
 import { hydrateProtectedRangesFromEngine } from '../engine/protection-sync.js';
 import { captureShapeAnchors, captureShapeRestore } from '../engine/shapes-sync.js';
 import {
@@ -43,6 +43,7 @@ import {
 } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { EngineDrawingObject } from '../engine/workbook-handle-annotations.js';
+import { sheetDrawingStack, writeDrawingOrder } from '../store/drawing-order.js';
 import { addMergeToMaps } from '../store/merge-maps.js';
 import { isSingleCell, rangesIntersect } from '../store/selection-geometry.js';
 import { withSparklineMembers } from '../store/sparkline-slice.js';
@@ -725,9 +726,19 @@ function applyAxisShiftViaEngine(
   const deletedDrawings: Uint8Array[] = [];
   // Table slicers have no snapshot; they, and any drawing without one, are inserted again.
   const deletedObjects: (() => boolean)[] = [];
+  // The store id of each removed drawing by object id, and the stacking order to put back.
+  const deletedIds = new Map<number, string>();
+  const orderBefore = store.getState().drawings.order;
   if (!positive && record && wb.capabilities.drawings) {
+    const stack = sheetDrawingStack(store.getState(), sheet);
     for (const object of wb.listDrawingObjects(sheet)) {
       if (!drawingRemovedByDelete(object, axis, split, count)) continue;
+      const entry = stack.find(
+        (candidate) =>
+          candidate.objectId === object.objectId &&
+          candidate.chart === (object.kind === DrawingObjectKind.Chart),
+      );
+      if (entry) deletedIds.set(object.objectId, entry.id);
       const snapshot = wb.snapshotDrawing(sheet, object.objectId);
       if (snapshot !== null) {
         deletedDrawings.push(snapshot);
@@ -972,8 +983,14 @@ function applyAxisShiftViaEngine(
     for (const restore of deletedObjects) {
       if (!restore()) throw new Error('structure: failed to restore a deleted drawing');
     }
-    if (deletedDrawings.length > 0) hydrateChartsFromEngine(wb, store, sheet);
-    hydrateImagesFromEngine(wb, store, sheet);
+    if (deletedDrawings.length > 0) hydrateRestoredCharts(wb, store, sheet, deletedIds);
+    hydrateRestoredImages(wb, store, sheet, deletedIds);
+    if (deletedIds.size > 0) {
+      mutators.setDrawingOrder(store, orderBefore);
+      if (!writeDrawingOrder(wb, store.getState(), sheet)) {
+        throw new Error('structure: failed to restore the drawing order');
+      }
+    }
     hydrateSlicersFromEngine(wb, store);
   };
 

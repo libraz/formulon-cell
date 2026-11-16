@@ -520,7 +520,8 @@ export type SessionChartUnsupportedReason = 'chartex' | 'multi-plot' | 'plot-typ
  *  what the engine reports, re-read after every edit, recalc and structural
  *  change. Position and size come from `nativeAnchor` at draw time. */
 export interface SessionChart extends Omit<ChartSpec, 'kind'> {
-  /** `chart-native-${sheet}-${nativeObjectId}`. */
+  /** Minted as `chart-native-${sheet}-${nativeObjectId}` when the chart is first
+   *  read, and kept while the chart lives, across sheet moves. */
   id: string;
   /** Sheet hosting the chart, which can differ from the sheet of its data. */
   sheet: number;
@@ -606,6 +607,13 @@ export interface SessionIllustration {
 
 export interface IllustrationsSlice {
   illustrations: readonly SessionIllustration[];
+}
+
+/** The stacking order of every chart, picture and shape, back to front, by id.
+ *  A sheet's stack is the subsequence of its objects. An id stays after its
+ *  object is removed, so a restored object returns to its slot. */
+export interface DrawingsSlice {
+  order: readonly string[];
 }
 
 /** Cells the user has pinned in the Watch Window. Session-only — desktop spreadsheets
@@ -819,6 +827,7 @@ export interface State {
   sparkline: SparklineSlice;
   charts: ChartsSlice;
   illustrations: IllustrationsSlice;
+  drawings: DrawingsSlice;
   watch: WatchSlice;
   traces: TracesSlice;
   errorIndicators: ErrorIndicatorSlice;

@@ -6,9 +6,9 @@ import { deleteCols, insertCols, insertRows } from '../../../src/commands/struct
 import {
   hydrateImagesFromEngine,
   persistentImageFromState,
-  reloadImagesFromEngine,
 } from '../../../src/engine/images-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { reloadDrawingsAfterSheetEdit } from '../../../src/mount/engine-binding.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -78,9 +78,14 @@ describe('pictures follow row/column edits', () => {
       hydrateImagesFromEngine(wb, store, 1);
       expect(store.getState().illustrations.illustrations[0]?.sheet).toBe(1);
 
+      wb.attachStore(store);
+      // The mounted sheet tabs reload drawings through this entry point.
+      const unsubscribe = wb.subscribe((event) => {
+        if (event.kind === 'sheet-move') reloadDrawingsAfterSheetEdit(wb, store, event);
+      });
       expect(wb.moveSheet(1, 0)).toBe(true);
+      unsubscribe();
       mutators.setSheetIndex(store, 0);
-      reloadImagesFromEngine(wb, store);
       const items = store.getState().illustrations.illustrations;
       expect(items).toHaveLength(1);
       expect(items[0]?.sheet).toBe(0);

@@ -129,7 +129,7 @@ describe('one stacking order across drawing kinds', () => {
     const { wb, store, history, chart } = await sheet();
     const s1 = shapeId(store, 'S1', wb);
     arrangeSessionChart(store, chart.id, 'send-backward', history, wb);
-    expect(sheetDrawingStack(store.getState(), 0, wb).map((entry) => entry.id)).toEqual([
+    expect(sheetDrawingStack(store.getState(), 0).map((entry) => entry.id)).toEqual([
       s1,
       shapeId(store, 'S2', wb),
       shapeId(store, 'S3', wb),
@@ -173,12 +173,12 @@ describe('one stacking order across drawing kinds', () => {
     expect(kinds(reopened)).toEqual(kinds(wb));
     expect(reopened.listShapes(0).map((shape) => shape.name)).toEqual(['S2', 'S3', 'S1']);
     const { store: reloaded } = bind(reopened);
-    expect(sheetDrawingStack(reloaded.getState(), 0, reopened)).toHaveLength(5);
+    expect(sheetDrawingStack(reloaded.getState(), 0)).toHaveLength(5);
   });
 
   it('reports the ends of the cross-kind stack for the arrange commands', async () => {
     const { wb, store, chart } = await sheet();
-    const stack = sheetDrawingStack(store.getState(), 0, wb);
+    const stack = sheetDrawingStack(store.getState(), 0);
     expect(arrangeStackPosition(stack, chart.id)).toMatchObject({ atFront: true, atBack: false });
     expect(arrangeStackPosition(stack, shapeId(store, 'S1', wb))).toMatchObject({
       atFront: false,
@@ -216,17 +216,16 @@ describe('session-only objects in the stack', () => {
         shape: 'arrow',
       },
     );
-    const ids = () => sheetDrawingStack(store.getState(), 0, wb).map((entry) => entry.id);
+    const ids = () => sheetDrawingStack(store.getState(), 0).map((entry) => entry.id);
     expect(ids().at(-1)).toBe('arrow');
     arrangeSessionChart(store, chart.id, 'send-back', history, wb);
     expect(ids().at(-1)).toBe('arrow');
     expect(
       arrangeSessionIllustration(store, 'arrow', 'send-back', history, undefined, wb),
     ).not.toBe(null);
-    // It cannot pass the chart: it sits right under the backmost picture or shape.
     expect(ids()).toEqual([
-      chart.id,
       'arrow',
+      chart.id,
       shapeId(store, 'S1', wb),
       shapeId(store, 'S2', wb),
       shapeId(store, 'S3', wb),

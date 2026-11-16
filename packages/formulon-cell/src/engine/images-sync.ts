@@ -1,4 +1,5 @@
 import { DrawingObjectKind } from '@libraz/formulon';
+import { mintDrawingId, savedDrawingIds } from '../store/drawing-order.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import {
@@ -81,12 +82,12 @@ const muted = (wb: WorkbookHandle, fn: () => void): void => {
   wb.withEngineSyncMuted(fn);
 };
 
-/** Drop the native projections of `sheet` (every sheet when omitted). Overlays
- *  without a native object stay. */
-const dropNativeProjections = (store: SpreadsheetStore, sheet?: number): void => {
+/** Drop the native projections of `sheet`. Overlays without a native object
+ *  stay, and so do the dropped ids in the drawing order, for the re-read. */
+const dropNativeProjections = (store: SpreadsheetStore, sheet: number): void => {
   store.setState((state) => {
     const illustrations = state.illustrations.illustrations.filter(
-      (item) => (sheet !== undefined && item.sheet !== sheet) || item.nativeObjectId === undefined,
+      (item) => item.sheet !== sheet || item.nativeObjectId === undefined,
     );
     return illustrations.length === state.illustrations.illustrations.length
       ? state
@@ -94,19 +95,31 @@ const dropNativeProjections = (store: SpreadsheetStore, sheet?: number): void =>
   });
 };
 
-/** Hydrate the pictures and shapes of `sheet` in drawing order. Charts and
- * other drawing objects are not projected here. */
+/** Hydrate the pictures and shapes of `sheet` and take the engine's drawing
+ * order. Charts and other drawing objects are not projected here. */
 export function hydrateImagesFromEngine(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
   sheet: number,
+): void {
+  hydrateRestoredImages(wb, store, sheet, new Map());
+}
+
+/** {@link hydrateImagesFromEngine}, naming each object of `restored`, put back
+ *  after the store dropped it, by the id it had. */
+export function hydrateRestoredImages(
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  sheet: number,
+  restored: ReadonlyMap<number, string>,
 ): void {
   if (!wb.capabilities.images && !wb.capabilities.shapes) return;
   // A second hydration follows a workbook replacement, an undo or a structure
   // edit: remove the stale native projections first, keeping the overlays that
   // have no native object yet.
   muted(wb, () => {
-    // An object keeps the overlay id it had, so selection and history stay valid.
+    // An object keeps the overlay id it had, so selection, history and its
+    // place in the drawing order stay valid; a new one gets a fresh id.
     const known = new Map(
       store
         .getState()
@@ -117,7 +130,10 @@ export function hydrateImagesFromEngine(
     );
     const named = <T extends { id: string; nativeObjectId?: number }>(item: T): T => ({
       ...item,
-      id: known.get(item.nativeObjectId) ?? item.id,
+      id:
+        known.get(item.nativeObjectId) ??
+        (item.nativeObjectId === undefined ? undefined : restored.get(item.nativeObjectId)) ??
+        mintDrawingId(store.getState(), item.id),
     });
     dropNativeProjections(store, sheet);
     const shapes = new Map(
@@ -139,16 +155,28 @@ export function hydrateImagesFromEngine(
         named(imageFromNative(store, sheet, object, image)) as unknown as SessionIllustration,
       );
     }
+    followEngineDrawingOrder(wb, store, sheet);
   });
 }
 
-/** Rebuild every native projection after sheets moved or were removed: their
- * stored sheet indexes are stale on every sheet, not just the active one.
- * Other sheets re-project when they are next shown. */
+/** Put the saved drawings of `sheet` in the engine's order. A drawing the
+ *  engine does not hold keeps its place over the saved one under it. */
+export function followEngineDrawingOrder(
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  sheet: number,
+): void {
+  if (!wb.capabilities.drawings) return;
+  mutators.followSavedDrawingOrder(store, savedDrawingIds(store.getState(), sheet, wb));
+}
+
+/** Re-read the active sheet's pictures and shapes after sheets moved or were
+ * removed. Run it once the store's sheet indexes follow the edit
+ * (`applySheetStructureEvent`), so each keeps its id; other sheets re-project
+ * when shown. */
 export function reloadImagesFromEngine(wb: WorkbookHandle, store: SpreadsheetStore): void {
   if (!wb.capabilities.images && !wb.capabilities.shapes) return;
   muted(wb, () => {
-    dropNativeProjections(store);
     hydrateImagesFromEngine(wb, store, store.getState().data.sheetIndex);
   });
 }

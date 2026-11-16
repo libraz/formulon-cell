@@ -13,10 +13,7 @@ import { activeFilterRange } from '../../../commands/filter-ranges.js';
 import { hasListedDefinedNames } from '../../../commands/named-ranges.js';
 import { hasOutlineDetail } from '../../../commands/outline.js';
 import { isWorkbookStructureProtected, noteChangePermitted } from '../../../commands/protection.js';
-import {
-  arrangeStackPosition,
-  drawingArrangeStack,
-} from '../../../commands/session-illustration.js';
+import { arrangeStackPosition, sheetDrawingStack } from '../../../commands/session-illustration.js';
 import { TEMPORARY_SHEET_VIEW_ID } from '../../../commands/sheet-views.js';
 import { activeTableOverlay } from '../../../commands/table-design.js';
 import { addrKey, parseAddrKey } from '../../../engine/address.js';
@@ -476,7 +473,7 @@ export const projectMacRibbonState = (
   const chart = selectedSessionChart(chartState);
   if (chart) {
     const { atFront, atBack } = arrangeStackPosition(
-      drawingArrangeStack(chartState, chart.sheet, chart.id, instance.workbook),
+      sheetDrawingStack(chartState, chart.sheet),
       chart.id,
     );
     const strings = instance.i18n.strings.ribbonMenu;

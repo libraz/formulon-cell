@@ -13,6 +13,12 @@ import {
 import type { EngineDrawingAnchor, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
+  type DrawingStackEntry,
+  type DrawingState,
+  sheetDrawingStack,
+  writeDrawingOrder,
+} from '../store/drawing-order.js';
+import {
   mutators,
   type SessionIllustration,
   type SessionShapeKind,
@@ -22,7 +28,9 @@ import {
 import type { History } from './history.js';
 import type { InteractionOrigin } from './interaction-policy.js';
 import { type ObjectActionContext, objectWrite } from './object-actions.js';
-import { applyIllustrationsSnapshot, captureIllustrationsSnapshot } from './slice-history.js';
+import { captureIllustrationsSnapshot } from './slice-history.js';
+
+export { type DrawingStackEntry, sheetDrawingStack } from '../store/drawing-order.js';
 
 export interface CreateSessionShapeOptions {
   id?: string;
@@ -86,10 +94,23 @@ export const canDeleteIllustration = (item: SessionIllustration): boolean =>
 /** Whether the illustration can be copied; the same objects can be deleted. */
 export const canDuplicateIllustration = canDeleteIllustration;
 
-const sameIllustrations = (
-  a: readonly SessionIllustration[],
-  b: readonly SessionIllustration[],
-): boolean => JSON.stringify(a) === JSON.stringify(b);
+/** The illustrations with the drawing order, which a history step restores together. */
+const captureDrawings = (state: State) => ({
+  items: captureIllustrationsSnapshot(state),
+  order: state.drawings.order,
+});
+
+type DrawingsSnapshot = ReturnType<typeof captureDrawings>;
+
+const sameDrawings = (a: DrawingsSnapshot, b: DrawingsSnapshot): boolean =>
+  JSON.stringify(a) === JSON.stringify(b);
+
+const restoreDrawings = (store: SpreadsheetStore, snap: DrawingsSnapshot): void =>
+  mutators.restoreIllustrations(
+    store,
+    snap.items.map((item) => ({ ...item })),
+    snap.order,
+  );
 
 const recordIllustrationChange = (
   history: History | null,
@@ -100,14 +121,33 @@ const recordIllustrationChange = (
     mutate();
     return;
   }
-  const before = captureIllustrationsSnapshot(store.getState());
+  const before = captureDrawings(store.getState());
   mutate();
-  const after = captureIllustrationsSnapshot(store.getState());
-  if (sameIllustrations(before, after)) return;
+  const after = captureDrawings(store.getState());
+  if (sameDrawings(before, after)) return;
   history.push({
-    undo: () => applyIllustrationsSnapshot(store, before),
-    redo: () => applyIllustrationsSnapshot(store, after),
+    undo: () => restoreDrawings(store, before),
+    redo: () => restoreDrawings(store, after),
   });
+};
+
+/** Add `item` on top of its sheet's drawings. */
+const addIllustration = (store: SpreadsheetStore, item: SessionIllustration): void => {
+  mutators.raiseDrawing(store, item.id);
+  mutators.upsertIllustration(store, item);
+};
+
+/** Put `order` back and restack the engine's objects of `sheet` to match. */
+export const settleDrawingOrder = (
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  sheet: number,
+  order: readonly string[],
+): void => {
+  mutators.setDrawingOrder(store, order);
+  if (!writeDrawingOrder(wb, store.getState(), sheet)) {
+    throw new Error('drawing order restore failed');
+  }
 };
 
 /** The entry point of an illustration change: `authorization`, or the instance API running
@@ -154,7 +194,7 @@ export function createSessionShape(
         lineWidth: options.lineWidth,
         opacity: options.opacity,
       };
-      recordIllustrationChange(history, store, () => mutators.upsertIllustration(store, item));
+      recordIllustrationChange(history, store, () => addIllustration(store, item));
       return item;
     },
   );
@@ -285,7 +325,10 @@ export function createSessionImage(
         }
         const inserted = persistentImageFromState(persistedItem);
         if (!inserted) return null;
-        mutators.upsertIllustration(store, persistedItem);
+        const orderBefore = store.getState().drawings.order;
+        addIllustration(store, persistedItem);
+        writeDrawingOrder(nativeWb, store.getState(), range.sheet);
+        const orderAfter = store.getState().drawings.order;
         if (history && !history.isReplaying()) {
           history.push({
             undo: () => {
@@ -317,6 +360,7 @@ export function createSessionImage(
                   mutators.upsertIllustration(store, previous);
                 }
               }
+              settleDrawingOrder(store, nativeWb, range.sheet, orderBefore);
             },
             redo: () => {
               const current = sessionIllustrationById(store.getState(), persistedItem.id);
@@ -335,14 +379,13 @@ export function createSessionImage(
                 nativeAnchor:
                   nativeImageAnchor(nativeWb, range.sheet, redoneId) ?? inserted.nativeAnchor,
               });
+              settleDrawingOrder(store, nativeWb, range.sheet, orderAfter);
             },
           });
         }
         return persistedItem;
       }
-      recordIllustrationChange(history, store, () =>
-        mutators.upsertIllustration(store, persistedItem),
-      );
+      recordIllustrationChange(history, store, () => addIllustration(store, persistedItem));
       return persistedItem;
     },
   );
@@ -462,6 +505,7 @@ export function clearSessionIllustration(
         return false;
       }
       if (persisted && wb && snapshot) {
+        const order = store.getState().drawings.order;
         mutators.removeIllustration(store, id);
         if (history && !history.isReplaying()) {
           history.push({
@@ -469,6 +513,7 @@ export function clearSessionIllustration(
               const nativeObjectId = wb.restoreDrawing(item.sheet, snapshot);
               if (nativeObjectId === null) throw new Error('image undo restore failed');
               mutators.upsertIllustration(store, { ...item, nativeObjectId });
+              settleDrawingOrder(store, wb, item.sheet, order);
             },
             redo: () => {
               const current = persistentImageFromState(
@@ -687,7 +732,7 @@ const placeIllustrationCopy = (
       : {}),
   };
   if (!persisted) {
-    recordIllustrationChange(history, store, () => mutators.upsertIllustration(store, copy));
+    recordIllustrationChange(history, store, () => addIllustration(store, copy));
     return copy;
   }
   if (!wb || !source.drawing) return null;
@@ -707,7 +752,9 @@ const placeIllustrationCopy = (
     imageFormat: persisted.imageFormat,
     nativeAnchor: nativeImageAnchor(wb, target.sheet, newId) ?? persisted.nativeAnchor,
   });
-  mutators.upsertIllustration(store, copy);
+  addIllustration(store, copy);
+  writeDrawingOrder(wb, store.getState(), target.sheet);
+  const order = store.getState().drawings.order;
   if (history && !history.isReplaying()) {
     history.push({
       undo: () => {
@@ -724,189 +771,91 @@ const placeIllustrationCopy = (
         if (nativeObjectId === null) throw new Error('image copy redo failed');
         Object.assign(copy as object, { nativeObjectId });
         mutators.upsertIllustration(store, copy);
+        settleDrawingOrder(store, wb, copy.sheet, order);
       },
     });
   }
   return copy;
 };
 
-/** One drawing of a sheet's stack; `objectId` is set while the engine lists it. */
-export interface DrawingStackEntry {
-  readonly id: string;
-  readonly chart: boolean;
-  readonly objectId: number | null;
-}
-
-type DrawingState = Pick<State, 'charts' | 'illustrations'>;
-
-/**
- * A sheet's charts, pictures and shapes, back to front. Saved objects follow the
- * engine's drawing order. A session-only picture or shape sits right under the
- * next picture or shape of the store, or on top when none follows: the store
- * cannot hold its place between charts.
- */
-export function sheetDrawingStack(
-  state: DrawingState,
-  sheet: number,
-  wb?: WorkbookHandle | null,
-): DrawingStackEntry[] {
-  const charts = state.charts.charts.filter((chart) => chart.sheet === sheet);
-  const items = state.illustrations.illustrations.filter((item) => item.sheet === sheet);
-  const byObject = new Map<number, DrawingStackEntry>();
-  for (const chart of charts) {
-    byObject.set(chart.nativeObjectId, {
-      id: chart.id,
-      chart: true,
-      objectId: chart.nativeObjectId,
-    });
-  }
-  for (const item of items) {
-    if (item.nativeObjectId === undefined) continue;
-    byObject.set(item.nativeObjectId, { id: item.id, chart: false, objectId: item.nativeObjectId });
-  }
-  const stack: DrawingStackEntry[] = [];
-  const listed = new Set<string>();
-  for (const object of wb?.capabilities.drawings ? wb.listDrawingObjects(sheet) : []) {
-    const entry = byObject.get(object.objectId);
-    if (!entry || listed.has(entry.id)) continue;
-    stack.push(entry);
-    listed.add(entry.id);
-  }
-  // A chart the engine does not list keeps the store's order, on top.
-  for (const chart of charts) {
-    if (!listed.has(chart.id)) stack.push({ id: chart.id, chart: true, objectId: null });
-  }
-  let above: DrawingStackEntry | undefined;
-  for (const item of [...items].reverse()) {
-    if (listed.has(item.id)) {
-      above = stack.find((entry) => entry.id === item.id);
-      continue;
-    }
-    const entry: DrawingStackEntry = { id: item.id, chart: false, objectId: null };
-    stack.splice(above ? stack.indexOf(above) : stack.length, 0, entry);
-    above = entry;
-  }
-  return stack;
-}
-
-/** The part of `stack` that `entry` moves through: a chart cannot pass a
- *  session-only picture or shape, which cannot pass a chart. */
-const arrangePeers = (
-  stack: readonly DrawingStackEntry[],
-  entry: DrawingStackEntry,
-): DrawingStackEntry[] => {
-  if (entry.chart) return stack.filter((peer) => peer.chart || peer.objectId !== null);
-  if (entry.objectId === null) return stack.filter((peer) => !peer.chart);
-  return [...stack];
-};
-
-/** The stack `id` moves through on `sheet`, listed back to front, for the
- *  enable rules of the arrange commands. */
-export function drawingArrangeStack(
-  state: DrawingState,
-  sheet: number,
-  id: string,
-  wb?: WorkbookHandle | null,
-): DrawingStackEntry[] {
-  const stack = sheetDrawingStack(state, sheet, wb);
-  const entry = stack.find((candidate) => candidate.id === id);
-  return entry ? arrangePeers(stack, entry) : stack;
-}
-
-/** A planned arrange step: the sheet's stack after it, and the engine index the
- *  object moves `from` and `to` when the engine lists it. */
-export interface DrawingArrangePlan {
-  readonly stack: readonly DrawingStackEntry[];
-  readonly entry: DrawingStackEntry;
-  readonly engine: { readonly from: number; readonly to: number } | null;
-}
-
-/** Plan moving `id` one step or to an end of its sheet's stack, the way the
- *  spreadsheet's arrange commands do for every kind; null when it is already there. */
-export function planDrawingArrange(
+/** A planned arrange step: the sheet's stack after it, back to front. */
+const planDrawingArrange = (
   state: DrawingState,
   sheet: number,
   id: string,
   action: SessionIllustrationArrangeAction,
-  wb?: WorkbookHandle | null,
-): DrawingArrangePlan | null {
-  const stack = sheetDrawingStack(state, sheet, wb);
-  const entry = stack.find((candidate) => candidate.id === id);
+): readonly DrawingStackEntry[] | null => {
+  const stack = sheetDrawingStack(state, sheet);
+  const rank = stack.findIndex((candidate) => candidate.id === id);
+  const entry = stack[rank];
   if (!entry) return null;
-  const peers = arrangePeers(stack, entry);
-  const rank = peers.indexOf(entry);
   const target =
     action === 'bring-front'
-      ? peers.length - 1
+      ? stack.length - 1
       : action === 'send-back'
         ? 0
         : action === 'bring-forward'
-          ? Math.min(peers.length - 1, rank + 1)
+          ? Math.min(stack.length - 1, rank + 1)
           : Math.max(0, rank - 1);
-  const passed = peers[target];
-  if (target === rank || !passed) return null;
+  if (target === rank) return null;
   const next = stack.filter((candidate) => candidate !== entry);
-  next.splice(next.indexOf(passed) + (target > rank ? 1 : 0), 0, entry);
-  return { stack: next, entry, engine: wb ? engineMove(wb, sheet, next, entry) : null };
+  next.splice(target, 0, entry);
+  return next;
+};
+
+/** History steps that put the drawing order back and forward again. */
+export interface DrawingOrderSteps {
+  readonly undo: () => void;
+  readonly redo: () => void;
 }
 
-/** The engine index `entry` moves from, and the one that puts it right over the
- *  nearest saved object under it in `stack`. */
-const engineMove = (
-  wb: WorkbookHandle,
+/**
+ * Move drawing `id` of `sheet` one step or to an end of its sheet's stack, the
+ * way the spreadsheet's arrange commands do for every kind. The store order
+ * changes and the engine follows it. Null when the drawing is already there or
+ * the engine refuses.
+ */
+export function arrangeDrawing(
+  store: SpreadsheetStore,
   sheet: number,
-  stack: readonly DrawingStackEntry[],
-  entry: DrawingStackEntry,
-): { from: number; to: number } | null => {
-  if (entry.objectId === null) return null;
-  const objects = wb.listDrawingObjects(sheet);
-  const from = objects.findIndex((object) => object.objectId === entry.objectId);
-  if (from < 0) return null;
-  const rest = objects.filter((object) => object.objectId !== entry.objectId);
-  const at = stack.indexOf(entry);
-  const below = stack
-    .slice(0, at)
-    .reverse()
-    .find((candidate) => candidate.objectId !== null);
-  const above = stack.slice(at + 1).find((candidate) => candidate.objectId !== null);
-  const to =
-    above === undefined
-      ? rest.length
-      : below === undefined
-        ? 0
-        : rest.findIndex((object) => object.objectId === below.objectId) + 1;
-  return { from, to };
-};
+  id: string,
+  action: SessionIllustrationArrangeAction,
+  wb?: WorkbookHandle | null,
+): DrawingOrderSteps | null {
+  const state = store.getState();
+  const stack = planDrawingArrange(state, sheet, id, action);
+  if (!stack) return null;
+  const before = state.drawings.order;
+  mutators.restackDrawings(
+    store,
+    stack.map((entry) => entry.id),
+  );
+  const after = store.getState().drawings.order;
+  const apply = (order: readonly string[]): boolean => {
+    mutators.setDrawingOrder(store, order);
+    return !wb || writeDrawingOrder(wb, store.getState(), sheet);
+  };
+  if (wb && !writeDrawingOrder(wb, store.getState(), sheet)) {
+    apply(before);
+    return null;
+  }
+  const replay = (order: readonly string[], phase: 'undo' | 'redo') => (): void => {
+    if (!apply(order)) throw new Error(`drawing arrange ${phase} failed`);
+  };
+  return { undo: replay(before, 'undo'), redo: replay(after, 'redo') };
+}
 
 /** The z-index of each drawing panel on `sheet`: its place in the stack from 1,
  *  and the selected panel over every kind. */
 export function drawingPanelZIndex(
   state: DrawingState,
   sheet: number,
-  wb: WorkbookHandle | null | undefined,
   selectedId: string | null,
 ): (id: string) => string {
-  const stack = sheetDrawingStack(state, sheet, wb);
+  const stack = sheetDrawingStack(state, sheet);
   return (id) =>
     String(id === selectedId ? stack.length + 1 : stack.findIndex((entry) => entry.id === id) + 1);
 }
-
-/** `illustrations` with `sheet`'s items in the order of `stack`. */
-const illustrationsInStackOrder = (
-  illustrations: readonly SessionIllustration[],
-  sheet: number,
-  stack: readonly DrawingStackEntry[],
-): readonly SessionIllustration[] => {
-  const byId = new Map(illustrations.map((item) => [item.id, item] as const));
-  const ordered = stack.flatMap((entry) => byId.get(entry.id) ?? []);
-  let cursor = 0;
-  return illustrations.map((item) => {
-    if (item.sheet !== sheet) return item;
-    const next = ordered[cursor];
-    cursor += 1;
-    return next ?? item;
-  });
-};
 
 /** Where `activeId` sits in a sheet's drawing stack, listed back to front:
  *  whether it is in the stack, and whether nothing lies in front of or
@@ -932,50 +881,17 @@ export function arrangeSessionIllustration(
   authorization?: IllustrationMutationAuthorization,
   wb?: WorkbookHandle,
 ): SessionIllustration | null {
-  const state = store.getState();
-  const item = sessionIllustrationById(state, id);
+  const item = sessionIllustrationById(store.getState(), id);
   if (!item) return null;
   return objectWrite(
     illustrationEntry(store, history, authorization, 'pictureArrange'),
     item.sheet,
     null,
     () => {
-      const { nativeObjectId } = item;
-      if (nativeObjectId !== undefined && !wb?.capabilities.drawings) return null;
-      const plan = planDrawingArrange(state, item.sheet, id, action, wb);
-      if (!plan) return null;
-      const arranged = illustrationsInStackOrder(
-        state.illustrations.illustrations,
-        item.sheet,
-        plan.stack,
-      );
-      if (nativeObjectId !== undefined) {
-        const z = plan.engine;
-        if (!wb || !z || !wb.setDrawingZOrder(item.sheet, nativeObjectId, z.to)) return null;
-        const before = state.illustrations.illustrations;
-        const apply = (list: readonly SessionIllustration[]): void =>
-          store.setState((current) => ({ ...current, illustrations: { illustrations: list } }));
-        apply(arranged);
-        if (history && !history.isReplaying()) {
-          const replay = (origin: 'undo' | 'redo', index: number, list: typeof before): void => {
-            const current = sessionIllustrationById(store.getState(), id);
-            if (!current || !wb.setDrawingZOrder(item.sheet, nativeObjectId, index)) {
-              throw new Error(`drawing arrange ${origin} failed`);
-            }
-            apply(list);
-          };
-          history.push({
-            undo: () => replay('undo', z.from, before),
-            redo: () => replay('redo', z.to, arranged),
-          });
-        }
-        return sessionIllustrationById(store.getState(), id);
-      }
-      recordIllustrationChange(history, store, () => {
-        store.setState((state) => {
-          return { ...state, illustrations: { illustrations: arranged } };
-        });
-      });
+      if (item.nativeObjectId !== undefined && !wb?.capabilities.drawings) return null;
+      const steps = arrangeDrawing(store, item.sheet, id, action, wb);
+      if (!steps) return null;
+      if (history && !history.isReplaying()) history.push(steps);
       return sessionIllustrationById(store.getState(), id);
     },
   );

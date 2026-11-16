@@ -34,6 +34,7 @@ import { hydrateTableOverlaysFromEngine } from '../engine/table-sync.js';
 import type { Addr, CellValue } from '../engine/types.js';
 import { hydrateValidationsFromEngine } from '../engine/validation-sync.js';
 import { hydrateViewStateFromEngine } from '../engine/view-state-sync.js';
+import { applySheetStructureEvent } from '../engine/whole-sheet-font-sync.js';
 import type {
   ChangeEvent,
   FacadeChange,
@@ -136,6 +137,22 @@ const FACADE_HYDRATORS: Readonly<Record<FacadeChangeKind, readonly SliceHydrator
     hydrateProtectedRangesFromEngine,
   ],
 };
+
+/** Re-read the drawings a sheet rename, move, removal or copy changed. The
+ *  store's sheet indexes follow the edit first, so each drawing is found on
+ *  its new sheet under its id. */
+export function reloadDrawingsAfterSheetEdit(
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  event: Extract<
+    ChangeEvent,
+    { kind: 'sheet-rename' | 'sheet-remove' | 'sheet-move' | 'sheet-copy' }
+  >,
+): void {
+  if (event.kind !== 'sheet-rename') applySheetStructureEvent(wb, event);
+  reloadChartsFromEngine(wb, store);
+  if (event.kind !== 'sheet-rename') reloadImagesFromEngine(wb, store);
+}
 
 export interface EngineBinding {
   editor: InlineEditor;
@@ -683,9 +700,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       e.kind === 'sheet-copy'
     ) {
       getSheetTabs()?.update();
-      if (e.kind !== 'sheet-add') reloadChartsFromEngine(wb, store);
-      if (e.kind === 'sheet-remove' || e.kind === 'sheet-move' || e.kind === 'sheet-copy')
-        reloadImagesFromEngine(wb, store);
+      if (e.kind !== 'sheet-add') reloadDrawingsAfterSheetEdit(wb, store, e);
     }
   });
 

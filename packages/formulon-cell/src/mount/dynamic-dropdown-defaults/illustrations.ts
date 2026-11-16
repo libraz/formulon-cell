@@ -5,7 +5,7 @@ import {
   arrangeStackPosition,
   createRibbonImageFromSelection,
   createRibbonShapeFromSelection,
-  drawingArrangeStack,
+  sheetDrawingStack,
 } from '../../commands/session-illustration.js';
 import { focusSheet } from '../../interact/dialog-focus.js';
 import type { SpreadsheetInstance } from '../../mount.js';
@@ -169,7 +169,7 @@ export function createIllustrationDropdownDefaults(
       const chart = selectedSessionChart(state);
       const activeId = chart?.id ?? activeIllustrationId(instance);
       const { hasTarget, atFront, atBack } = arrangeStackPosition(
-        drawingArrangeStack(state, sheet, activeId ?? '', instance.workbook),
+        sheetDrawingStack(state, sheet),
         activeId,
       );
       // A saved picture or shape moves only in an engine that orders drawings.

@@ -31,6 +31,7 @@ import type { EngineDrawingAnchor, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { EngineChartInfo } from '../engine/workbook-handle-charts.js';
 import { cellRectUnclamped, layoutForView } from '../render/geometry.js';
+import { writeDrawingOrder } from '../store/drawing-order.js';
 import { rangeOfAddr, rangesIntersect, sameRange } from '../store/selection-geometry.js';
 import { cloneSessionChart } from '../store/sheet-object-mutators.js';
 import {
@@ -44,8 +45,9 @@ import type { History } from './history.js';
 import type { InteractionOrigin, OperationIntent } from './interaction-policy.js';
 import { objectChangeAllowed, objectWrite } from './object-actions.js';
 import {
-  planDrawingArrange,
+  arrangeDrawing,
   type SessionIllustrationArrangeAction,
+  settleDrawingOrder,
 } from './session-illustration.js';
 
 /** Placement of a chart frame: its anchor kind, top-left cell and offset inside it, and its size, in EMU.
@@ -514,6 +516,9 @@ export function createSessionChart(
     }
     const created = syncChartFromEngine(wb, store, sheet, objectId);
     if (!created) return null;
+    mutators.raiseDrawing(store, created.id);
+    writeDrawingOrder(wb, store.getState(), sheet);
+    const order = store.getState().drawings.order;
     pushChartHistory(
       history,
       () => {
@@ -523,7 +528,8 @@ export function createSessionChart(
       () => {
         if (wb.restoreDrawing(sheet, snapshot) === null)
           throw new Error('chart create redo failed');
-        syncChartFromEngine(wb, store, sheet, objectId);
+        syncChartFromEngine(wb, store, sheet, objectId, created.id);
+        settleDrawingOrder(store, wb, sheet, order);
       },
     );
     return cloneSessionChart(created);
@@ -600,6 +606,7 @@ const removeChart = (
   wb: WorkbookHandle,
 ): boolean => {
   const { sheet, nativeObjectId } = chart;
+  const order = store.getState().drawings.order;
   const snapshot = wb.snapshotDrawing(sheet, nativeObjectId);
   if (!snapshot || !wb.removeDrawing(sheet, nativeObjectId)) return false;
   syncChartFromEngine(wb, store, sheet, nativeObjectId);
@@ -607,7 +614,8 @@ const removeChart = (
     history,
     () => {
       if (wb.restoreDrawing(sheet, snapshot) === null) throw new Error('chart delete undo failed');
-      syncChartFromEngine(wb, store, sheet, nativeObjectId);
+      syncChartFromEngine(wb, store, sheet, nativeObjectId, chart.id);
+      settleDrawingOrder(store, wb, sheet, order);
     },
     () => {
       if (!wb.removeDrawing(sheet, nativeObjectId)) throw new Error('chart delete redo failed');
@@ -650,29 +658,10 @@ export function arrangeSessionChart(
   if (!chart || !wb.capabilities.charts) return null;
   const intent = chartIntent(chartCells(chart), 'chartArrange', authorization);
   return writeChart(store, history, intent, null, () => {
-    const { sheet, nativeObjectId } = chart;
-    const plan = planDrawingArrange(store.getState(), sheet, id, action, wb);
-    if (!plan?.engine || plan.engine.from === plan.engine.to) return null;
-    const { from, to } = plan.engine;
-    const sync = (): SessionChart | null => syncChartFromEngine(wb, store, sheet, nativeObjectId);
-    if (!wb.setDrawingZOrder(sheet, nativeObjectId, to)) return null;
-    const arranged = sync();
-    pushChartHistory(
-      history,
-      () => {
-        if (!wb.setDrawingZOrder(sheet, nativeObjectId, from)) {
-          throw new Error('chart arrange undo failed');
-        }
-        sync();
-      },
-      () => {
-        if (!wb.setDrawingZOrder(sheet, nativeObjectId, to)) {
-          throw new Error('chart arrange redo failed');
-        }
-        sync();
-      },
-    );
-    return arranged && cloneSessionChart(arranged);
+    const steps = arrangeDrawing(store, chart.sheet, id, action, wb);
+    if (!steps) return null;
+    pushChartHistory(history, steps.undo, steps.redo);
+    return sessionChartById(store.getState(), id);
   });
 }
 
@@ -780,6 +769,9 @@ const placeChartCopy = (
   const sync = (): SessionChart | null => syncChartFromEngine(wb, store, sheet, objectId);
   const copy = sync();
   if (!copy) return null;
+  mutators.raiseDrawing(store, copy.id);
+  writeDrawingOrder(wb, store.getState(), sheet);
+  const order = store.getState().drawings.order;
   pushChartHistory(
     history,
     () => {
@@ -790,7 +782,8 @@ const placeChartCopy = (
       if (wb.restoreDrawing(sheet, snapshot) === null) {
         throw new Error('chart copy redo failed');
       }
-      sync();
+      syncChartFromEngine(wb, store, sheet, objectId, copy.id);
+      settleDrawingOrder(store, wb, sheet, order);
     },
   );
   return cloneSessionChart(copy);

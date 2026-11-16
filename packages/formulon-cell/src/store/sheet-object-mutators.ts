@@ -7,6 +7,7 @@ import type {
 import type { SheetView, SheetViewPatch } from '../commands/sheet-views.js';
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
+import { followingSaved, liveOrder, restacked, withDrawingOrder } from './drawing-order.js';
 import { frozenColEnd, frozenRowEnd } from './freeze-band.js';
 import { rangeContainsAddr, rangesIntersect } from './selection-geometry.js';
 import { cloneSparklineSettings, withSparklineMembers } from './sparkline-slice.js';
@@ -19,6 +20,7 @@ import type {
   SlicerSpec,
   Sparkline,
   SparklineGroupSettings,
+  State,
   TablesSlice,
 } from './types.js';
 
@@ -35,6 +37,10 @@ function keyInRange(key: string, range: Range): boolean {
   const addr = parseAddrKey(key);
   return addr !== null && rangeContainsAddr(range, addr);
 }
+
+/** `state` with the ids of the drawings it no longer holds dropped from the order. */
+const withoutRemoved = <S extends State>(state: S): S =>
+  withDrawingOrder(state, liveOrder(state, state.drawings.order));
 
 /** Session objects layered over the grid: conditional rules, sparklines,
  *  charts, illustrations, slicers, table overlays/styles and sheet views. */
@@ -123,7 +129,10 @@ export const sheetObjectMutators = {
   upsertChart(store: SpreadsheetStore, chart: SessionChart): void {
     store.setState((s) => {
       const next = s.charts.charts.filter((c) => c.id !== chart.id);
-      return { ...s, charts: { charts: [...next, cloneSessionChart(chart)] } };
+      return withDrawingOrder(
+        { ...s, charts: { charts: [...next, cloneSessionChart(chart)] } },
+        s.drawings.order,
+      );
     });
   },
 
@@ -131,7 +140,7 @@ export const sheetObjectMutators = {
     store.setState((s) => {
       const next = s.charts.charts.filter((c) => c.id !== id);
       if (next.length === s.charts.charts.length) return s;
-      return { ...s, charts: { charts: next } };
+      return withoutRemoved({ ...s, charts: { charts: next } });
     });
   },
 
@@ -157,14 +166,20 @@ export const sheetObjectMutators = {
     store.setState((s) => {
       const kept = s.charts.charts.filter((chart) => chart.sheet !== sheet);
       if (kept.length === s.charts.charts.length && charts.length === 0) return s;
-      return { ...s, charts: { charts: [...kept, ...charts.map(cloneSessionChart)] } };
+      return withoutRemoved({
+        ...s,
+        charts: { charts: [...kept, ...charts.map(cloneSessionChart)] },
+      });
     });
   },
 
   upsertIllustration(store: SpreadsheetStore, illustration: SessionIllustration): void {
     store.setState((s) => {
       const next = s.illustrations.illustrations.filter((item) => item.id !== illustration.id);
-      return { ...s, illustrations: { illustrations: [...next, { ...illustration }] } };
+      return withDrawingOrder(
+        { ...s, illustrations: { illustrations: [...next, { ...illustration }] } },
+        s.drawings.order,
+      );
     });
   },
 
@@ -172,7 +187,7 @@ export const sheetObjectMutators = {
     store.setState((s) => {
       const next = s.illustrations.illustrations.filter((item) => item.id !== id);
       if (next.length === s.illustrations.illustrations.length) return s;
-      return { ...s, illustrations: { illustrations: next } };
+      return withoutRemoved({ ...s, illustrations: { illustrations: next } });
     });
   },
 
@@ -180,7 +195,7 @@ export const sheetObjectMutators = {
     store.setState((s) =>
       s.illustrations.illustrations.length === 0
         ? s
-        : { ...s, illustrations: { illustrations: [] } },
+        : withoutRemoved({ ...s, illustrations: { illustrations: [] } }),
     );
   },
 
@@ -199,6 +214,42 @@ export const sheetObjectMutators = {
       if (!changed) return s;
       return { ...s, illustrations: { illustrations: next } };
     });
+  },
+
+  /** Replace the illustrations and the drawing order together, as a history step restores them. */
+  restoreIllustrations(
+    store: SpreadsheetStore,
+    illustrations: readonly SessionIllustration[],
+    order: readonly string[],
+  ): void {
+    store.setState((s) =>
+      withDrawingOrder({ ...s, illustrations: { illustrations: [...illustrations] } }, order),
+    );
+  },
+
+  /** Set the stacking order of every drawing, back to front. */
+  setDrawingOrder(store: SpreadsheetStore, order: readonly string[]): void {
+    store.setState((s) => withDrawingOrder(s, order));
+  },
+
+  /** Put drawing `id` on top of every other, as a newly added object goes. */
+  raiseDrawing(store: SpreadsheetStore, id: string): void {
+    store.setState((s) =>
+      withDrawingOrder(s, [...s.drawings.order.filter((other) => other !== id), id]),
+    );
+  },
+
+  /** Restack a sheet's drawings as `stack` lists them, back to front. */
+  restackDrawings(store: SpreadsheetStore, stack: readonly string[]): void {
+    store.setState((s) => withDrawingOrder(s, restacked(s.drawings.order, stack)));
+  },
+
+  /** Put the saved drawings in `saved`, the engine's order, keeping every other
+   *  drawing over the saved one it lay over, and drop the ids of objects gone. */
+  followSavedDrawingOrder(store: SpreadsheetStore, saved: readonly string[]): void {
+    store.setState((s) =>
+      withDrawingOrder(s, followingSaved(liveOrder(s, s.drawings.order), saved)),
+    );
   },
 
   /** Append a fresh slicer to the slice. Caller is responsible for picking a

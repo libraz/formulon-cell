@@ -19,8 +19,8 @@ import {
 } from '../commands/session-chart.js';
 import {
   arrangeStackPosition,
-  drawingArrangeStack,
   drawingPanelZIndex,
+  sheetDrawingStack,
 } from '../commands/session-illustration.js';
 import {
   ANCHOR_KIND_ABSOLUTE,
@@ -411,7 +411,7 @@ export function attachSessionCharts(deps: {
   const updateSelectionClasses = (): void => {
     syncSelection();
     const state = store.getState();
-    const zIndex = drawingPanelZIndex(state, state.data.sheetIndex, getWb(), selectedId);
+    const zIndex = drawingPanelZIndex(state, state.data.sheetIndex, selectedId);
     for (const panel of root.querySelectorAll<HTMLElement>('.fc-chart')) {
       const selected = panel.dataset.chartId === selectedId;
       panel.classList.toggle('fc-chart--selected', selected);
@@ -552,7 +552,7 @@ export function attachSessionCharts(deps: {
   const openMenu = (chart: SessionChart, panel: HTMLElement, x: number, y: number): void => {
     const state = store.getState();
     const { atFront, atBack } = arrangeStackPosition(
-      drawingArrangeStack(state, chart.sheet, chart.id, getWb()),
+      sheetDrawingStack(state, chart.sheet),
       chart.id,
     );
     const arrangeable = chartWorkbook() !== null && canEditChart(chart);
@@ -749,7 +749,7 @@ export function attachSessionCharts(deps: {
     const adopted = adoptSelection(state, charts);
     // Another object took the selection, and the focus with it.
     const left = held !== null && selectedId === null;
-    const zIndex = drawingPanelZIndex(state, state.data.sheetIndex, getWb(), selectedId);
+    const zIndex = drawingPanelZIndex(state, state.data.sheetIndex, selectedId);
     charts.forEach((chart) => {
       const drawable = isDrawable(chart);
       if (drawable) visibleChartIds.add(chart.id);

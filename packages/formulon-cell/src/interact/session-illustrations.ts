@@ -5,9 +5,9 @@ import {
   arrangeStackPosition,
   canDeleteIllustration,
   clearSessionIllustration,
-  drawingArrangeStack,
   drawingPanelZIndex,
   duplicateSessionIllustration,
+  sheetDrawingStack,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
 import {
@@ -359,7 +359,7 @@ export function attachSessionIllustrations(deps: {
   const refreshSelection = (): void => {
     syncSelection();
     const state = store.getState();
-    const zIndex = drawingPanelZIndex(state, state.data.sheetIndex, getWb(), selectedId);
+    const zIndex = drawingPanelZIndex(state, state.data.sheetIndex, selectedId);
     for (const panel of root.querySelectorAll<HTMLElement>('.fc-illustration')) {
       const selected = panel.dataset.illustrationId === selectedId;
       panel.classList.toggle('fc-illustration--selected', selected);
@@ -490,10 +490,7 @@ export function attachSessionIllustrations(deps: {
   const openMenu = (item: SessionIllustration, panel: HTMLElement, x: number, y: number): void => {
     const state = store.getState();
     const wb = getWb();
-    const { atFront, atBack } = arrangeStackPosition(
-      drawingArrangeStack(state, item.sheet, item.id, wb),
-      item.id,
-    );
+    const { atFront, atBack } = arrangeStackPosition(sheetDrawingStack(state, item.sheet), item.id);
     const arrange = (action: 'bring-front' | 'send-back'): void => {
       arrangeSessionIllustration(
         store,
