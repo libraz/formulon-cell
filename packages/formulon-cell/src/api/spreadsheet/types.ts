@@ -181,7 +181,8 @@ export interface RecalcEvent {
   readonly cells: readonly ChangedCell[];
 }
 
-/** These option keys changed. */
+/** These option keys were set. From `update` the keys are those the patch passed, whether or not
+ *  a value differs from the current one; a `'user'` update lists a key only when its value changed. */
 export interface UpdateEvent {
   readonly keys: readonly (keyof SpreadsheetPatch)[];
   /** `'api'` for a call to `update`; `'user'` when the user changed an option from the UI: the

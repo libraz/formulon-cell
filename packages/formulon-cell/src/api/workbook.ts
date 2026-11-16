@@ -343,7 +343,11 @@ export class Workbook {
     this.dispose();
   }
 
-  /** Subscribes to workbook events; the returned function unsubscribes. */
+  /** Subscribes to workbook events; the returned function unsubscribes. A `Workbook` or `Sheet`
+   *  setter and `batch()` report `change` synchronously when they return. A write made outside
+   *  them (`instance.applyChanges`, an edit in the grid) is reported one microtask later, after the
+   *  write's own values and the instance's synchronous `cell` / `change` events; each event
+   *  carries the origin of its writes. */
   on<K extends keyof WorkbookEvents>(
     name: K,
     listener: (event: WorkbookEvents[K]) => void,

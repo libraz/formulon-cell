@@ -511,8 +511,8 @@ export class SpreadsheetInstance {
   }
 
   /** Applies a patch to the options: keys present are replaced, `null` resets one to its default,
-   *  and keys left out keep their values. Emits `update` with the keys it changed and
-   *  `source: 'api'`. */
+   *  and keys left out keep their values. Emits `update` with the keys the patch set (a key
+   *  set to its current value is listed too) and `source: 'api'`. */
   update(patch: SpreadsheetPatch): void {
     const state = stateOf(this);
     const keys = (Object.keys(patch) as (keyof SpreadsheetPatch)[]).filter(
