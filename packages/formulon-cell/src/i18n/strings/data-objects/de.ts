@@ -288,6 +288,8 @@ export const dataObjectsDe: DataObjectsStrings = {
     objectSelect: 'Auswählen',
     objectDuplicate: 'Duplizieren',
     objectDelete: 'Löschen',
+    drawingFixedPosition:
+      'Dieses Objekt ist an einer festen Position auf dem Blatt statt an Zellen verankert. Es lässt sich daher weder verschieben noch kopieren.',
     shapeLocked:
       'Der Editor kann diese Form nicht neu zeichnen. Sie lässt sich verschieben, aber nicht löschen, kopieren oder umformatieren.',
     shapePaintKept:

@@ -3,6 +3,7 @@ import type { History } from '../commands/history.js';
 import {
   canDeleteIllustration,
   canDuplicateIllustration,
+  illustrationCopyRefusal,
 } from '../commands/session-illustration.js';
 import {
   DEFAULT_SHAPE_COLOR,
@@ -23,6 +24,7 @@ import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SessionIllustration, type SpreadsheetStore } from '../store/store.js';
+import { commandRefusalMessage } from '../toolbar/dialogs/command-refusal.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   appendDialogIconButton,
@@ -231,12 +233,8 @@ export function attachWorkbookObjectsPanel(
     li: HTMLLIElement,
     illustration: SessionIllustration,
   ): void => {
-    const locked = illustration.kind === 'shape' && illustration.nativeLocked === true;
-    const reason = locked
-      ? strings.workbookObjects.shapeLocked
-      : illustration.kind === 'shape'
-        ? strings.workbookObjects.shapePaintKept
-        : strings.workbookObjects.compatibilityDetails.images;
+    const refusal = illustrationCopyRefusal(illustration);
+    const reason = refusal ? commandRefusalMessage(refusal, strings) : null;
     const actions = document.createElement('div');
     actions.className = 'fc-objects__actions fc-objects__illustration-actions';
     const select = createWorkbookObjectsActionButton(strings.workbookObjects.objectSelect);

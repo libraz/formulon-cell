@@ -3,10 +3,12 @@ import type { Strings } from '../../i18n/strings.js';
 import { showMessage } from './prompt.js';
 
 /** A command that refused to run: its range was too large, the engine could not carry it out, or
- *  the selected shape cannot be copied because it is locked or keeps a paint as saved. */
+ *  the selected picture or shape cannot be copied (one fixed in place, a locked shape, or a shape
+ *  that keeps a paint as saved). */
 export type CommandRefusalReason =
   | 'too-large'
   | 'engine-failed'
+  | 'drawing-fixed-position'
   | 'shape-locked'
   | 'shape-paint-kept';
 
@@ -21,6 +23,8 @@ export const commandRefusalMessage = (reason: CommandRefusalReason, strings: Str
       return strings.workbookObjects.shapeLocked;
     case 'shape-paint-kept':
       return strings.workbookObjects.shapePaintKept;
+    case 'drawing-fixed-position':
+      return strings.workbookObjects.drawingFixedPosition;
   }
 };
 

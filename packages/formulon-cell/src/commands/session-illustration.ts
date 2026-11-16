@@ -81,33 +81,34 @@ export type SessionIllustrationArrangeAction =
   | 'bring-front'
   | 'send-back';
 
-/** A picture whose anchor the engine cannot change. A shape in that state can
- *  still be restyled and deleted. */
+/** A saved picture or shape at a fixed position on the sheet: the engine can neither re-anchor it
+ *  nor insert it afresh, though a snapshot of it restores. */
+const isFixedInPlace = (item: SessionIllustration): boolean =>
+  item.nativeObjectId !== undefined && item.nativeGeometryEditable !== true;
+
+/** A picture fixed in place takes no edit; a shape there can still be restyled. */
 const isGeometryLockedPicture = (item: SessionIllustration): boolean =>
-  item.kind === 'image' &&
-  item.nativeObjectId !== undefined &&
-  item.nativeGeometryEditable !== true;
+  item.kind === 'image' && isFixedInPlace(item);
 
 /** Whether the illustration can be deleted. A shape drawn only as its
  *  bounding box cannot be put back faithfully by an undo, so it stays. */
-export const canDeleteIllustration = (item: SessionIllustration): boolean =>
-  !isGeometryLockedPicture(item) && !item.nativeLocked;
+export const canDeleteIllustration = (item: SessionIllustration): boolean => !item.nativeLocked;
 
-/** Whether a shape can be inserted afresh: a paint the cell cannot state would be rewritten. */
+/** Whether a picture or shape can be inserted afresh: one fixed in place cannot be placed anew,
+ *  and a paint the cell cannot state would be rewritten. */
 export const canReinsertIllustration = (item: SessionIllustration): boolean =>
-  !item.nativeFillOther && !item.nativeLineOther;
+  !isFixedInPlace(item) && !item.nativeFillOther && !item.nativeLineOther;
 
 /** Whether the illustration can be copied: one that can be deleted and inserted afresh. */
 export const canDuplicateIllustration = (item: SessionIllustration): boolean =>
   canDeleteIllustration(item) && canReinsertIllustration(item);
 
-/** Why a shape cannot be copied, for the notice a refused copy shows; null when it can be, or
- *  when it is not a shape. */
-export const shapeCopyRefusal = (
+/** Why a picture or shape cannot be copied, for the notice a refused copy shows; null when it can be. */
+export const illustrationCopyRefusal = (
   item: SessionIllustration,
-): 'shape-locked' | 'shape-paint-kept' | null => {
-  if (item.kind !== 'shape') return null;
-  if (item.nativeLocked) return 'shape-locked';
+): 'drawing-fixed-position' | 'shape-locked' | 'shape-paint-kept' | null => {
+  if (item.kind === 'shape' && item.nativeLocked) return 'shape-locked';
+  if (isFixedInPlace(item)) return 'drawing-fixed-position';
   return canReinsertIllustration(item) ? null : 'shape-paint-kept';
 };
 

@@ -283,6 +283,8 @@ export const dataObjectsJa: DataObjectsStrings = {
     objectSelect: '選択',
     objectDuplicate: '複製',
     objectDelete: '削除',
+    drawingFixedPosition:
+      'このオブジェクトはセルではなくシート上の固定位置に配置されているため、移動やコピーはできません。',
     shapeLocked:
       'この図形はエディターで再描画できないため、移動のみ可能で、削除・コピー・書式変更はできません。',
     shapePaintKept:

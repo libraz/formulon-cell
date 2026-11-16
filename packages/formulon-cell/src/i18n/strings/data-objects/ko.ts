@@ -281,6 +281,8 @@ export const dataObjectsKo: DataObjectsStrings = {
     objectSelect: '선택',
     objectDuplicate: '복제',
     objectDelete: '삭제',
+    drawingFixedPosition:
+      '이 개체는 셀이 아닌 시트의 고정된 위치에 배치되어 있으므로 이동하거나 복사할 수 없습니다.',
     shapeLocked:
       '이 도형은 편집기에서 다시 그릴 수 없으므로 이동만 가능하며 삭제, 복사, 서식 변경은 할 수 없습니다.',
     shapePaintKept:

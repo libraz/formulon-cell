@@ -280,6 +280,7 @@ export const dataObjectsZh: DataObjectsStrings = {
     objectSelect: '选择',
     objectDuplicate: '复制',
     objectDelete: '删除',
+    drawingFixedPosition: '此对象位于工作表上的固定位置，而不是附着于单元格，因此无法移动或复制。',
     shapeLocked: '编辑器无法重绘此形状，因此只能移动，不能删除、复制或更改格式。',
     shapePaintKept:
       '此形状的填充或轮廓使用了编辑器无法重现的样式。它将按保存时的状态保留，因此该部分无法更改格式，形状也无法复制或移动到其他工作表。',

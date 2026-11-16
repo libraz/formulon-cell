@@ -35,7 +35,10 @@ import {
   valuesOnlyClipboard,
 } from '../commands/interaction-policy.js';
 import { runAfterAllowedRangeUnlock } from '../commands/protection.js';
-import { sessionIllustrationById, shapeCopyRefusal } from '../commands/session-illustration.js';
+import {
+  illustrationCopyRefusal,
+  sessionIllustrationById,
+} from '../commands/session-illustration.js';
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import { formatBoolean, formatCell, formatEditableNumber } from '../engine/value.js';
@@ -112,7 +115,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (mode === 'cut' && !policyPermits(policy(), 'object')) return null;
     const selected = store.getState().ui.selectedObject;
     const item = selected ? sessionIllustrationById(store.getState(), selected.id) : undefined;
-    const refusal = item ? shapeCopyRefusal(item) : null;
+    const refusal = item ? illustrationCopyRefusal(item) : null;
     if (refusal) {
       const strings = getStrings();
       void showCommandRefusal({ host, strings, title: strings.contextMenu[mode], reason: refusal });

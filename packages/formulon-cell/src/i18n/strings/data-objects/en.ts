@@ -281,6 +281,8 @@ export const dataObjectsEn: DataObjectsStrings = {
     objectSelect: 'Select',
     objectDuplicate: 'Duplicate',
     objectDelete: 'Delete',
+    drawingFixedPosition:
+      "This object is placed at a fixed position on the sheet rather than in cells, so it can't be moved or copied.",
     shapeLocked:
       'This shape cannot be redrawn by the editor, so it can be moved but not deleted, copied or restyled.',
     shapePaintKept:

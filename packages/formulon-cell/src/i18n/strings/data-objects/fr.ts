@@ -286,6 +286,8 @@ export const dataObjectsFr: DataObjectsStrings = {
     objectSelect: 'Sélectionner',
     objectDuplicate: 'Dupliquer',
     objectDelete: 'Supprimer',
+    drawingFixedPosition:
+      'Cet objet est placé à une position fixe sur la feuille plutôt que dans les cellules : il ne peut être ni déplacé ni copié.',
     shapeLocked:
       'L’éditeur ne sait pas redessiner cette forme : elle peut être déplacée, mais pas supprimée, copiée ni remise en forme.',
     shapePaintKept:

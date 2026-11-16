@@ -7,7 +7,7 @@ import {
   clearSessionIllustration,
   drawingPanelZIndex,
   duplicateSessionIllustration,
-  shapeCopyRefusal,
+  illustrationCopyRefusal,
   sheetDrawingStack,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
@@ -562,16 +562,16 @@ export function attachSessionIllustrations(deps: {
       focusSheet(host, { preventScroll: true });
       return;
     }
-    if (!isEditable(item)) return;
     if (isDuplicateShortcut(event)) {
       event.preventDefault();
-      const refusal = shapeCopyRefusal(item);
+      const refusal = illustrationCopyRefusal(item);
       if (refusal) {
         const strings = getStrings();
         const title = strings.workbookObjects.objectDuplicate;
         void showCommandRefusal({ host, strings, title, reason: refusal });
         return;
       }
+      if (!isEditable(item)) return;
       const copy = duplicateSessionIllustration(
         store,
         item.id,
@@ -586,6 +586,7 @@ export function attachSessionIllustrations(deps: {
       if (copy && copyPanel) select(copy.id, copyPanel);
       return;
     }
+    if (!isEditable(item)) return;
     const deltas: Record<string, [number, number]> = {
       ArrowLeft: [-KEYBOARD_STEP, 0],
       ArrowRight: [KEYBOARD_STEP, 0],

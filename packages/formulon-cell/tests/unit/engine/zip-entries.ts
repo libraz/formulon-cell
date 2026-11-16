@@ -1,4 +1,4 @@
-import { inflateRawSync } from 'node:zlib';
+import { crc32, inflateRawSync } from 'node:zlib';
 
 /** Every entry of a zip package by path, inflated. Enough for the stored and
  *  deflated entries an xlsx holds; no zip64, no encryption. */
@@ -33,4 +33,41 @@ export function zipEntries(bytes: Uint8Array): Map<string, Uint8Array> {
 export function zipText(entries: Map<string, Uint8Array>, path: string): string {
   const entry = entries.get(path);
   return entry ? new TextDecoder().decode(entry) : '';
+}
+
+/** A zip of stored entries. */
+export function zipStored(entries: Map<string, Uint8Array>): Uint8Array {
+  const parts: Buffer[] = [];
+  const central: Buffer[] = [];
+  let offset = 0;
+  for (const [name, data] of entries) {
+    const nameBytes = Buffer.from(name);
+    const head = Buffer.alloc(30);
+    head.writeUInt32LE(0x04034b50, 0);
+    head.writeUInt16LE(20, 4);
+    head.writeUInt32LE(crc32(data), 14);
+    head.writeUInt32LE(data.length, 18);
+    head.writeUInt32LE(data.length, 22);
+    head.writeUInt16LE(nameBytes.length, 26);
+    const entry = Buffer.alloc(46);
+    entry.writeUInt32LE(0x02014b50, 0);
+    entry.writeUInt16LE(20, 4);
+    entry.writeUInt16LE(20, 6);
+    entry.writeUInt32LE(crc32(data), 16);
+    entry.writeUInt32LE(data.length, 20);
+    entry.writeUInt32LE(data.length, 24);
+    entry.writeUInt16LE(nameBytes.length, 28);
+    entry.writeUInt32LE(offset, 42);
+    central.push(Buffer.concat([entry, nameBytes]));
+    parts.push(head, nameBytes, Buffer.from(data));
+    offset += 30 + nameBytes.length + data.length;
+  }
+  const directory = Buffer.concat(central);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(entries.size, 8);
+  end.writeUInt16LE(entries.size, 10);
+  end.writeUInt32LE(directory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...parts, directory, end]);
 }
