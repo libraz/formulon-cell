@@ -21,84 +21,6 @@ export type ExtraTranslations = Readonly<{
 }>;
 
 type RibbonKey = Exclude<keyof Strings['ribbon'], 'tabs' | 'fontFamilies'>;
-type CoreLabelSource =
-  | { readonly section: 'ribbon'; readonly key: RibbonKey }
-  | { readonly section: 'ribbonTabs'; readonly key: keyof Strings['ribbon']['tabs'] }
-  | { readonly section: 'viewToggle'; readonly key: keyof Strings['viewToggle'] }
-  | { readonly section: 'viewToolbar'; readonly key: keyof Strings['viewToolbar'] }
-  | { readonly section: 'pageScale'; readonly key: keyof Strings['pageScale'] };
-
-/**
- * Explicit dictionary paths for labels that already belong to the central
- * string registry. The key is the Mac command's stable label id; keeping the
- * mapping by id avoids ambiguous English-value replacement.
- */
-export const MAC_LABEL_SOURCES: Readonly<Record<string, CoreLabelSource>> = {
-  home: { section: 'ribbonTabs', key: 'home' },
-  addins: { section: 'ribbon', key: 'addIn' },
-  pivotTable: { section: 'ribbon', key: 'pivotTable' },
-  table: { section: 'ribbon', key: 'table' },
-  shapes: { section: 'ribbon', key: 'shapes' },
-  screenshot: { section: 'ribbon', key: 'screenshot' },
-  insert: { section: 'ribbonTabs', key: 'insert' },
-  formulas: { section: 'ribbonTabs', key: 'formulas' },
-  data: { section: 'ribbonTabs', key: 'data' },
-  review: { section: 'ribbonTabs', key: 'review' },
-  view: { section: 'ribbonTabs', key: 'view' },
-  automate: { section: 'ribbonTabs', key: 'automate' },
-  sortFilter: { section: 'ribbon', key: 'sortFilter' },
-  gridlines: { section: 'viewToolbar', key: 'gridlines' },
-  headings: { section: 'viewToolbar', key: 'headings' },
-  formulaBar: { section: 'viewToggle', key: 'formulaBar' },
-  symbol: { section: 'ribbon', key: 'symbols' },
-  draw: { section: 'ribbonTabs', key: 'draw' },
-  toggle: { section: 'ribbonTabs', key: 'draw' },
-  eraser: { section: 'ribbon', key: 'eraser' },
-  margins: { section: 'ribbon', key: 'margins' },
-  orientation: { section: 'ribbon', key: 'orientation' },
-  printArea: { section: 'ribbon', key: 'printArea' },
-  pageBreaks: { section: 'ribbon', key: 'breaks' },
-  background: { section: 'ribbon', key: 'background' },
-  printTitles: { section: 'ribbon', key: 'printTitles' },
-  width: { section: 'pageScale', key: 'width' },
-  height: { section: 'pageScale', key: 'height' },
-  scaleWidth: { section: 'pageScale', key: 'width' },
-  scaleHeight: { section: 'pageScale', key: 'height' },
-  insertFunction: { section: 'ribbon', key: 'insertFunction' },
-  autoSum: { section: 'ribbon', key: 'autoSum' },
-  financial: { section: 'ribbon', key: 'functionFinancial' },
-  logical: { section: 'ribbon', key: 'functionLogical' },
-  text: { section: 'ribbon', key: 'functionText' },
-  dateTime: { section: 'ribbon', key: 'functionDateTime' },
-  lookup: { section: 'ribbon', key: 'functionLookupReference' },
-  math: { section: 'ribbon', key: 'functionMathTrig' },
-  precedents: { section: 'ribbon', key: 'tracePrecedents' },
-  dependents: { section: 'ribbon', key: 'traceDependents' },
-  removeArrows: { section: 'ribbon', key: 'removeArrows' },
-  errorCheck: { section: 'ribbon', key: 'errorChecking' },
-  recalc: { section: 'ribbon', key: 'recalc' },
-  sortAsc: { section: 'ribbon', key: 'sortAscending' },
-  sortDesc: { section: 'ribbon', key: 'sortDescending' },
-  filter: { section: 'ribbon', key: 'filter' },
-  clear: { section: 'ribbon', key: 'clear' },
-  removeDuplicates: { section: 'ribbon', key: 'removeDuplicates' },
-  validation: { section: 'ribbon', key: 'dataValidation' },
-  group: { section: 'ribbon', key: 'groupOutline' },
-  ungroup: { section: 'ribbon', key: 'ungroupOutline' },
-  showDetail: { section: 'ribbon', key: 'showDetail' },
-  hideDetail: { section: 'ribbon', key: 'hideDetail' },
-  spelling: { section: 'ribbon', key: 'spelling' },
-  accessibility: { section: 'ribbon', key: 'accessibility' },
-  translate: { section: 'ribbon', key: 'translate' },
-  previousComment: { section: 'ribbon', key: 'previousComment' },
-  nextComment: { section: 'ribbon', key: 'nextComment' },
-  standard: { section: 'viewToolbar', key: 'normalView' },
-  pageBreakPreview: { section: 'viewToolbar', key: 'pageBreakPreview' },
-  pageLayout: { section: 'viewToolbar', key: 'pageLayoutView' },
-  zoom: { section: 'viewToolbar', key: 'zoom' },
-  zoomSelection: { section: 'ribbon', key: 'zoomSelection' },
-  freeze: { section: 'viewToolbar', key: 'freezePanes' },
-};
 
 /**
  * Mac labels without a reusable central dictionary field. Values are kept by
@@ -107,180 +29,19 @@ export const MAC_LABEL_SOURCES: Readonly<Record<string, CoreLabelSource>> = {
  * remain unchanged where that is the Excel UI term.
  */
 export const MAC_LABEL_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> = {
-  navigation: { de: 'Navigation', fr: 'Navigation', zh: '导航', ko: '탐색', th: 'การนำทาง' },
-  ruler: { de: 'Lineal', fr: 'Règle', zh: '标尺', ko: '눈금자', th: 'ไม้บรรทัด' },
-  dataTypeIcons: {
-    de: 'Datentypsymbole',
-    fr: 'Icônes de type de données',
-    zh: '数据类型图标',
-    ko: '데이터 형식 아이콘',
-    th: 'ไอคอนชนิดข้อมูล',
-  },
-  zoom100: {
-    de: 'Zoom (100 %)',
-    fr: 'Zoom (100 %)',
-    zh: '缩放 (100%)',
-    ko: '확대/축소 (100%)',
-    th: 'ซูม (100%)',
-  },
-  cellFocus: {
-    de: 'Zellfokus',
-    fr: 'Focus sur la cellule',
-    zh: '单元格焦点',
-    ko: '셀 포커스',
-    th: 'โฟกัสเซลล์',
-  },
-  dataCleanup: {
-    de: 'Datenbereinigung',
-    fr: 'Nettoyage des données',
-    zh: '数据清理',
-    ko: '데이터 정리',
-    th: 'ล้างข้อมูล',
-  },
-  dataAnalysis: {
-    de: 'Datenanalyse',
-    fr: 'Analyse des données',
-    zh: '数据分析',
-    ko: '데이터 분석',
-    th: 'วิเคราะห์ข้อมูล',
-  },
-  recommendedPivotTable: {
-    de: 'Empfohlene PivotTables',
-    fr: 'Tableaux croisés dynamiques recommandés',
-    zh: '推荐的数据透视表',
-    ko: '추천 피벗 테이블',
-    th: 'PivotTable ที่แนะนำ',
-  },
-  forms: { de: 'Formulare', fr: 'Formulaires', zh: '窗体', ko: '양식', th: 'ฟอร์ม' },
-  pictureFromFile: {
-    de: 'Bilder von Datei',
-    fr: 'Images à partir d’un fichier',
-    zh: '此设备',
-    ko: '이 디바이스',
-    th: 'รูปภาพจากไฟล์',
-  },
-  pictureFromOnline: {
-    de: 'Onlinebilder',
-    fr: 'Images en ligne',
-    zh: '联机图片',
-    ko: '온라인 그림',
-    th: 'รูปภาพออนไลน์',
-  },
-  photo: { de: 'Fotos', fr: 'Photos', zh: '照片', ko: '사진', th: 'รูปถ่าย' },
-  icons: { de: 'Symbole', fr: 'Icônes', zh: '图标', ko: '아이콘', th: 'ไอคอน' },
-  smartArt: { de: 'SmartArt', fr: 'SmartArt', zh: 'SmartArt', ko: 'SmartArt', th: 'SmartArt' },
-  threeDModel: {
-    de: '3D-Modelle',
-    fr: 'Modèles 3D',
-    zh: '3D 模型',
-    ko: '3D 모델',
-    th: 'โมเดล 3 มิติ',
-  },
-  checkBox: {
-    de: 'Kontrollkästchen',
-    fr: 'Case à cocher',
-    zh: '复选框',
-    ko: '확인란',
-    th: 'กล่องกาเครื่องหมาย',
-  },
-  recommendedChart: {
-    de: 'Empfohlene Diagramme',
-    fr: 'Graphiques recommandés',
-    zh: '推荐的图表',
-    ko: '추천 차트',
-    th: 'แผนภูมิที่แนะนำ',
-  },
-  chartColumn: { de: 'Säule', fr: 'Histogramme', zh: '柱形图', ko: '세로 막대형', th: 'คอลัมน์' },
   chartBar: { de: 'Balken', fr: 'Barres', zh: '条形图', ko: '가로 막대형', th: 'แท่ง' },
-  chartLine: { de: 'Linie', fr: 'Courbes', zh: '折线图', ko: '꺾은선형', th: 'เส้น' },
   chartArea: { de: 'Fläche', fr: 'Aires', zh: '面积图', ko: '영역형', th: 'พื้นที่' },
-  chartPie: { de: 'Kreis', fr: 'Secteurs', zh: '饼图', ko: '원형', th: 'วงกลม' },
-  chartHierarchy: {
-    de: 'Hierarchie',
-    fr: 'Hiérarchie',
-    zh: '层次结构',
-    ko: '계층 구조',
-    th: 'ลำดับชั้น',
-  },
-  chartStatistical: { de: 'Statistik', fr: 'Statistiques', zh: '统计图', ko: '통계', th: 'สถิติ' },
-  chartScatter: {
-    de: 'Punkt (XY)',
-    fr: 'Nuage de points',
-    zh: '散点图',
-    ko: '분산형',
-    th: 'กระจาย',
-  },
-  chartWaterfall: { de: 'Wasserfall', fr: 'Cascade', zh: '瀑布图', ko: '폭포형', th: 'น้ำตก' },
-  chartCombo: { de: 'Kombination', fr: 'Graphique combiné', zh: '组合图', ko: '콤보', th: 'ผสม' },
-  chartMap: { de: 'Karte', fr: 'Carte', zh: '地图', ko: '지도', th: 'แผนที่' },
-  pivotChart: {
-    de: 'PivotChart',
-    fr: 'Graphique croisé dynamique',
-    zh: '数据透视图',
-    ko: '피벗 차트',
-    th: 'PivotChart',
-  },
-  sparkline: {
-    de: 'Sparklines',
-    fr: 'Mini-graphiques',
-    zh: '迷你图',
-    ko: '스파크라인',
-    th: 'เส้นประกาย',
-  },
-  slicer: { de: 'Datenschnitt', fr: 'Segment', zh: '切片器', ko: '슬라이서', th: 'ตัวแบ่งส่วนข้อมูล' },
-  timeline: { de: 'Zeitachse', fr: 'Chronologie', zh: '时间线', ko: '타임라인', th: 'ไทม์ไลน์' },
-  sheetViews: {
-    de: 'Blattansichten',
-    fr: 'Affichages de feuille',
-    zh: '工作表视图',
-    ko: '시트 보기',
-    th: 'มุมมองแผ่นงาน',
-  },
   shapeLine: { de: 'Linie', fr: 'Ligne', zh: '直线', ko: '선', th: 'เส้น' },
   shapeRectangle: { de: 'Rechteck', fr: 'Rectangle', zh: '矩形', ko: '직사각형', th: 'สี่เหลี่ยมผืนผ้า' },
-  shapeRoundedRectangle: {
-    de: 'Abgerundetes Rechteck',
-    fr: 'Rectangle arrondi',
-    zh: '圆角矩形',
-    ko: '모서리가 둥근 직사각형',
-    th: 'สี่เหลี่ยมผืนผ้ามุมมน',
-  },
   shapeOval: { de: 'Oval', fr: 'Ovale', zh: '椭圆', ko: '타원', th: 'วงรี' },
-  shapeTriangle: { de: 'Dreieck', fr: 'Triangle', zh: '三角形', ko: '삼각형', th: 'สามเหลี่ยม' },
   shapeDiamond: { de: 'Raute', fr: 'Losange', zh: '菱形', ko: '마름모', th: 'ข้าวหลามตัด' },
   shapeArrow: { de: 'Pfeil', fr: 'Flèche', zh: '箭头', ko: '화살표', th: 'ลูกศร' },
-  shapeCallout: { de: 'Legende', fr: 'Légende', zh: '标注', ko: '설명선', th: 'คำบรรยายภาพ' },
-  link: { de: 'Link', fr: 'Lien', zh: '链接', ko: '링크', th: 'ลิงก์' },
-  newComment: {
-    de: 'Neuer Kommentar',
-    fr: 'Nouveau commentaire',
-    zh: '新建批注',
-    ko: '새 댓글',
-    th: 'ข้อคิดเห็นใหม่',
-  },
-  textBox: {
-    de: 'Textfeld',
-    fr: 'Zone de texte',
-    zh: '文本框',
-    ko: '텍스트 상자',
-    th: 'กล่องข้อความ',
-  },
   headerFooter: {
     de: 'Kopf- und Fußzeile',
     fr: 'En-tête et pied de page',
     zh: '页眉和页脚',
     ko: '머리글 및 바닥글',
     th: 'หัวกระดาษและท้ายกระดาษ',
-  },
-  wordArt: { de: 'WordArt', fr: 'WordArt', zh: '艺术字', ko: 'WordArt', th: 'อักษรศิลป์' },
-  object: { de: 'Objekt', fr: 'Objet', zh: '对象', ko: '개체', th: 'วัตถุ' },
-  equation: { de: 'Gleichung', fr: 'Équation', zh: '公式', ko: '수식', th: 'สมการ' },
-  lasso: {
-    de: 'Lassoauswahl',
-    fr: 'Sélection au lasso',
-    zh: '套索选择',
-    ko: '올가미 선택',
-    th: 'เลือกแบบบ่วง',
   },
   penBlack: {
     de: 'Schwarzer Stift',
@@ -290,21 +51,6 @@ export const MAC_LABEL_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>>
     th: 'ปากกาสีดำ',
   },
   penRed: { de: 'Roter Stift', fr: 'Stylet rouge', zh: '红色笔', ko: '빨간색 펜', th: 'ปากกาสีแดง' },
-  pencil: { de: 'Bleistift', fr: 'Crayon', zh: '铅笔', ko: '연필', th: 'ดินสอ' },
-  highlighter: {
-    de: 'Textmarker',
-    fr: 'Surligneur',
-    zh: '荧光笔',
-    ko: '형광펜',
-    th: 'ปากกาเน้นข้อความ',
-  },
-  add: {
-    de: 'Stift hinzufügen',
-    fr: 'Ajouter un stylet',
-    zh: '添加笔',
-    ko: '펜 추가',
-    th: 'เพิ่มปากกา',
-  },
   trackpad: {
     de: 'Mit Trackpad zeichnen',
     fr: 'Dessiner avec le Trackpad',
@@ -312,51 +58,12 @@ export const MAC_LABEL_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>>
     ko: '트랙피드로 그리기',
     th: 'วาดด้วยแทร็คแพ็ด',
   },
-  theme: { de: 'Designs', fr: 'Thèmes', zh: '主题', ko: '테마', th: 'ธีม' },
-  color: { de: 'Farben', fr: 'Couleurs', zh: '颜色', ko: '색', th: 'สี' },
-  font: { de: 'Schriftarten', fr: 'Polices', zh: '字体', ko: '글꼴', th: 'ฟอนต์' },
-  size: { de: 'Größe', fr: 'Taille', zh: '大小', ko: '크기', th: 'ขนาด' },
   pageSetup: {
     de: 'Seiteneinrichtung',
     fr: 'Mise en page',
     zh: '页面设置',
     ko: '페이지 설정',
     th: 'ตั้งค่าหน้ากระดาษ',
-  },
-  showGridlines: {
-    de: 'Anzeigen',
-    fr: 'Afficher',
-    zh: '查看',
-    ko: '보기',
-    th: 'แสดง',
-  },
-  printGridlines: {
-    de: 'Drucken',
-    fr: 'Imprimer',
-    zh: '打印',
-    ko: '인쇄',
-    th: 'พิมพ์',
-  },
-  showHeadings: {
-    de: 'Anzeigen',
-    fr: 'Afficher',
-    zh: '查看',
-    ko: '보기',
-    th: 'แสดง',
-  },
-  printHeadings: {
-    de: 'Drucken',
-    fr: 'Imprimer',
-    zh: '打印',
-    ko: '인쇄',
-    th: 'พิมพ์',
-  },
-  gridlinesHeading: {
-    de: 'Gitternetzlinien',
-    fr: 'Quadrillage',
-    zh: '网格线',
-    ko: '눈금선',
-    th: 'เส้นตาราง',
   },
   headingsHeading: {
     de: 'Überschriften',
@@ -365,21 +72,6 @@ export const MAC_LABEL_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>>
     ko: '머리글',
     th: 'หัวเรื่อง',
   },
-  recent: {
-    de: 'Zuletzt verwendet',
-    fr: 'Récemment utilisés',
-    zh: '最近使用',
-    ko: '최근 사용',
-    th: 'ใช้ล่าสุด',
-  },
-  more: {
-    de: 'Weitere Funktionen',
-    fr: 'Autres fonctions',
-    zh: '其他函数',
-    ko: '기타 함수',
-    th: 'ฟังก์ชันเพิ่มเติม',
-  },
-  statistical: { de: 'Statistik', fr: 'Statistiques', zh: '统计', ko: '통계', th: 'สถิติ' },
   dynamicArray: {
     de: 'Dynamisches Array',
     fr: 'Tableau dynamique',
@@ -387,137 +79,7 @@ export const MAC_LABEL_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>>
     ko: '동적 배열',
     th: 'อาร์เรย์แบบไดนามิก',
   },
-  allFunctions: {
-    de: 'Alle Funktionen',
-    fr: 'Toutes les fonctions',
-    zh: '所有函数',
-    ko: '모든 함수',
-    th: 'ฟังก์ชันทั้งหมด',
-  },
-  python: {
-    de: 'Python einfügen',
-    fr: 'Insérer Python',
-    zh: '插入 Python',
-    ko: 'Python 삽입',
-    th: 'แทรก Python',
-  },
   reset: { de: 'Zurücksetzen', fr: 'Réinitialiser', zh: '重置', ko: '다시 설정', th: 'รีเซ็ต' },
-  editor: { de: 'Editor', fr: 'Éditeur', zh: '编辑器', ko: '편집기', th: 'ตัวแก้ไข' },
-  initialize: { de: 'Initialisieren', fr: 'Initialiser', zh: '初始化', ko: '초기화', th: 'เริ่มต้น' },
-  namesManager: {
-    de: 'Namens-Manager',
-    fr: 'Gestionnaire de noms',
-    zh: '名称管理器',
-    ko: '이름 관리자',
-    th: 'ตัวจัดการชื่อ',
-  },
-  defineName: {
-    de: 'Namen definieren',
-    fr: 'Définir un nom',
-    zh: '定义名称',
-    ko: '이름 정의',
-    th: 'กำหนดชื่อ',
-  },
-  useInFormula: {
-    de: 'In Formel verwenden',
-    fr: 'Utiliser dans la formule',
-    zh: '在公式中使用',
-    ko: '수식에서 사용',
-    th: 'ใช้ในสูตร',
-  },
-  createFromSelection: {
-    de: 'Aus Auswahl erstellen',
-    fr: 'Créer à partir de la sélection',
-    zh: '根据所选内容创建',
-    ko: '선택 영역에서 만들기',
-    th: 'สร้างจากส่วนที่เลือก',
-  },
-  showFormulas: {
-    de: 'Formeln anzeigen',
-    fr: 'Afficher les formules',
-    zh: '显示公式',
-    ko: '수식 표시',
-    th: 'แสดงสูตร',
-  },
-  watch: {
-    de: 'Überwachungsfenster',
-    fr: 'Fenêtre Espion',
-    zh: '监视窗口',
-    ko: '감시 창',
-    th: 'หน้าต่างการตรวจสอบ',
-  },
-  calcOptions: {
-    de: 'Berechnungsoptionen',
-    fr: 'Options de calcul',
-    zh: '计算选项',
-    ko: '계산 옵션',
-    th: 'ตัวเลือกการคำนวณ',
-  },
-  sheetRecalc: {
-    de: 'Blatt berechnen',
-    fr: 'Calculer la feuille',
-    zh: '计算工作表',
-    ko: '시트 계산',
-    th: 'คำนวณแผ่นงาน',
-  },
-  powerQuery: {
-    de: 'Daten abrufen',
-    fr: 'Obtenir des données',
-    zh: '获取数据',
-    ko: '데이터 가져오기',
-    th: 'รับข้อมูล',
-  },
-  pictureFromData: {
-    de: 'Aus Bild',
-    fr: 'À partir d’une image',
-    zh: '从图片',
-    ko: '그림에서',
-    th: 'จากรูปภาพ',
-  },
-  refreshAll: {
-    de: 'Alle aktualisieren',
-    fr: 'Actualiser tout',
-    zh: '全部刷新',
-    ko: '모두 새로 고침',
-    th: 'รีเฟรชทั้งหมด',
-  },
-  queriesConnections: {
-    de: 'Abfragen und Verbindungen',
-    fr: 'Requêtes et connexions',
-    zh: '查询和连接',
-    ko: '쿼리 및 연결',
-    th: 'คิวรีและการเชื่อมต่อ',
-  },
-  properties: { de: 'Eigenschaften', fr: 'Propriétés', zh: '属性', ko: '속성', th: 'คุณสมบัติ' },
-  workbookLinks: {
-    de: 'Arbeitsmappenverknüpfungen',
-    fr: 'Liens de classeur',
-    zh: '工作簿链接',
-    ko: '통합 문서 링크',
-    th: 'ลิงก์เวิร์กบุ๊ก',
-  },
-  dataTypes: {
-    de: 'Datentypen',
-    fr: 'Types de données',
-    zh: '数据类型',
-    ko: '데이터 형식',
-    th: 'ชนิดข้อมูล',
-  },
-  sortCustom: {
-    de: 'Benutzerdefiniert sortieren',
-    fr: 'Tri personnalisé',
-    zh: '自定义排序',
-    ko: '사용자 지정 정렬',
-    th: 'เรียงลำดับแบบกำหนดเอง',
-  },
-  reapply: {
-    de: 'Erneut anwenden',
-    fr: 'Réappliquer',
-    zh: '重新应用',
-    ko: '다시 적용',
-    th: 'นำไปใช้ใหม่',
-  },
-  advancedFilter: { de: 'Erweitert', fr: 'Avancé', zh: '高级', ko: '고급', th: 'ขั้นสูง' },
   textToColumns: {
     de: 'Text in Spalten',
     fr: 'Convertir',
@@ -525,157 +87,12 @@ export const MAC_LABEL_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>>
     ko: '텍스트 나누기',
     th: 'ข้อความเป็นคอลัมน์',
   },
-  flashFill: {
-    de: 'Blitzvorschau',
-    fr: 'Remplissage instantané',
-    zh: '快速填充',
-    ko: '빠른 채우기',
-    th: 'เติมแบบรวดเร็ว',
-  },
-  consolidate: { de: 'Konsolidieren', fr: 'Consolider', zh: '合并计算', ko: '통합', th: 'รวม' },
-  whatIf: {
-    de: 'Was-wäre-wenn-Analyse',
-    fr: 'Analyse de scénarios',
-    zh: '模拟分析',
-    ko: '가상 분석',
-    th: 'การวิเคราะห์แบบ What-If',
-  },
-  subtotal: { de: 'Teilergebnis', fr: 'Sous-total', zh: '分类汇总', ko: '부분합', th: 'ผลรวมย่อย' },
   analysis: {
     de: 'Analyse-Funktionen',
     fr: 'Utilitaire d’analyse',
     zh: '分析工具库',
     ko: '분석 도구',
     th: 'เครื่องมือวิเคราะห์',
-  },
-  thesaurus: {
-    de: 'Thesaurus',
-    fr: 'Dictionnaire des synonymes',
-    zh: '同义词库',
-    ko: '동의어 사전',
-    th: 'พจนานุกรม',
-  },
-  stats: {
-    de: 'Arbeitsmappenstatistik',
-    fr: 'Statistiques du classeur',
-    zh: '工作簿统计信息',
-    ko: '통합 문서 통계',
-    th: 'สถิติเวิร์กบุ๊ก',
-  },
-  showChanges: {
-    de: 'Änderungen anzeigen',
-    fr: 'Afficher les modifications',
-    zh: '显示更改',
-    ko: '변경 내용 표시',
-    th: 'แสดงการเปลี่ยนแปลง',
-  },
-  deleteComment: {
-    de: 'Kommentar löschen',
-    fr: 'Supprimer le commentaire',
-    zh: '删除批注',
-    ko: '댓글 삭제',
-    th: 'ลบข้อคิดเห็น',
-  },
-  showComments: {
-    de: 'Kommentare anzeigen',
-    fr: 'Afficher les commentaires',
-    zh: '显示批注',
-    ko: '댓글 표시',
-    th: 'แสดงข้อคิดเห็น',
-  },
-  notes: { de: 'Notizen', fr: 'Notes', zh: '备注', ko: '메모', th: 'บันทึกย่อ' },
-  protectSheet: {
-    de: 'Blatt schützen',
-    fr: 'Protéger la feuille',
-    zh: '保护工作表',
-    ko: '시트 보호',
-    th: 'ป้องกันแผ่นงาน',
-  },
-  protectWorkbook: {
-    de: 'Arbeitsmappe schützen',
-    fr: 'Protéger le classeur',
-    zh: '保护工作簿',
-    ko: '통합 문서 보호',
-    th: 'ป้องกันเวิร์กบุ๊ก',
-  },
-  alwaysReadOnly: {
-    de: 'Immer schreibgeschützt öffnen',
-    fr: 'Toujours ouvrir en lecture seule',
-    zh: '始终以只读方式打开',
-    ko: '항상 읽기 전용으로 열기',
-    th: 'เปิดเป็นแบบอ่านอย่างเดียวเสมอ',
-  },
-  hideInk: {
-    de: 'Freihand ausblenden',
-    fr: 'Masquer l’entrée manuscrite',
-    zh: '隐藏墨迹',
-    ko: '잉크 숨기기',
-    th: 'ซ่อนหมึก',
-  },
-  sheetView: {
-    de: 'Blattansicht',
-    fr: 'Affichage de feuille',
-    zh: '工作表视图',
-    ko: '시트 보기',
-    th: 'มุมมองแผ่นงาน',
-  },
-  customViews: {
-    de: 'Benutzerdefinierte Ansichten',
-    fr: 'Affichages personnalisés',
-    zh: '自定义视图',
-    ko: '사용자 지정 보기',
-    th: 'มุมมองแบบกำหนดเอง',
-  },
-  newWindow: {
-    de: 'Neues Fenster',
-    fr: 'Nouvelle fenêtre',
-    zh: '新建窗口',
-    ko: '새 창',
-    th: 'หน้าต่างใหม่',
-  },
-  arrange: {
-    de: 'Alle anordnen',
-    fr: 'Réorganiser tout',
-    zh: '全部重排',
-    ko: '모두 정렬',
-    th: 'จัดเรียงทั้งหมด',
-  },
-  split: { de: 'Teilen', fr: 'Fractionner', zh: '拆分', ko: '나누기', th: 'แยก' },
-  hide: { de: 'Ausblenden', fr: 'Masquer', zh: '隐藏', ko: '숨기기', th: 'ซ่อน' },
-  unhide: {
-    de: 'Einblenden',
-    fr: 'Afficher',
-    zh: '取消隐藏',
-    ko: '숨기기 취소',
-    th: 'ยกเลิกการซ่อน',
-  },
-  sideBySide: {
-    de: 'Nebeneinander anzeigen',
-    fr: 'Afficher côte à côte',
-    zh: '并排查看',
-    ko: '나란히 보기',
-    th: 'ดูแบบเคียงข้างกัน',
-  },
-  syncScroll: {
-    de: 'Synchrones Scrollen',
-    fr: 'Défilement synchrone',
-    zh: '同步滚动',
-    ko: '동시 스크롤',
-    th: 'การเลื่อนแบบซิงโครนัส',
-  },
-  resetWindow: {
-    de: 'Fensterposition zurücksetzen',
-    fr: 'Réinitialiser la position de la fenêtre',
-    zh: '重置窗口位置',
-    ko: '창 위치 다시 설정',
-    th: 'รีเซ็ตตำแหน่งหน้าต่าง',
-  },
-  switchWindow: {
-    de: 'Fenster wechseln',
-    fr: 'Changer de fenêtre',
-    zh: '切换窗口',
-    ko: '창 전환',
-    th: 'สลับหน้าต่าง',
   },
   macros: {
     de: 'Makros anzeigen',
@@ -684,38 +101,11 @@ export const MAC_LABEL_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>>
     ko: '매크로 보기',
     th: 'ดูแมโคร',
   },
-  recordMacro: {
-    de: 'Makro aufzeichnen',
-    fr: 'Enregistrer une macro',
-    zh: '录制宏',
-    ko: '매크로 기록',
-    th: 'บันทึกแมโคร',
-  },
-  relativeRecording: {
-    de: 'Relative Verweise verwenden',
-    fr: 'Utiliser les références relatives',
-    zh: '使用相对引用',
-    ko: '상대 참조로 기록',
-    th: 'ใช้การอ้างอิงแบบสัมพัทธ์',
-  },
-  newScript: {
-    de: 'Neues Skript',
-    fr: 'Nouveau script',
-    zh: '新建脚本',
-    ko: '새 스크립트',
-    th: 'สคริปต์ใหม่',
-  },
-  showScripts: {
-    de: 'Skripts anzeigen',
-    fr: 'Afficher les scripts',
-    zh: '查看脚本',
-    ko: '스크립트 보기',
-    th: 'ดูสคริปต์',
-  },
 };
 
-export const MAC_GROUP_SOURCES: Readonly<Record<string, CoreLabelSource>> = {
-  Options: { section: 'ribbon', key: 'options' },
+/** Group titles worded by a ribbon dictionary entry. */
+export const MAC_GROUP_SOURCES: Readonly<Record<string, RibbonKey>> = {
+  Options: 'options',
 };
 
 export const MAC_GROUP_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> = {
@@ -1283,31 +673,15 @@ export const MAC_MENU_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> 
   },
 };
 
-// Excel 16.113.4 Mac AXRadioButton labels, captured in each app locale.
-const MAC_TAB_OVERRIDES: Partial<Record<Locale, Partial<Strings['ribbon']['tabs']>>> = {
-  fr: { insert: 'Insérer', automate: 'Automatisation' },
-  th: { automate: 'อัตโนมัติ' },
-};
-
-const readCoreValue = (locale: Locale, source: CoreLabelSource): string => {
-  const strings = dictionaries[locale];
-  const value =
-    source.section === 'ribbon'
-      ? (strings.ribbon as unknown as Record<string, unknown>)[source.key]
-      : source.section === 'ribbonTabs'
-        ? (MAC_TAB_OVERRIDES[locale]?.[source.key] ?? strings.ribbon.tabs[source.key])
-        : source.section === 'viewToolbar'
-          ? strings.viewToolbar[source.key]
-          : source.section === 'viewToggle'
-            ? strings.viewToggle[source.key]
-            : strings.pageScale[source.key];
+const readCoreValue = (locale: Locale, key: RibbonKey): string => {
+  const value = (dictionaries[locale].ribbon as unknown as Record<string, unknown>)[key];
   if (typeof value !== 'string')
-    throw new Error(`Mac label source ${source.section}.${String(source.key)} is not a string.`);
+    throw new Error(`Mac label source ribbon.${String(key)} is not a string.`);
   return value;
 };
 
-export const localizedFromCore = (source: CoreLabelSource): Label =>
-  Object.fromEntries(MAC_LOCALES.map((locale) => [locale, readCoreValue(locale, source)])) as Label;
+export const localizedFromCore = (key: RibbonKey): Label =>
+  Object.fromEntries(MAC_LOCALES.map((locale) => [locale, readCoreValue(locale, key)])) as Label;
 
 export const localizedFromTranslations = (
   seed: LegacyLabel,
@@ -1365,8 +739,6 @@ export const localizedFunctionName = (name: string, locale: Locale): string => {
 export const localizedLabel = (key: string, seed: LegacyLabel): Label => {
   const bundled = MAC_BUNDLE_LABELS[`labels:${key}`];
   if (bundled) return bundled;
-  const source = MAC_LABEL_SOURCES[key];
-  if (source) return localizedFromCore(source);
   const translations = MAC_LABEL_TRANSLATIONS[key];
   if (translations) return localizedFromTranslations(seed, translations);
   throw new Error(`Missing Mac ribbon translations for label: ${key}`);

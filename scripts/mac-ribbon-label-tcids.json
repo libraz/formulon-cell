@@ -5373,11 +5373,6 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "labels:allFunctions": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
     "labels:allRowsColumns": {
       "status": "unresolved",
       "tcid": null,
@@ -5499,18 +5494,6 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "labels:pictureFromFile": {
-      "status": "no-consumer",
-      "tcid": 33995,
-      "name": "DataFromPicture",
-      "reason": "nothing in the label set resolves this key"
-    },
-    "labels:pictureFromOnline": {
-      "status": "no-consumer",
-      "tcid": 34809,
-      "name": "LaunchOnlineCellPicturesPane",
-      "reason": "nothing in the label set resolves this key"
-    },
     "labels:previousComment": {
       "status": "drawn-disagrees",
       "tcid": 1590,
@@ -5552,11 +5535,6 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "labels:shapeCallout": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
     "labels:shapeDiamond": {
       "status": "unresolved",
       "tcid": null,
@@ -5576,17 +5554,6 @@
       "status": "unresolved",
       "tcid": null,
       "reason": "no node with matching ja label"
-    },
-    "labels:sheetView": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "labels:sheetViews": {
-      "status": "no-consumer",
-      "tcid": 33907,
-      "name": "ChunkNamedSheetView",
-      "reason": "nothing in the label set resolves this key"
     },
     "labels:show": {
       "status": "no-consumer",

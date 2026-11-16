@@ -124,6 +124,14 @@ def seed_keys(src, name):
     return [re.sub(r"^'|'$", '', e.split(':', 1)[0].strip()) for e in split_top(body)]
 
 
+def list_keys(src, name):
+    """Entries of `const <name>: readonly string[] = ['a', ...]`."""
+    m = re.search(rf'const {name}\b[^=]*=\s*\[', src)
+    start = m.end() - 1
+    body = src[start + 1:match_close(src, start, '[', ']')]
+    return [e.strip().strip("'").replace("\\'", "'") for e in split_top(body)]
+
+
 def read_model():
     """tab id -> [{'title', 'cmds': [command id]}], in render order."""
     s = (MAC / 'model.ts').read_text(encoding='utf-8')
@@ -137,7 +145,7 @@ def read_model():
             if not g.startswith('group('):
                 raise ValueError(f'model.ts: unexpected group expression {g[:40]!r}')
             gargs = split_top(g[len('group('):-1])
-            title = re.search(r"en: '([^']*)'", gargs[0])
+            title = re.fullmatch(r"'([^']*)'", gargs[0].strip())
             cmds = []
             for c in split_top(gargs[1][1:-1]):
                 if c.startswith('...FORMULA_FAMILY_KEYS'):
@@ -183,9 +191,9 @@ class Surface:
 
     def __init__(self):
         labels = (MAC / 'labels.ts').read_text(encoding='utf-8')
-        self.label_keys = set(seed_keys(labels, 'labelSeeds'))
-        self.menu_keys = set(seed_keys(labels, 'menuLabelSeeds'))
-        self.group_keys = set(seed_keys(labels, 'groupSeeds'))
+        self.label_keys = set(seed_keys(labels, 'labelSeeds')) | set(list_keys(labels, 'BUNDLE_LABEL_KEYS'))
+        self.menu_keys = set(seed_keys(labels, 'menuLabelSeeds')) | set(list_keys(labels, 'BUNDLE_MENU_KEYS'))
+        self.group_keys = set(seed_keys(labels, 'groupSeeds')) | set(list_keys(labels, 'BUNDLE_GROUP_KEYS'))
         self.model = read_model()
         self.menus = read_menus()
         text = ''.join((MAC / f).read_text(encoding='utf-8')
@@ -199,7 +207,7 @@ class Surface:
         direct |= set(re.findall(r"\bleaf\(\s*'[^']+',\s*'(\w+)'", text))
         self.direct = direct
         model_src = (MAC / 'model.ts').read_text(encoding='utf-8')
-        self.group_titles = set(re.findall(r"group\(\s*\{[^}]*\ben: '([^']+)'", model_src))
+        self.group_titles = set(re.findall(r"group\(\s*'([^']+)'", model_src))
         # The shared Home tab's groups are keyed by position; chart tab groups name their key last.
         home = re.search(r"MAC_HOME_GROUP_KEYS = \[(.*?)\]", model_src, re.S)
         self.group_titles |= set(re.findall(r"'([^']+)'", home.group(1))) if home else set()

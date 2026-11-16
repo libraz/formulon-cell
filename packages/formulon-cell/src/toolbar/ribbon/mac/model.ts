@@ -68,12 +68,9 @@ const command = (
   disabledReason: options.disabledReason ? text('en', options.disabledReason) : undefined,
 });
 
-const group = (
-  title: LabelLike,
-  commands: RibbonCommand[],
-  variant = 'tiles',
-): RibbonGroupModel => ({
-  title: text('en', title),
+/** A group titled by its `groups:` label key, which the localize pass turns into the title. */
+const group = (key: string, commands: RibbonCommand[], variant = 'tiles'): RibbonGroupModel => ({
+  title: key,
   commands,
   variant,
 });
@@ -185,15 +182,13 @@ const FORMULA_FAMILY_ICONS = {
 
 const insertTab = (): RibbonTabModel =>
   macTab('insert', t('insert'), [
-    group({ ja: 'テーブル', en: 'Tables' }, [
+    group('Tables', [
       menuCommand('mac.insert.pivotTable', t('pivotTable'), 'pivotTable'),
       menuCommand('mac.insert.recommendedPivotTable', t('recommendedPivotTable'), 'pivotTable'),
       menuCommand('mac.insert.table', t('table'), 'table'),
     ]),
-    group({ ja: 'フォーム', en: 'Forms' }, [
-      disabledCommand('mac.insert.forms', t('forms'), 'form', OFFICE_REQUIRED),
-    ]),
-    group({ ja: '画像からのデータ', en: 'Data from Picture' }, [
+    group('Forms', [disabledCommand('mac.insert.forms', t('forms'), 'form', OFFICE_REQUIRED)]),
+    group('Data from Picture', [
       disabledCommand(
         'mac.insert.pictureFromData',
         t('pictureFromData'),
@@ -202,7 +197,7 @@ const insertTab = (): RibbonTabModel =>
       ),
     ]),
     group(
-      { ja: 'イラスト', en: 'Illustrations' },
+      'Illustrations',
       [
         menuCommand('mac.insert.photo', t('photo'), 'picture'),
         menuCommand('mac.insert.shapes', t('shapes'), 'shapes'),
@@ -218,11 +213,11 @@ const insertTab = (): RibbonTabModel =>
       ],
       'illustrations',
     ),
-    group({ ja: 'コントロール', en: 'Controls' }, [
+    group('Controls', [
       disabledCommand('mac.insert.checkBox', t('checkBox'), 'checkBox', NOT_IMPLEMENTED),
     ]),
     group(
-      { ja: 'グラフ', en: 'Charts' },
+      'Charts',
       [
         menuCommand('mac.insert.recommendedChart', t('recommendedChart'), 'chartRecommended'),
         iconCommand('mac.insert.chartColumn', t('chartColumn'), 'chartColumn'),
@@ -238,24 +233,20 @@ const insertTab = (): RibbonTabModel =>
       ],
       'charts',
     ),
-    group({ ja: 'スパークライン', en: 'Sparklines' }, [
-      menuCommand('mac.insert.sparkline', t('sparkline'), 'sparkline'),
-    ]),
-    group({ ja: 'フィルター', en: 'Filters' }, [
+    group('Sparklines', [menuCommand('mac.insert.sparkline', t('sparkline'), 'sparkline')]),
+    group('Filters', [
       menuCommand('mac.insert.slicer', t('slicer'), 'slicer'),
       disabledCommand('mac.insert.timeline', t('timeline'), 'timeline', NOT_IMPLEMENTED),
     ]),
-    group({ ja: 'リンク', en: 'Links' }, [menuCommand('mac.insert.link', t('link'), 'link')]),
-    group({ ja: 'コメント', en: 'Comments' }, [
-      command('mac.insert.newComment', t('newComment'), 'commentAdd'),
-    ]),
-    group({ ja: 'テキスト', en: 'Text' }, [
+    group('Links', [menuCommand('mac.insert.link', t('link'), 'link')]),
+    group('Comments', [command('mac.insert.newComment', t('newComment'), 'commentAdd')]),
+    group('Text', [
       menuCommand('mac.insert.textBox', t('textBox'), 'textBox'),
       menuCommand('mac.insert.headerFooter', t('headerFooter'), 'headerFooter'),
       disabledCommand('mac.insert.wordArt', t('wordArt'), 'wordArt', NOT_IMPLEMENTED),
       disabledCommand('mac.insert.object', t('object'), 'object', NOT_IMPLEMENTED),
     ]),
-    group({ ja: '記号', en: 'Symbols' }, [
+    group('Symbols', [
       disabledCommand('mac.insert.equation', t('equation'), 'function', NOT_IMPLEMENTED),
       menuCommand('mac.insert.symbol', t('symbol'), 'symbol'),
     ]),
@@ -264,7 +255,7 @@ const insertTab = (): RibbonTabModel =>
 const drawTab = (): RibbonTabModel =>
   macTab('draw', t('draw'), [
     group(
-      { ja: 'ツール', en: 'Tools' },
+      'Tools',
       [
         menuCommand('mac.draw.toggle', t('draw'), 'pen'),
         menuCommand('mac.draw.eraser', t('eraser'), 'eraser'),
@@ -273,7 +264,7 @@ const drawTab = (): RibbonTabModel =>
       'draw-tools',
     ),
     group(
-      { ja: 'ペン', en: 'Pens' },
+      'Pens',
       [
         iconCommand('mac.draw.penBlack', t('penBlack'), 'penBlack'),
         iconCommand('mac.draw.penRed', t('penRed'), 'penRed'),
@@ -283,17 +274,13 @@ const drawTab = (): RibbonTabModel =>
       ],
       'pens',
     ),
-    group(
-      { ja: 'モード', en: 'Mode' },
-      [menuCommand('mac.draw.trackpad', t('trackpad'), 'trackpad')],
-      'draw-mode',
-    ),
+    group('Mode', [menuCommand('mac.draw.trackpad', t('trackpad'), 'trackpad')], 'draw-mode'),
   ]);
 
 const pageLayoutTab = (): RibbonTabModel =>
-  macTab('pageLayout', { ja: 'ページ レイアウト', en: 'Page Layout' }, [
+  macTab('pageLayout', t('pageLayout'), [
     group(
-      { ja: 'テーマ', en: 'Themes' },
+      'Themes',
       [
         menuCommand('mac.page.theme', t('theme'), 'pageTheme'),
         compactCommand('mac.page.color', t('color'), 'pageTheme'),
@@ -302,7 +289,7 @@ const pageLayoutTab = (): RibbonTabModel =>
       'themes',
     ),
     group(
-      { ja: 'ページ設定', en: 'Page Setup' },
+      'Page Setup',
       [
         menuCommand('mac.page.margins', t('margins'), 'pageSetup'),
         menuCommand('mac.page.orientation', t('orientation'), 'pageSetup'),
@@ -315,12 +302,12 @@ const pageLayoutTab = (): RibbonTabModel =>
       ],
       'page-setup',
     ),
-    group({ ja: '拡大縮小印刷', en: 'Scale to Fit' }, [
+    group('Scale to Fit', [
       selectCommand('scaleWidth', t('scaleWidth'), PAGE_SCALE_OPTIONS),
       selectCommand('scaleHeight', t('scaleHeight'), PAGE_SCALE_OPTIONS),
     ]),
     group(
-      { ja: 'シートのオプション', en: 'Sheet Options' },
+      'Sheet Options',
       [
         labelCommand('mac.page.gridlinesHeading', t('gridlinesHeading')),
         checkboxCommand('mac.page.showGridlines', t('showGridlines')),
@@ -336,7 +323,7 @@ const pageLayoutTab = (): RibbonTabModel =>
 const formulasTab = (): RibbonTabModel =>
   macTab('formulas', t('formulas'), [
     group(
-      { ja: '関数ライブラリ', en: 'Function Library' },
+      'Function Library',
       [
         menuCommand('mac.formulas.insertFunction', t('insertFunction'), 'function'),
         menuCommand('mac.formulas.autoSum', t('autoSum'), 'autosum'),
@@ -347,7 +334,7 @@ const formulasTab = (): RibbonTabModel =>
       'function-library',
     ),
     group(
-      { ja: 'Python (プレビュー)', en: 'Python (Preview)' },
+      'Python (Preview)',
       [
         disabledCommand('mac.formulas.python', t('python'), 'python', OFFICE_REQUIRED),
         disabledCompactCommand('mac.formulas.reset', t('reset'), 'clear', OFFICE_REQUIRED),
@@ -362,7 +349,7 @@ const formulasTab = (): RibbonTabModel =>
       'python',
     ),
     group(
-      { ja: '定義された名前', en: 'Defined Names' },
+      'Defined Names',
       [
         menuCommand('mac.formulas.namesManager', t('namesManager'), 'names'),
         compactCommand('mac.formulas.defineName', t('defineName'), 'names'),
@@ -372,7 +359,7 @@ const formulasTab = (): RibbonTabModel =>
       'defined-names',
     ),
     group(
-      { ja: '数式の監査', en: 'Formula Auditing' },
+      'Formula Auditing',
       [
         compactCommand('mac.formulas.precedents', t('precedents'), 'trace'),
         compactCommand('mac.formulas.dependents', t('dependents'), 'dependents'),
@@ -384,7 +371,7 @@ const formulasTab = (): RibbonTabModel =>
       'formula-auditing',
     ),
     group(
-      { ja: '計算方法', en: 'Calculation' },
+      'Calculation',
       [
         menuCommand('mac.formulas.calcOptions', t('calcOptions'), 'calcOptions'),
         compactCommand('mac.formulas.recalc', t('recalc'), 'autosum'),
@@ -396,12 +383,12 @@ const formulasTab = (): RibbonTabModel =>
 
 const dataTab = (): RibbonTabModel =>
   macTab('data', t('data'), [
-    group({ ja: 'データの取得と変換', en: 'Get & Transform Data' }, [
+    group('Get & Transform Data', [
       disabledCommand('mac.data.powerQuery', t('powerQuery'), 'data', NOT_IMPLEMENTED),
       menuCommand('mac.data.pictureFromData', t('pictureFromData'), 'picture'),
     ]),
     group(
-      { ja: 'クエリと接続', en: 'Queries & Connections' },
+      'Queries & Connections',
       [
         disabledCompactCommand('mac.data.refreshAll', t('refreshAll'), 'refresh', NOT_IMPLEMENTED),
         disabledCompactCommand(
@@ -415,13 +402,9 @@ const dataTab = (): RibbonTabModel =>
       ],
       'compact',
     ),
+    group('Data Types', [menuCommand('mac.data.dataTypes', t('dataTypes'), 'data')], 'compact'),
     group(
-      { ja: 'データの種類', en: 'Data Types' },
-      [menuCommand('mac.data.dataTypes', t('dataTypes'), 'data')],
-      'compact',
-    ),
-    group(
-      { ja: '並べ替えとフィルター', en: 'Sort & Filter' },
+      'Sort & Filter',
       [
         iconCommand('mac.data.sortAsc', t('sortAsc'), 'sortAsc'),
         iconCommand('mac.data.sortDesc', t('sortDesc'), 'sortDesc'),
@@ -434,7 +417,7 @@ const dataTab = (): RibbonTabModel =>
       'sort-filter',
     ),
     group(
-      { ja: 'データ ツール', en: 'Data Tools' },
+      'Data Tools',
       [
         compactCommand('mac.data.textToColumns', t('textToColumns'), 'textToColumns'),
         disabledCompactCommand('mac.data.dataCleanup', t('dataCleanup'), 'clear', OFFICE_REQUIRED),
@@ -451,13 +434,9 @@ const dataTab = (): RibbonTabModel =>
       ],
       'compact',
     ),
+    group('Forecast', [menuCommand('mac.data.whatIf', t('whatIf'), 'whatIf')], 'compact'),
     group(
-      { ja: '予測', en: 'Forecast' },
-      [menuCommand('mac.data.whatIf', t('whatIf'), 'whatIf')],
-      'compact',
-    ),
-    group(
-      { ja: 'アウトライン', en: 'Outline' },
+      'Outline',
       [
         compactCommand('mac.data.group', t('group'), 'outlineGroup'),
         compactCommand('mac.data.ungroup', t('ungroup'), 'outlineUngroup'),
@@ -468,7 +447,7 @@ const dataTab = (): RibbonTabModel =>
       'compact',
     ),
     group(
-      { ja: '分析', en: 'Analysis' },
+      'Analysis',
       [disabledCompactCommand('mac.data.analysis', t('analysis'), 'chart', NOT_IMPLEMENTED)],
       'compact',
     ),
@@ -476,18 +455,18 @@ const dataTab = (): RibbonTabModel =>
 
 const reviewTab = (): RibbonTabModel =>
   macTab('review', t('review'), [
-    group({ ja: '文章校正', en: 'Proofing' }, [
+    group('Proofing', [
       menuCommand('mac.review.spelling', t('spelling'), 'spelling'),
       disabledCommand('mac.review.thesaurus', t('thesaurus'), 'spelling', EMBEDDED_UNSUPPORTED),
       menuCommand('mac.review.stats', t('stats'), 'count'),
     ]),
-    group({ ja: 'アクセシビリティ', en: 'Accessibility' }, [
+    group('Accessibility', [
       menuCommand('mac.review.accessibility', t('accessibility'), 'accessibility'),
     ]),
-    group({ ja: '言語', en: 'Language' }, [
+    group('Language', [
       disabledCommand('mac.review.translate', t('translate'), 'translate', NOT_IMPLEMENTED),
     ]),
-    group({ ja: '変更', en: 'Changes' }, [
+    group('Changes', [
       disabledCommand(
         'mac.review.showChanges',
         t('showChanges'),
@@ -495,22 +474,22 @@ const reviewTab = (): RibbonTabModel =>
         EMBEDDED_UNSUPPORTED,
       ),
     ]),
-    group({ ja: 'コメント', en: 'Comments' }, [
+    group('Comments', [
       menuCommand('mac.review.newComment', t('newComment'), 'commentAdd'),
       menuCommand('mac.review.deleteComment', t('deleteComment'), 'clear'),
       menuCommand('mac.review.previousComment', t('previousComment'), 'goTo'),
       menuCommand('mac.review.nextComment', t('nextComment'), 'goTo'),
       menuCommand('mac.review.showComments', t('showComments'), 'commentAdd'),
     ]),
-    group({ ja: 'メモ', en: 'Notes' }, [menuCommand('mac.review.notes', t('notes'), 'commentAdd')]),
-    group({ ja: '変更箇所', en: 'Protection Changes' }, [
+    group('Notes', [menuCommand('mac.review.notes', t('notes'), 'commentAdd')]),
+    group('Protection Changes', [
       menuCommand('mac.review.protectSheet', t('protectSheet'), 'protect'),
       menuCommand('mac.review.protectWorkbook', t('protectWorkbook'), 'protect'),
     ]),
-    group({ ja: '保護', en: 'Protect' }, [
+    group('Protect', [
       disabledCommand('mac.review.alwaysReadOnly', t('alwaysReadOnly'), 'protect', NOT_IMPLEMENTED),
     ]),
-    group({ ja: 'インク', en: 'Ink' }, [
+    group('Ink', [
       disabledCommand('mac.review.hideInk', t('hideInk'), 'pen', EMBEDDED_UNSUPPORTED),
     ]),
   ]);
@@ -518,7 +497,7 @@ const reviewTab = (): RibbonTabModel =>
 const viewTab = (): RibbonTabModel =>
   macTab('view', t('view'), [
     group(
-      { ja: 'シート ビュー', en: 'Sheet Views' },
+      'Sheet Views',
       [
         selectCommand('sheetViewSelect', t('sheetViewSelect'), [
           { value: DEFAULT_SHEET_VIEW_ID, label: 'Default' },
@@ -532,7 +511,7 @@ const viewTab = (): RibbonTabModel =>
       'compact',
     ),
     group(
-      { ja: 'ブックの表示', en: 'Workbook Views' },
+      'Workbook Views',
       [
         compactCommand('mac.view.standard', t('standard'), 'table'),
         compactCommand('mac.view.pageBreakPreview', t('pageBreakPreview'), 'table'),
@@ -547,7 +526,7 @@ const viewTab = (): RibbonTabModel =>
       'compact',
     ),
     group(
-      { ja: '表示/非表示', en: 'Show' },
+      'Show',
       [
         disabledCompactCommand('mac.view.navigation', t('navigation'), 'show', NOT_IMPLEMENTED),
         disabledCheckboxCommand('mac.view.ruler', t('ruler'), NOT_IMPLEMENTED),
@@ -565,7 +544,7 @@ const viewTab = (): RibbonTabModel =>
       'compact',
     ),
     group(
-      { ja: 'ズーム', en: 'Zoom' },
+      'Zoom',
       [
         compactCommand('mac.view.zoom', t('zoom'), 'zoom'),
         compactCommand('mac.view.zoom100', t('zoom100'), 'zoom'),
@@ -574,7 +553,7 @@ const viewTab = (): RibbonTabModel =>
       'compact',
     ),
     group(
-      { ja: 'ウィンドウ', en: 'Window' },
+      'Window',
       [
         disabledCompactCommand(
           'mac.view.newWindow',
@@ -615,7 +594,7 @@ const viewTab = (): RibbonTabModel =>
       'compact',
     ),
     group(
-      { ja: 'マクロ', en: 'Macros' },
+      'Macros',
       [
         disabledCompactCommand('mac.view.macros', t('macros'), 'script', NOT_IMPLEMENTED),
         disabledCompactCommand('mac.view.recordMacro', t('recordMacro'), 'script', NOT_IMPLEMENTED),
@@ -632,12 +611,12 @@ const viewTab = (): RibbonTabModel =>
 
 const automateTab = (): RibbonTabModel =>
   macTab('automate', t('automate'), [
-    group({ ja: 'Office スクリプト', en: 'Office Scripts' }, [
+    group('Office Scripts', [
       disabledCommand('mac.automate.newScript', t('newScript'), 'script', OFFICE_REQUIRED),
       menuCommand('mac.automate.showScripts', t('showScripts'), 'script'),
     ]),
     group(
-      { ja: 'Office スクリプト ギャラリー', en: 'Office Scripts Gallery' },
+      'Office Scripts Gallery',
       [
         compactCommand('mac.automate.allRowsColumns', t('allRowsColumns'), 'show'),
         compactCommand('mac.automate.freezeSelection', t('freezeSelection'), 'freeze'),
@@ -763,9 +742,7 @@ const macHomeTab = (home: RibbonTabModel, lang: ToolbarLang): RibbonTabModel => 
         ],
       };
     }),
-    group({ ja: 'アドイン', en: 'Add-ins' }, [
-      menuCommand('mac.home.addins', t('addins'), 'addIn'),
-    ]),
+    group('Add-ins', [menuCommand('mac.home.addins', t('addins'), 'addIn')]),
   ],
 });
 
