@@ -85,18 +85,21 @@ export async function runExcelChromeBackstageSearchScenario(page: Page): Promise
   await expect(backstage).toBeHidden();
   await expect(page.locator('[data-ribbon-tab="home"][aria-selected="true"]')).toHaveCount(1);
 
+  // F6 rings the ribbon, Name Box, grid, active sheet tab and status bar; the title bar is not a
+  // stop.
+  await page.locator('.fc-host__grid').first().focus();
   await page.keyboard.press('F6');
-  await expect(page.locator('.demo__quick button[aria-label="Save"]')).toBeFocused();
+  await expect(page.locator('.fc-host__sheetbar-tab[aria-selected="true"]')).toBeFocused();
+  await page.keyboard.press('F6');
+  await expect(page.locator('.fc-host__statusbar')).toBeFocused();
   await page.keyboard.press('F6');
   await expect(page.locator('[data-ribbon-tab="home"]')).toBeFocused();
   await page.keyboard.press('F6');
   await expect(page.locator('.fc-host__formulabar-tag')).toBeFocused();
   await page.keyboard.press('F6');
-  await expect(page.locator('.fc-host')).toBeFocused();
-  await page.keyboard.press('F6');
-  await expect(page.locator('.fc-host__statusbar')).toBeFocused();
+  await expect(page.locator('.fc-host__grid')).toBeFocused();
   await page.keyboard.press('Shift+F6');
-  await expect(page.locator('.fc-host')).toBeFocused();
+  await expect(page.locator('.fc-host__formulabar-tag')).toBeFocused();
 
   const search = page.getByRole('combobox', { name: 'Search commands' });
   await page.keyboard.press('Alt+Q');
