@@ -14,6 +14,8 @@ import {
   updateSessionIllustration,
 } from '../../../src/commands/session-illustration.js';
 import { DEFAULT_SHAPE_OUTLINE_COLOR } from '../../../src/commands/shape-format.js';
+import { fontPointsToCssPx } from '../../../src/engine/font-units.js';
+import { cssColorFromArgb } from '../../../src/engine/theme-color.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachSessionIllustrations } from '../../../src/interact/session-illustrations.js';
 import { cellRectUnclamped, layoutForView } from '../../../src/render/geometry.js';
@@ -682,6 +684,74 @@ describe('attachSessionIllustrations', () => {
       history.undo();
       expect(store.getState().illustrations.illustrations[0]?.text).toBeUndefined();
       handle.detach();
+    });
+
+    describe('default text layout', () => {
+      const withTheme = async (options?: Parameters<typeof WorkbookHandle.createDefault>[0]) => {
+        const wb = await WorkbookHandle.createDefault(options);
+        const theme = wb.getWorkbookTheme();
+        if (!theme) throw new Error('missing theme');
+        const host = document.createElement('div');
+        document.body.appendChild(host);
+        const store = createSpreadsheetStore();
+        mutators.upsertIllustration(store, {
+          id: 'shape-1',
+          kind: 'shape',
+          shape: 'rectangle',
+          sheet: 0,
+          x: 100,
+          y: 100,
+          w: 200,
+          h: 80,
+          text: 'hello',
+        });
+        const handle = attachSessionIllustrations({
+          host,
+          store,
+          history: new History(),
+          getWb: () => wb,
+        });
+        const panel = host.querySelector<HTMLElement>('.fc-illustration');
+        if (!panel) throw new Error('missing panel');
+        return { wb, theme, host, handle, panel };
+      };
+
+      it('draws top-left, 11 pt, in the theme body font and colour, clipped', async () => {
+        const { wb, theme, handle, panel } = await withTheme();
+        const text = panel.querySelector('svg text');
+        expect(text?.getAttribute('text-anchor')).not.toBe('middle');
+        expect(Number(text?.getAttribute('font-size'))).toBeCloseTo(fontPointsToCssPx(11), 5);
+        expect(text?.getAttribute('font-family')).toBe(theme.fonts.minorLatin);
+        expect(text?.getAttribute('fill')).toBe(cssColorFromArgb(theme.colors[1] as number));
+        expect(Number(text?.getAttribute('y'))).toBeLessThan(40);
+        expect(text?.closest('svg svg')).not.toBeNull();
+        handle.detach();
+        wb.dispose();
+      });
+
+      it('draws in the minor face of the profile language, as cells do', async () => {
+        const { wb, theme, handle, panel } = await withTheme({ locale: 'ja', platform: 'mac' });
+        const face = theme.minorScripts.find((s) => s.script === 'Jpan')?.typeface;
+        expect(face).toBeTruthy();
+        expect(panel.querySelector('svg text')?.getAttribute('font-family')).toBe(face);
+        handle.detach();
+        wb.dispose();
+      });
+
+      it('opens the editor with the same size, font and colour', async () => {
+        const { wb, theme, host, handle, panel } = await withTheme();
+        firePointer(panel, 'pointerdown');
+        panel.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+        const editor = host.querySelector<HTMLTextAreaElement>('.fc-illustration textarea');
+        expect(Number.parseFloat(editor?.style.fontSize ?? '')).toBeCloseTo(
+          fontPointsToCssPx(11),
+          4,
+        );
+        expect(editor?.style.fontFamily).toContain(theme.fonts.minorLatin);
+        expect(editor?.style.color).not.toBe('');
+        handle.detach();
+        wb.dispose();
+      });
     });
 
     it('does not edit the text of a line', () => {

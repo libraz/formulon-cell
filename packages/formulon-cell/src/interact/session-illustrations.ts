@@ -22,9 +22,11 @@ import {
   sessionPosition,
   viewportZoom,
 } from '../engine/drawing-geometry.js';
+import { fontPointsToCssPx } from '../engine/font-units.js';
 import { DEFAULT_ILLUSTRATION_FRAME } from '../engine/shapes-sync.js';
-import { argbFromCssColor } from '../engine/theme-color.js';
+import { argbFromCssColor, cssColorFromArgb } from '../engine/theme-color.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { themeFontFace } from '../engine/workbook-handle-styles.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import type { SessionShapeKind, State } from '../store/types.js';
 import { SVG_NS } from '../svg-namespace.js';
@@ -218,28 +220,67 @@ const textColorOn = (fill: string | null): string => {
   return 0.299 * r + 0.587 * g + 0.114 * b < 140 ? '#fff' : '#000';
 };
 
-/** Centre the shape's text lines in its `w` x `h` box. */
-const drawShapeText = (svg: SVGSVGElement, item: SessionIllustration, w: number, h: number) => {
+/** A new shape's text is 11 pt, inset from the top-left corner, as the spreadsheet sets it. */
+const SHAPE_TEXT_SIZE = fontPointsToCssPx(11);
+const SHAPE_TEXT_INSET_X = 6;
+const SHAPE_TEXT_INSET_Y = 4;
+const SHAPE_TEXT_LINE_HEIGHT = 1.2;
+
+/** The text face and colour a shape takes from the workbook theme: its minor
+ *  font and the light-1 colour. Unset where the theme is not reachable. */
+interface ShapeTextTheme {
+  family?: string;
+  color?: string;
+}
+
+const shapeTextTheme = (wb: WorkbookHandle | null): ShapeTextTheme => {
+  const theme = wb?.getWorkbookTheme();
+  const light1 = theme?.colors[1];
+  const family = wb ? themeFontFace(wb, false) : undefined;
+  return {
+    ...(family ? { family } : {}),
+    ...(light1 !== undefined ? { color: cssColorFromArgb(light1) } : {}),
+  };
+};
+
+/** Top-left the shape's text lines in its `w` x `h` box, clipped to it. */
+const drawShapeText = (
+  svg: SVGSVGElement,
+  item: SessionIllustration,
+  w: number,
+  h: number,
+  theme: ShapeTextTheme,
+) => {
   if (!item.text || item.shape === 'line' || item.shape === 'arrow') return;
   const lines = item.text.split('\n');
-  const size = 14;
-  const text = appendSvg(svg, 'text', {
-    x: w / 2,
-    y: h / 2 - ((lines.length - 1) * size * 1.2) / 2,
-    'text-anchor': 'middle',
-    'dominant-baseline': 'central',
-    'font-size': size,
-    fill: textColorOn(shapeFillColor(item)),
+  const step = SHAPE_TEXT_SIZE * SHAPE_TEXT_LINE_HEIGHT;
+  const clip = appendSvg(svg, 'svg', { x: 0, y: 0, width: w, height: h });
+  const text = appendSvg(clip, 'text', {
+    x: SHAPE_TEXT_INSET_X,
+    y: SHAPE_TEXT_INSET_Y,
+    'dominant-baseline': 'hanging',
+    'font-size': SHAPE_TEXT_SIZE,
+    ...(theme.family ? { 'font-family': theme.family } : {}),
+    fill: theme.color ?? textColorOn(shapeFillColor(item)),
   });
   for (const [index, line] of lines.entries()) {
-    const span = appendSvg(text, 'tspan', { x: w / 2, dy: index === 0 ? 0 : size * 1.2 });
+    const span = appendSvg(text, 'tspan', {
+      x: SHAPE_TEXT_INSET_X,
+      dy: index === 0 ? 0 : step,
+    });
     span.textContent = line;
   }
 };
 
-const renderShape = (svg: SVGSVGElement, item: SessionIllustration, w: number, h: number): void => {
+const renderShape = (
+  svg: SVGSVGElement,
+  item: SessionIllustration,
+  w: number,
+  h: number,
+  theme: ShapeTextTheme,
+): void => {
   drawShape(svg, item, w, h);
-  drawShapeText(svg, item, w, h);
+  drawShapeText(svg, item, w, h, theme);
 };
 
 const appendImage = (panel: HTMLElement, item: SessionIllustration): void => {
@@ -337,10 +378,14 @@ export function attachSessionIllustrations(deps: {
     editor.className = 'fc-illustration__text';
     editor.setAttribute('aria-label', objectName(store.getState(), item, labels));
     editor.value = item.text ?? '';
+    const textTheme = shapeTextTheme(getWb());
     editor.style.cssText =
-      'position:absolute;inset:0;box-sizing:border-box;padding:4px 6px;margin:0;border:0;' +
+      'position:absolute;inset:0;box-sizing:border-box;margin:0;border:0;' +
       'outline:0;resize:none;overflow:hidden;background:transparent;font:inherit;' +
-      `font-size:14px;text-align:left;color:${textColorOn(shapeFillColor(item))};`;
+      `padding:${SHAPE_TEXT_INSET_Y}px ${SHAPE_TEXT_INSET_X}px;` +
+      `font-size:${SHAPE_TEXT_SIZE}px;line-height:${SHAPE_TEXT_LINE_HEIGHT};text-align:left;` +
+      (textTheme.family ? `font-family:${textTheme.family};` : '') +
+      `color:${textTheme.color ?? textColorOn(shapeFillColor(item))};`;
     panel.querySelector('svg text')?.remove();
     let done = false;
     const finish = (): void => {
@@ -595,7 +640,7 @@ export function attachSessionIllustrations(deps: {
         svg.setAttribute('preserveAspectRatio', 'none');
         svg.style.cssText = 'display:block;width:100%;height:100%;overflow:visible;';
         const scale = item.nativeAnchor ? viewportZoom(store) : 1;
-        renderShape(svg, item, placement.w / scale, placement.h / scale);
+        renderShape(svg, item, placement.w / scale, placement.h / scale, shapeTextTheme(getWb()));
         panel.appendChild(svg);
       }
 

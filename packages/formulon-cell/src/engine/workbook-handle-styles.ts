@@ -88,6 +88,25 @@ function profileScript(handle: WorkbookHandleStylesMethods): string | undefined 
   return locale ? SCRIPT_FOR_PROFILE_LOCALE.get(locale) : undefined;
 }
 
+/** The theme face a major or minor scheme font draws in: the script face its
+ *  `charset` (or, without one, the profile's language) selects, else the Latin face. */
+export function themeFontFace(
+  handle: WorkbookHandleStylesMethods,
+  major: boolean,
+  charset?: number | null,
+): string | undefined {
+  const theme = handle.capabilities.workbookTheme ? readTheme(handle) : null;
+  const script =
+    charset !== null && charset !== undefined
+      ? SCRIPT_FOR_CHARSET.get(charset)
+      : profileScript(handle);
+  const scriptFace = script
+    ? (major ? theme?.majorScripts : theme?.minorScripts)?.find((s) => s.script === script)
+        ?.typeface
+    : undefined;
+  return scriptFace || (major ? theme?.fonts.majorLatin : theme?.fonts.minorLatin) || undefined;
+}
+
 function readTheme(handle: WorkbookHandleStylesMethods): WorkbookTheme | null {
   if (themeCache.has(handle)) return themeCache.get(handle) ?? null;
   const native = wb(handle);
@@ -338,17 +357,7 @@ export abstract class WorkbookHandleStylesMethods {
     if (!record) return null;
     let resolved = record;
     if (record.scheme === FontScheme.Major || record.scheme === FontScheme.Minor) {
-      const theme = this.capabilities.workbookTheme ? readTheme(this) : null;
-      const major = record.scheme === FontScheme.Major;
-      const script =
-        record.charset !== null && record.charset !== undefined
-          ? SCRIPT_FOR_CHARSET.get(record.charset)
-          : profileScript(this);
-      const scriptFace = script
-        ? (major ? theme?.majorScripts : theme?.minorScripts)?.find((s) => s.script === script)
-            ?.typeface
-        : undefined;
-      const themeName = scriptFace || (major ? theme?.fonts.majorLatin : theme?.fonts.minorLatin);
+      const themeName = themeFontFace(this, record.scheme === FontScheme.Major, record.charset);
       if (themeName) resolved = { ...resolved, name: themeName };
     }
     if (!record.color) return resolved;
