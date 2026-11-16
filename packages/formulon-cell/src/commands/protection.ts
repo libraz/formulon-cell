@@ -667,8 +667,9 @@ async function unlockPending(store: SpreadsheetStore, ranges: readonly Range[]):
 
 /** When a guarded range holds back an edit of `ranges`, ask for its password and
  *  call `run` once unlocked (a wrong or cancelled password drops it). Returns
- *  true when the edit was deferred, false when it can go ahead now.
- *  `onSettled` fires first, whichever way the prompt ends. */
+ *  true when the edit was deferred or blocked, false when it can go ahead now.
+ *  `onSettled` fires first on every deferred or blocked outcome (synchronously
+ *  when blocked), never when this returns false. */
 export function deferForAllowedRangeUnlock(
   store: SpreadsheetStore,
   ranges: readonly Range[],
@@ -682,6 +683,7 @@ export function deferForAllowedRangeUnlock(
     console.warn(
       'formulon-cell: edit blocked — it reaches locked cells outside every allowed range',
     );
+    onSettled?.();
     return true;
   }
   void requestAllowedRangeUnlock(store, ranges).then((ok) => {

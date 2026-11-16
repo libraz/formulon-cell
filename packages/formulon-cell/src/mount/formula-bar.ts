@@ -757,14 +757,16 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     clearReferenceState();
     const state = store.getState();
     if (commitDeferred) return;
+    // Set before the call: a blocked edit settles synchronously.
+    commitDeferred = true;
     if (
       deferForAllowedRangeUnlock(store, selectionEditRanges(state), commitSelection, () => {
         commitDeferred = false;
       })
     ) {
-      commitDeferred = true;
       return;
     }
+    commitDeferred = false;
     const anchor = state.selection.active;
     const raw = correctTypedEntry(store, fxInput.value);
     const batch = buildSelectionInputBatch(state, raw, anchor);
@@ -951,6 +953,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     const cell = rangeOfAddr(a);
     // One deferred commit at a time; it keeps its Enter / Tab direction.
     if (commitDeferred) return false;
+    commitDeferred = true;
     if (
       deferForAllowedRangeUnlock(
         store,
@@ -961,9 +964,9 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
         },
       )
     ) {
-      commitDeferred = true;
       return false;
     }
+    commitDeferred = false;
     if (!commitRawAt(a, fxInput.value)) return false;
     finishEditing();
     moveAfterCommit(advance);
