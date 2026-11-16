@@ -162,7 +162,12 @@ interface WorkbookState {
   readonly events: Emitter<WorkbookEvents>;
   readonly sheets: WeakMap<EngineSheet, Sheet>;
   readonly batch: BatchState;
-  readonly pending: { cells: Map<string, ChangedCell>; parts: Set<FacadeChangeKind | 'sheets'> };
+  readonly pending: {
+    cells: Map<string, ChangedCell>;
+    parts: Set<FacadeChangeKind | 'sheets'>;
+    /** Origin in force when the first queued change was recorded. */
+    origin: ChangeOrigin;
+  };
   sourceFormat: SaveFormat;
   origin: ChangeOrigin;
   flushQueued: boolean;
@@ -252,7 +257,7 @@ export class Workbook {
       events: new Emitter<WorkbookEvents>(),
       sheets: new WeakMap(),
       batch: { depth: 0, cells: new Map() },
-      pending: { cells: new Map(), parts: new Set() },
+      pending: { cells: new Map(), parts: new Set(), origin: 'instanceApi' },
       sourceFormat: 'xlsx',
       origin: 'instanceApi',
       flushQueued: false,
@@ -497,8 +502,20 @@ export class Workbook {
     });
   }
 
+  /** Pins the queued change to the origin in force now; a different origin flushes the earlier one first. */
+  #captureOrigin(state: WorkbookState): void {
+    const { cells, parts } = state.pending;
+    if (cells.size === 0 && parts.size === 0) {
+      state.pending.origin = state.origin;
+    } else if (state.pending.origin !== state.origin && state.batch.depth === 0) {
+      this.#flush(state);
+      state.pending.origin = state.origin;
+    }
+  }
+
   #record(state: WorkbookState, e: HandleChangeEvent): void {
     if (e.kind === 'recalc') return;
+    this.#captureOrigin(state);
     if (e.kind === 'value') {
       state.pending.cells.set(cellKey(e.addr), {
         sheet: e.addr.sheet,
@@ -511,6 +528,7 @@ export class Workbook {
   }
 
   #recordPart(state: WorkbookState, change: FacadeChange): void {
+    this.#captureOrigin(state);
     state.pending.parts.add(change.kind);
     this.#queueFlush(state);
   }
@@ -529,7 +547,7 @@ export class Workbook {
     const { cells, parts } = state.pending;
     if (cells.size === 0 && parts.size === 0) return;
     const event: WorkbookChange = {
-      origin: state.origin,
+      origin: state.pending.origin,
       cells: [...cells.values()],
       parts: [...parts],
     };
