@@ -105,7 +105,7 @@ export function openPivotShowDetailDialog(
       selected: false,
       tabIndex: -1,
     });
-    option.disabled = !field.pickable;
+    projectDisabledState(option, !field.pickable, null);
     shell.on(option, 'click', () => choose(index));
     list.appendChild(option);
     return option;
