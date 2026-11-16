@@ -74,9 +74,9 @@ const confirmWithBody = (
       shell,
       resolve,
       onCancel: () => false,
+      onSubmit: () => lifecycle.finish(true),
+      buttons: { okBtn, cancelBtn },
     });
-    okBtn.addEventListener('click', () => lifecycle.finish(true));
-    cancelBtn.addEventListener('click', () => lifecycle.finish(false));
     mountDialog(shell, cancelBtn);
   });
 
