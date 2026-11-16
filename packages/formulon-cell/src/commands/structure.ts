@@ -720,10 +720,10 @@ function applyAxisShiftViaEngine(
   // A delete drops or trims the protected ranges inside the band; undo writes them back.
   const protectedRangesBefore =
     !positive && record && wb.capabilities.protectedRanges ? wb.getProtectedRanges(sheet) : [];
-  // The engine deletes the pictures and charts lying inside the band; undo puts
-  // them back from these captures, under their own ids.
+  // The engine deletes the pictures, charts and shapes lying inside the band; undo
+  // puts them back from these captures, under their own ids and in their slots.
   const deletedDrawings: Uint8Array[] = [];
-  // Shapes and table slicers have no snapshot; they are put back by inserting them again.
+  // Table slicers have no snapshot; they, and any drawing without one, are inserted again.
   const deletedObjects: (() => boolean)[] = [];
   if (!positive && record && wb.capabilities.drawings) {
     for (const object of wb.listDrawingObjects(sheet)) {

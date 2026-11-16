@@ -146,10 +146,18 @@
     cursor: not-allowed;
   }
 
+  /* No stacking context: chart panels interleave with picture and shape panels in .fc-drawings. */
   .fc-charts {
     position: absolute;
     inset: 0;
-    z-index: var(--fc-z-grid, 16777010);
+    pointer-events: none;
+  }
+
+  /* The one stacking context of every chart, picture and shape panel. */
+  .fc-drawings {
+    position: absolute;
+    inset: 0;
+    z-index: var(--fc-z-drawing, 16777004);
     pointer-events: none;
   }
 

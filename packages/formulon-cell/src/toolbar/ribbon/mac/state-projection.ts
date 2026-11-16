@@ -13,7 +13,10 @@ import { activeFilterRange } from '../../../commands/filter-ranges.js';
 import { hasListedDefinedNames } from '../../../commands/named-ranges.js';
 import { hasOutlineDetail } from '../../../commands/outline.js';
 import { isWorkbookStructureProtected, noteChangePermitted } from '../../../commands/protection.js';
-import { arrangeStackPosition } from '../../../commands/session-illustration.js';
+import {
+  arrangeStackPosition,
+  drawingArrangeStack,
+} from '../../../commands/session-illustration.js';
 import { TEMPORARY_SHEET_VIEW_ID } from '../../../commands/sheet-views.js';
 import { activeTableOverlay } from '../../../commands/table-design.js';
 import { addrKey, parseAddrKey } from '../../../engine/address.js';
@@ -467,13 +470,15 @@ export const projectMacRibbonState = (
     }
   }
 
-  // A chart moves only among the sheet's charts: nothing in front or behind it
-  // leaves the matching command off, as the desktop does for a lone chart.
+  // Nothing in front of or behind a chart in its sheet's drawing stack leaves
+  // the matching command off, as the desktop does for a lone chart.
   const chartState = instance.store.getState();
   const chart = selectedSessionChart(chartState);
   if (chart) {
-    const charts = chartState.charts.charts.filter((item) => item.sheet === chart.sheet);
-    const { atFront, atBack } = arrangeStackPosition(charts, chart.id);
+    const { atFront, atBack } = arrangeStackPosition(
+      drawingArrangeStack(chartState, chart.sheet, chart.id, instance.workbook),
+      chart.id,
+    );
     const strings = instance.i18n.strings.ribbonMenu;
     for (const [id, blocked, reason] of [
       ['objectBringForward', atFront, strings.arrangeAtFront],

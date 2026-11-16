@@ -26,6 +26,7 @@ const overlayCss = walkCss(resolve(styleRoot, 'app')).join('\n');
 
 const expectedTierValues = {
   base: 16_777_000,
+  drawing: 16_777_004,
   grid: 16_777_010,
   dialog: 16_777_020,
   tooltip: 16_777_030,
@@ -38,6 +39,7 @@ const expectedTierValues = {
 type ZTier = Exclude<keyof typeof expectedTierValues, 'base'>;
 
 const expectedStackOrder: ZTier[] = [
+  'drawing',
   'grid',
   'dialog',
   'tooltip',
@@ -49,7 +51,6 @@ const expectedStackOrder: ZTier[] = [
 
 const overlayExpectations: [selector: string, tier: ZTier][] = [
   ['.fc-quick', 'grid'],
-  ['.fc-charts', 'grid'],
   ['.fc-objects', 'grid'],
   ['.fc-find', 'grid'],
   ['.fc-slicer', 'grid'],
@@ -109,6 +110,29 @@ describe('overlay z-index tiers', () => {
         `z-index: var(--fc-z-${tier}, ${expectedTierValues[tier]});`,
       );
     }
+  });
+
+  it('stacks every drawing panel in one root, over the sheet and under the in-grid panels', () => {
+    // One stacking context at the drawing tier holds the chart, picture and shape
+    // panels; the inner roots form none, so the panels interleave by z-index.
+    const drawings = cssBlockFor(overlayCss, '.fc-drawings');
+    expect(drawings).toContain(`z-index: var(--fc-z-drawing, ${expectedTierValues.drawing});`);
+    expect(drawings).toContain('pointer-events: none;');
+    expect(drawings).not.toMatch(/overflow|clip|contain:/);
+    expect(cssBlockFor(overlayCss, '.fc-charts')).not.toMatch(
+      /z-index:|transform:|opacity:|filter:|isolation:/,
+    );
+    const surfaceCss = walkCss(resolve(styleRoot, 'surface')).join('\n');
+    expect(cssBlockFor(surfaceCss, '.fc-host__grid')).not.toMatch(/z-index:/);
+    expect(cssBlockFor(surfaceCss, '.fc-host__canvas')).not.toMatch(/z-index:/);
+    for (const selector of ['.fc-find', '.fc-quick', '.fc-slicer']) {
+      expect(cssBlockFor(overlayCss, selector), selector).toContain(
+        `z-index: var(--fc-z-grid, ${expectedTierValues.grid});`,
+      );
+    }
+    expect(cssBlockFor(overlayCss, '.fc-ctxmenu')).toContain(
+      `z-index: var(--fc-z-menu, ${expectedTierValues.menu});`,
+    );
   });
 
   it('keeps every overlay z-index fallback aligned with the global tier defaults', () => {

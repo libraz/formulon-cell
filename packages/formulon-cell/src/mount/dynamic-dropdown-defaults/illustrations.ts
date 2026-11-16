@@ -5,6 +5,7 @@ import {
   arrangeStackPosition,
   createRibbonImageFromSelection,
   createRibbonShapeFromSelection,
+  drawingArrangeStack,
 } from '../../commands/session-illustration.js';
 import { focusSheet } from '../../interact/dialog-focus.js';
 import type { SpreadsheetInstance } from '../../mount.js';
@@ -166,15 +167,16 @@ export function createIllustrationDropdownDefaults(
       const state = instance.store.getState();
       const sheet = state.data.sheetIndex;
       const chart = selectedSessionChart(state);
-      // A chart is ordered among the sheet's charts, and its native order can change.
-      const visible: readonly { id: string }[] = chart
-        ? state.charts.charts.filter((item) => item.sheet === sheet)
-        : state.illustrations.illustrations.filter((item) => item.sheet === sheet);
       const activeId = chart?.id ?? activeIllustrationId(instance);
-      const { hasTarget, atFront, atBack } = arrangeStackPosition(visible, activeId);
+      const { hasTarget, atFront, atBack } = arrangeStackPosition(
+        drawingArrangeStack(state, sheet, activeId ?? '', instance.workbook),
+        activeId,
+      );
+      // A saved picture or shape moves only in an engine that orders drawings.
       const nativeTarget =
         !chart &&
         hasTarget &&
+        !instance.workbook.capabilities.drawings &&
         state.illustrations.illustrations.find((item) => item.id === activeId)?.nativeObjectId !==
           undefined;
       const strings = instance.i18n.strings.ribbonMenu;

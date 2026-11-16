@@ -2,8 +2,11 @@ import type { History } from '../commands/history.js';
 import type { IllustrationMutationAuthorization } from '../commands/session-illustration.js';
 import {
   arrangeSessionIllustration,
+  arrangeStackPosition,
   canDeleteIllustration,
   clearSessionIllustration,
+  drawingArrangeStack,
+  drawingPanelZIndex,
   duplicateSessionIllustration,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
@@ -292,6 +295,36 @@ const appendImage = (panel: HTMLElement, item: SessionIllustration): void => {
   panel.appendChild(img);
 };
 
+const drawingRootUsers = new WeakMap<HTMLElement, number>();
+
+/** The one `.fc-drawings` root of `parent`, a stacking context at the grid tier
+ *  in which every chart, picture and shape panel interleaves. `release` removes
+ *  it once the last overlay using it leaves. */
+export function acquireDrawingRoot(parent: HTMLElement): {
+  root: HTMLElement;
+  release: () => void;
+} {
+  let found = parent.querySelector<HTMLElement>(':scope > .fc-drawings');
+  if (!found) {
+    found = document.createElement('div');
+    found.className = 'fc-drawings';
+    parent.appendChild(found);
+  }
+  const root = found;
+  drawingRootUsers.set(root, (drawingRootUsers.get(root) ?? 0) + 1);
+  let released = false;
+  return {
+    root,
+    release: () => {
+      if (released) return;
+      released = true;
+      const users = (drawingRootUsers.get(root) ?? 1) - 1;
+      drawingRootUsers.set(root, users);
+      if (users <= 0) root.remove();
+    },
+  };
+}
+
 export function attachSessionIllustrations(deps: {
   host: HTMLElement;
   /** The element the pictures and shapes are drawn over, whose top-left corner is the
@@ -307,7 +340,8 @@ export function attachSessionIllustrations(deps: {
   const root = document.createElement('div');
   root.className = 'fc-illustrations';
   root.style.cssText = 'position:absolute;inset:0;pointer-events:none;';
-  (deps.layer ?? host).appendChild(root);
+  const drawings = acquireDrawingRoot(deps.layer ?? host);
+  drawings.root.appendChild(root);
   let selectedId: string | null = null;
   const selection = createObjectSelectionPublisher(store);
 
@@ -323,12 +357,13 @@ export function attachSessionIllustrations(deps: {
 
   const refreshSelection = (): void => {
     syncSelection();
-    const panels = Array.from(root.querySelectorAll<HTMLElement>('.fc-illustration'));
-    for (const [index, panel] of panels.entries()) {
+    const state = store.getState();
+    const zIndex = drawingPanelZIndex(state, state.data.sheetIndex, getWb(), selectedId);
+    for (const panel of root.querySelectorAll<HTMLElement>('.fc-illustration')) {
       const selected = panel.dataset.illustrationId === selectedId;
       panel.classList.toggle('fc-illustration--selected', selected);
       panel.setAttribute('aria-selected', selected ? 'true' : 'false');
-      panel.style.zIndex = selected ? String(panels.length + 1) : String(index + 1);
+      panel.style.zIndex = zIndex(panel.dataset.illustrationId ?? '');
     }
   };
 
@@ -452,10 +487,11 @@ export function attachSessionIllustrations(deps: {
   /** The object's right-click menu, in the spreadsheet's order. */
   const openMenu = (item: SessionIllustration, panel: HTMLElement, x: number, y: number): void => {
     const state = store.getState();
-    const sheetItems = state.illustrations.illustrations.filter(
-      (entry) => entry.sheet === item.sheet,
+    const wb = getWb();
+    const { atFront, atBack } = arrangeStackPosition(
+      drawingArrangeStack(state, item.sheet, item.id, wb),
+      item.id,
     );
-    const rank = sheetItems.indexOf(item);
     const arrange = (action: 'bring-front' | 'send-back'): void => {
       arrangeSessionIllustration(
         store,
@@ -467,8 +503,8 @@ export function attachSessionIllustrations(deps: {
       );
     };
     const editable = isEditable(item);
-    // The engine orders pictures only; a saved shape keeps its slot.
-    const orderable = editable && !(item.kind === 'shape' && item.nativeObjectId !== undefined);
+    const orderable =
+      editable && (item.nativeObjectId === undefined || wb?.capabilities.drawings === true);
     menu.open(
       x,
       y,
@@ -476,13 +512,13 @@ export function attachSessionIllustrations(deps: {
         {
           id: 'bringToFront',
           label: labels.bringToFront,
-          disabled: !orderable || rank === sheetItems.length - 1,
+          disabled: !orderable || atFront,
           run: () => arrange('bring-front'),
         },
         {
           id: 'sendToBack',
           label: labels.sendToBack,
-          disabled: !orderable || rank === 0,
+          disabled: !orderable || atBack,
           run: () => arrange('send-back'),
         },
       ],
@@ -677,6 +713,7 @@ export function attachSessionIllustrations(deps: {
       selectedId = null;
       syncSelection();
       root.remove();
+      drawings.release();
     },
   };
 }

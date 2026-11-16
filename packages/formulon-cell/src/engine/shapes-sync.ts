@@ -209,9 +209,8 @@ const shapeInputOf = (shape: EngineShape): EngineShapeInput | null => {
 };
 
 /** Capture shape `objectId` so a row or column delete that drops it can be
- *  undone. The restorer inserts it again; null when it cannot be restored
- *  without loss. The engine's `setDrawingZOrder` refuses shapes, so a restored
- *  shape goes on top of the drawing order. */
+ *  undone. The restorer inserts it again at its slot in the drawing order; null
+ *  when it cannot be restored without loss. */
 export function captureShapeRestore(
   wb: WorkbookHandle,
   sheet: number,
@@ -219,7 +218,12 @@ export function captureShapeRestore(
 ): (() => boolean) | null {
   const shape = wb.listShapes(sheet).find((candidate) => candidate.objectId === objectId);
   const input = shape ? shapeInputOf(shape) : null;
-  return input ? () => wb.insertShape(sheet, input) !== null : null;
+  if (!input) return null;
+  const index = wb.listDrawingObjects(sheet).findIndex((object) => object.objectId === objectId);
+  return () => {
+    const restored = wb.insertShape(sheet, input);
+    return restored !== null && (index < 0 || wb.setDrawingZOrder(sheet, restored, index));
+  };
 }
 
 /** Capture the anchors of `sheet`'s shapes ahead of a row or column delete,
@@ -254,10 +258,13 @@ export class ShapeMirror {
   /** Engine object id of each mirrored overlay item. */
   private readonly objectIds = new Map<string, number>();
 
-  /** The engine's description of each shape removed through the mirror, so a
-   *  later undo re-inserts it as it was (name, text, anchor kind, geometry).
-   *  The engine cannot reorder shapes, so a restored shape goes on top. */
-  private readonly removed = new Map<string, { objectId: number; input: EngineShapeInput }>();
+  /** Each shape removed through the mirror, so a later undo puts it back as it
+   *  was: from the engine's capture, at its slot in the drawing order, or else
+   *  re-inserted from its description (name, text, anchor kind, geometry). */
+  private readonly removed = new Map<
+    string,
+    { sheet: number; objectId: number; snapshot: Uint8Array | null; input: EngineShapeInput }
+  >();
 
   /** Adopt `state` as what the engine already carries. */
   rebase(state: State | null): void {
@@ -319,7 +326,10 @@ export class ShapeMirror {
       .listShapes(sheet)
       .find((candidate) => candidate.objectId === objectId);
     const description = shape ? shapeInputOf(shape) : null;
-    if (description) this.removed.set(id, { objectId, input: description });
+    if (description) {
+      const snapshot = this.handle.snapshotDrawing(sheet, objectId);
+      this.removed.set(id, { sheet, objectId, snapshot, input: description });
+    }
     this.handle.removeShape(sheet, objectId);
     this.objectIds.delete(id);
   }
@@ -330,8 +340,11 @@ export class ShapeMirror {
     // Only the item that was removed comes back as described; a new item reusing its id does not.
     const removed = this.removed.get(item.id);
     this.removed.delete(item.id);
-    const restored = removed?.objectId === item.nativeObjectId ? removed?.input : undefined;
-    const objectId = wb.insertShape(item.sheet, restored ?? this.newShape(store, item));
+    const restored = removed?.objectId === item.nativeObjectId ? removed : undefined;
+    const objectId =
+      (restored?.snapshot && restored.sheet === item.sheet
+        ? wb.restoreDrawing(item.sheet, restored.snapshot)
+        : null) ?? wb.insertShape(item.sheet, restored?.input ?? this.newShape(store, item));
     if (objectId === null) return null;
     this.objectIds.set(item.id, objectId);
     return this.tie(item.sheet, objectId);

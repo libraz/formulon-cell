@@ -12,6 +12,9 @@ describe('Mac chart Format tab arrange buttons', () => {
       store: createSpreadsheetStore(),
       i18n: createI18nController({ locale: 'ja' }),
       workbook: {
+        capabilities: { drawings: true },
+        // A chart under a saved shape, back to front.
+        listDrawingObjects: () => [{ objectId: 1 }, { objectId: 2 }],
         calcMode: () => 'auto',
         getExternalLinks: () => [],
         getPivotTables: () => [],
@@ -48,6 +51,20 @@ describe('Mac chart Format tab arrange buttons', () => {
     expect(disabled()).toEqual([false, true]);
     setCharts(['back', 'front'], 'front');
     expect(disabled()).toEqual([true, false]);
+
+    // A chart moves through every drawing kind: a shape over it leaves Bring Forward on.
+    instance.store.setState((s) => ({
+      ...s,
+      charts: {
+        ...s.charts,
+        charts: [{ id: 'chart', sheet: 0, nativeObjectId: 1 } as unknown as SessionChart],
+      },
+      illustrations: {
+        illustrations: [{ id: 'shape', kind: 'shape', sheet: 0, nativeObjectId: 2 }],
+      },
+      ui: { ...s.ui, selectedObject: { id: 'chart', name: 'chart' } },
+    }));
+    expect(disabled()).toEqual([false, true]);
   });
 
   it('shares one front-most / back-most rule with the arrange menu', () => {

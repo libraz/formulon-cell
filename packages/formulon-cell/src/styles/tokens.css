@@ -221,8 +221,10 @@
    *                   typical host modal/backdrop z-index of 1000–9999;
    *                   every tier stays an exact float32 integer, so a CSS
    *                   minifier cannot round the stack down).
-   *   --fc-z-grid     in-grid panels (find bar, slicer, charts, quick
-   *                   analysis, objects inspector).
+   *   --fc-z-drawing  drawing objects (charts, pictures, shapes) above
+   *                   the sheet chrome, below the in-grid panels.
+   *   --fc-z-grid     in-grid panels (find bar, slicer, quick analysis,
+   *                   objects inspector).
    *   --fc-z-dialog   modal-with-backdrop dialogs (Format Cells,
    *                   Iterative Calc, External Links, CF Rules, Cell
    *                   Styles gallery).
@@ -235,6 +237,7 @@
    *   --fc-z-error    error / data-validation indicator popup. */
   :where(html) {
     --fc-z-base: initial;
+    --fc-z-drawing: initial;
     --fc-z-grid: initial;
     --fc-z-dialog: initial;
     --fc-z-tooltip: initial;

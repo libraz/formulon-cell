@@ -390,7 +390,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
     });
   }
 
-  /** Capture a picture or chart as opaque bytes for `restoreDrawing`. */
+  /** Capture a picture, chart or shape with its stacking slot as opaque bytes for `restoreDrawing`. */
   snapshotDrawing(sheet: number, objectId: number): Uint8Array | null {
     assertAlive(this);
     if (!this.capabilities.drawings) return null;
@@ -402,7 +402,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   }
 
   /** Put a `snapshotDrawing` capture back and return the object id: the same
-   *  id in place by default, or a fresh one on top with `newId`. */
+   *  id at its captured slot by default, or a fresh one on top with `newId`. */
   restoreDrawing(
     sheet: number,
     bytes: Uint8Array,

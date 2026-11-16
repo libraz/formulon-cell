@@ -4,7 +4,6 @@ import {
   type ChartSeriesPatch,
   type DrawingAnchorInput,
   type DrawingAnchorPatch,
-  DrawingObjectKind,
   ChartSeriesDirection as EngineSeriesDirection,
 } from '@libraz/formulon';
 import {
@@ -44,7 +43,10 @@ import { formatSheetAbsoluteRange } from '../wrappers/toolbar-a1.js';
 import type { History } from './history.js';
 import type { InteractionOrigin, OperationIntent } from './interaction-policy.js';
 import { objectChangeAllowed, objectWrite } from './object-actions.js';
-import type { SessionIllustrationArrangeAction } from './session-illustration.js';
+import {
+  planDrawingArrange,
+  type SessionIllustrationArrangeAction,
+} from './session-illustration.js';
 
 /** Placement of a chart frame: its anchor kind, top-left cell and offset inside it, and its size, in EMU.
  *  A zero or omitted size keeps the current one. */
@@ -632,8 +634,8 @@ export function clearSessionChart(
 }
 
 /**
- * Move a chart in its sheet's stacking order among the sheet's charts, the way
- * the spreadsheet's Bring to Front and Send to Back do. Returns null, changing
+ * Move a chart in its sheet's stacking order across every drawing kind, the way
+ * the spreadsheet's arrange commands do. Returns null, changing
  * nothing, when the chart is already there or the change is refused.
  */
 export function arrangeSessionChart(
@@ -649,26 +651,9 @@ export function arrangeSessionChart(
   const intent = chartIntent(chartCells(chart), 'chartArrange', authorization);
   return writeChart(store, history, intent, null, () => {
     const { sheet, nativeObjectId } = chart;
-    // Charts keep the slots they hold among the sheet's drawings, so pictures stay put.
-    const slots = wb
-      .listDrawingObjects(sheet)
-      .flatMap((object, index) => (object.kind === DrawingObjectKind.Chart ? [index] : []));
-    const rank = wb
-      .listDrawingObjects(sheet)
-      .filter((object) => object.kind === DrawingObjectKind.Chart)
-      .findIndex((object) => object.objectId === nativeObjectId);
-    if (rank < 0) return null;
-    const targetRank =
-      action === 'bring-front'
-        ? slots.length - 1
-        : action === 'send-back'
-          ? 0
-          : action === 'bring-forward'
-            ? Math.min(slots.length - 1, rank + 1)
-            : Math.max(0, rank - 1);
-    const from = slots[rank];
-    const to = slots[targetRank];
-    if (from === undefined || to === undefined || from === to) return null;
+    const plan = planDrawingArrange(store.getState(), sheet, id, action, wb);
+    if (!plan?.engine || plan.engine.from === plan.engine.to) return null;
+    const { from, to } = plan.engine;
     const sync = (): SessionChart | null => syncChartFromEngine(wb, store, sheet, nativeObjectId);
     if (!wb.setDrawingZOrder(sheet, nativeObjectId, to)) return null;
     const arranged = sync();

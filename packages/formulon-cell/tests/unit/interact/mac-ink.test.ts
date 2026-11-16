@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import {
@@ -31,6 +34,45 @@ const firePointer = (
   target.dispatchEvent(event);
   return event;
 };
+
+const styleRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../src/styles/core');
+const readStyle = (file: string): string => readFileSync(resolve(styleRoot, file), 'utf8');
+
+/** The z-index tiers of base.css, resolved from `--fc-z-base`. */
+const tiers = (): Map<string, number> => {
+  const css = readStyle('base.css');
+  const base = Number(/--fc-z-base: (\d+);/.exec(css)?.[1]);
+  const values = new Map([['base', base]]);
+  for (const [, name, offset] of css.matchAll(
+    /--fc-z-([a-z]+): calc\(var\(--fc-z-base\) \+ (\d+)\);/g,
+  )) {
+    values.set(name as string, base + Number(offset));
+  }
+  return values;
+};
+
+/** A z-index value: a number, or `calc(var(--fc-z-tier, fallback) + n)` resolved
+ *  against the tiers, whose fallback must agree. */
+const resolveZ = (value: string, values: Map<string, number>): number => {
+  if (/^\d+$/.test(value.trim())) return Number(value);
+  const match = /var\(--fc-z-([a-z]+),\s*(\d+)\)(?:\s*\+\s*(\d+))?/.exec(value);
+  if (!match) throw new Error(`unresolved z-index ${value}`);
+  const tier = values.get(match[1] as string);
+  expect(Number(match[2]), `fallback of --fc-z-${match[1]}`).toBe(tier);
+  return (tier ?? Number.NaN) + Number(match[3] ?? 0);
+};
+
+/** The literal z-index of `selector` in `file`. */
+const cssZ = (file: string, selector: string): number =>
+  Number(
+    new RegExp(`${selector.replace(/[.]/g, '\\.')} \\{[^}]*?z-index: (\\d+);`).exec(
+      readStyle(file),
+    )?.[1],
+  );
+
+/** The z-index written into an element's style attribute. */
+const inlineZ = (element: Element | null): string =>
+  /z-index:\s*([^;]+);/.exec(element?.getAttribute('style') ?? '')?.[1] ?? '';
 
 const flushPlatformObserver = async (): Promise<void> => {
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -87,6 +129,30 @@ describe('Mac ink controller', () => {
     expect(controller?.activate('lasso')).toBe(false);
     expect(controller?.activate('add-pen')).toBe(false);
     expect(host.querySelector('.fc-mac-ink__input')).toBeNull();
+  });
+
+  it('stacks the ink over the drawings and under the in-grid panels', () => {
+    controller = ensureMacInk({ host, store });
+    expect(controller?.activate('pen-black')).toBe(true);
+    const values = tiers();
+    const chrome = Math.max(
+      cssZ('surface/grid-editor.css', '.fc-host__editor'),
+      cssZ('surface/scrollbars.css', '.fc-scrolltrack'),
+      cssZ('surface/scrollbars.css', '.fc-scrollthumb'),
+      cssZ('surface/sheetbar.css', '.fc-host__sheetbar-drop'),
+    );
+    const drawingCss = /\.fc-drawings \{[^}]*?z-index: ([^;]+);/.exec(
+      readStyle('app/overlays/quick-analysis-and-charts.css'),
+    )?.[1];
+    const drawing = resolveZ(drawingCss ?? '', values);
+    const display = resolveZ(inlineZ(host.querySelector('.fc-mac-ink__display')), values);
+    const input = resolveZ(inlineZ(host.querySelector('.fc-mac-ink__input')), values);
+    const grid = values.get('grid') ?? Number.NaN;
+    expect(chrome).toBeGreaterThan(0);
+    expect(chrome).toBeLessThan(drawing);
+    expect(drawing).toBeLessThan(display);
+    expect(display).toBeLessThan(input);
+    expect(input).toBeLessThan(grid);
   });
 
   it('gets an existing controller without creating one', () => {

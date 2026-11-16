@@ -406,7 +406,7 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
     'data-fc-mac-ink-display': 'true',
   });
   display.style.cssText =
-    'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1002;';
+    'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:calc(var(--fc-z-drawing, 16777004) + 1);';
   grid.appendChild(display);
   const displayClipId = nextClipId();
   const inputClipId = nextClipId();
@@ -712,7 +712,7 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
       role: 'application',
     });
     input.style.cssText =
-      'position:absolute;inset:0;width:100%;height:100%;z-index:1003;touch-action:none;overflow:visible;';
+      'position:absolute;inset:0;width:100%;height:100%;z-index:calc(var(--fc-z-drawing, 16777004) + 2);touch-action:none;overflow:visible;';
     input.addEventListener('pointerdown', onPointerDown);
     input.addEventListener('pointermove', onPointerMove);
     input.addEventListener('pointerup', onPointerUp);

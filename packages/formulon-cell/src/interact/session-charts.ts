@@ -18,6 +18,11 @@ import {
   updateSessionChart,
 } from '../commands/session-chart.js';
 import {
+  arrangeStackPosition,
+  drawingArrangeStack,
+  drawingPanelZIndex,
+} from '../commands/session-illustration.js';
+import {
   ANCHOR_KIND_ABSOLUTE,
   drawingClipPath,
   nearestGridline,
@@ -73,6 +78,7 @@ import {
   type SessionChartSettingsLabels,
 } from './session-chart-settings-labels.js';
 import type { SessionChartSettingsShape } from './session-chart-settings-model.js';
+import { acquireDrawingRoot } from './session-illustrations.js';
 
 export interface SessionChartsHandle {
   refresh(): void;
@@ -298,7 +304,8 @@ export function attachSessionCharts(deps: {
   let labels: SessionChartLabels = { ...DEFAULT_LABELS, ...deps.labels };
   const root = document.createElement('div');
   root.className = 'fc-charts';
-  (deps.layer ?? host).appendChild(root);
+  const drawings = acquireDrawingRoot(deps.layer ?? host);
+  drawings.root.appendChild(root);
   let selectedId: string | null = null;
   let settings: SessionChartSettingsHandle;
 
@@ -403,12 +410,13 @@ export function attachSessionCharts(deps: {
 
   const updateSelectionClasses = (): void => {
     syncSelection();
-    const panels = Array.from(root.querySelectorAll<HTMLElement>('.fc-chart'));
-    for (const [index, panel] of panels.entries()) {
+    const state = store.getState();
+    const zIndex = drawingPanelZIndex(state, state.data.sheetIndex, getWb(), selectedId);
+    for (const panel of root.querySelectorAll<HTMLElement>('.fc-chart')) {
       const selected = panel.dataset.chartId === selectedId;
       panel.classList.toggle('fc-chart--selected', selected);
       panel.setAttribute('aria-selected', selected ? 'true' : 'false');
-      panel.style.zIndex = selected ? String(panels.length + 1) : String(index + 1);
+      panel.style.zIndex = zIndex(panel.dataset.chartId ?? '');
     }
     syncParts();
   };
@@ -543,8 +551,10 @@ export function attachSessionCharts(deps: {
   /** The chart's right-click menu, in the spreadsheet's order. */
   const openMenu = (chart: SessionChart, panel: HTMLElement, x: number, y: number): void => {
     const state = store.getState();
-    const sheetCharts = state.charts.charts.filter((entry) => entry.sheet === chart.sheet);
-    const rank = sheetCharts.findIndex((entry) => entry.id === chart.id);
+    const { atFront, atBack } = arrangeStackPosition(
+      drawingArrangeStack(state, chart.sheet, chart.id, getWb()),
+      chart.id,
+    );
     const arrangeable = chartWorkbook() !== null && canEditChart(chart);
     const arrange = (action: 'bring-front' | 'send-back'): void => {
       const wb = chartWorkbook();
@@ -574,13 +584,13 @@ export function attachSessionCharts(deps: {
       {
         id: 'bringToFront',
         label: labels.bringToFront,
-        disabled: !arrangeable || rank === sheetCharts.length - 1,
+        disabled: !arrangeable || atFront,
         run: () => arrange('bring-front'),
       },
       {
         id: 'sendToBack',
         label: labels.sendToBack,
-        disabled: !arrangeable || rank === 0,
+        disabled: !arrangeable || atBack,
         run: () => arrange('send-back'),
       },
     );
@@ -739,7 +749,8 @@ export function attachSessionCharts(deps: {
     const adopted = adoptSelection(state, charts);
     // Another object took the selection, and the focus with it.
     const left = held !== null && selectedId === null;
-    charts.forEach((chart, index) => {
+    const zIndex = drawingPanelZIndex(state, state.data.sheetIndex, getWb(), selectedId);
+    charts.forEach((chart) => {
       const drawable = isDrawable(chart);
       if (drawable) visibleChartIds.add(chart.id);
       const position = sessionPosition(store, chart.nativeAnchor);
@@ -764,7 +775,7 @@ export function attachSessionCharts(deps: {
       panel.style.width = `${position.w}px`;
       panel.style.height = `${position.h}px`;
       panel.style.clipPath = drawingClipPath(store, chart.nativeAnchor, position);
-      panel.style.zIndex = chart.id === selectedId ? String(charts.length + 1) : String(index + 1);
+      panel.style.zIndex = zIndex(chart.id);
       panel.classList.toggle('fc-chart--selected', chart.id === selectedId);
       panel.classList.toggle('fc-chart--fixed', !placeable);
       panel.addEventListener('focus', () => {
@@ -918,6 +929,7 @@ export function attachSessionCharts(deps: {
       settings.detach();
       selectData?.detach();
       root.remove();
+      drawings.release();
     },
   };
 }

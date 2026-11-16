@@ -1,4 +1,4 @@
-import { AnchorEditAs, AnchorKind, DrawingObjectKind } from '@libraz/formulon';
+import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
 import {
   cellOrigin,
   DUPLICATE_OFFSET_PX,
@@ -17,6 +17,7 @@ import {
   type SessionIllustration,
   type SessionShapeKind,
   type SpreadsheetStore,
+  type State,
 } from '../store/store.js';
 import type { History } from './history.js';
 import type { InteractionOrigin } from './interaction-policy.js';
@@ -729,62 +730,182 @@ const placeIllustrationCopy = (
   return copy;
 };
 
-const reorderIllustrations = (
-  illustrations: readonly SessionIllustration[],
+/** One drawing of a sheet's stack; `objectId` is set while the engine lists it. */
+export interface DrawingStackEntry {
+  readonly id: string;
+  readonly chart: boolean;
+  readonly objectId: number | null;
+}
+
+type DrawingState = Pick<State, 'charts' | 'illustrations'>;
+
+/**
+ * A sheet's charts, pictures and shapes, back to front. Saved objects follow the
+ * engine's drawing order. A session-only picture or shape sits right under the
+ * next picture or shape of the store, or on top when none follows: the store
+ * cannot hold its place between charts.
+ */
+export function sheetDrawingStack(
+  state: DrawingState,
+  sheet: number,
+  wb?: WorkbookHandle | null,
+): DrawingStackEntry[] {
+  const charts = state.charts.charts.filter((chart) => chart.sheet === sheet);
+  const items = state.illustrations.illustrations.filter((item) => item.sheet === sheet);
+  const byObject = new Map<number, DrawingStackEntry>();
+  for (const chart of charts) {
+    byObject.set(chart.nativeObjectId, {
+      id: chart.id,
+      chart: true,
+      objectId: chart.nativeObjectId,
+    });
+  }
+  for (const item of items) {
+    if (item.nativeObjectId === undefined) continue;
+    byObject.set(item.nativeObjectId, { id: item.id, chart: false, objectId: item.nativeObjectId });
+  }
+  const stack: DrawingStackEntry[] = [];
+  const listed = new Set<string>();
+  for (const object of wb?.capabilities.drawings ? wb.listDrawingObjects(sheet) : []) {
+    const entry = byObject.get(object.objectId);
+    if (!entry || listed.has(entry.id)) continue;
+    stack.push(entry);
+    listed.add(entry.id);
+  }
+  // A chart the engine does not list keeps the store's order, on top.
+  for (const chart of charts) {
+    if (!listed.has(chart.id)) stack.push({ id: chart.id, chart: true, objectId: null });
+  }
+  let above: DrawingStackEntry | undefined;
+  for (const item of [...items].reverse()) {
+    if (listed.has(item.id)) {
+      above = stack.find((entry) => entry.id === item.id);
+      continue;
+    }
+    const entry: DrawingStackEntry = { id: item.id, chart: false, objectId: null };
+    stack.splice(above ? stack.indexOf(above) : stack.length, 0, entry);
+    above = entry;
+  }
+  return stack;
+}
+
+/** The part of `stack` that `entry` moves through: a chart cannot pass a
+ *  session-only picture or shape, which cannot pass a chart. */
+const arrangePeers = (
+  stack: readonly DrawingStackEntry[],
+  entry: DrawingStackEntry,
+): DrawingStackEntry[] => {
+  if (entry.chart) return stack.filter((peer) => peer.chart || peer.objectId !== null);
+  if (entry.objectId === null) return stack.filter((peer) => !peer.chart);
+  return [...stack];
+};
+
+/** The stack `id` moves through on `sheet`, listed back to front, for the
+ *  enable rules of the arrange commands. */
+export function drawingArrangeStack(
+  state: DrawingState,
+  sheet: number,
+  id: string,
+  wb?: WorkbookHandle | null,
+): DrawingStackEntry[] {
+  const stack = sheetDrawingStack(state, sheet, wb);
+  const entry = stack.find((candidate) => candidate.id === id);
+  return entry ? arrangePeers(stack, entry) : stack;
+}
+
+/** A planned arrange step: the sheet's stack after it, and the engine index the
+ *  object moves `from` and `to` when the engine lists it. */
+export interface DrawingArrangePlan {
+  readonly stack: readonly DrawingStackEntry[];
+  readonly entry: DrawingStackEntry;
+  readonly engine: { readonly from: number; readonly to: number } | null;
+}
+
+/** Plan moving `id` one step or to an end of its sheet's stack, the way the
+ *  spreadsheet's arrange commands do for every kind; null when it is already there. */
+export function planDrawingArrange(
+  state: DrawingState,
+  sheet: number,
   id: string,
   action: SessionIllustrationArrangeAction,
-): readonly SessionIllustration[] | null => {
-  const item = illustrations.find((candidate) => candidate.id === id);
-  if (!item) return null;
-  const sameSheet = illustrations.filter((candidate) => candidate.sheet === item.sheet);
-  const currentIndex = sameSheet.findIndex((candidate) => candidate.id === id);
-  if (currentIndex < 0) return null;
-  const targetIndex =
+  wb?: WorkbookHandle | null,
+): DrawingArrangePlan | null {
+  const stack = sheetDrawingStack(state, sheet, wb);
+  const entry = stack.find((candidate) => candidate.id === id);
+  if (!entry) return null;
+  const peers = arrangePeers(stack, entry);
+  const rank = peers.indexOf(entry);
+  const target =
     action === 'bring-front'
-      ? sameSheet.length - 1
+      ? peers.length - 1
       : action === 'send-back'
         ? 0
         : action === 'bring-forward'
-          ? Math.min(sameSheet.length - 1, currentIndex + 1)
-          : Math.max(0, currentIndex - 1);
-  if (targetIndex === currentIndex) return null;
+          ? Math.min(peers.length - 1, rank + 1)
+          : Math.max(0, rank - 1);
+  const passed = peers[target];
+  if (target === rank || !passed) return null;
+  const next = stack.filter((candidate) => candidate !== entry);
+  next.splice(next.indexOf(passed) + (target > rank ? 1 : 0), 0, entry);
+  return { stack: next, entry, engine: wb ? engineMove(wb, sheet, next, entry) : null };
+}
 
-  const reorderedSameSheet = sameSheet.filter((candidate) => candidate.id !== id);
-  reorderedSameSheet.splice(targetIndex, 0, item);
-  let sheetCursor = 0;
-  return illustrations.map((candidate) => {
-    if (candidate.sheet !== item.sheet) return candidate;
-    const next = reorderedSameSheet[sheetCursor];
-    sheetCursor += 1;
-    return next ?? candidate;
-  });
+/** The engine index `entry` moves from, and the one that puts it right over the
+ *  nearest saved object under it in `stack`. */
+const engineMove = (
+  wb: WorkbookHandle,
+  sheet: number,
+  stack: readonly DrawingStackEntry[],
+  entry: DrawingStackEntry,
+): { from: number; to: number } | null => {
+  if (entry.objectId === null) return null;
+  const objects = wb.listDrawingObjects(sheet);
+  const from = objects.findIndex((object) => object.objectId === entry.objectId);
+  if (from < 0) return null;
+  const rest = objects.filter((object) => object.objectId !== entry.objectId);
+  const at = stack.indexOf(entry);
+  const below = stack
+    .slice(0, at)
+    .reverse()
+    .find((candidate) => candidate.objectId !== null);
+  const above = stack.slice(at + 1).find((candidate) => candidate.objectId !== null);
+  const to =
+    above === undefined
+      ? rest.length
+      : below === undefined
+        ? 0
+        : rest.findIndex((object) => object.objectId === below.objectId) + 1;
+  return { from, to };
 };
 
-/** Engine index to move a native picture to so its stacking among pictures
- * matches `arranged`, or null when it already sits there. Charts and other
- * objects keep their slots: the picture takes the slot of the picture that
- * currently holds its new rank. */
-const nativeZTarget = (
-  wb: WorkbookHandle,
-  item: SessionIllustration,
-  arranged: readonly SessionIllustration[],
-): { from: number; to: number } | null => {
-  const objects = wb.listDrawingObjects(item.sheet);
-  const from = objects.findIndex((object) => object.objectId === item.nativeObjectId);
-  if (from < 0) return null;
-  const rank = arranged
-    .filter(
-      (candidate) =>
-        candidate.sheet === item.sheet &&
-        candidate.kind === 'image' &&
-        candidate.nativeObjectId !== undefined,
-    )
-    .findIndex((candidate) => candidate.id === item.id);
-  const slots = objects.flatMap((object, index) =>
-    object.kind === DrawingObjectKind.Picture ? [index] : [],
-  );
-  const to = slots[rank];
-  return rank < 0 || to === undefined || to === from ? null : { from, to };
+/** The z-index of each drawing panel on `sheet`: its place in the stack from 1,
+ *  and the selected panel over every kind. */
+export function drawingPanelZIndex(
+  state: DrawingState,
+  sheet: number,
+  wb: WorkbookHandle | null | undefined,
+  selectedId: string | null,
+): (id: string) => string {
+  const stack = sheetDrawingStack(state, sheet, wb);
+  return (id) =>
+    String(id === selectedId ? stack.length + 1 : stack.findIndex((entry) => entry.id === id) + 1);
+}
+
+/** `illustrations` with `sheet`'s items in the order of `stack`. */
+const illustrationsInStackOrder = (
+  illustrations: readonly SessionIllustration[],
+  sheet: number,
+  stack: readonly DrawingStackEntry[],
+): readonly SessionIllustration[] => {
+  const byId = new Map(illustrations.map((item) => [item.id, item] as const));
+  const ordered = stack.flatMap((entry) => byId.get(entry.id) ?? []);
+  let cursor = 0;
+  return illustrations.map((item) => {
+    if (item.sheet !== sheet) return item;
+    const next = ordered[cursor];
+    cursor += 1;
+    return next ?? item;
+  });
 };
 
 /** Where `activeId` sits in a sheet's drawing stack, listed back to front:
@@ -819,23 +940,27 @@ export function arrangeSessionIllustration(
     item.sheet,
     null,
     () => {
-      const arranged = reorderIllustrations(state.illustrations.illustrations, id, action);
-      if (!arranged) return null;
-      if (item.nativeObjectId !== undefined) {
-        // The engine orders pictures and charts only; a saved shape keeps its slot.
-        if (item.kind === 'shape' || !wb?.capabilities.drawings) return null;
-        const z = nativeZTarget(wb, item, arranged);
-        if (!z || !wb.setDrawingZOrder(item.sheet, item.nativeObjectId, z.to)) return null;
+      const { nativeObjectId } = item;
+      if (nativeObjectId !== undefined && !wb?.capabilities.drawings) return null;
+      const plan = planDrawingArrange(state, item.sheet, id, action, wb);
+      if (!plan) return null;
+      const arranged = illustrationsInStackOrder(
+        state.illustrations.illustrations,
+        item.sheet,
+        plan.stack,
+      );
+      if (nativeObjectId !== undefined) {
+        const z = plan.engine;
+        if (!wb || !z || !wb.setDrawingZOrder(item.sheet, nativeObjectId, z.to)) return null;
         const before = state.illustrations.illustrations;
         const apply = (list: readonly SessionIllustration[]): void =>
           store.setState((current) => ({ ...current, illustrations: { illustrations: list } }));
         apply(arranged);
         if (history && !history.isReplaying()) {
-          const nativeObjectId = item.nativeObjectId;
           const replay = (origin: 'undo' | 'redo', index: number, list: typeof before): void => {
             const current = sessionIllustrationById(store.getState(), id);
             if (!current || !wb.setDrawingZOrder(item.sheet, nativeObjectId, index)) {
-              throw new Error(`image arrange ${origin} failed`);
+              throw new Error(`drawing arrange ${origin} failed`);
             }
             apply(list);
           };
