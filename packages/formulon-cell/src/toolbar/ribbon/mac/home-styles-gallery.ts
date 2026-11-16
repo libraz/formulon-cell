@@ -100,15 +100,16 @@ export const createMacCellStylesGallery = (opts: MacCellStylesGalleryOptions): H
   syncActive();
   const inst = getInst();
   if (inst) {
-    let attached = false;
+    // The ribbon re-renders often; drop the subscription once this strip has left the page.
+    // The strip is attached by its caller right after creation, so the first check waits a tick.
+    let settled = false;
     const unsubscribe = inst.store.subscribe(() => {
-      // The ribbon re-renders often; drop the subscription once this strip has left the page.
-      if (!wrap.isConnected) {
-        if (attached) unsubscribe();
-        return;
-      }
-      attached = true;
-      syncActive();
+      if (wrap.isConnected) syncActive();
+      else if (settled) unsubscribe();
+    });
+    queueMicrotask(() => {
+      settled = true;
+      if (!wrap.isConnected) unsubscribe();
     });
   }
 

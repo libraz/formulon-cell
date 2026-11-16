@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/address.js';
 import type { SpreadsheetInstance } from '../../../src/mount/types.js';
-import { createSpreadsheetStore } from '../../../src/store/store.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 import { createMacCellStylesGallery } from '../../../src/toolbar/ribbon/mac/home-styles-gallery.js';
 
 const build = () => {
@@ -69,6 +69,56 @@ describe('Mac Home cell styles gallery', () => {
     expect(gallery.querySelector('[data-cell-style="good"]')?.getAttribute('aria-pressed')).toBe(
       'true',
     );
+  });
+});
+
+describe('Mac Home cell styles gallery subscription', () => {
+  const watch = () => {
+    const store = createSpreadsheetStore();
+    let live = 0;
+    const subscribe = store.subscribe.bind(store);
+    store.subscribe = ((listener: Parameters<typeof subscribe>[0]) => {
+      live += 1;
+      const off = subscribe(listener);
+      return () => {
+        live -= 1;
+        off();
+      };
+    }) as typeof store.subscribe;
+    const inst = {
+      host: document.createElement('div'),
+      store,
+      history: new History(),
+      workbook: null,
+    } as unknown as SpreadsheetInstance;
+    const gallery = createMacCellStylesGallery({
+      lang: 'ja',
+      getInst: () => inst,
+      arrow: document.createElement('button'),
+      menu: null,
+    });
+    return { store, gallery, live: () => live };
+  };
+
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  it('drops the subscription of a strip discarded before any notification', async () => {
+    const { live } = watch();
+    expect(live()).toBe(1);
+    await Promise.resolve();
+    expect(live()).toBe(0);
+  });
+
+  it('drops the subscription at the first notification after the strip leaves the page', async () => {
+    const { store, gallery, live } = watch();
+    document.body.appendChild(gallery);
+    await Promise.resolve();
+    expect(live()).toBe(1);
+    gallery.remove();
+    mutators.setActive(store, { sheet: 0, row: 1, col: 0 });
+    expect(live()).toBe(0);
   });
 });
 
