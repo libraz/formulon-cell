@@ -588,30 +588,31 @@ export function mountToolbar(
   // the live `borderStyle/borderColor` via getters so the borders submenu
   // always picks the most recent value. The host may still override
   // individual helpers/menus/hooks by spreading on top.
-  const defaultsInstance = initialInstance;
+  let defaultsInstance: SpreadsheetInstance | null = null;
   let mergedHelpers: RibbonRenderHelpers;
   let mergedMenus: RibbonMenus;
   const rebuildLocalizedDefaults = (): void => {
-    const defaultHelpers: RibbonRenderHelpers | null = defaultsInstance
-      ? createDefaultRibbonHelpers(defaultsInstance, {
+    const bound = defaultsInstance;
+    const defaultHelpers: RibbonRenderHelpers | null = bound
+      ? createDefaultRibbonHelpers(bound, {
           lang,
           focusSheet,
           refreshCells,
           projectFormatToolbar,
         })
       : null;
-    const defaultMenus: RibbonMenus = defaultsInstance
-      ? createDefaultRibbonMenus(defaultsInstance, {
+    const defaultMenus: RibbonMenus = bound
+      ? createDefaultRibbonMenus(bound, {
           lang,
           getBorderColor: () => borderColor,
           setBorderColor: (color) => {
             borderColor = color;
-            defaultsInstance.borderDraw?.setColor(color);
+            bound.borderDraw?.setColor(color);
           },
         })
       : {};
-    const defaultHooks: RibbonHooks = defaultsInstance
-      ? createDefaultRibbonHooks(defaultsInstance, { lang, refreshZoom })
+    const defaultHooks: RibbonHooks = bound
+      ? createDefaultRibbonHooks(bound, { lang, refreshZoom })
       : {};
 
     mergedHelpers = {
@@ -633,13 +634,13 @@ export function mountToolbar(
       }
     }
   };
-  rebuildLocalizedDefaults();
-
   // Auto-wire the default dynamic-dropdowns delegation when the host opts in;
   // dispose detaches its document listeners so they do not leak across re-mounts.
   let dropdownsDelegation: DynamicDropdownDelegation | null = null;
   let dropdownsApi: DynamicDropdownsApi | null = null;
-  if (opts.dynamicDropdowns) {
+  const attachDropdowns = (): void => {
+    if (!opts.dynamicDropdowns) return;
+    dropdownsDelegation?.detach();
     dropdownsDelegation = attachDynamicDropdownDelegation(opts.dynamicDropdowns, {
       defaultsInstance,
       getInstance,
@@ -653,7 +654,20 @@ export function mountToolbar(
       onMenuClosedByCommand: () => dismissRibbonPeek(),
     });
     dropdownsApi = dropdownsDelegation.api;
-  }
+  };
+  // Everything built from the instance is rebuilt when the getter starts
+  // returning a different one (a deferred mount, or a swap). True when it did.
+  let defaultsBound = false;
+  const syncInstanceDefaults = (): boolean => {
+    const current = getInstance();
+    if (defaultsBound && current === defaultsInstance) return false;
+    defaultsBound = true;
+    defaultsInstance = current;
+    rebuildLocalizedDefaults();
+    attachDropdowns();
+    return true;
+  };
+  syncInstanceDefaults();
   const detachTableStyleContextMenu = attachTableStyleContextMenu(
     host,
     getInstance,
@@ -1235,6 +1249,7 @@ export function mountToolbar(
     renderToolbar();
   };
   const ensureStoreSubscription = (): void => {
+    if (syncInstanceDefaults()) renderApi = createRibbonRenderer();
     const current = getInstance();
     if (current === subscribedInstance) {
       syncInheritedPlatform(current);
