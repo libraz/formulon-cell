@@ -263,89 +263,62 @@ export interface DemoF6NavigationTargets {
   getInstance: () => SpreadsheetInstance | null | undefined;
 }
 
-const isVisibleDemoLandmark = (el: HTMLElement | null | undefined): el is HTMLElement =>
-  !!el && el.isConnected && !el.hidden && el.getAttribute('aria-hidden') !== 'true';
-
 const focusFirstFocusable = (root: HTMLElement): boolean => {
-  const target = root.matches(
-    'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), [tabindex]',
-  )
-    ? root
-    : root.querySelector<HTMLElement>(
-        'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), [tabindex]',
-      );
+  const selector =
+    'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), [tabindex]';
+  const target = root.matches(selector) ? root : root.querySelector<HTMLElement>(selector);
   if (!target) return false;
   target.focus({ preventScroll: true });
   return document.activeElement === target;
 };
 
+/**
+ * F6 for the part of the demo outside the mount: the title bar and the ribbon are siblings of the
+ * sheet, so the core ring (which lives on the mount element) cannot see them. This joins them to
+ * the ends of that ring: the ring's first stop (Name Box) steps back to them with Shift+F6 and its
+ * last stop (status bar) steps forward to them; from them F6 re-enters the ring at the Name Box and
+ * Shift+F6 at the status bar.
+ */
 export const installDemoF6Navigation = ({
   getQuickAccess,
   getToolbar,
   getInstance,
 }: DemoF6NavigationTargets): (() => void) => {
-  const getNameBox = (): HTMLInputElement | null =>
-    getInstance()?.host.querySelector<HTMLInputElement>('.fc-host__formulabar-tag') ?? null;
-  const getStatusBar = (): HTMLElement | null =>
-    getInstance()?.host.querySelector<HTMLElement>('.fc-host__statusbar') ?? null;
-  const containsActive = (el: HTMLElement | null | undefined): boolean =>
-    !!el && document.activeElement instanceof Node && el.contains(document.activeElement);
-  const focusers = [
-    () => {
-      const quick = getQuickAccess();
-      return isVisibleDemoLandmark(quick) && focusFirstFocusable(quick);
-    },
-    () => getToolbar()?.focusActiveTab() ?? false,
-    () => {
-      const nameBox = getNameBox();
-      if (!isVisibleDemoLandmark(nameBox)) return false;
-      nameBox.focus({ preventScroll: true });
-      nameBox.select();
-      return document.activeElement === nameBox;
-    },
-    () => {
-      const instance = getInstance();
-      if (!instance || !isVisibleDemoLandmark(instance.host)) return false;
-      instance.focus();
-      return instance.host.contains(document.activeElement);
-    },
-    () => {
-      const status = getStatusBar();
-      if (!isVisibleDemoLandmark(status)) return false;
-      status.focus({ preventScroll: true });
-      return document.activeElement === status;
-    },
-  ] as const;
-  const currentIndex = (): number => {
-    if (containsActive(getQuickAccess())) return 0;
-    if (containsActive(getToolbar()?.host)) return 1;
-    const active = document.activeElement;
-    const nameBox = getNameBox();
-    if (active === nameBox || containsActive(nameBox?.closest<HTMLElement>('.fc-host__formulabar')))
-      return 2;
-    const status = getStatusBar();
-    if (active === status || containsActive(status)) return 4;
-    if (containsActive(getInstance()?.host)) return 3;
-    return -1;
+  const contains = (el: Element | null | undefined, active: Element | null): boolean =>
+    !!el && !!active && el.contains(active);
+  const enterOutside = (): boolean => {
+    const quick = getQuickAccess();
+    if (quick?.isConnected && !quick.hidden && focusFirstFocusable(quick)) return true;
+    return getToolbar()?.focusActiveTab() ?? false;
   };
   const onKeydown = (event: KeyboardEvent): void => {
     if (event.key !== 'F6' || event.ctrlKey || event.metaKey || event.altKey) return;
+    const host = getInstance()?.host;
     const active = document.activeElement;
-    if (
-      active instanceof Element &&
-      active.closest('.fc-tb__dlg, .fc-fmtdlg, .fc-tb__menu, .fc-statusbar__chooser')
-    )
-      return;
-    event.preventDefault();
-    const start = currentIndex();
-    const direction = event.shiftKey ? -1 : 1;
-    for (let step = 1; step <= focusers.length; step += 1) {
-      const next = (start + direction * step + focusers.length) % focusers.length;
-      if (focusers[next]?.()) return;
+    if (!host || host.querySelector('[data-fc-surface="modal"]')?.contains(active)) return;
+    const outside = contains(getQuickAccess(), active) || contains(getToolbar()?.host, active);
+    const nameBoxBar = host.querySelector('.fc-host__formulabar');
+    const statusBar = host.querySelector('.fc-host__statusbar');
+    const backFromRing = event.shiftKey && contains(nameBoxBar, active);
+    const forwardFromRing = !event.shiftKey && contains(statusBar, active);
+    if (outside) {
+      const target = host.querySelector<HTMLElement>(
+        event.shiftKey ? '.fc-host__statusbar' : '.fc-host__formulabar-tag',
+      );
+      if (!target) return;
+      // Handle the key here so the ring on the mount does not also move focus.
+      event.stopPropagation();
+      event.preventDefault();
+      target.focus({ preventScroll: true });
+      if (target instanceof HTMLInputElement) target.select();
+    } else if ((backFromRing || forwardFromRing) && enterOutside()) {
+      event.stopPropagation();
+      event.preventDefault();
     }
   };
-  document.addEventListener('keydown', onKeydown);
-  return () => document.removeEventListener('keydown', onKeydown);
+  // Capture on the document so this runs before the ring on the mount element.
+  document.addEventListener('keydown', onKeydown, true);
+  return () => document.removeEventListener('keydown', onKeydown, true);
 };
 
 export type PresetKey = 'minimal' | 'standard' | 'full';

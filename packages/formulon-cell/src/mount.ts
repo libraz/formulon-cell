@@ -105,6 +105,7 @@ import { syncLocaleProfile } from './mount/locale-profile.js';
 import { attachPivotFieldListFollow } from './mount/pivot-field-list-follow.js';
 import { createPrinterProfiles } from './mount/printer-profiles.js';
 import { createAllowedRangeUnlockUi } from './mount/range-unlock-ui.js';
+import { attachRegionCycle } from './mount/region-cycle.js';
 import { createRibbonHost } from './mount/ribbon-host.js';
 import {
   attachSheetTabsController,
@@ -845,6 +846,10 @@ export const Spreadsheet = {
       getInstance: () => instance,
       getLocale: () => i18n.locale,
     });
+    const detachRegionCycle = attachRegionCycle({
+      host,
+      focusRibbonTab: () => ribbon.getToolbar()?.focusActiveTab() ?? false,
+    });
     let requestedToolbar = opts.toolbar ?? false;
     // Theme the host set itself; `setUi` falls back to the ui default only without it.
     let hostTheme = opts.theme;
@@ -1299,6 +1304,7 @@ export const Spreadsheet = {
         cleanup(() => closeSheetViewOptionsDialog(instance));
         cleanup(() => disposeMacPivotMoveDialog(instance));
         cleanup(() => disposeDataTableDialog(instance));
+        cleanup(detachRegionCycle);
         cleanup(() => ribbon.dispose());
         cleanup(() => emitter.dispose());
         cleanup(() => ro.disconnect());
