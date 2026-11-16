@@ -348,6 +348,11 @@ export const ribbonZh: RibbonStrings = {
     pen: '笔',
     eraser: '橡皮擦',
     disabled: '即将推出',
+    helpSearch: {
+      label: '帮助和培训',
+      hint: '搜索帮助、支持和操作方法',
+      keywords: '帮助 培训 支持 操作方法 help support training',
+    },
     tabs: {
       file: '文件',
       home: '开始',

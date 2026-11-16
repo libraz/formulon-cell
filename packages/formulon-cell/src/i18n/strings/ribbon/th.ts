@@ -348,6 +348,11 @@ export const ribbonTh: RibbonStrings = {
     pen: 'ปากกา',
     eraser: 'ยางลบ',
     disabled: 'เร็วๆ นี้',
+    helpSearch: {
+      label: 'ความช่วยเหลือและการฝึกอบรม',
+      hint: 'ค้นหาความช่วยเหลือ การสนับสนุน และวิธีใช้งาน',
+      keywords: 'ความช่วยเหลือ การฝึกอบรม การสนับสนุน วิธีใช้ help support training',
+    },
     tabs: {
       file: 'ไฟล์',
       home: 'หน้าแรก',

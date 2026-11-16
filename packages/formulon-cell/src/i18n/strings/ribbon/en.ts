@@ -350,6 +350,11 @@ export const ribbonEn: RibbonStrings = {
     pen: 'Pen',
     eraser: 'Eraser',
     disabled: 'Coming soon',
+    helpSearch: {
+      label: 'Help and training',
+      hint: 'Search help, support, and how-to topics',
+      keywords: 'help training support how to tell me search',
+    },
     tabs: {
       file: 'File',
       home: 'Home',

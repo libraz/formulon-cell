@@ -351,6 +351,11 @@ export const ribbonJa: RibbonStrings = {
     pen: 'ペン',
     eraser: '消しゴム',
     disabled: '未実装',
+    helpSearch: {
+      label: 'ヘルプとトレーニング',
+      hint: 'ヘルプ、サポート、使い方を検索',
+      keywords: 'ヘルプ トレーニング サポート 使い方 help support training',
+    },
     tabs: {
       file: 'ファイル',
       home: 'ホーム',

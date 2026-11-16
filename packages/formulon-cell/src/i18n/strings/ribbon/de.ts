@@ -352,6 +352,11 @@ export const ribbonDe: RibbonStrings = {
     pen: 'Stift',
     eraser: 'Radierer',
     disabled: 'In Kürze verfügbar',
+    helpSearch: {
+      label: 'Hilfe und Schulung',
+      hint: 'Hilfe, Support und Anleitungen durchsuchen',
+      keywords: 'hilfe schulung training support anleitung help',
+    },
     tabs: {
       file: 'Datei',
       home: 'Start',

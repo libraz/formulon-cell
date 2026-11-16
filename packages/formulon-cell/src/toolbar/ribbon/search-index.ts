@@ -203,23 +203,6 @@ const searchCommandDisabled = (command: RibbonCommand): boolean =>
   (isRibbonActivatableCommand(command) &&
     ribbonActivationForCommand(command.id).kind === 'disabled');
 
-const helpSearchText = (
-  input: Strings | ToolbarLang,
-): { label: string; hint: string; keywords: string } => {
-  const tr = toolbarText(input);
-  return tr.tabs.help === 'ヘルプ'
-    ? {
-        label: 'ヘルプとトレーニング',
-        hint: 'ヘルプ、サポート、使い方を検索',
-        keywords: 'ヘルプ トレーニング サポート 使い方 help support training',
-      }
-    : {
-        label: 'Help and training',
-        hint: 'Search help, support, and how-to topics',
-        keywords: 'help training support how to tell me search',
-      };
-};
-
 /**
  * The ribbon's tabs and commands as search entries, in the ribbon's own labels and
  * availability: what a host's window search box ("Tell me") lists, so it finds what the
@@ -279,7 +262,7 @@ export function buildRibbonSearchIndex(
     }
   }
   if (tabs.some((tab) => tab.id === 'help')) {
-    const help = helpSearchText(input);
+    const help = tr.helpSearch;
     items.push({
       id: 'help:helpAndTraining',
       kind: 'help',

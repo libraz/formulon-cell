@@ -351,6 +351,11 @@ export const ribbonFr: RibbonStrings = {
     pen: 'Stylet',
     eraser: 'Gomme',
     disabled: 'Bientôt disponible',
+    helpSearch: {
+      label: 'Aide et formation',
+      hint: "Rechercher dans l'aide, l'assistance et les procédures",
+      keywords: 'aide formation assistance support procédure help training',
+    },
     tabs: {
       file: 'Fichier',
       home: 'Accueil',

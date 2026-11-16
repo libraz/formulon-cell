@@ -350,6 +350,11 @@ export const ribbonKo: RibbonStrings = {
     pen: '펜',
     eraser: '지우개',
     disabled: '곧 제공 예정',
+    helpSearch: {
+      label: '도움말 및 교육',
+      hint: '도움말, 지원 및 사용 방법 검색',
+      keywords: '도움말 교육 지원 사용 방법 help support training',
+    },
     tabs: {
       file: '파일',
       home: '홈',

@@ -361,6 +361,8 @@ export interface RibbonStrings {
     pen: string;
     eraser: string;
     disabled: string;
+    /** The help-and-training entry of the ribbon search index. */
+    helpSearch: { label: string; hint: string; keywords: string };
     /** Ribbon tab labels — keyed by RibbonTab id. */
     tabs: {
       file: string;
