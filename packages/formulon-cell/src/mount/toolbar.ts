@@ -84,7 +84,10 @@ import {
   hasOpenStaticRibbonMenu,
   toggleStaticRibbonSubmenu,
 } from '../toolbar/ribbon/static-menus.js';
-import { projectRibbonActiveState } from '../toolbar/ribbon-active-state.js';
+import {
+  projectDrawingCommands,
+  projectRibbonActiveState,
+} from '../toolbar/ribbon-active-state.js';
 import {
   CHART_CONTEXTUAL_RIBBON_TABS,
   CONTEXTUAL_RIBBON_TABS,
@@ -548,11 +551,14 @@ export function mountToolbar(
     const instance = getInstance();
     if (instance) mutators.setFormulaBarVisible(instance.store, formulaBarVisible);
   };
+  // Host hooks merged over the defaults; rebuilt with the localized defaults below.
+  let mergedHooks: RibbonHooks = {};
   const projectFormatToolbar = (): void => {
     projectRibbonActiveState(host, getInstance(), {
       background: text.background,
       sheetBackgroundClear: menuText.sheetBackgroundClear,
     });
+    projectDrawingCommands(host, mergedHooks.drawing?.setInkMode !== undefined);
     const instance = getInstance();
     if (instance && platform === 'mac') {
       projectMacFunctionMenus(host, instance, lang);
@@ -586,7 +592,6 @@ export function mountToolbar(
   const defaultsInstance = initialInstance;
   let mergedHelpers: RibbonRenderHelpers;
   let mergedMenus: RibbonMenus;
-  let mergedHooks: RibbonHooks;
   const rebuildLocalizedDefaults = (): void => {
     const defaultHelpers: RibbonRenderHelpers | null = defaultsInstance
       ? createDefaultRibbonHelpers(defaultsInstance, {

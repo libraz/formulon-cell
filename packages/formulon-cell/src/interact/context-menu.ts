@@ -75,13 +75,16 @@ import {
   buildPivotEntries,
   buildRowEntries,
   compactMenuEntries,
+  type DialogMenuItemId,
   type ItemId,
   isBuiltinItemId,
+  isDialogMenuItemId,
   type MenuKind,
   menuEntryToContextItem,
   PASTE_QUICK_IDS,
   PLAIN_INSERT_IDS,
   toMacBandEntries,
+  withoutMenuItems,
   withTableInsertMenu,
 } from './context-menu-spec.js';
 import {
@@ -115,6 +118,9 @@ export interface ContextMenuDeps {
   onAfterCommit?: () => void;
   /** Called when the user clicks the "Format Cells…" menu entry. */
   onFormatDialog?: () => void;
+  /** Whether the dialog behind a dialog-opening item is attached; asked each time the menu
+   *  opens, and an item whose dialog is not attached is hidden. Omitted: every one is. */
+  dialogAttached?: (id: DialogMenuItemId) => boolean;
   /** Called when the user clicks "Paste Special…". */
   onPasteSpecial?: () => void;
   /** Called when the user clicks "Define Name…". When omitted the entry is
@@ -671,7 +677,10 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       pendingSnapshot?.mode === 'cut' && wholeBandAxisFor(pendingSnapshot) === kind;
     const watched = !!deps.isWatched?.(activeAddr);
     const entries = compactMenuEntries(
-      platformEntries
+      withoutMenuItems(
+        platformEntries,
+        (id) => isDialogMenuItemId(id) && deps.dialogAttached?.(id) === false,
+      )
         .filter(
           (e) => !(e.kind === 'item' && e.id === 'insertHyperlink' && !deps.onInsertHyperlink),
         )

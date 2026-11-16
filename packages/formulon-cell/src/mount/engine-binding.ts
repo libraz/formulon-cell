@@ -449,6 +449,21 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
           getFormatDialog()?.open(undefined, {
             entry: { origin: 'contextMenu', commandId: 'formatCells' },
           }),
+        // The dialogs attach and detach with their features, so availability is read as the menu opens.
+        dialogAttached: (id) => {
+          switch (id) {
+            case 'formatCells':
+              return getFormatDialog() !== null;
+            case 'pasteSpecial':
+              return pasteSpecialDialog !== null;
+            case 'insertHyperlink':
+              return getHyperlinkDialog() !== null;
+            case 'insertComment':
+              return getCommentDialog() !== null;
+            case 'defineName':
+              return getNamedRangeDialog() !== null;
+          }
+        },
         onPasteSpecial: () =>
           pasteSpecialDialog?.open(undefined, { origin: 'contextMenu', commandId: 'pasteSpecial' }),
         onInsertHyperlink: () =>

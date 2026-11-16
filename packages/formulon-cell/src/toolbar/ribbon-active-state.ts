@@ -461,6 +461,21 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
   };
 };
 
+/** The Draw tab's Pen and Eraser set the host's ink mode; with no drawing hook they would do
+ *  nothing, so they stay greyed. Re-enables only what this projection greyed. */
+export const projectDrawingCommands = (host: HTMLElement, available: boolean): void => {
+  for (const command of ['drawPen', 'drawErase']) {
+    for (const button of host.querySelectorAll<HTMLButtonElement>(
+      `[data-ribbon-command="${command}"]`,
+    )) {
+      if (available && button.dataset.drawingHookMissing !== 'true') continue;
+      projectDisabledState(button, !available, null);
+      if (available) delete button.dataset.drawingHookMissing;
+      else button.dataset.drawingHookMissing = 'true';
+    }
+  }
+};
+
 /** Projects the active state onto the ribbon buttons under `host`. */
 export const projectRibbonActiveState = (
   host: HTMLElement,

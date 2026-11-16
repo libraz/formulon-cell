@@ -45,6 +45,32 @@ describe('Spreadsheet.mountToolbar backstage and default tabs', () => {
     full.dispose();
   });
 
+  it('greys Pen and Eraser on the Draw tab unless the host supplies a drawing hook', () => {
+    const states = () =>
+      ['drawPen', 'drawErase'].map(
+        (id) => host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${id}"]`)?.disabled,
+      );
+    const bare = Spreadsheet.mountToolbar(host, sheet.instance, {
+      helpers: stubHelpers(),
+      ribbonTabs: RIBBON_TABS,
+    });
+    bare.setActiveTab('draw');
+    expect(states()).toEqual([true, true]);
+    bare.dispose();
+
+    const setInkMode = vi.fn();
+    const inked = Spreadsheet.mountToolbar(host, sheet.instance, {
+      helpers: stubHelpers(),
+      ribbonTabs: RIBBON_TABS,
+      hooks: { drawing: { setInkMode } },
+    });
+    inked.setActiveTab('draw');
+    expect(states()).toEqual([false, false]);
+    host.querySelector<HTMLButtonElement>('[data-ribbon-command="drawPen"]')?.click();
+    expect(setInkMode).toHaveBeenCalledWith('pen');
+    inked.dispose();
+  });
+
   it('does not open the backstage from the File tab and reports the tab change', () => {
     const onTabChange = vi.fn();
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {

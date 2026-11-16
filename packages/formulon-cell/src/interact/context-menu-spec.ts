@@ -956,6 +956,44 @@ export function toMacBandEntries(entries: readonly MenuEntry[], s: Strings): Men
     });
 }
 
+/** Context-menu items that open a dialog the host may not have attached. */
+export type DialogMenuItemId =
+  | 'formatCells'
+  | 'pasteSpecial'
+  | 'insertHyperlink'
+  | 'insertComment'
+  | 'defineName';
+
+const DIALOG_MENU_ITEM_IDS: ReadonlySet<string> = new Set<DialogMenuItemId>([
+  'formatCells',
+  'pasteSpecial',
+  'insertHyperlink',
+  'insertComment',
+  'defineName',
+]);
+
+export const isDialogMenuItemId = (id: string): id is DialogMenuItemId =>
+  DIALOG_MENU_ITEM_IDS.has(id);
+
+/** `entries` without the items `hidden` names, submenus included; a submenu left with no
+ *  item goes too. */
+export function withoutMenuItems(
+  entries: readonly MenuEntry[],
+  hidden: (id: ItemId) => boolean,
+): MenuEntry[] {
+  const out: MenuEntry[] = [];
+  for (const entry of entries) {
+    if (entry.kind === 'item' && hidden(entry.id)) continue;
+    if (entry.kind === 'submenu') {
+      const children = compactMenuEntries(withoutMenuItems(entry.children, hidden));
+      if (children.some((child) => child.kind !== 'sep')) out.push({ ...entry, children });
+      continue;
+    }
+    out.push(entry);
+  }
+  return out;
+}
+
 export function compactMenuEntries(entries: MenuEntry[]): MenuEntry[] {
   const out: MenuEntry[] = [];
   for (const entry of entries) {

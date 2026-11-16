@@ -37,6 +37,7 @@ import { attachClipboard } from '../interact/clipboard.js';
 import { attachCommentDialog } from '../interact/comment-dialog.js';
 import { attachConditionalDialog } from '../interact/conditional-dialog.js';
 import { attachContextMenu } from '../interact/context-menu.js';
+import type { DialogMenuItemId } from '../interact/context-menu-spec.js';
 import type { DialogEntry } from '../interact/dialog-entry.js';
 import { attachFindReplace } from '../interact/find-replace.js';
 import { attachFormatDialog, type FormatDialogHandle } from '../interact/format-dialog.js';
@@ -677,6 +678,15 @@ export const pasteSpecial = (): Extension =>
     },
   });
 
+/** The extension behind each context-menu item that opens a dialog. */
+const DIALOG_EXTENSION_IDS: Record<DialogMenuItemId, string> = {
+  formatCells: 'formatDialog',
+  pasteSpecial: 'pasteSpecial',
+  insertHyperlink: 'hyperlink',
+  insertComment: 'commentDialog',
+  defineName: 'namedRanges',
+};
+
 /** Right-click context menu — id `'contextMenu'`. Cross-feature
  *  callbacks resolve at call time via `ctx.resolve`, so user
  *  replacements of `formatDialog` / `hyperlink` / `pasteSpecial` are
@@ -710,6 +720,7 @@ export const contextMenu = (): Extension =>
               .resolve<ExtensionHandle & FormatDialogHandle>('formatDialog')
               ?.open(undefined, { entry: { origin: 'contextMenu', commandId: 'formatCells' } }),
           onPasteSpecial: () => callOpen('pasteSpecial'),
+          dialogAttached: (id) => !!ctx.resolve(DIALOG_EXTENSION_IDS[id]),
           onInsertHyperlink: () =>
             ctx
               .resolve<ExtensionHandle & HyperlinkDialogHandle>('hyperlink')

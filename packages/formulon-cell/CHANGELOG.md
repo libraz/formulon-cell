@@ -187,6 +187,7 @@ versioning is [SemVer](https://semver.org/).
 - The comment editor, Find, the filter dropdowns and the Watch Window take focus as they open, so a key pressed straight after opening reaches them; the Watch Window no longer pulls focus back a moment after it opens or when its watches change.
 - Tab in the formula bar no longer keeps focus there: with an edit it commits and moves on with focus in the grid, without one it moves on from the grid, and where the bar is read-only the key is left to the browser. A viewer with a fixed viewport, and a bar focused without typing, used to stay in the bar.
 - After a formula is committed the cell shows it as the engine stored it, which can differ from the text typed (`=sum(1.50,2)` is stored as `=sum(1.5,2)`): the formula bar shows the stored text after an external or API draft commits, and an edit started next compares against it; the Mac Formula Builder edits the stored call after Done; `upsertDefinedName` returns the stored name and formula; and a data validation rule whose bound or list formula the engine respells is still checked by the engine, where it fell back to the local check.
+- Controls that would do nothing are no longer offered: the Draw tab's Pen and Eraser stay greyed out while the host supplies no drawing hook, and the cell and header context menus leave out Format Cells, Paste Special, Insert Hyperlink, the note item and Define Name while the dialog behind them is turned off, checked each time the menu opens.
 
 ### Removed
 
