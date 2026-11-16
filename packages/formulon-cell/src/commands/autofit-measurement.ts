@@ -13,7 +13,11 @@ import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { normalizeFormatLocale } from '../format/locale.js';
 import { styleElementFormatSource } from '../render/grid/table-format.js';
-import { FILTER_BUTTON_SIZE, MAC_PIVOT_BUTTON_SIZE } from '../render/painters/filter-button.js';
+import {
+  FILTER_BUTTON_INSET,
+  FILTER_BUTTON_SIZE,
+  MAC_PIVOT_BUTTON_SIZE,
+} from '../render/painters/filter-button.js';
 import {
   TABLE_HEADER_CHEVRON_INSET,
   TABLE_HEADER_CHEVRON_SIZE,
@@ -40,7 +44,7 @@ import { showsHeaderFilterButton, tableForCell } from './format-as-table.js';
 
 /** Width the in-cell AutoFilter button occupies at a header cell's trailing
  *  edge: the button plus its one-pixel inset. */
-export const FILTER_DROPDOWN_RESERVED_WIDTH = FILTER_BUTTON_SIZE + 1;
+export const FILTER_DROPDOWN_RESERVED_WIDTH = FILTER_BUTTON_SIZE + FILTER_BUTTON_INSET;
 
 /** Width the table header dropdown chevron occupies at a cell's trailing edge. */
 export const TABLE_HEADER_RESERVED_WIDTH = TABLE_HEADER_CHEVRON_INSET + TABLE_HEADER_CHEVRON_SIZE;
@@ -334,7 +338,7 @@ function headerButtonWidth(
 ): number {
   if (pivotButton) {
     return wholePointAdvances(state.layout)
-      ? fontPointsToCssPx(MAC_PIVOT_BUTTON_SIZE) + 1
+      ? fontPointsToCssPx(MAC_PIVOT_BUTTON_SIZE) + FILTER_BUTTON_INSET
       : FILTER_DROPDOWN_RESERVED_WIDTH;
   }
   const filter =

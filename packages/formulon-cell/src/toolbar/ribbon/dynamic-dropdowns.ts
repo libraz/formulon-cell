@@ -12,7 +12,7 @@ import { clamp, viewportSize } from '../../interact/overlay-position.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import type { SessionChartKind } from '../../store/store.js';
 import type { SessionShapeKind } from '../illustration-types.js';
-import { focusMenuItem, handleMenuKeydown } from '../menu-a11y.js';
+import { focusMenuItem, handleMenuKeydown, isMenuItemDisabled } from '../menu-a11y.js';
 import { RIBBON_DROPDOWN_MENU_FOR_COMMAND } from './activation.js';
 import type { RibbonFillSeriesMode } from './fill-series.js';
 import {
@@ -288,8 +288,7 @@ const eventElement = (event: Event): Element | null =>
   event.target instanceof Element ? event.target : null;
 
 const isDisabledMenuControl = (element: Element | null): boolean =>
-  element instanceof HTMLButtonElement &&
-  (element.disabled || element.getAttribute('aria-disabled') === 'true');
+  element instanceof HTMLButtonElement && isMenuItemDisabled(element);
 
 const RIBBON_DROPDOWN_VIEWPORT_PAD = 8;
 const RIBBON_DROPDOWN_MIN_SCROLL_HEIGHT = 80;

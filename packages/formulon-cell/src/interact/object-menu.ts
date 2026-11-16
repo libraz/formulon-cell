@@ -2,6 +2,7 @@ import { isMacHost } from '../extensions/ui-options.js';
 import {
   focusMenuItem,
   handleMenuKeydown,
+  isMenuItemDisabled,
   onPointerArrive,
   projectDisabledState,
 } from '../toolbar/menu-a11y.js';
@@ -56,8 +57,7 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
     target instanceof HTMLButtonElement &&
     root.contains(target) &&
     target.classList.contains('fc-ctxmenu__item') &&
-    !target.disabled &&
-    target.getAttribute('aria-disabled') !== 'true';
+    !isMenuItemDisabled(target);
 
   const syncActiveItem = (target: EventTarget | null): void => {
     clearActiveItem();

@@ -50,8 +50,10 @@ describe('toolbar/ribbon menu primitives', () => {
   it('keeps shared menu a11y disabled checks aligned with aria-disabled', () => {
     const menuA11ySource = readFileSync(join(root, 'src/toolbar/menu-a11y.ts'), 'utf8');
 
-    expect(menuA11ySource).toContain('!item.disabled');
-    expect(menuA11ySource).toContain("item.getAttribute('aria-disabled') !== 'true'");
+    expect(menuA11ySource).toContain(
+      "item.disabled || item.getAttribute('aria-disabled') === 'true'",
+    );
+    expect(menuA11ySource).toContain('!isMenuItemDisabled(item)');
   });
 
   it('projects disabled reasons through the shared helper', () => {

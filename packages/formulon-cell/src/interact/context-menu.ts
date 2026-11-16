@@ -35,7 +35,7 @@ import { bodyBandOrigin, layoutForView, rangeRects } from '../render/geometry.js
 import { selectionRangeList } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { showDimensionDialog } from '../toolbar/dialogs/dimension.js';
-import { onPointerArrive, projectDisabledState } from '../toolbar/menu-a11y.js';
+import { isMenuItemDisabled, onPointerArrive, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { canReadClipboard, createContextMenuClipboard } from './context-menu-clipboard.js';
 import {
   contextItemIds,
@@ -101,6 +101,13 @@ import { createPivotNumberFormatPicker } from './pivot-field-settings-dialog.js'
 
 /** Distance from a Mac submenu's top edge to the centre of its first row. */
 const MAC_SUB_ROW_CENTER = 18;
+/** Grace period before a submenu closes, so the pointer can cross sibling rows into it. */
+const SUBMENU_CLOSE_DELAY_MS = 260;
+/** How far a non-Mac submenu overlaps its parent row horizontally and sits above it. */
+const SUB_OVERLAP_PX = 2;
+const SUB_TOP_OFFSET_PX = 4;
+/** Parking spot for a panel being measured before it is placed. */
+const OFFSCREEN_PX = '-9999px';
 
 export interface ContextMenuDeps {
   host: HTMLElement;
@@ -300,7 +307,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     cancelSubClose();
     subCloseTimer = setTimeout(() => {
       closeSubmenu();
-    }, 260);
+    }, SUBMENU_CLOSE_DELAY_MS);
   };
 
   const hide = (restoreFocus = false): void => {
@@ -336,11 +343,20 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
 
   const isMacPlatform = (): boolean => isMacHost(host);
 
+  /** Disable a button on behalf of the host policy, remembering that the policy did it. */
+  const markPolicyDisabled = (
+    btn: HTMLButtonElement,
+    decision: ReturnType<typeof decisionForItem>,
+  ): void => {
+    btn.dataset.policyDisabled = 'true';
+    setContextMenuItemDisabled(btn, true, decisionReason(decision));
+  };
+
   const activePanel = (): HTMLElement => (focusPanel === 'sub' ? sub : root);
 
   const panelItems = (panel: HTMLElement): HTMLButtonElement[] =>
     Array.from(panel.querySelectorAll<HTMLButtonElement>('.fc-ctxmenu__item')).filter(
-      (btn) => !btn.disabled && btn.getAttribute('aria-disabled') !== 'true',
+      (btn) => !isMenuItemDisabled(btn),
     );
 
   const clearPanelActiveItem = (panel: HTMLElement): void => {
@@ -351,7 +367,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
 
   const setPanelActiveItem = (panel: HTMLElement, item: HTMLButtonElement | null): void => {
     clearPanelActiveItem(panel);
-    if (item && !item.disabled && item.getAttribute('aria-disabled') !== 'true') {
+    if (item && !isMenuItemDisabled(item)) {
       item.classList.add('fc-ctxmenu__item--active');
     }
   };
@@ -429,7 +445,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
 
   const followPointer = (panel: 'root' | 'sub', btn: HTMLButtonElement): void => {
     const menuPanel = panel === 'root' ? root : sub;
-    if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') {
+    if (isMenuItemDisabled(btn)) {
       focusPanel = panel;
       activeIndex = -1;
       setPanelActiveItem(menuPanel, null);
@@ -461,17 +477,19 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     sub.dataset.fcSubmenu = id;
     for (const child of children) appendEntry('sub', sub, child, disabled);
     sub.style.display = 'block';
-    sub.style.left = '-9999px';
-    sub.style.top = '-9999px';
+    sub.style.left = OFFSCREEN_PX;
+    sub.style.top = OFFSCREEN_PX;
     const r = parentBtn.getBoundingClientRect();
     const { width: sw } = panelSize(sub);
     const viewport = viewportSize(ownerDocument);
     // The desktop submenu overlaps its parent by the panel padding and centres its
     // first row on the parent row.
     const mac = isMacPlatform();
-    let x = mac ? r.right : r.right - 2;
-    if (x + sw > viewport.width - VIEWPORT_PANEL_PAD) x = mac ? r.left - sw : r.left - sw + 2;
-    placePanel(sub, x, mac ? r.top + r.height / 2 - MAC_SUB_ROW_CENTER : r.top - 4);
+    let x = mac ? r.right : r.right - SUB_OVERLAP_PX;
+    if (x + sw > viewport.width - VIEWPORT_PANEL_PAD) {
+      x = mac ? r.left - sw : r.left - sw + SUB_OVERLAP_PX;
+    }
+    placePanel(sub, x, mac ? r.top + r.height / 2 - MAC_SUB_ROW_CENTER : r.top - SUB_TOP_OFFSET_PX);
     openSub = { id, parentBtn };
     parentBtn.setAttribute('aria-expanded', 'true');
     parentBtn.classList.add('fc-ctxmenu__item--open');
@@ -503,7 +521,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         setContextMenuItemDisabled(btn, true, decisionReason(decision));
       }
       onPointerArrive(btn, () => {
-        if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') {
+        if (isMenuItemDisabled(btn)) {
           if (panel === 'root' && openSub && openSub.parentBtn !== btn) scheduleSubClose();
           followPointer(panel, btn);
           return;
@@ -532,14 +550,9 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         btn.dataset.policyDisabled = 'true';
       }
       setContextMenuItemDisabled(btn, true, source.disabledReason ?? null);
-    } else if (source?.builtIn && !decisionForItem(source).allowed) {
+    } else if (source?.builtIn || source?.command) {
       const decision = decisionForItem(source);
-      btn.dataset.policyDisabled = 'true';
-      setContextMenuItemDisabled(btn, true, decisionReason(decision));
-    } else if (source?.command && !decisionForItem(source).allowed) {
-      const decision = decisionForItem(source);
-      btn.dataset.policyDisabled = 'true';
-      setContextMenuItemDisabled(btn, true, decisionReason(decision));
+      if (!decision.allowed) markPolicyDisabled(btn, decision);
     }
     btn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -550,7 +563,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     onPointerArrive(btn, () => {
       if (panel === 'root') {
         if (openSub && openSub.parentBtn !== btn) scheduleSubClose();
-      } else if (!btn.disabled && btn.getAttribute('aria-disabled') !== 'true') {
+      } else if (!isMenuItemDisabled(btn)) {
         cancelSubClose();
       }
       followPointer(panel, btn);
@@ -599,10 +612,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       const pressed = pressedById[item.id];
       if (pressed !== undefined) btn.setAttribute('aria-pressed', String(pressed));
       const decision = decisionForItem(item.id);
-      if (!decision.allowed) {
-        btn.dataset.policyDisabled = 'true';
-        setContextMenuItemDisabled(btn, true, decisionReason(decision));
-      }
+      if (!decision.allowed) markPolicyDisabled(btn, decision);
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -627,6 +637,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     pasteBtnRef = null;
     const mac = isMacPlatform();
     const activeAddr = store.getState().selection.active;
+    const hasNote = commentAt(store.getState(), activeAddr) !== null;
     // The report cell under the pointer, which a right-click does not always make active.
     const pivotAddr = kind === 'cell' && activeTarget ? activeTarget.cell : activeAddr;
     const pivot = kind === 'cell' ? wb.pivotCellInfo(pivotAddr) : null;
@@ -654,11 +665,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
             ? buildMacColEntries(strings)
             : buildColEntries(strings)
           : mac
-            ? (corner ? buildMacCornerEntries : buildMacCellEntries)(
-                strings,
-                commentAt(store.getState(), activeAddr) !== null,
-              )
-            : buildCellEntries(strings, commentAt(store.getState(), activeAddr) !== null);
+            ? (corner ? buildMacCornerEntries : buildMacCellEntries)(strings, hasNote)
+            : buildCellEntries(strings, hasNote);
     const stateNow = store.getState();
     const bandRange = stateNow.selection.range;
     const inTable =
@@ -694,14 +702,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         .filter(
           (e) => !(e.kind === 'item' && e.id === 'newComment' && !wb.capabilities.threadedComments),
         )
-        .filter(
-          (e) =>
-            !(
-              e.kind === 'item' &&
-              e.id === 'showHideNote' &&
-              commentAt(store.getState(), activeAddr) === null
-            ),
-        )
+        .filter((e) => !(e.kind === 'item' && e.id === 'showHideNote' && !hasNote))
         // A protected sheet without Edit objects drops a note's edit and delete rows entirely,
         // and on the Mac New Note as well.
         .filter(
@@ -709,7 +710,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
             !(
               e.kind === 'item' &&
               (e.id === 'insertComment' || e.id === 'deleteComment') &&
-              (mac || commentAt(store.getState(), activeAddr) !== null) &&
+              (mac || hasNote) &&
               !noteChangePermitted(store.getState(), activeAddr)
             ),
         )
@@ -854,14 +855,15 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
     }
     root.style.display = 'block';
-    root.style.left = '-9999px';
-    root.style.top = '-9999px';
+    root.style.left = OFFSCREEN_PX;
+    root.style.top = OFFSCREEN_PX;
     visible = true;
-    if (isMacPlatform()) placeMacMenu(root, clientX, clientY);
+    const mac = isMacPlatform();
+    if (mac) placeMacMenu(root, clientX, clientY);
     else placePanel(root, clientX, clientY);
     // A Mac menu opened by the pointer starts with no row highlighted; the
     // first arrow key then lands on the first row.
-    if (isMacPlatform() && event.type === 'contextmenu') {
+    if (mac && event.type === 'contextmenu') {
       activeIndex = -1;
       root.focus({ preventScroll: true });
     } else {
@@ -945,12 +947,9 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     if (fragments.length === 0) return fallback();
 
     // `rangeRects` clips to the viewport, so this stays bounded for a far-away row.
-    const activeCell = rangeRects(layout, viewport, {
-      r0: active.row,
-      r1: active.row,
-      c0: active.col,
-      c1: active.col,
-    }).find((rect) => rect.w > 0 && rect.h > 0);
+    const activeCell = merge
+      ? rangeRects(layout, viewport, activeRange).find((rect) => rect.w > 0 && rect.h > 0)
+      : fragments[0];
 
     const fragment = activeCell
       ? fragments.find(
@@ -996,7 +995,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const panelName = root.contains(target) ? 'root' : 'sub';
     const panel = panelName === 'root' ? root : sub;
     focusPanel = panelName;
-    if (target.disabled || target.getAttribute('aria-disabled') === 'true') {
+    if (isMenuItemDisabled(target)) {
       activeIndex = -1;
       setPanelActiveItem(panel, null);
     } else {
@@ -1006,16 +1005,24 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     if (panelName === 'sub' && openSub) setPanelActiveItem(root, openSub.parentBtn);
   };
 
-  const onDocPointerDown = (e: MouseEvent): void => {
+  const onDocOutsidePress = (e: MouseEvent): void => {
     if (!visible) return;
     if (insideMenu(e.target)) return;
     hide(false);
   };
 
-  const onDocContextMenu = (e: MouseEvent): void => {
-    if (!visible) return;
-    if (insideMenu(e.target)) return;
-    hide(false);
+  const swallow = (e: Event): void => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const closeSubmenuToParent = (): void => {
+    if (!openSub) return;
+    const parent = openSub.parentBtn;
+    closeSubmenu();
+    focusPanel = 'root';
+    parent.focus();
+    activeIndex = panelItems(root).indexOf(parent);
   };
 
   const onDocKey = (e: KeyboardEvent): void => {
@@ -1029,57 +1036,38 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       return;
     }
     if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      if (openSub) {
-        const parent = openSub.parentBtn;
-        closeSubmenu();
-        focusPanel = 'root';
-        parent.focus();
-        activeIndex = panelItems(root).indexOf(parent);
-      } else {
-        hide(true);
-      }
+      swallow(e);
+      if (openSub) closeSubmenuToParent();
+      else hide(true);
     } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      e.stopPropagation();
+      swallow(e);
       focusMenuItem(activeIndex + 1);
     } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      e.stopPropagation();
+      swallow(e);
       focusMenuItem(activeIndex - 1);
     } else if (e.key === 'Home') {
-      e.preventDefault();
-      e.stopPropagation();
+      swallow(e);
       focusMenuItem(0);
     } else if (e.key === 'End') {
-      e.preventDefault();
-      e.stopPropagation();
+      swallow(e);
       focusMenuItem(panelItems(activePanel()).length - 1);
     } else if (e.key === 'ArrowRight') {
       const el = ownerDocument.activeElement;
       if (el instanceof OwnerHTMLButtonElement && el.dataset.fcSubmenu) {
-        e.preventDefault();
-        e.stopPropagation();
+        swallow(e);
         openSubmenu(el.dataset.fcSubmenu, el);
         focusPanel = 'sub';
         focusMenuItem(0);
       }
     } else if (e.key === 'ArrowLeft') {
       if (openSub && focusPanel === 'sub') {
-        e.preventDefault();
-        e.stopPropagation();
-        const parent = openSub.parentBtn;
-        closeSubmenu();
-        focusPanel = 'root';
-        parent.focus();
-        activeIndex = panelItems(root).indexOf(parent);
+        swallow(e);
+        closeSubmenuToParent();
       }
     } else if (e.key === 'Enter' || e.key === ' ') {
       const target = ownerDocument.activeElement;
       if (target instanceof OwnerHTMLButtonElement && insideMenu(target)) {
-        e.preventDefault();
-        e.stopPropagation();
+        swallow(e);
         target.click();
       }
     }
@@ -1107,14 +1095,13 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         if (!id || (!source && !isBuiltinItemId(id))) continue;
         const decision = source ? decisionForItem(source) : decisionForItem(id as ItemId);
         if (!decision.allowed) {
-          button.dataset.policyDisabled = 'true';
-          setContextMenuItemDisabled(button, true, decisionReason(decision));
+          markPolicyDisabled(button, decision);
         } else if (button.dataset.policyDisabled === 'true') {
           delete button.dataset.policyDisabled;
           if (source && explicitDisabledSources.has(source)) {
             setContextMenuItemDisabled(button, true, source.disabledReason ?? null);
           } else {
-            projectDisabledState(button, false, null, { datasetKey: 'disabledReason' });
+            setContextMenuItemDisabled(button, false, null);
           }
         }
       }
@@ -1152,22 +1139,11 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       return;
     }
     if (source?.command) {
-      if (!interactionController) return;
-      try {
-        // Commands supplied by a host are still dispatched through the
-        // context-menu route. Never trust a caller-provided origin here: an
-        // arbitrary origin could bypass the route's policy decision between
-        // rendering and activation.
-        const command: CellBatchCommand = { ...source.command, origin: 'contextMenu' };
-        const result = interactionController.execute(command);
-        if (result && typeof result === 'object' && 'then' in result) {
-          void Promise.resolve(result).then(() => deps.onAfterCommit?.());
-        } else {
-          deps.onAfterCommit?.();
-        }
-      } catch (err) {
-        console.warn('formulon-cell: context-menu command failed', err);
-      }
+      // Commands supplied by a host are still dispatched through the
+      // context-menu route. Never trust a caller-provided origin here: an
+      // arbitrary origin could bypass the route's policy decision between
+      // rendering and activation.
+      executeBatch({ ...source.command, origin: 'contextMenu' });
       return;
     }
     if (source?.action) {
@@ -1264,7 +1240,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         store,
         wb,
         strings,
-        history: deps.history ?? null,
+        history,
         pickNumberFormat: pivotNumberFormat.pick,
         refresh: refreshPivotCells,
         ...(activeEvent && 'clientX' in activeEvent
@@ -1291,7 +1267,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         return;
       }
       case 'clear': {
-        const selected = store.getState().selection;
+        const selected = state.selection;
         if (deferForAllowedRangeUnlock(store, selectionRangeList(selected), () => run(id))) {
           return;
         }
@@ -1332,8 +1308,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       case 'rowHeight':
       case 'colWidth': {
         const rows = id === 'rowHeight';
-        const run = rows ? runRowHeightDialog : runColumnWidthDialog;
-        void run({
+        const runDialog = rows ? runRowHeightDialog : runColumnWidthDialog;
+        void runDialog({
           store,
           history,
           wb,
@@ -1403,7 +1379,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           { ok: false } as ReturnType<typeof refreshPivotTable>,
           () => refreshPivotTable(wb, { sheet: pivot.sheet, pivotIndex: pivot.pivotIndex }),
         );
-        if (result.ok) refreshPivotCells(activePivot.sheet);
+        if (result.ok) refreshPivotCells(pivot.sheet);
         return;
       }
     }
@@ -1411,8 +1387,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
 
   host.addEventListener('contextmenu', onContextMenu);
   host.addEventListener('keydown', onHostKey);
-  ownerDocument.addEventListener('contextmenu', onDocContextMenu, true);
-  ownerDocument.addEventListener('mousedown', onDocPointerDown, true);
+  ownerDocument.addEventListener('contextmenu', onDocOutsidePress, true);
+  ownerDocument.addEventListener('mousedown', onDocOutsidePress, true);
   ownerDocument.addEventListener('focusin', onDocFocusIn, true);
   ownerDocument.addEventListener('keydown', onDocKey, true);
   ownerWindow?.addEventListener('scroll', onScroll, true);
@@ -1422,8 +1398,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const detach = ((): void => {
     host.removeEventListener('contextmenu', onContextMenu);
     host.removeEventListener('keydown', onHostKey);
-    ownerDocument.removeEventListener('contextmenu', onDocContextMenu, true);
-    ownerDocument.removeEventListener('mousedown', onDocPointerDown, true);
+    ownerDocument.removeEventListener('contextmenu', onDocOutsidePress, true);
+    ownerDocument.removeEventListener('mousedown', onDocOutsidePress, true);
     ownerDocument.removeEventListener('focusin', onDocFocusIn, true);
     ownerDocument.removeEventListener('keydown', onDocKey, true);
     ownerWindow?.removeEventListener('scroll', onScroll, true);

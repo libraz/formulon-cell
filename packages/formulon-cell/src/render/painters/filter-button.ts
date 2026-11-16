@@ -1,15 +1,23 @@
-import type { ResolvedTheme } from '../../theme/resolve.js';
 import { mirrorInRect, type Rect } from '../geometry.js';
 
 /** Side of the in-cell AutoFilter button, CSS px. */
 export const FILTER_BUTTON_SIZE = 17;
 
+/** CSS px between a header button and the cell edge it sits inside, and between
+ *  the button and the text beside it. */
+export const FILTER_BUTTON_INSET = 1;
+
 /** The button's rectangle in a header cell of a filter range: right-aligned,
  *  one CSS px inside the cell's trailing edge and one below its top (leading
  *  edge when `rtl`). Also the click target. */
 export function filterButtonRect(cell: Rect, rtl = false): Rect {
-  const x = mirrorInRect(cell, cell.x + cell.w - 1 - FILTER_BUTTON_SIZE, FILTER_BUTTON_SIZE, rtl);
-  return { x, y: cell.y + 1, w: FILTER_BUTTON_SIZE, h: FILTER_BUTTON_SIZE };
+  const x = mirrorInRect(
+    cell,
+    cell.x + cell.w - FILTER_BUTTON_INSET - FILTER_BUTTON_SIZE,
+    FILTER_BUTTON_SIZE,
+    rtl,
+  );
+  return { x, y: cell.y + FILTER_BUTTON_INSET, w: FILTER_BUTTON_SIZE, h: FILTER_BUTTON_SIZE };
 }
 
 /** Side of a PivotTable field-caption button on the Mac profile, CSS px (14 pt). */
@@ -66,8 +74,6 @@ export const MAC_PIVOT_BUTTON_LOOK: FilterButtonLook = {
 };
 
 export interface FilterButtonState {
-  /** Rows are hidden by a filter on this sheet. */
-  active?: boolean;
   /** Sort direction of the column, when sorted. */
   sorted?: 'asc' | 'desc';
   /** A PivotTable field with hidden items or a filter: a small arrow and a funnel. */
@@ -79,7 +85,6 @@ export interface FilterButtonState {
 export function paintFilterButton(
   ctx: CanvasRenderingContext2D,
   rect: Rect,
-  theme: ResolvedTheme,
   state: FilterButtonState = {},
   look: FilterButtonLook = FILTER_BUTTON_LOOK,
   dpr = 1,
@@ -89,27 +94,27 @@ export function paintFilterButton(
   const face = ctx.createLinearGradient(0, y, 0, y + h);
   face.addColorStop(0, '#ffffff');
   face.addColorStop(1, look.faceBottom);
-  ctx.fillStyle = state.active ? theme.accent : face;
+  ctx.fillStyle = face;
   ctx.fillRect(x, y, w, h);
-  if (!state.active && look.highlight) {
+  if (look.highlight) {
     ctx.fillStyle = look.highlight;
     ctx.fillRect(x + 1, y + 1, w - 2, 0.5);
   }
-  ctx.strokeStyle = state.active ? theme.accent : look.frame;
+  ctx.strokeStyle = look.frame;
   const ring = look.innerFrame && dpr >= 2 ? 1 / Math.round(dpr) : 1;
   ctx.lineWidth = ring;
   ctx.strokeRect(x + ring / 2, y + ring / 2, w - ring, h - ring);
-  if (look.innerFrame && ring < 1 && !state.active) {
+  if (look.innerFrame && ring < 1) {
     ctx.strokeStyle = look.innerFrame;
     ctx.strokeRect(x + ring * 1.5, y + ring * 1.5, w - ring * 3, h - ring * 3);
   }
-  const ink = state.active ? theme.bg : look.arrow;
+  const ink = look.arrow;
   const cx = x + w / 2;
   ctx.fillStyle = ink;
   ctx.beginPath();
   if (state.filtered && !state.sorted) {
     // Measured on the 14 pt Mac button; other sizes scale with it.
-    const k = w / 14;
+    const k = w / MAC_PIVOT_BUTTON_SIZE;
     ctx.moveTo(x + 2 * k, y + 7 * k);
     ctx.lineTo(x + 5.5 * k, y + 7 * k);
     ctx.lineTo(x + 3.75 * k, y + 9.5 * k);

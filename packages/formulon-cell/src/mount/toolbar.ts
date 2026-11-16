@@ -48,6 +48,7 @@ import { mutators } from '../store/store.js';
 import type { CellBorderStyle, State } from '../store/types.js';
 import { showMessage as showRibbonMessage } from '../toolbar/dialogs/prompt.js';
 import { cancelOpenAppDialogs } from '../toolbar/dialogs/shell.js';
+import { isMenuItemDisabled } from '../toolbar/menu-a11y.js';
 import { ribbonDisplayText, type ToolbarMenuText, toolbarMenuText } from '../toolbar/menu-text.js';
 import {
   isRibbonMenuFirstCommand,
@@ -138,8 +139,6 @@ const DEFAULT_BORDER_COLOR = '#000000';
 
 const SPLIT_CHEVRON_SELECTOR = '.fc-tb__rb-split-chevron';
 const MAC_MENU_SELECTOR = '.fc-tb__menu--mac';
-
-const isAriaDisabled = (el: Element): boolean => el.getAttribute('aria-disabled') === 'true';
 
 /** Scroll the nearest scrolling box inside `host` just enough to show `el`. Unlike
  *  `scrollIntoView`, it never scrolls the page the toolbar is mounted in. */
@@ -689,7 +688,7 @@ export function mountToolbar(
     const menuId = button?.dataset.ribbonMenuId;
     if (!button || !menuId || !button.querySelector(SPLIT_CHEVRON_SELECTOR)) return;
     e.preventDefault();
-    if (button.disabled || isAriaDisabled(button)) return;
+    if (isMenuItemDisabled(button)) return;
     openSplitMenu(button.dataset.ribbonCommand ?? '', button, menuId);
   };
   host.addEventListener('keydown', onSplitMenuKey);
@@ -881,7 +880,7 @@ export function mountToolbar(
 
   const activateRibbonTab = (tab: RibbonTab, reveal: boolean): void => {
     const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-tab="${tab}"]`);
-    if (!button || button.disabled || isAriaDisabled(button)) return;
+    if (!button || isMenuItemDisabled(button)) return;
     dropdownsApi?.closeAllDynamicRibbonDropdowns();
     closeStaticRibbonMenus(host);
     const changed = tab !== activeTab;
@@ -911,13 +910,7 @@ export function mountToolbar(
     if (!(target instanceof Element)) return;
     const cmdBtn = target.closest<HTMLButtonElement>('[data-ribbon-command]');
     const id = cmdBtn?.dataset.ribbonCommand;
-    if (
-      !cmdBtn ||
-      !id ||
-      cmdBtn.disabled ||
-      isAriaDisabled(cmdBtn) ||
-      !isImmediateMacFormulaPrimary(target, id)
-    )
+    if (!cmdBtn || !id || isMenuItemDisabled(cmdBtn) || !isImmediateMacFormulaPrimary(target, id))
       return;
     // Preserve the active formula edit until the palette has captured it.
     e.preventDefault();
@@ -989,7 +982,7 @@ export function mountToolbar(
     const cmdBtn = target.closest<HTMLButtonElement>('[data-ribbon-command]');
     if (cmdBtn?.dataset.ribbonCommand) {
       const id = cmdBtn.dataset.ribbonCommand;
-      if (cmdBtn.disabled || isAriaDisabled(cmdBtn)) return;
+      if (isMenuItemDisabled(cmdBtn)) return;
       // WebKit follows the macOS convention of not focusing a <button> on
       // click. Ribbon keyboard navigation and host dialogs that restore focus
       // to the command that opened them both rely on the invoked command being
@@ -1047,7 +1040,7 @@ export function mountToolbar(
     if (!(target instanceof Element)) return;
     const painter = target.closest<HTMLButtonElement>('[data-ribbon-command="formatPainter"]');
     if (painter) {
-      if (painter.disabled || isAriaDisabled(painter)) return;
+      if (isMenuItemDisabled(painter)) return;
       // A double-click keeps the painter on for repeated pastes until it is clicked again.
       e.preventDefault();
       getInstance()?.formatPainter?.activate(true);
@@ -1075,7 +1068,7 @@ export function mountToolbar(
     // Hidden tabs are filtered so custom tab profiles can omit optional
     // add-in surfaces without leaving dead stops in the roving tabindex.
     const tabs = Array.from(host.querySelectorAll<HTMLButtonElement>('[data-ribbon-tab]')).filter(
-      (btn) => btn.offsetParent !== null && !btn.disabled && !isAriaDisabled(btn),
+      (btn) => btn.offsetParent !== null && !isMenuItemDisabled(btn),
     );
     if (tabs.length === 0) return;
     const currentIndex = tabs.indexOf(tabBtn);

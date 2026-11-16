@@ -211,9 +211,10 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(
       dynamicDropdownsSource.split('\n').filter((line) => line.includes('event.target')),
     ).toHaveLength(1);
+    expect(dynamicDropdownsSource).toContain('isMenuItemDisabled(element)');
     expect(
       dynamicDropdownsSource.split('\n').filter((line) => line.includes('.disabled')),
-    ).toHaveLength(1);
+    ).toHaveLength(0);
   });
 
   it('keeps dynamic dropdown viewport clamp and scroll projection centralized', () => {

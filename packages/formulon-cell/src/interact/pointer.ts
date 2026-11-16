@@ -51,6 +51,7 @@ import { syncLayoutSizesToEngine } from '../engine/layout-sync.js';
 import { pivotStyleLayer } from '../engine/pivot-style.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import type { GridPopupsStrings } from '../i18n/strings/grid-popups/types.js';
 import { defaultStrings } from '../i18n/strings.js';
 import {
@@ -64,6 +65,7 @@ import {
   hitZone,
   layoutForView,
   pointPx,
+  type Rect,
   rowHeight,
 } from '../render/geometry.js';
 import type { PageBreakHandle, RulerHandle } from '../render/grid/page-view.js';
@@ -77,9 +79,9 @@ import {
   isWholeColumnRange,
   isWholeRowRange,
   type SelectionGestureMode,
+  sameRange,
   selectionContainsAddr,
   selectionCoversRange,
-  selectionRangeList,
 } from '../store/selection-geometry.js';
 import {
   mutators,
@@ -294,7 +296,7 @@ function pivotButtonAt(
     col,
     cellRect(view, s.viewport, row, col),
     {
-      mac: (host.closest?.<HTMLElement>('.fc-host') ?? host).dataset?.fcPlatform === 'mac',
+      mac: isMacHost(host),
       zoom: visualZoom(s.viewport.zoom),
       ptPx: pointPx(view, s.viewport),
       dpr: host.ownerDocument.defaultView?.devicePixelRatio ?? 1,
@@ -337,7 +339,7 @@ function selectionBorderEdgeAt(
   x: number,
   y: number,
 ): SelectionBorderEdge | null {
-  if ((host.closest?.<HTMLElement>('.fc-host') ?? host).dataset?.fcPlatform !== 'mac') return null;
+  if (!isMacHost(host)) return null;
   if ((s.selection.extraRanges?.length ?? 0) > 0) return null;
   const { r0, c0, r1, c1 } = s.selection.range;
   const layout = layoutForView(s);
@@ -427,9 +429,24 @@ export function attachPointer(
       commandId: axis === 'row' ? 'rowHeight' : 'colWidth',
     }) as const;
 
-  const localXY = (e: PointerEvent | MouseEvent): { x: number; y: number } => {
-    const rect = host.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  const localXY = (
+    e: PointerEvent | MouseEvent,
+    rect: DOMRect = host.getBoundingClientRect(),
+  ): { x: number; y: number } => ({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+
+  /** Client coordinates of a cell rect's trailing corner, for anchoring popups to the pointer's frame. */
+  const clientAnchorOf = (
+    e: PointerEvent | MouseEvent,
+    rect: Rect,
+    at: { x: number; y: number } = localXY(e),
+  ): { x: number; y: number } => ({
+    x: e.clientX - at.x + rect.x + rect.w,
+    y: e.clientY - at.y + rect.y + rect.h,
+  });
+
+  const refreshCursor = (e: PointerEvent | MouseEvent): void => {
+    const { x, y } = localXY(e);
+    updateCursor(host, store, x, y);
   };
 
   const applySelectionMarquee = (marquee: SelectionMarqueeDrag, x: number, y: number): void => {
@@ -443,53 +460,35 @@ export function attachPointer(
     });
     if (!zone) return;
 
+    let requested: Range;
+    let tip: Addr;
     if (marquee.axis === 'cell') {
       if (zone.kind !== 'cell') return;
-      const tip = mergeAnchorOf(s, { sheet: s.data.sheetIndex, row: zone.row, col: zone.col });
-      const requested: Range = {
+      tip = mergeAnchorOf(s, { sheet: s.data.sheetIndex, row: zone.row, col: zone.col });
+      requested = {
         sheet: marquee.start.sheet,
         r0: Math.min(marquee.start.row, tip.row),
         c0: Math.min(marquee.start.col, tip.col),
         r1: Math.max(marquee.start.row, tip.row),
         c1: Math.max(marquee.start.col, tip.col),
       };
-      mutators.applySelectionRectangle(
-        store,
-        marquee.base,
-        expandRangeWithMerges(s, requested),
-        marquee.mode,
-        marquee.start,
-        tip,
-      );
-      return;
-    }
-
-    if (marquee.axis === 'row') {
+    } else if (marquee.axis === 'row') {
       if (zone.kind !== 'row-header' && zone.kind !== 'row-resize') return;
-      const requested = axisSelectionRange(marquee.bounds, 'row', marquee.startIndex, zone.row);
-      const tip = mergeAnchorOf(s, {
+      requested = axisSelectionRange(marquee.bounds, 'row', marquee.startIndex, zone.row);
+      tip = mergeAnchorOf(s, {
         sheet: marquee.bounds.sheet,
         row: zone.row,
         col: marquee.bounds.c0,
       });
-      mutators.applySelectionRectangle(
-        store,
-        marquee.base,
-        expandRangeWithMerges(s, requested),
-        marquee.mode,
-        marquee.start,
-        tip,
-      );
-      return;
+    } else {
+      if (zone.kind !== 'col-header' && zone.kind !== 'col-resize') return;
+      requested = axisSelectionRange(marquee.bounds, 'col', marquee.startIndex, zone.col);
+      tip = mergeAnchorOf(s, {
+        sheet: marquee.bounds.sheet,
+        row: marquee.bounds.r0,
+        col: zone.col,
+      });
     }
-
-    if (zone.kind !== 'col-header' && zone.kind !== 'col-resize') return;
-    const requested = axisSelectionRange(marquee.bounds, 'col', marquee.startIndex, zone.col);
-    const tip = mergeAnchorOf(s, {
-      sheet: marquee.bounds.sheet,
-      row: marquee.bounds.r0,
-      col: zone.col,
-    });
     mutators.applySelectionRectangle(
       store,
       marquee.base,
@@ -505,14 +504,7 @@ export function attachPointer(
     mutators.extendRangeTo(store, addr);
     const after = store.getState();
     const grown = expandRangeWithMerges(after, after.selection.range);
-    if (
-      grown.r0 !== after.selection.range.r0 ||
-      grown.r1 !== after.selection.range.r1 ||
-      grown.c0 !== after.selection.range.c0 ||
-      grown.c1 !== after.selection.range.c1
-    ) {
-      mutators.setRange(store, grown);
-    }
+    if (!sameRange(grown, after.selection.range)) mutators.setRange(store, grown);
   };
 
   /** Ctrl/Cmd-click on a row or column header: begin a marquee that adds the
@@ -555,7 +547,7 @@ export function attachPointer(
     dest: Range,
     opts: { copyOnly: boolean; announce?: { clientX: number; clientY: number } },
   ): { applied: boolean; restricted: boolean } => {
-    const restricted = interactionControllerFor(store)?.policy !== undefined;
+    const restricted = hostPolicy() !== undefined;
     // A password-guarded range in the way is unlocked first; the fill then repeats.
     if (
       !restricted &&
@@ -631,6 +623,7 @@ export function attachPointer(
   // A drag starts only when the policy allows its operation; the cells and the sheet's
   // protection are decided when it drops.
   const hostPolicy = () => interactionControllerFor(store)?.policy;
+  const selectionDisabled = (): boolean => hostPolicy()?.selection === false;
   /** A border drag moves whole cells, formats and formulas included. */
   const moveDragAllowed = (): boolean => fullFidelityCellWrites(hostPolicy());
   /** A right-button fill drag ends in a menu whose fills carry formats and formulas. */
@@ -638,24 +631,34 @@ export function attachPointer(
     fullFidelityCellWrites(hostPolicy()) && policyPermits(hostPolicy(), 'fill');
   const pageDragAllowed = (): boolean => policyPermits(hostPolicy(), 'pageSetup');
 
+  // setPointerCapture throws on synthetic events / certain pointer-id mismatches.
+  // Wrap to avoid crashing the handler; the worst-case fallback is that move
+  // events stop firing once the pointer leaves the host.
+  const tryCapture = (e: PointerEvent): void => {
+    try {
+      host.setPointerCapture(e.pointerId);
+    } catch {
+      /* no-op: still works without capture for in-host drags */
+    }
+  };
+  /** Take focus and pointer capture for a gesture the host owns. */
+  const grab = (e: PointerEvent): void => {
+    host.focus();
+    tryCapture(e);
+  };
+
   /** A secondary press moves the selection before the context menu opens:
    *  a cell outside every selected range becomes the selection, the corner
    *  selects the sheet. Headers are resolved by the menu itself. */
   const onSecondaryDown = (e: PointerEvent): void => {
     const s = store.getState();
-    const controller = interactionControllerFor(store);
-    if (controller?.policy?.selection === false) return;
+    if (selectionDisabled()) return;
     if (s.ui.editor.kind !== 'idle') return;
     const { x, y } = localXY(e);
     if (isFillHandleHit(hits, x, y) && fillMenuDragAllowed()) {
       // A right-button fill drag ends in a menu of fill kinds, so the context
       // menu the same press would raise is swallowed.
-      host.focus();
-      try {
-        host.setPointerCapture(e.pointerId);
-      } catch {
-        /* no-op: in-host drags still work without capture */
-      }
+      grab(e);
       drag = { kind: 'fill', src: { ...s.selection.range }, menu: true };
       mutators.setFillPreview(store, { ...s.selection.range });
       host.style.cursor = 'crosshair';
@@ -666,12 +669,7 @@ export function attachPointer(
     if (moveDragAllowed() && isSelectionBorderHit(s, x, y)) {
       const grabbed = hitTest(layoutForView(s), s.viewport, x, y);
       if (grabbed) {
-        host.focus();
-        try {
-          host.setPointerCapture(e.pointerId);
-        } catch {
-          /* no-op: in-host drags still work without capture */
-        }
+        grab(e);
         const src = { ...s.selection.range };
         drag = {
           kind: 'move',
@@ -692,11 +690,8 @@ export function attachPointer(
       return;
     }
     if (zone.kind !== 'cell') return;
-    const inside = selectionRangeList(s.selection).some(
-      (r) => zone.row >= r.r0 && zone.row <= r.r1 && zone.col >= r.c0 && zone.col <= r.c1,
-    );
-    if (inside) return;
     const addr = { sheet: s.data.sheetIndex, row: zone.row, col: zone.col };
+    if (selectionContainsAddr(s.selection, addr)) return;
     if (!isNavigationAddrAllowed(store, addr)) return;
     mutators.setActive(store, addr);
   };
@@ -716,7 +711,6 @@ export function attachPointer(
     const s = store.getState();
     const controller = interactionControllerFor(store);
     const restricted = controller?.policy !== undefined;
-    const selectionDisabled = controller?.policy?.selection === false;
 
     // Capture editor intent BEFORE we touch focus — host.focus() blurs the
     //  textarea, which triggers commit + cancel and tears down the editor
@@ -727,23 +721,12 @@ export function attachPointer(
     // A selection-disabled mount may still use cell clicks while a formula
     // editor is open to insert references. All other pointer entry points
     // must leave the host's fixed active selection untouched.
-    if (selectionDisabled && !inFormula) {
+    if (selectionDisabled() && !inFormula) {
       e.preventDefault();
       if (s.ui.editor.kind !== 'idle') host.focus({ preventScroll: true });
       drag = { kind: 'none' };
       return;
     }
-
-    // setPointerCapture throws on synthetic events / certain pointer-id mismatches.
-    // Wrap to avoid crashing the handler; the worst-case fallback is that move
-    // events stop firing once the pointer leaves the host.
-    const tryCapture = (): void => {
-      try {
-        host.setPointerCapture(e.pointerId);
-      } catch {
-        /* no-op: still works without capture for in-host drags */
-      }
-    };
 
     // Outline toggles and level buttons in the gutters take precedence over hit-zoning;
     // they sit in territory the hitZone fall-through would otherwise treat as
@@ -782,13 +765,9 @@ export function attachPointer(
     // same affordance the desktop app puts on its rulers.
     const ruler = rulerHandleAt(s, hits, x, y);
     if (ruler) {
-      if (!pageDragAllowed()) {
-        e.preventDefault();
-        return;
-      }
       e.preventDefault();
-      host.focus();
-      tryCapture();
+      if (!pageDragAllowed()) return;
+      grab(e);
       drag = { kind: 'ruler-margin', handle: ruler, inches: marginInchesFor(ruler, x, y) };
       host.style.cursor =
         ruler.side === 'left' || ruler.side === 'right' ? 'col-resize' : 'row-resize';
@@ -799,11 +778,8 @@ export function attachPointer(
     // no cell occupies, so a click there can only mean "edit that slot".
     const band = pageBandAt(s, hits, x, y);
     if (band) {
-      if (!pageDragAllowed()) {
-        e.preventDefault();
-        return;
-      }
       e.preventDefault();
+      if (!pageDragAllowed()) return;
       host.dispatchEvent(
         new CustomEvent('fc:editpageband', { bubbles: true, detail: { ...band } }),
       );
@@ -815,13 +791,9 @@ export function attachPointer(
     // the only thing in that view a drag from this position could mean.
     const breakHandle = pageBreakHandleAt(s, hits, x, y);
     if (breakHandle) {
-      if (!pageDragAllowed()) {
-        e.preventDefault();
-        return;
-      }
       e.preventDefault();
-      host.focus();
-      tryCapture();
+      if (!pageDragAllowed()) return;
+      grab(e);
       drag = { kind: 'page-break', handle: breakHandle, target: breakHandle.index };
       mutators.setPageBreakDrag(store, {
         axis: breakHandle.axis,
@@ -833,13 +805,12 @@ export function attachPointer(
 
     // Fill handle takes precedence over normal cell hit-testing.
     if (isFillHandleHit(hits, x, y)) {
-      if (selectionDisabled) {
+      if (selectionDisabled()) {
         e.preventDefault();
         drag = { kind: 'none' };
         return;
       }
       if (restricted) {
-        if (!controller) return;
         const permission = controller.canExecute({
           operation: 'fill',
           origin: 'fillHandle',
@@ -850,8 +821,7 @@ export function attachPointer(
           return;
         }
       }
-      host.focus();
-      tryCapture();
+      grab(e);
       drag = { kind: 'fill', src: { ...s.selection.range } };
       mutators.setFillPreview(store, { ...s.selection.range });
       host.style.cursor = 'crosshair';
@@ -864,8 +834,7 @@ export function attachPointer(
       const table = resizableTableGripAt(store, x, y);
       if (table) {
         e.preventDefault();
-        host.focus();
-        tryCapture();
+        grab(e);
         drag = { kind: 'table-resize', id: table.id };
         mutators.setFillPreview(store, { ...table.range });
         host.style.cursor = 'nwse-resize';
@@ -883,15 +852,13 @@ export function attachPointer(
         r0 === r1 && c0 === c1 ? pivotItemSlotsAt(s, wb, s.data.sheetIndex, r0, c0) : null;
       if (itemSlots) {
         e.preventDefault();
-        host.focus();
-        tryCapture();
+        grab(e);
         drag = { kind: 'pivot-item', slots: itemSlots, fromRow: r0, after: r0 };
         return;
       }
       if (grabbed) {
         e.preventDefault();
-        host.focus();
-        tryCapture();
+        grab(e);
         const src = { ...s.selection.range };
         drag = {
           kind: 'move',
@@ -911,7 +878,7 @@ export function attachPointer(
       const pressed = box ? hitTest(layoutForView(s), s.viewport, x, y) : null;
       if (box && ref && pressed) {
         e.preventDefault();
-        tryCapture();
+        tryCapture(e);
         const orig = { sheet: s.data.sheetIndex, r0: ref.r0, c0: ref.c0, r1: ref.r1, c1: ref.c1 };
         drag = {
           kind: 'ref-box',
@@ -938,7 +905,7 @@ export function attachPointer(
     //  pointerdown's default focus-change behavior).
     if (inFormula && zone.kind === 'cell' && editor) {
       e.preventDefault();
-      tryCapture();
+      tryCapture(e);
       const rawAnchor = { row: zone.row, col: zone.col };
       const mergedAnchor = mergeAnchorOf(s, {
         sheet: s.data.sheetIndex,
@@ -953,8 +920,7 @@ export function attachPointer(
       return;
     }
 
-    host.focus();
-    tryCapture();
+    grab(e);
 
     switch (zone.kind) {
       case 'corner':
@@ -1046,7 +1012,7 @@ export function attachPointer(
           col: zone.col,
           spans: headerGestureSpans(s, 'col', zone.col),
           startPointer: x,
-          startSize: colWidth(layoutForView(s), zone.col, s.viewport),
+          startSize: colWidth(layout, zone.col, s.viewport),
           rtl: s.ui.rightToLeft === true,
           preLayout: captureLayoutSnapshot(s),
         };
@@ -1067,7 +1033,7 @@ export function attachPointer(
           row: zone.row,
           spans: headerGestureSpans(s, 'row', zone.row),
           startPointer: y,
-          startSize: rowHeight(layoutForView(s), zone.row, s.viewport),
+          startSize: rowHeight(layout, zone.row, s.viewport),
           preLayout: captureLayoutSnapshot(s),
         };
         return;
@@ -1162,7 +1128,7 @@ export function attachPointer(
           return;
         }
         mutators.setActive(store, addr);
-        const url = e.button === 0 && !e.altKey ? hyperlinkAt(s, rawAddr) : null;
+        const url = e.altKey ? null : hyperlinkAt(s, rawAddr);
         drag = url
           ? {
               kind: 'cell',
@@ -1201,8 +1167,9 @@ export function attachPointer(
   };
 
   /** Body area the pointer must stay inside to avoid scrolling, in host coordinates. */
-  const autoscrollBounds = (): AutoscrollBounds | null => {
-    const rect = host.getBoundingClientRect();
+  const autoscrollBounds = (
+    rect: DOMRect = host.getBoundingClientRect(),
+  ): AutoscrollBounds | null => {
     if (rect.width <= 0 || rect.height <= 0) return null;
     const s = store.getState();
     const layout = layoutForView(s);
@@ -1230,9 +1197,9 @@ export function attachPointer(
     };
   };
 
-  const updateAutoscroll = (x: number, y: number): void => {
+  const updateAutoscroll = (x: number, y: number, rect: DOMRect): void => {
     const axes = autoscrollAxes();
-    const bounds = autoscrollBounds();
+    const bounds = autoscrollBounds(rect);
     if (!axes || !bounds) {
       autoscroll.stop();
       return;
@@ -1241,13 +1208,10 @@ export function attachPointer(
   };
 
   const onMove = (e: PointerEvent): void => {
-    const { x, y } = localXY(e);
+    const rect = host.getBoundingClientRect();
+    const { x, y } = localXY(e, rect);
 
-    if (
-      interactionControllerFor(store)?.policy?.selection === false &&
-      drag.kind !== 'none' &&
-      drag.kind !== 'range-insert'
-    ) {
+    if (selectionDisabled() && drag.kind !== 'none' && drag.kind !== 'range-insert') {
       drag = { kind: 'none' };
       mutators.setFillPreview(store, null);
       return;
@@ -1259,7 +1223,7 @@ export function attachPointer(
       return;
     }
 
-    updateAutoscroll(x, y);
+    updateAutoscroll(x, y, rect);
     applyDrag(e, x, y);
   };
 
@@ -1294,6 +1258,54 @@ export function attachPointer(
       e.clientX,
       e.clientY,
     );
+  };
+
+  // Header and cell drags rewrite the selection only when the pointer moves to
+  // another target while the selection is as the last write left it.
+  let lastDragWrite: {
+    drag: DragMode;
+    key: string;
+    selection: State['selection'];
+    merges: State['merges'];
+  } | null = null;
+  const applyOncePerTarget = (s: State, key: string, write: () => void): void => {
+    const last = lastDragWrite;
+    if (
+      last &&
+      last.drag === drag &&
+      last.key === key &&
+      last.selection === s.selection &&
+      last.merges === s.merges
+    ) {
+      return;
+    }
+    write();
+    const after = store.getState();
+    lastDragWrite = { drag, key, selection: after.selection, merges: after.merges };
+  };
+
+  // The tooltip value only changes with the destination, not with every move.
+  let fillValueCache: {
+    drag: DragMode;
+    dest: Range;
+    data: State['data'];
+    format: State['format'];
+    value: string | null;
+  } | null = null;
+  const fillValueFor = (s: State, owner: DragMode, src: Range, dest: Range): string | null => {
+    const cached = fillValueCache;
+    if (
+      cached &&
+      cached.drag === owner &&
+      cached.data === s.data &&
+      cached.format === s.format &&
+      sameRange(cached.dest, dest)
+    ) {
+      return cached.value;
+    }
+    const value = fillLastValue(s, src, dest, inputLocaleForWorkbook(wb), userCustomLists(store));
+    fillValueCache = { drag: owner, dest: { ...dest }, data: s.data, format: s.format, value };
+    return value;
   };
 
   const applyDrag = (e: PointerEvent | null, x: number, y: number): void => {
@@ -1343,20 +1355,34 @@ export function attachPointer(
       case 'col-header': {
         const layout = layoutForView(s);
         const zone = hitZone(layout, s.viewport, x, y, [], { resizeHandles: false });
-        if (zone && (zone.kind === 'col-header' || zone.kind === 'cell')) {
-          mutators.selectCols(store, drag.anchorCol, zone.col, s.selection.active.row);
-        } else if (zone === null) {
-          mutators.selectCols(store, drag.anchorCol, lastVisibleCol(s), s.selection.active.row);
+        const end =
+          zone && (zone.kind === 'col-header' || zone.kind === 'cell')
+            ? zone.col
+            : zone === null
+              ? lastVisibleCol(s)
+              : null;
+        if (end !== null) {
+          const anchorCol = drag.anchorCol;
+          applyOncePerTarget(s, `col:${end}`, () =>
+            mutators.selectCols(store, anchorCol, end, s.selection.active.row),
+          );
         }
         return;
       }
       case 'row-header': {
         const layout = layoutForView(s);
         const zone = hitZone(layout, s.viewport, x, y, [], { resizeHandles: false });
-        if (zone && (zone.kind === 'row-header' || zone.kind === 'cell')) {
-          mutators.selectRows(store, drag.anchorRow, zone.row, s.selection.active.col);
-        } else if (zone === null) {
-          mutators.selectRows(store, drag.anchorRow, lastVisibleRow(s), s.selection.active.col);
+        const end =
+          zone && (zone.kind === 'row-header' || zone.kind === 'cell')
+            ? zone.row
+            : zone === null
+              ? lastVisibleRow(s)
+              : null;
+        if (end !== null) {
+          const anchorRow = drag.anchorRow;
+          applyOncePerTarget(s, `row:${end}`, () =>
+            mutators.selectRows(store, anchorRow, end, s.selection.active.col),
+          );
         }
         return;
       }
@@ -1366,21 +1392,27 @@ export function attachPointer(
         // Over a header strip the drag reaches the nearest visible edge cell.
         const edge = topLeftVisibleCell(s);
         const sheet = s.data.sheetIndex;
+        let target: Addr | null = null;
         if (zone && zone.kind === 'cell') {
-          extendSelectionTo({ sheet, row: zone.row, col: zone.col });
+          target = { sheet, row: zone.row, col: zone.col };
         } else if (zone && (zone.kind === 'row-header' || zone.kind === 'row-resize')) {
-          extendSelectionTo({ sheet, row: zone.row, col: edge.col });
+          target = { sheet, row: zone.row, col: edge.col };
         } else if (zone && (zone.kind === 'col-header' || zone.kind === 'col-resize')) {
-          extendSelectionTo({ sheet, row: edge.row, col: zone.col });
+          target = { sheet, row: edge.row, col: zone.col };
         } else if (zone?.kind === 'corner') {
-          extendSelectionTo({ sheet, row: edge.row, col: edge.col });
+          target = { sheet, row: edge.row, col: edge.col };
+        }
+        if (target) {
+          const to = target;
+          applyOncePerTarget(s, `${to.sheet}:${to.row}:${to.col}`, () => extendSelectionTo(to));
         }
         return;
       }
       case 'fill': {
-        const cell = hitTest(layoutForView(s), s.viewport, x, y);
+        const layout = layoutForView(s);
+        const cell = hitTest(layout, s.viewport, x, y);
         if (!cell) return;
-        const corner = cellRect(layoutForView(s), s.viewport, drag.src.r1, drag.src.c1);
+        const corner = cellRect(layout, s.viewport, drag.src.r1, drag.src.c1);
         const kept = drag.menu
           ? null
           : fillShrinkFor(
@@ -1402,19 +1434,12 @@ export function attachPointer(
         }
         mutators.setFillPreview(store, dest);
         host.style.cursor = 'crosshair';
-        const last = fillLastValue(
-          s,
-          drag.src,
-          dest,
-          inputLocaleForWorkbook(wb),
-          userCustomLists(store),
-        );
+        const last = fillValueFor(s, drag, drag.src, dest);
         if (last === null || !e) {
           fillTooltip.hide();
         } else {
-          const edge = cellRect(layoutForView(s), s.viewport, dest.r1, dest.c1);
-          const at = localXY(e);
-          fillTooltip.show(last, e.clientX - at.x + edge.x + edge.w, e.clientY);
+          const edge = cellRect(layout, s.viewport, dest.r1, dest.c1);
+          fillTooltip.show(last, clientAnchorOf(e, edge, { x, y }).x, e.clientY);
         }
         return;
       }
@@ -1455,8 +1480,7 @@ export function attachPointer(
         mutators.setMovePreview(store, band);
         if (!e) return;
         const edge = cellRect(layoutForView(s), s.viewport, band.r1, band.c1);
-        const at = localXY(e);
-        fillTooltip.show(formatA1Range(band), e.clientX - at.x + edge.x + edge.w, e.clientY);
+        fillTooltip.show(formatA1Range(band), clientAnchorOf(e, edge, { x, y }).x, e.clientY);
         return;
       }
       case 'ruler-margin': {
@@ -1550,22 +1574,12 @@ export function attachPointer(
     autoscroll.stop();
     if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
     if (
-      interactionControllerFor(store)?.policy?.selection === false &&
-      drag.kind !== 'none' &&
-      drag.kind !== 'range-insert'
-    ) {
-      drag = { kind: 'none' };
-      host.style.cursor = '';
-      mutators.setPageBreakDrag(store, null);
-      mutators.setFillPreview(store, null);
-      return;
-    }
-    if (
-      interactionControllerFor(store)?.policy !== undefined &&
-      (drag.kind === 'col-resize' ||
-        drag.kind === 'row-resize' ||
-        drag.kind === 'ruler-margin' ||
-        drag.kind === 'page-break')
+      (selectionDisabled() && drag.kind !== 'none' && drag.kind !== 'range-insert') ||
+      (hostPolicy() !== undefined &&
+        (drag.kind === 'col-resize' ||
+          drag.kind === 'row-resize' ||
+          drag.kind === 'ruler-margin' ||
+          drag.kind === 'page-break'))
     ) {
       drag = { kind: 'none' };
       host.style.cursor = '';
@@ -1708,8 +1722,7 @@ export function attachPointer(
         } as const;
         if (applyTableResize(ctx, table, range)) onAfterCommit?.();
       }
-      const { x, y } = localXY(e);
-      updateCursor(host, store, x, y);
+      refreshCursor(e);
       return;
     }
     if (drag.kind === 'fill') {
@@ -1718,13 +1731,7 @@ export function attachPointer(
       const dest = s.ui.fillPreview;
       mutators.setFillPreview(store, null);
       fillTooltip.hide();
-      const unchanged =
-        drag.menu === true &&
-        dest !== null &&
-        dest.r0 === drag.src.r0 &&
-        dest.c0 === drag.src.c0 &&
-        dest.r1 === drag.src.r1 &&
-        dest.c1 === drag.src.c1;
+      const unchanged = drag.menu === true && dest !== null && sameRange(dest, drag.src);
       const shrunk =
         dest !== null &&
         !drag.menu &&
@@ -1736,14 +1743,14 @@ export function attachPointer(
       } else if (dest && !unchanged) {
         if (!isNavigationRangeAllowed(store, dest)) {
           drag = { kind: 'none' };
-          const { x, y } = localXY(e);
-          updateCursor(host, store, x, y);
+          refreshCursor(e);
           return;
         }
+        // The chip hangs off the last filled cell, not the pointer.
+        const filled = fillOutputRange(drag.src, dest);
+        const last = cellRect(layoutForView(s), s.viewport, filled.r1, filled.c1);
+        const anchor = clientAnchorOf(e, last);
         if (drag.menu) {
-          const filled = fillOutputRange(drag.src, dest);
-          const last = cellRect(layoutForView(s), s.viewport, filled.r1, filled.c1);
-          const at = localXY(e);
           host.dispatchEvent(
             new CustomEvent('fc:autofillmenu', {
               bubbles: true,
@@ -1752,35 +1759,26 @@ export function attachPointer(
                 dest: { ...dest },
                 clientX: e.clientX,
                 clientY: e.clientY,
-                anchorX: e.clientX - at.x + last.x + last.w,
-                anchorY: e.clientY - at.y + last.y + last.h,
+                anchorX: anchor.x,
+                anchorY: anchor.y,
               },
             }),
           );
           drag = { kind: 'none' };
-          const { x, y } = localXY(e);
-          updateCursor(host, store, x, y);
+          refreshCursor(e);
           return;
         }
         // Spreadsheet parity: holding Ctrl/⌘ on release toggles series → tile copy.
         const copyOnly = e.ctrlKey || e.metaKey;
-        // The chip hangs off the last filled cell, not the pointer.
-        const filled = fillOutputRange(drag.src, dest);
-        const last = cellRect(layoutForView(s), s.viewport, filled.r1, filled.c1);
-        const at = localXY(e);
         commitFill(drag.src, dest, {
           copyOnly,
-          announce: {
-            clientX: e.clientX - at.x + last.x + last.w,
-            clientY: e.clientY - at.y + last.y + last.h,
-          },
+          announce: { clientX: anchor.x, clientY: anchor.y },
         });
       }
     }
     if (drag.kind === 'cell' && drag.link) followClickedLink(drag.link, e.timeStamp);
     drag = { kind: 'none' };
-    const { x, y } = localXY(e);
-    updateCursor(host, store, x, y);
+    refreshCursor(e);
   };
 
   /** A plain click on a link cell follows it once released; a long press or a
@@ -1789,17 +1787,17 @@ export function attachPointer(
     if (upAt - link.at >= HYPERLINK_HOLD_SELECT_MS) return;
     const now = store.getState().selection.range;
     const was = link.range;
-    if (now.r0 !== was.r0 || now.c0 !== was.c0 || now.r1 !== was.r1 || now.c1 !== was.c1) return;
+    if (!sameRange(now, was)) return;
     followHyperlink({ store, wb, ...hyperlinkFollow }, link.url);
   };
 
-  /** An interrupted gesture is abandoned: live previews revert and nothing is committed. */
   /** The browser may raise `contextmenu` after the release, so the swallow outlives it by a tick. */
   const finishSecondaryDrag = (): void => {
     const release = releaseContextMenuSwallow;
     if (release) setTimeout(release, 0);
   };
 
+  /** An interrupted gesture is abandoned: live previews revert and nothing is committed. */
   const onCancel = (e: PointerEvent): void => {
     finishSecondaryDrag();
     autoscroll.stop();
@@ -1826,7 +1824,7 @@ export function attachPointer(
   const onDblClick = (e: MouseEvent): void => {
     const { x, y } = localXY(e);
     const s = store.getState();
-    if (interactionControllerFor(store)?.policy?.selection === false) {
+    if (selectionDisabled()) {
       e.preventDefault();
       e.stopPropagation();
       return;

@@ -106,11 +106,14 @@ const shownIn = (item: HTMLElement, menu: HTMLElement): boolean => {
   return true;
 };
 
+/** Whether a menu item cannot be activated: natively disabled or marked `aria-disabled`. */
+export const isMenuItemDisabled = (item: HTMLButtonElement): boolean =>
+  item.disabled || item.getAttribute('aria-disabled') === 'true';
+
 const menuItems = (menu: HTMLElement, selector = 'button'): HTMLButtonElement[] =>
   Array.from(menu.querySelectorAll<HTMLButtonElement>(selector)).filter(
     (item) =>
-      !item.disabled &&
-      item.getAttribute('aria-disabled') !== 'true' &&
+      !isMenuItemDisabled(item) &&
       item.closest<HTMLElement>('[role="menu"]') === menu &&
       shownIn(item, menu),
   );

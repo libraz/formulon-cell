@@ -7,7 +7,6 @@ import {
   paintFilterButton,
   pivotFieldButtonRect,
 } from '../../../../src/render/painters/filter-button.js';
-import type { ResolvedTheme } from '../../../../src/theme/resolve.js';
 
 describe('filterButtonRect', () => {
   it('sits 17x17 one pixel inside the trailing edge and one below the top', () => {
@@ -25,7 +24,7 @@ describe('filterButtonRect', () => {
 });
 
 describe('paintFilterButton', () => {
-  const run = (state: Parameters<typeof paintFilterButton>[3]) => {
+  const run = (state: Parameters<typeof paintFilterButton>[2]) => {
     const strokes: number[][] = [];
     const fills: number[][] = [];
     const ctx = new Proxy(
@@ -42,12 +41,7 @@ describe('paintFilterButton', () => {
         set: () => true,
       },
     ) as unknown as CanvasRenderingContext2D;
-    paintFilterButton(
-      ctx,
-      { x: 10, y: 20, w: 17, h: 17 },
-      { accent: '#217346', bg: '#fff' } as ResolvedTheme,
-      state,
-    );
+    paintFilterButton(ctx, { x: 10, y: 20, w: 17, h: 17 }, state);
     return { strokes, fills };
   };
 
@@ -91,14 +85,7 @@ describe('PivotTable field-caption button (Mac)', () => {
         },
       },
     ) as unknown as CanvasRenderingContext2D;
-    paintFilterButton(
-      ctx,
-      { x: 76, y: 54.5, w: 14, h: 14 },
-      { accent: '#217346', bg: '#fff' } as ResolvedTheme,
-      {},
-      MAC_PIVOT_BUTTON_LOOK,
-      2,
-    );
+    paintFilterButton(ctx, { x: 76, y: 54.5, w: 14, h: 14 }, {}, MAC_PIVOT_BUTTON_LOOK, 2);
     expect(strokes).toEqual([
       { color: '#848a90', rect: [76.25, 54.75, 13.5, 13.5] },
       { color: '#93989e', rect: [76.75, 55.25, 12.5, 12.5] },
@@ -129,7 +116,6 @@ describe('filtered PivotTable field button (Mac)', () => {
     paintFilterButton(
       ctx,
       { x: 76, y: 54, w: 14, h: 14 },
-      { accent: '#217346', bg: '#fff' } as ResolvedTheme,
       { filtered: true },
       MAC_PIVOT_BUTTON_LOOK,
       2,

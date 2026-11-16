@@ -37,6 +37,7 @@ import {
   type ViewState,
 } from '../geometry.js';
 import {
+  FILTER_BUTTON_INSET,
   FILTER_BUTTON_LOOK,
   filterButtonRect,
   MAC_PIVOT_BUTTON_LOOK,
@@ -131,6 +132,9 @@ export interface CellPaintResult {
  *  `paintCellText` lays it out. */
 const NO_PIVOT_BUTTONS: readonly PivotCellButton[] = [];
 
+const hasFillSource = (fmt: Partial<CellFormat> | undefined): boolean =>
+  !!(fmt?.fill || fmt?.fillPattern || fmt?.fillGradient);
+
 const overflowRunSpan = (
   ctx: CanvasRenderingContext2D,
   p: Parameters<typeof paintCellText>[0],
@@ -180,21 +184,26 @@ export function paintCells(
     tables,
   } = state;
   const rtl = layout.rtl;
+  const rtlOn = layout.rtl === true;
   const active = selection.active;
   const wb = cellCtx.wb;
   const pivots = pivotStyleLayer(wb, state);
   const styleFormatAt = styleElementFormatSource(state, wb);
-  const pivotButtonSize = pivotFieldButtonSize(
-    cellCtx.fontEffects,
-    visualZoom(state.viewport.zoom),
-  );
+  const viewZoom = visualZoom(state.viewport.zoom);
+  const pivotButtonSize = pivotFieldButtonSize(cellCtx.fontEffects, viewZoom);
   const pivotButtonLook = cellCtx.fontEffects ? MAC_PIVOT_BUTTON_LOOK : FILTER_BUTTON_LOOK;
   const ptPx = pointPx(state.layout, state.viewport);
+  const dprPx = cellCtx.dpr ?? 1;
+  const showFormulas = state.ui.showFormulas === true;
+  const showZeros = state.ui.showZeros !== false;
+  const date1904 = state.ui.date1904 === true;
+  const scale = renderScale(state.layout, state.viewport);
+  const wholePoint = wholePointAdvances(state.layout);
   const pivotButtonMetrics = {
     mac: cellCtx.fontEffects,
-    zoom: visualZoom(state.viewport.zoom),
+    zoom: viewZoom,
     ptPx,
-    dpr: cellCtx.dpr ?? 1,
+    dpr: dprPx,
     rtl,
   };
   const visibleBounds = {
@@ -226,15 +235,16 @@ export function paintCells(
   // RangeResolver is only needed for list-validation re-resolution. We
   // build it lazily — most viewport repaints don't have a single DV cell,
   // so allocating the resolver up-front would be wasted work.
-  const wbForResolver = cellCtx.wb;
   let resolver: RangeResolver | undefined;
   const getResolver = (): RangeResolver | undefined => {
     if (resolver) return resolver;
-    if (!wbForResolver) return undefined;
-    resolver = makeRangeResolver(wbForResolver, data.sheetIndex);
+    if (!wb) return undefined;
+    resolver = makeRangeResolver(wb, data.sheetIndex);
     return resolver;
   };
   const triangleHits: ErrorTriangleHit[] = [];
+  const cellAt = (row: number, col: number) =>
+    data.cells.get(addrKey({ sheet: data.sheetIndex, row, col }));
   const { errorChecking } = state.ui;
   // Format Stale Values: decided once per paint, then read for formula cells only.
   const staleAt =
@@ -244,9 +254,13 @@ export function paintCells(
   const locale = normalizeFormatLocale(cellCtx.locale);
   // Numbers stored as text are read the way typing them would be.
   const inputLocale = (wb && inputLocaleForWorkbook(wb)) ?? cellCtx.locale;
-  // Engine-side CF (rules loaded from .xlsx). Merged on top — engine rules
-  // currently win per field for cells with overlap. Restricted to the
-  // visible viewport rect so we don't pay for off-screen cells.
+  const errorCheckOptions = {
+    macNa: cellCtx.fontEffects,
+    numberAsText: cellCtx.fontEffects,
+    formulaRules: cellCtx.fontEffects,
+    locale: inputLocale,
+    errorChecking,
+  };
   const effectiveFormats = new Map<string, Partial<CellFormat> | null>();
   const effectiveFormatAt = (row: number, col: number): Partial<CellFormat> | undefined => {
     if (!wb?.capabilities.effectiveStyle || typeof wb.getEffectiveStyle !== 'function') {
@@ -256,6 +270,9 @@ export function paintCells(
       effectiveCellFormatFromEngine(wb, data.sheetIndex, row, col, effectiveFormats) ?? undefined
     );
   };
+  // Engine-side CF (rules loaded from .xlsx). Merged on top — engine rules
+  // currently win per field for cells with overlap. Restricted to the
+  // visible viewport rect so we don't pay for off-screen cells.
   if (wb?.capabilities.conditionalFormat) {
     const sheet = state.data.sheetIndex;
     const engineCf = evaluateCfFromEngine(
@@ -307,24 +324,28 @@ export function paintCells(
     const range = merges.byAnchor.get(addrKey({ sheet: data.sheetIndex, row, col }));
     return range ? rangeRects(layout, state.viewport, range) : [];
   };
-  const mergeBounds = (row: number, col: number): Rect | null =>
-    connectedRects(mergeRectsAt(row, col))[0] ?? null;
 
   // The sheet background is painted before grid lines. Repaint it inside a
   // merge before its content so internal gridlines cannot show through. If
   // the background image is already loaded, restore the same repeat pattern
   // instead of replacing it with an opaque theme fill.
-  const paintMergeBase = (cell: Rect): void => {
-    // Keep the merge's own trailing rule; only interior gridlines go.
-    const bounds = surfaceRect(cell, cellCtx.dpr ?? 1, layout.rtl === true);
+  let backgroundPattern: CanvasPattern | null | undefined;
+  const getBackgroundPattern = (): CanvasPattern | null => {
+    if (backgroundPattern !== undefined) return backgroundPattern;
     const image = cellCtx.sheetBackgroundImage;
-    const pattern =
+    backgroundPattern =
       image &&
       image.naturalWidth > 0 &&
       image.naturalHeight > 0 &&
       typeof ctx.createPattern === 'function'
         ? ctx.createPattern(image, 'repeat')
         : null;
+    return backgroundPattern;
+  };
+  const paintMergeBase = (cell: Rect): void => {
+    // Keep the merge's own trailing rule; only interior gridlines go.
+    const bounds = surfaceRect(cell, dprPx, rtlOn);
+    const pattern = getBackgroundPattern();
     if (pattern) {
       const ox = layout.rtl ? 0 : gridOriginX(layout);
       const oy = gridOriginY(layout);
@@ -354,7 +375,7 @@ export function paintCells(
         isActive: true,
         isInRange: false,
         dpr: cellCtx.dpr,
-        rtl: layout.rtl === true,
+        rtl: rtlOn,
       });
     } else if (isSelected) {
       paintCellBackground({
@@ -404,7 +425,7 @@ export function paintCells(
     col: number,
   ): void => {
     const fmt = paintCtx.format;
-    const sides = overflowSides(fmt?.align, layout.rtl === true);
+    const sides = overflowSides(fmt?.align, rtlOn);
     // Columns run right-to-left on an RTL sheet.
     const rightStep: 1 | -1 = layout.rtl ? -1 : 1;
     const leftCols = sides.left ? overflowColumns(row, col, -rightStep as 1 | -1) : [];
@@ -420,11 +441,10 @@ export function paintCells(
     const clip = { ...base, x: base.x - leftW, w: base.w + leftW + widthOf(rightCols) };
     const span = overflowRunSpan(ctx, paintCtx);
     deferredOverflow.push(() => {
-      const dpr = cellCtx.dpr ?? 1;
-      const rule = ruleWidth(dpr);
-      const surface = surfaceRect(base, dpr, layout.rtl === true);
+      const rule = ruleWidth(dprPx);
+      const surface = surfaceRect(base, dprPx, rtlOn);
       // Each boundary between two columns of the span; `owner` holds the rule.
-      const ordered = [...leftCols.slice().reverse(), col, ...rightCols];
+      const ordered = [...[...leftCols].reverse(), col, ...rightCols];
       for (let i = 0; i + 1 < ordered.length; i += 1) {
         const a = ordered[i] as number;
         const b = ordered[i + 1] as number;
@@ -436,15 +456,10 @@ export function paintCells(
         if (!gridLinesShown(state)) continue;
         const next = format.formats.get(addrKey({ sheet: data.sheetIndex, row, col: owner + 1 }));
         // The following cell's fill already covers the rule before it.
-        if (next?.fill || next?.fillPattern || next?.fillGradient) continue;
+        if (hasFillSource(next)) continue;
         const own = format.formats.get(addrKey({ sheet: data.sheetIndex, row, col: owner }));
         ctx.fillStyle = own?.fill ?? theme.bg;
-        ctx.fillRect(
-          ruleCenter(boundary, dpr, layout.rtl === true) - rule / 2,
-          surface.y,
-          rule,
-          surface.h,
-        );
+        ctx.fillRect(ruleCenter(boundary, dprPx, rtlOn) - rule / 2, surface.y, rule, surface.h);
       }
       paintCellText({ ...paintCtx, clip });
     });
@@ -470,6 +485,10 @@ export function paintCells(
     return extra === 0 ? base : spillRect(base, extra);
   };
 
+  const inSelection = (addr: { sheet: number; row: number; col: number }): boolean =>
+    rangeContainsAddr(rng, addr) ||
+    extras?.some((extra) => rangeContainsAddr(extra, addr)) === true;
+
   // The anchor can be scrolled or hidden while a visible body segment of the
   // merge remains on screen. Clear that segment here; the normal anchor walk
   // below handles the common visible-anchor case and then paints content.
@@ -479,20 +498,18 @@ export function paintCells(
     const anchorVisible = rows.positionAt.has(merge.r0) && cols.positionAt.has(merge.c0);
     if (rects.length === 0 || anchorVisible) continue;
     const anchor = { sheet: merge.sheet, row: merge.r0, col: merge.c0 };
-    const selected =
-      rangeContainsAddr(rng, anchor) ||
-      extras?.some((extra) => rangeContainsAddr(extra, anchor)) === true;
+    const selected = inSelection(anchor);
     const isActive =
       active.sheet === merge.sheet && active.row === merge.r0 && active.col === merge.c0;
     const anchorFormat = format.formats.get(anchorKey);
     for (const rect of rects) {
       paintMergeSurface(rect, isActive, selected);
-      if (anchorFormat?.fill || anchorFormat?.fillPattern || anchorFormat?.fillGradient) {
+      if (hasFillSource(anchorFormat)) {
         paintCellFill({
           ctx,
           theme,
           dpr: cellCtx.dpr,
-          rtl: layout.rtl === true,
+          rtl: rtlOn,
           bounds: rect,
           value: { kind: 'blank' },
           formula: null,
@@ -510,7 +527,8 @@ export function paintCells(
   // formatted cells; a viewport-sized grid is bounded.
   for (const r of rows.visible) {
     for (const c of cols.visible) {
-      const key = addrKey({ sheet: data.sheetIndex, row: r, col: c });
+      const cellAddr = { sheet: data.sheetIndex, row: r, col: c };
+      const key = addrKey(cellAddr);
       // Skip cells hidden inside a merge — only the anchor paints.
       if (merges.byCell.has(key)) continue;
       const cell = data.cells.get(key);
@@ -544,13 +562,9 @@ export function paintCells(
         !cell &&
         !isActive &&
         !isMergeAnchor &&
-        !engineFmt?.fill &&
-        !engineFmt?.fillPattern &&
-        !engineFmt?.fillGradient &&
+        !hasFillSource(engineFmt) &&
         !engineFmt?.borders &&
-        !fmt?.fill &&
-        !fmt?.fillPattern &&
-        !fmt?.fillGradient &&
+        !hasFillSource(fmt) &&
         !fmt?.borders &&
         !styleFmt?.fill &&
         !styleFmt?.fillPattern &&
@@ -562,11 +576,11 @@ export function paintCells(
         !filterHeader
       )
         continue;
-      const bounds = mergeBounds(r, c) ?? cellRectIn(layout, cols, rows, r, c);
-      const isInRange = rangeContainsAddr(rng, { sheet: data.sheetIndex, row: r, col: c });
-      const isInExtraRange = extras?.some((extra) =>
-        rangeContainsAddr(extra, { sheet: data.sheetIndex, row: r, col: c }),
-      );
+      const bounds =
+        (isMergeAnchor ? connectedRects(mergedRects)[0] : undefined) ??
+        cellRectIn(layout, cols, rows, r, c);
+      const isInRange = rangeContainsAddr(rng, cellAddr);
+      const isInExtraRange = extras?.some((extra) => rangeContainsAddr(extra, cellAddr));
 
       const overlay = conditional.get(key);
       const baseFmt: typeof fmt =
@@ -602,9 +616,8 @@ export function paintCells(
 
       const value: CellValue = cell?.value ?? { kind: 'blank' };
       const storedFormula = cell?.formula ?? null;
-      const cellAddr = { sheet: data.sheetIndex, row: r, col: c };
       let formula = storedFormula;
-      if (storedFormula && state.ui.showFormulas === true) {
+      if (storedFormula && showFormulas) {
         if (wb) {
           try {
             formula = formulaForEdit(wb, cellAddr, storedFormula, state.ui.r1c1) ?? storedFormula;
@@ -615,21 +628,14 @@ export function paintCells(
               ? formatA1FormulaAsR1C1(storedFormula, cellAddr)
               : storedFormula;
           }
-        }
-        if (!wb && state.ui.r1c1 === true) {
-          formula = formatA1FormulaAsR1C1(storedFormula, { row: r, col: c });
+        } else if (state.ui.r1c1 === true) {
+          formula = formatA1FormulaAsR1C1(storedFormula, cellAddr);
         }
       }
-      const customDisplay =
-        cellCtx.getDisplay?.(
-          { sheet: data.sheetIndex, row: r, col: c },
-          value,
-          storedFormula,
-          fmt,
-        ) ?? null;
+      const customDisplay = cellCtx.getDisplay?.(cellAddr, value, storedFormula, fmt) ?? null;
       let nativeDisplay: string | null = null;
       const formatCode = fmt?.numFmt ? numFmtToFormatCode(fmt.numFmt, wb) : null;
-      if (customDisplay === null && state.ui.showFormulas !== true && wb) {
+      if (customDisplay === null && !showFormulas && wb) {
         // A just-authored number format may be present in the store before a
         // mirror flush reaches the native XF table. Format that value directly
         // with formulon; loaded/inherited formats can use the workbook cell
@@ -660,17 +666,17 @@ export function paintCells(
         isActive,
         isInRange,
         format: effectiveFmt,
-        showFormulas: state.ui.showFormulas === true,
-        showZeros: state.ui.showZeros !== false,
+        showFormulas,
+        showZeros,
         displayOverride,
         locale,
-        date1904: state.ui.date1904 === true,
+        date1904,
         rtl,
         dpr: cellCtx.dpr,
         rowBaselineFont: rowFonts.get(r),
         merged: isMergeAnchor,
-        zoom: renderScale(state.layout, state.viewport),
-        wholePointAdvances: wholePointAdvances(state.layout),
+        zoom: scale,
+        wholePointAdvances: wholePoint,
         formatPaint:
           formatCode && customDisplay === null && value.kind === 'number'
             ? numberFormatPaint(formatCode, value.value)
@@ -681,7 +687,7 @@ export function paintCells(
       // Static format fill OR overlay fill — both painted via paintCellFill,
       // which reads `format.fill`. The merged effectiveFmt already prefers
       // overlay over static, so a single call yields the right result.
-      if (effectiveFmt?.fill || effectiveFmt?.fillPattern || effectiveFmt?.fillGradient) {
+      if (hasFillSource(effectiveFmt)) {
         if (isMergeAnchor && mergedRects.length > 0) {
           for (const mergedRect of mergedRects) {
             paintCellFill({ ...paintCtx, bounds: mergedRect });
@@ -694,7 +700,7 @@ export function paintCells(
         !isActive &&
         !objectSelected &&
         (isInRange || isInExtraRange) &&
-        (effectiveFmt?.fill || effectiveFmt?.fillPattern || effectiveFmt?.fillGradient)
+        hasFillSource(effectiveFmt)
       ) {
         if (isMergeAnchor && mergedRects.length > 0) {
           for (const mergedRect of mergedRects) {
@@ -717,7 +723,7 @@ export function paintCells(
       if (overlay?.iconKind && overlay.iconSlot !== undefined) {
         // Icons are screen pixels at 100%: they follow the sheet zoom only,
         // not the platform screen scale.
-        const iconZoom = visualZoom(state.viewport.zoom);
+        const iconZoom = viewZoom;
         paintConditionalIcon(
           ctx,
           bounds,
@@ -741,7 +747,9 @@ export function paintCells(
         // Conditional formatting's "Show Bar/Icon Only" suppresses the
         // value text while still leaving fills, bars, and icons visible.
       } else if (headerButton || pivotButton) {
-        const reserved = headerButton ? TABLE_HEADER_TEXT_RESERVE : pivotButtonSize + 1;
+        const reserved = headerButton
+          ? TABLE_HEADER_TEXT_RESERVE
+          : pivotButtonSize + FILTER_BUTTON_INSET;
         paintCellText({
           ...paintCtx,
           bounds: {
@@ -767,7 +775,7 @@ export function paintCells(
           value,
           formula,
           format: effectiveFmt,
-          showFormulas: state.ui.showFormulas === true,
+          showFormulas,
           displayOverride,
           tableHeader,
           hasIcon: false,
@@ -784,7 +792,7 @@ export function paintCells(
       }
       if (headerButton) paintTableHeaderChevron(ctx, bounds, theme, rtl);
       if (filterHeader) {
-        paintFilterButton(ctx, filterButtonRect(bounds, rtl), theme, {
+        paintFilterButton(ctx, filterButtonRect(bounds, rtl), {
           filtered: activeFilters.some(({ range, cols }) => range.r0 === r && cols.has(c)),
           sorted: filterSorts.flatMap((spec) => spec.keys).find((key) => key.byCol === c)
             ?.direction,
@@ -797,15 +805,14 @@ export function paintCells(
           : NO_PIVOT_BUTTONS;
       for (const button of pivotButtons) {
         if (button.kind === 'outline') {
-          paintPivotCollapseButton(ctx, button.rect, ptPx, cellCtx.dpr ?? 1, button.collapsed);
+          paintPivotCollapseButton(ctx, button.rect, ptPx, dprPx, button.collapsed);
         } else if (!filterHeader) {
           paintFilterButton(
             ctx,
             button.rect,
-            theme,
             { filtered: button.filtered },
             pivotButtonLook,
-            cellCtx.dpr ?? 1,
+            dprPx,
           );
         }
       }
@@ -823,8 +830,7 @@ export function paintCells(
       // the green triangle conveys that without piling on a red one). The
       // ignoredErrors set suppresses both kinds for the cell once the user
       // dismisses the popover via the "Ignore" action.
-      const cellKey = key;
-      if (!ignored.has(cellKey)) {
+      if (!ignored.has(key)) {
         const validation = fmt?.validation ?? rangeValidationAt(format, cellAddr);
         // A blocked PivotTable's anchor is checked like a formula's #SPILL!.
         const pivotSpill = pivots.spills.some(
@@ -832,23 +838,11 @@ export function paintCells(
         );
         if (
           (stale && errorChecking.enabled) ||
-          errorCheckFlagged(
-            value,
-            storedFormula,
-            pivotSpill,
-            {
-              macNa: cellCtx.fontEffects,
-              numberAsText: cellCtx.fontEffects,
-              formulaRules: cellCtx.fontEffects,
-              locale: inputLocale,
-              errorChecking,
-            },
-            {
-              addr: cellAddr,
-              ...(effectiveFmt?.locked !== undefined ? { locked: effectiveFmt.locked } : {}),
-              cellAt: (row, col) => data.cells.get(addrKey({ sheet: data.sheetIndex, row, col })),
-            },
-          )
+          errorCheckFlagged(value, storedFormula, pivotSpill, errorCheckOptions, {
+            addr: cellAddr,
+            ...(effectiveFmt?.locked !== undefined ? { locked: effectiveFmt.locked } : {}),
+            cellAt,
+          })
         ) {
           const hit = cellCtx.fontEffects
             ? paintErrorTriangle(

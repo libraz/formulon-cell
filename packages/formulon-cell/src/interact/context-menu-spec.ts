@@ -7,147 +7,6 @@ import { PivotAggregation, PivotShowValuesAs } from '../engine/types.js';
 import type { Strings } from '../i18n/strings.js';
 import type { ContextMenuItem } from './context-menu-options.js';
 
-export type ItemId =
-  | 'copy'
-  | 'cut'
-  | 'paste'
-  | 'pasteSpecial'
-  | 'pasteAll'
-  | 'pasteFormulas'
-  | 'pasteFormulasNumFmt'
-  | 'pasteValues'
-  | 'pasteValuesNumFmt'
-  | 'pasteFormatsOnly'
-  | 'pasteTranspose'
-  | 'pasteKeepSource'
-  | 'pasteNoBorders'
-  | 'pasteColumnWidths'
-  | 'pasteLink'
-  | 'insertCopiedCells'
-  | 'insertCells'
-  | 'insertTableRows'
-  | 'insertTableColumns'
-  | 'deleteCells'
-  | 'clear'
-  | 'bold'
-  | 'italic'
-  | 'underline'
-  | 'alignLeft'
-  | 'alignCenter'
-  | 'alignRight'
-  | 'borders'
-  | 'formatCells'
-  | 'pickFromList'
-  | 'defineName'
-  | 'filterClear'
-  | 'filterReapply'
-  | 'filterByValue'
-  | 'sortAsc'
-  | 'sortDesc'
-  | 'selectAll'
-  | 'rowHeight'
-  | 'colWidth'
-  | 'rowInsertAbove'
-  | 'rowInsertBelow'
-  | 'rowDelete'
-  | 'rowHide'
-  | 'rowUnhide'
-  | 'colInsertLeft'
-  | 'colInsertRight'
-  | 'colDelete'
-  | 'colHide'
-  | 'colUnhide'
-  | 'rowGroup'
-  | 'rowUngroup'
-  | 'colGroup'
-  | 'colUngroup'
-  | 'newComment'
-  | 'insertComment'
-  | 'deleteComment'
-  | 'showHideNote'
-  | 'insertHyperlink'
-  | 'openHyperlink'
-  | 'editPhonetic'
-  | 'showPhonetic'
-  | 'toggleWatch'
-  | 'pivotRefresh'
-  | 'pivotSortAsc'
-  | 'pivotSortDesc'
-  | 'pivotFieldSettings'
-  | 'pivotShowFieldList'
-  | 'pivotNumberFormat'
-  | 'pivotDelete'
-  | 'pivotSortMore'
-  | 'pivotFilterClear'
-  | 'pivotFilterKeepSelected'
-  | 'pivotFilterHideSelected'
-  | 'pivotFilterTop10'
-  | 'pivotFilterLabel'
-  | 'pivotFilterValue'
-  | 'pivotSelectLabels'
-  | 'pivotSelectData'
-  | 'pivotSelectLabelsAndData'
-  | 'pivotSelectTable'
-  | 'pivotSelectEnable'
-  | 'pivotCalcField'
-  | 'pivotCalcItem'
-  | 'pivotSolveOrder'
-  | 'pivotListFormulas'
-  | 'pivotRemoveField'
-  | 'pivotRemoveValues'
-  | 'pivotRemoveGrandTotal'
-  | 'pivotSubtotal'
-  | 'pivotExpand'
-  | 'pivotCollapse'
-  | 'pivotExpandField'
-  | 'pivotCollapseField'
-  | 'pivotCollapseTo'
-  | 'pivotGroup'
-  | 'pivotUngroup'
-  | 'pivotMoveItemFirst'
-  | 'pivotMoveItemUp'
-  | 'pivotMoveItemDown'
-  | 'pivotMoveItemLast'
-  | 'pivotMoveFieldFirst'
-  | 'pivotMoveFieldLeft'
-  | 'pivotMoveFieldRight'
-  | 'pivotMoveFieldLast'
-  | 'pivotMoveFieldToColumns'
-  | 'pivotMoveFieldToRows'
-  | 'pivotSummarizeSum'
-  | 'pivotSummarizeCount'
-  | 'pivotSummarizeAverage'
-  | 'pivotSummarizeMax'
-  | 'pivotSummarizeMin'
-  | 'pivotSummarizeProduct'
-  | 'pivotSummarizeDistinctCount'
-  | 'pivotSummarizeMore'
-  | 'pivotShowAsNormal'
-  | 'pivotShowAsPercentOfTotal'
-  | 'pivotShowAsPercentOfColumn'
-  | 'pivotShowAsPercentOfRow'
-  | 'pivotShowAsPercentOfParentRow'
-  | 'pivotShowAsPercentOfParentColumn'
-  | 'pivotShowAsMore'
-  | 'pivotShowDetails'
-  | 'pivotOptions';
-
-/** Menu-level IDs are also stable composition targets. They are not commands
- * themselves; selecting one selects the corresponding nested item tree. */
-export type MenuContainerId =
-  | 'pasteSpecialMenu'
-  | 'filterMenu'
-  | 'sortMenu'
-  | 'insertTableMenu'
-  | 'pivotSortMenu'
-  | 'pivotFilterMenu'
-  | 'pivotSelectMenu'
-  | 'pivotFormulasMenu'
-  | 'pivotSummarizeMenu'
-  | 'pivotShowAsMenu'
-  | 'pivotExpandMenu'
-  | 'pivotMoveMenu';
-
 export type MenuKind = 'cell' | 'row' | 'col';
 
 /** Plain insert entries. While a copy is pending the desktop menus replace
@@ -177,7 +36,7 @@ export type MenuEntry =
 
 /** Every registered executable built-in ID. Custom IDs must stay outside this
  * set so a host cannot accidentally turn a callback item into a built-in. */
-export const BUILTIN_ITEM_IDS: readonly ItemId[] = [
+export const BUILTIN_ITEM_IDS = [
   'copy',
   'cut',
   'paste',
@@ -301,7 +160,9 @@ export const BUILTIN_ITEM_IDS: readonly ItemId[] = [
   'pivotShowAsMore',
   'pivotShowDetails',
   'pivotOptions',
-];
+] as const;
+
+export type ItemId = (typeof BUILTIN_ITEM_IDS)[number];
 
 const BUILTIN_ITEM_ID_SET: ReadonlySet<string> = new Set(BUILTIN_ITEM_IDS);
 
@@ -433,14 +294,22 @@ export function withTableInsertMenu(
   );
 }
 
-export function buildCellEntries(s: Strings, hasNote: boolean): MenuEntry[] {
+/** Clipboard rows that open every Windows menu, closed by the separator `sepId`. */
+function bandHead(s: Strings, sepId: string): MenuEntry[] {
   const t = s.contextMenu;
   return [
     { kind: 'item', id: 'cut', label: t.cut, hint: '⌘X' },
     { kind: 'item', id: 'copy', label: t.copy, hint: '⌘C' },
     { kind: 'item', id: 'paste', label: t.paste, hint: '⌘V' },
     pasteSpecialSubmenu(s),
-    { kind: 'sep', id: 'sep1' },
+    { kind: 'sep', id: sepId },
+  ];
+}
+
+export function buildCellEntries(s: Strings, hasNote: boolean): MenuEntry[] {
+  const t = s.contextMenu;
+  return [
+    ...bandHead(s, 'sep1'),
     { kind: 'item', id: 'insertCells', label: s.ribbonMenu.insertCells },
     { kind: 'item', id: 'insertCopiedCells', label: t.insertCopiedCells },
     { kind: 'item', id: 'deleteCells', label: s.ribbonMenu.deleteCells },
@@ -766,11 +635,7 @@ export function buildPivotEntries(s: Strings, target: PivotMenuTarget): MenuEntr
 export function buildRowEntries(s: Strings): MenuEntry[] {
   const t = s.contextMenu;
   return [
-    { kind: 'item', id: 'cut', label: t.cut, hint: '⌘X' },
-    { kind: 'item', id: 'copy', label: t.copy, hint: '⌘C' },
-    { kind: 'item', id: 'paste', label: t.paste, hint: '⌘V' },
-    pasteSpecialSubmenu(s),
-    { kind: 'sep', id: 'sepR1' },
+    ...bandHead(s, 'sepR1'),
     { kind: 'item', id: 'rowInsertAbove', label: t.insert },
     { kind: 'item', id: 'rowInsertBelow', label: t.rowInsertBelow },
     { kind: 'item', id: 'insertCopiedCells', label: t.insertCopiedBand },
@@ -789,11 +654,7 @@ export function buildRowEntries(s: Strings): MenuEntry[] {
 export function buildColEntries(s: Strings): MenuEntry[] {
   const t = s.contextMenu;
   return [
-    { kind: 'item', id: 'cut', label: t.cut, hint: '⌘X' },
-    { kind: 'item', id: 'copy', label: t.copy, hint: '⌘C' },
-    { kind: 'item', id: 'paste', label: t.paste, hint: '⌘V' },
-    pasteSpecialSubmenu(s),
-    { kind: 'sep', id: 'sepC1' },
+    ...bandHead(s, 'sepC1'),
     { kind: 'item', id: 'colInsertLeft', label: t.insert },
     { kind: 'item', id: 'colInsertRight', label: t.colInsertRight },
     { kind: 'item', id: 'insertCopiedCells', label: t.insertCopiedBand },
@@ -959,20 +820,17 @@ export function toMacBandEntries(entries: readonly MenuEntry[], s: Strings): Men
 }
 
 /** Context-menu items that open a dialog the host may not have attached. */
-export type DialogMenuItemId =
-  | 'formatCells'
-  | 'pasteSpecial'
-  | 'insertHyperlink'
-  | 'insertComment'
-  | 'defineName';
+export type DialogMenuItemId = (typeof DIALOG_MENU_ITEM_ID_LIST)[number];
 
-const DIALOG_MENU_ITEM_IDS: ReadonlySet<string> = new Set<DialogMenuItemId>([
+const DIALOG_MENU_ITEM_ID_LIST = [
   'formatCells',
   'pasteSpecial',
   'insertHyperlink',
   'insertComment',
   'defineName',
-]);
+] as const satisfies readonly ItemId[];
+
+const DIALOG_MENU_ITEM_IDS: ReadonlySet<string> = new Set(DIALOG_MENU_ITEM_ID_LIST);
 
 export const isDialogMenuItemId = (id: string): id is DialogMenuItemId =>
   DIALOG_MENU_ITEM_IDS.has(id);
