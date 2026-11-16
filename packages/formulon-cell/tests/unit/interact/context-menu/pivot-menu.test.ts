@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../../src/commands/history.js';
+import {
+  InteractionController,
+  registerInteractionController,
+} from '../../../../src/commands/interaction-controller.js';
 import { PivotAggregation, PivotAxis, PivotShowValuesAs } from '../../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { ja } from '../../../../src/i18n/strings/ja.js';
@@ -7,6 +11,7 @@ import {
   attachContextMenu,
   type ContextMenuHandle,
 } from '../../../../src/interact/context-menu.js';
+import { runContextMenuPivotItem } from '../../../../src/interact/context-menu-pivot.js';
 import { disposeOverlayPortal } from '../../../../src/interact/overlay-portal.js';
 import { cellRect, layoutForView } from '../../../../src/render/geometry.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../../src/store/store.js';
@@ -362,6 +367,27 @@ describe('PivotTable context menu, as measured on the Mac app', () => {
     submenu('pivotSelectMenu');
     run('pivotSelectTable');
     expect(store.getState().selection.range).toMatchObject({ r0: 2, c0: 0, r1: 6, c1: 2 });
+  });
+
+  it('refuses Remove Grand Total when the interaction policy denies pivot writes', () => {
+    const cellInfo = wb.pivotCellInfo({ sheet: 0, row: CELL.total[0], col: CELL.total[1] });
+    if (!cellInfo) throw new Error('missing pivot cell');
+    const ref = { addr: { sheet: 0, row: CELL.total[0], col: CELL.total[1] }, info: cellInfo };
+    const controller = new InteractionController({ store, getWb: () => wb, history });
+    registerInteractionController(store, controller);
+    const ctx = {
+      host,
+      store,
+      wb,
+      strings: ja,
+      history,
+      pickNumberFormat: async () => null,
+      refresh: () => {},
+    };
+    controller.setPolicy({ defaultOperation: 'allow', operations: { pivot: false } });
+    runContextMenuPivotItem(ctx, ref, 'pivotRemoveGrandTotal');
+    expect(wb.getPivotTableGrandTotals(0, 0)).toMatchObject({ cols: true });
+    expect(history.undo()).toBe(false);
   });
 
   it('opens the field dialog, the options dialog and the field list', () => {

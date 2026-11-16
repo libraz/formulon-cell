@@ -1,10 +1,11 @@
-import { type History, recordingHistory } from '../commands/history.js';
+import type { History } from '../commands/history.js';
 import { pivotReportRange } from '../commands/pivot-actions.js';
 import {
   clearPivotFieldFilter,
   pivotFieldFilterModel,
   setPivotFieldItemsChecked,
 } from '../commands/pivot-filter.js';
+import { applyPivotGrandTotals } from '../commands/pivot-layout.js';
 import { deletePivotTables } from '../commands/pivot-table.js';
 import { PIVOT_CELL_KIND, pivotItemText } from '../engine/pivot-cell-kind.js';
 import { type Addr, PivotAxis, PivotSortOrder } from '../engine/types.js';
@@ -349,17 +350,12 @@ export function runContextMenuPivotItem(
     }
     case 'pivotRemoveGrandTotal': {
       const totals = wb.getPivotTableGrandTotals(sheet, info.pivotIndex);
-      if (!totals) return true;
       // The total row under the report is the column grand total.
-      const write = (cols: boolean): void => {
-        wb.setPivotTableGrandTotals(sheet, info.pivotIndex, totals.rows, cols);
-        ctx.refresh(sheet);
-      };
-      write(false);
-      recordingHistory(ctx.history)?.push({
-        undo: () => write(totals.cols),
-        redo: () => write(false),
-      });
+      if (totals) {
+        commitPivotChange(commit, sheet, info.pivotIndex, () =>
+          applyPivotGrandTotals(wb, pivot, { rows: totals.rows, cols: false }),
+        );
+      }
       return true;
     }
     case 'pivotFieldSettings':
