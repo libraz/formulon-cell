@@ -365,3 +365,51 @@
     min-height: 0;
   }
 }
+
+@layer fc.app {
+  /* Grouping dialog of a date field: two bounds, the By list, Number of days. */
+  .fc-pivotgroup .fc-pivotgroup__panel {
+    width: 300px;
+    max-width: 96vw;
+  }
+  .fc-pivotgroup .fc-fmtdlg__panel > .fc-pivotgroup__body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 16px 13px 0;
+    font-size: 13px;
+  }
+  .fc-pivotgroup__row,
+  .fc-pivotgroup__by {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+  }
+  .fc-pivotgroup__by {
+    align-items: start;
+  }
+  .fc-pivotgroup__row > label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .fc-pivotgroup__periods {
+    min-width: 0;
+    font: inherit;
+  }
+  .fc-pivotgroup__status:empty {
+    display: none;
+  }
+  .fc-pivotgroup__status[data-state="error"] {
+    color: var(--fc-danger, #c42b1c);
+  }
+  .fc-pivotgroup .fc-fmtdlg__panel > .fc-pivotgroup__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 12px 13px 16px;
+    border-top: 0;
+  }
+}

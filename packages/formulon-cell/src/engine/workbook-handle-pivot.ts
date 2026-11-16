@@ -95,7 +95,10 @@ export interface PivotFieldDefinition {
   readonly sortByField: string;
   /** A bound of -1 follows the field's data (automatic). */
   readonly dateGroup: {
+    /** The finest of `periods`. */
     readonly granularity: PivotDateGrouping;
+    /** Every period the field is grouped by, an OR of `PivotDatePeriod` bits. */
+    readonly periods: number;
     readonly calendar: PivotCalendar;
     readonly startYear: number;
     readonly endYear: number;
@@ -817,6 +820,7 @@ export abstract class WorkbookHandlePivotMethods {
             ? null
             : {
                 granularity,
+                periods: dateGroup.periods,
                 calendar: dateGroup.calendar,
                 startYear: -1,
                 endYear: -1,
@@ -1209,6 +1213,8 @@ export abstract class WorkbookHandlePivotMethods {
     granularity: PivotDateGrouping,
     calendar: PivotCalendar,
     bounds: {
+      /** Every period to group by; the granularity's own period when omitted. */
+      periods?: number;
       startYear?: number;
       endYear?: number;
       intervalDays?: number;
@@ -1222,7 +1228,7 @@ export abstract class WorkbookHandlePivotMethods {
       const start = dateBound(this, bounds.startSerial, bounds.startYear, 'start');
       const end = dateBound(this, bounds.endSerial, bounds.endYear, 'end');
       pivotOf(this, sheet, pivotIdx).setFieldDateGroup(fieldIdx, {
-        periods: DATE_GROUPING_PERIOD[granularity],
+        periods: bounds.periods ?? DATE_GROUPING_PERIOD[granularity],
         calendar,
         ...(bounds.intervalDays !== undefined ? { intervalDays: bounds.intervalDays } : {}),
         ...(start ? { start } : {}),
@@ -1406,7 +1412,7 @@ const DATE_GROUPING_PERIOD: Record<PivotDateGrouping, number> = {
 };
 
 /** The granularity of a date group's finest period; null for an ungrouped field. */
-function dateGroupingOf(periods: number): PivotDateGrouping | null {
+export function dateGroupingOf(periods: number): PivotDateGrouping | null {
   if (periods & PivotDatePeriod.Seconds) return PivotDateGrouping.Second;
   if (periods & PivotDatePeriod.Minutes) return PivotDateGrouping.Minute;
   if (periods & PivotDatePeriod.Hours) return PivotDateGrouping.Hour;

@@ -26,6 +26,8 @@ import {
   updatePivotDataField,
 } from './pivot-field-settings-dialog-apply.js';
 import { openPivotFieldFilter } from './pivot-filter-panel.js';
+import { pivotGroupTargetAt } from './pivot-group.js';
+import { openPivotGroupDialog } from './pivot-group-dialog.js';
 import { openPivotOptions } from './pivot-options-dialog.js';
 
 type PivotCellInfo = NonNullable<ReturnType<WorkbookHandle['pivotCellInfo']>>;
@@ -100,7 +102,8 @@ export function pivotMenuTarget(
     itemCount: model?.items.length ?? 0,
     fieldPosition: axisOrder.indexOf(field?.index ?? -1),
     fieldCount: axisOrder.length,
-    grouped: field?.dateGroup !== null && field?.dateGroup !== undefined,
+    grouped: !!(field?.dateGroup || field?.numericGroup),
+    groupable: (pivotGroupTargetAt(wb, addr)?.values ?? 'other') !== 'other',
     dateField: model?.dateField ?? false,
     ...(fieldListHidden === undefined ? {} : { fieldListHidden }),
     canRefresh: info.cacheId >= 0,
@@ -300,11 +303,20 @@ export function runContextMenuPivotItem(
       );
       return true;
     }
+    case 'pivotGroup': {
+      const target = pivotGroupTargetAt(wb, addr);
+      if (target) openPivotGroupDialog({ ...commit, host: ctx.host, strings: ctx.strings }, target);
+      return true;
+    }
     case 'pivotUngroup': {
       const index = pivotField?.index;
       if (index !== undefined && pivotField?.dateGroup) {
         commitPivotChange(commit, sheet, info.pivotIndex, () =>
           wb.clearPivotFieldDateGroup(sheet, info.pivotIndex, index),
+        );
+      } else if (index !== undefined && pivotField?.numericGroup) {
+        commitPivotChange(commit, sheet, info.pivotIndex, () =>
+          wb.setPivotFieldNumericGroup(sheet, info.pivotIndex, index, null),
         );
       }
       return true;

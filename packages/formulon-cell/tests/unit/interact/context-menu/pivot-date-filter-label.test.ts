@@ -19,6 +19,7 @@ const target = (dateField: boolean): PivotMenuTarget => ({
   fieldPosition: 0,
   fieldCount: 1,
   grouped: false,
+  groupable: false,
   dateField,
   canRefresh: true,
   canOpenFieldList: true,

@@ -501,8 +501,10 @@ export interface PivotMenuTarget {
   /** Where the item's field sits on its axis, and how many fields share it. */
   fieldPosition: number;
   fieldCount: number;
-  /** The item's field is grouped by date. */
+  /** The item's field is grouped by date or into number ranges. */
   grouped: boolean;
+  /** The item's field holds only dates or only numbers, so Group… opens the Grouping dialog on it. */
+  groupable: boolean;
   /** The item's field holds dates, so its label filters are date filters. */
   dateField: boolean;
   /** Whether the field list is hidden, when the host can tell; draws the Hide
@@ -731,7 +733,7 @@ export function buildPivotEntries(s: Strings, target: PivotMenuTarget): MenuEntr
       separator(),
       expandMenu,
       separator(),
-      off('pivotGroup', t.pivotGroup),
+      onIf('pivotGroup', t.pivotGroup, target.groupable),
       onIf('pivotUngroup', t.pivotUngroup, target.grouped),
       separator(),
       moveMenu,

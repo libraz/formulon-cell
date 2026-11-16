@@ -449,6 +449,7 @@ export const RIBBON_PRIMARY_ACTION_COMMANDS: ReadonlySet<string> = new Set([
   'pivotCollapseField',
   'pivotExpandField',
   'pivotFieldList',
+  'pivotGroupSelection',
   'pivotHeaders',
   'pivotInsertSlicer',
   'pivotOptions',

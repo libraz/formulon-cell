@@ -74,6 +74,8 @@ import {
   expandPivotField,
   pivotRowItemAt,
 } from '../../interact/pivot-detail.js';
+import { pivotGroupTargetAt } from '../../interact/pivot-group.js';
+import { openPivotGroupDialog } from '../../interact/pivot-group-dialog.js';
 import { togglePivotShowOption } from '../../interact/pivot-options-dialog.js';
 import { refreshAfterPivotEdit } from '../../mount/dynamic-dropdown-defaults/pivot.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
@@ -497,6 +499,25 @@ const applyGenericRibbonCommand = (
         else expandPivotField(ctx, ref);
       }
       runtime.focusSheet();
+      return true;
+    }
+    case 'pivotGroupSelection': {
+      const target = pivotGroupTargetAt(i.workbook, i.store.getState().selection.active);
+      if (target) {
+        openPivotGroupDialog(
+          {
+            wb: i.workbook,
+            history: i.history,
+            store: i.store,
+            origin: 'ribbon',
+            commandId: id,
+            onChanged: () => refreshAfterPivotEdit(i),
+            host: i.host,
+            strings: i.i18n.strings,
+          },
+          target,
+        );
+      }
       return true;
     }
     case 'pivotRowHeaders':

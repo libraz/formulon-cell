@@ -620,6 +620,25 @@ export interface DataObjectsStrings {
     bringToFront: string;
     sendToBack: string;
   };
+  /** The PivotTable Grouping dialog of a date or number field. */
+  pivotGroupDialog: {
+    title: string;
+    startingAt: string;
+    endingAt: string;
+    /** The By list of a date field. */
+    by: string;
+    /** The By interval of a number field. */
+    numberBy: string;
+    numberOfDays: string;
+    /** The By list, finest period first. */
+    seconds: string;
+    minutes: string;
+    hours: string;
+    days: string;
+    months: string;
+    quarters: string;
+    years: string;
+  };
   slicer: {
     /** Default panel header used when no column is bound yet. */
     title: string;

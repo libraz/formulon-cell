@@ -8,6 +8,7 @@ import {
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import { focusSheet } from '../../interact/dialog-focus.js';
 import { isInnermostRowItem, pivotRowItemAt } from '../../interact/pivot-detail.js';
+import { pivotGroupTargetAt } from '../../interact/pivot-group.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { showMessage } from '../dialogs/prompt.js';
 import { projectDisabledState } from '../menu-a11y.js';
@@ -137,7 +138,8 @@ export const projectTableDesign = (host: HTMLElement, instance: SpreadsheetInsta
 };
 
 /** Expand Field and Collapse Field run on a row label. Expand Field on the innermost field and
- *  Collapse Field on a report's only row field stay greyed, as does every other cell. */
+ *  Collapse Field on a report's only row field stay greyed, as does every other cell. Group
+ *  Selection runs on an item label of a date or number field. */
 const projectPivotDetailCommands = (
   host: HTMLElement,
   instance: SpreadsheetInstance,
@@ -148,6 +150,8 @@ const projectPivotDetailCommands = (
   const runs: Record<string, boolean> = {
     pivotExpandField: !!ref && !isInnermostRowItem(ref),
     pivotCollapseField: !!ref && !(isInnermostRowItem(ref) && ref.level === 0),
+    pivotGroupSelection:
+      inReport && (pivotGroupTargetAt(instance.workbook, active)?.values ?? 'other') !== 'other',
   };
   for (const [command, enabled] of Object.entries(runs)) {
     for (const button of host.querySelectorAll<HTMLButtonElement>(
