@@ -6,6 +6,11 @@
 import { PivotAggregation, PivotShowValuesAs } from '../engine/types.js';
 import type { Strings } from '../i18n/strings.js';
 import type { ContextMenuItem } from './context-menu-options.js';
+import { formatRibbonShortcut, type RibbonScreenTipPlatform } from './ribbon-screen-tip.js';
+
+/** Menu hint for declared shortcut alternatives, spelled for `platform`. */
+const shortcutHint = (declared: string, platform: RibbonScreenTipPlatform): string =>
+  formatRibbonShortcut(declared, platform) ?? declared;
 
 export type MenuKind = 'cell' | 'row' | 'col';
 
@@ -298,9 +303,14 @@ export function withTableInsertMenu(
 function bandHead(s: Strings, sepId: string): MenuEntry[] {
   const t = s.contextMenu;
   return [
-    { kind: 'item', id: 'cut', label: t.cut, hint: '⌘X' },
-    { kind: 'item', id: 'copy', label: t.copy, hint: '⌘C' },
-    { kind: 'item', id: 'paste', label: t.paste, hint: '⌘V' },
+    { kind: 'item', id: 'cut', label: t.cut, hint: shortcutHint('Control+X Meta+X', 'default') },
+    { kind: 'item', id: 'copy', label: t.copy, hint: shortcutHint('Control+C Meta+C', 'default') },
+    {
+      kind: 'item',
+      id: 'paste',
+      label: t.paste,
+      hint: shortcutHint('Control+V Meta+V', 'default'),
+    },
     pasteSpecialSubmenu(s),
     { kind: 'sep', id: sepId },
   ];
@@ -313,7 +323,7 @@ export function buildCellEntries(s: Strings, hasNote: boolean): MenuEntry[] {
     { kind: 'item', id: 'insertCells', label: s.ribbonMenu.insertCells },
     { kind: 'item', id: 'insertCopiedCells', label: t.insertCopiedCells },
     { kind: 'item', id: 'deleteCells', label: s.ribbonMenu.deleteCells },
-    { kind: 'item', id: 'clear', label: t.clear, hint: 'Del' },
+    { kind: 'item', id: 'clear', label: t.clear, hint: shortcutHint('Del', 'default') },
     { kind: 'sep', id: 'sep2' },
     filterSubmenu(s),
     sortSubmenu(s),
@@ -324,22 +334,49 @@ export function buildCellEntries(s: Strings, hasNote: boolean): MenuEntry[] {
     // measured here.
     ...(hasNote
       ? ([
-          { kind: 'item', id: 'insertComment', label: t.editNote, hint: '⇧F2' },
+          {
+            kind: 'item',
+            id: 'insertComment',
+            label: t.editNote,
+            hint: shortcutHint('Shift+F2', 'default'),
+          },
           { kind: 'item', id: 'deleteComment', label: t.deleteNote },
           { kind: 'item', id: 'showHideNote', label: t.showHideNote },
         ] as const)
-      : ([{ kind: 'item', id: 'insertComment', label: t.newNote, hint: '⇧F2' }] as const)),
+      : ([
+          {
+            kind: 'item',
+            id: 'insertComment',
+            label: t.newNote,
+            hint: shortcutHint('Shift+F2', 'default'),
+          },
+        ] as const)),
     { kind: 'sep', id: 'sep4' },
-    { kind: 'item', id: 'formatCells', label: t.formatCells, hint: '⌘1' },
+    {
+      kind: 'item',
+      id: 'formatCells',
+      label: t.formatCells,
+      hint: shortcutHint('Control+1 Meta+1', 'default'),
+    },
     { kind: 'item', id: 'pickFromList', label: t.pickFromList },
     { kind: 'item', id: 'defineName', label: t.defineName },
     { kind: 'sep', id: 'sep5' },
-    { kind: 'item', id: 'insertHyperlink', label: t.insertHyperlink, hint: '⌘K' },
+    {
+      kind: 'item',
+      id: 'insertHyperlink',
+      label: t.insertHyperlink,
+      hint: shortcutHint('Control+K Meta+K', 'default'),
+    },
     { kind: 'item', id: 'openHyperlink', label: s.ribbonMenu.linkOpen },
     { kind: 'item', id: 'editPhonetic', label: t.editPhonetic },
     { kind: 'sep', id: 'sep6' },
     { kind: 'item', id: 'toggleWatch', label: t.addWatch },
-    { kind: 'item', id: 'selectAll', label: t.selectAll, hint: '⌘A' },
+    {
+      kind: 'item',
+      id: 'selectAll',
+      label: t.selectAll,
+      hint: shortcutHint('Control+A Meta+A', 'default'),
+    },
   ];
 }
 
@@ -424,7 +461,11 @@ export const PIVOT_MENU_SHOW_AS: Partial<Record<ItemId, number>> = Object.fromEn
 /** Cell menu for a PivotTable report cell: the entries, separators and
  *  submenus of the desktop menu for that kind of cell, in its order. An entry
  *  the host cannot carry out is listed disabled with the reason. */
-export function buildPivotEntries(s: Strings, target: PivotMenuTarget): MenuEntry[] {
+export function buildPivotEntries(
+  s: Strings,
+  target: PivotMenuTarget,
+  platform: RibbonScreenTipPlatform = 'default',
+): MenuEntry[] {
   const t = s.contextMenu;
   const { cell } = target;
   const reason = t.pivotUnavailable;
@@ -586,8 +627,13 @@ export function buildPivotEntries(s: Strings, target: PivotMenuTarget): MenuEntr
   };
 
   const entries: MenuEntry[] = [
-    { kind: 'item', id: 'copy', label: t.copy, hint: '⌘C' },
-    { kind: 'item', id: 'formatCells', label: t.formatCells, hint: '⌘1' },
+    { kind: 'item', id: 'copy', label: t.copy, hint: shortcutHint('Control+C Meta+C', platform) },
+    {
+      kind: 'item',
+      id: 'formatCells',
+      label: t.formatCells,
+      hint: shortcutHint('Control+1 Meta+1', platform),
+    },
   ];
   if (valueLike) entries.push(on('pivotNumberFormat', t.pivotNumberFormat));
   entries.push(separator());
@@ -640,14 +686,24 @@ export function buildRowEntries(s: Strings): MenuEntry[] {
     { kind: 'item', id: 'rowInsertBelow', label: t.rowInsertBelow },
     { kind: 'item', id: 'insertCopiedCells', label: t.insertCopiedBand },
     { kind: 'item', id: 'rowDelete', label: t.delete },
-    { kind: 'item', id: 'clear', label: t.clear, hint: 'Del' },
+    { kind: 'item', id: 'clear', label: t.clear, hint: shortcutHint('Del', 'default') },
     { kind: 'sep', id: 'sepR2' },
-    { kind: 'item', id: 'formatCells', label: t.formatCells, hint: '⌘1' },
+    {
+      kind: 'item',
+      id: 'formatCells',
+      label: t.formatCells,
+      hint: shortcutHint('Control+1 Meta+1', 'default'),
+    },
     { kind: 'item', id: 'rowHeight', label: t.rowHeight },
     { kind: 'item', id: 'rowHide', label: t.rowHide },
     { kind: 'item', id: 'rowUnhide', label: t.rowUnhide },
     { kind: 'sep', id: 'sepR3' },
-    { kind: 'item', id: 'selectAll', label: t.selectAll, hint: '⌘A' },
+    {
+      kind: 'item',
+      id: 'selectAll',
+      label: t.selectAll,
+      hint: shortcutHint('Control+A Meta+A', 'default'),
+    },
   ];
 }
 
@@ -659,17 +715,27 @@ export function buildColEntries(s: Strings): MenuEntry[] {
     { kind: 'item', id: 'colInsertRight', label: t.colInsertRight },
     { kind: 'item', id: 'insertCopiedCells', label: t.insertCopiedBand },
     { kind: 'item', id: 'colDelete', label: t.delete },
-    { kind: 'item', id: 'clear', label: t.clear, hint: 'Del' },
+    { kind: 'item', id: 'clear', label: t.clear, hint: shortcutHint('Del', 'default') },
     { kind: 'sep', id: 'sepC2' },
     filterSubmenu(s),
     sortSubmenu(s),
     { kind: 'sep', id: 'sepC3' },
-    { kind: 'item', id: 'formatCells', label: t.formatCells, hint: '⌘1' },
+    {
+      kind: 'item',
+      id: 'formatCells',
+      label: t.formatCells,
+      hint: shortcutHint('Control+1 Meta+1', 'default'),
+    },
     { kind: 'item', id: 'colWidth', label: t.colWidth },
     { kind: 'item', id: 'colHide', label: t.colHide },
     { kind: 'item', id: 'colUnhide', label: t.colUnhide },
     { kind: 'sep', id: 'sepC4' },
-    { kind: 'item', id: 'selectAll', label: t.selectAll, hint: '⌘A' },
+    {
+      kind: 'item',
+      id: 'selectAll',
+      label: t.selectAll,
+      hint: shortcutHint('Control+A Meta+A', 'default'),
+    },
   ];
 }
 

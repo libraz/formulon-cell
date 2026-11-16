@@ -352,6 +352,22 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     setContextMenuItemDisabled(btn, true, decisionReason(decision));
   };
 
+  /** Disabled state for a plain item or a submenu parent built from `source`: an explicit
+   *  disable keeps its own reason, and a policy denial is remembered either way. */
+  const applySourceDisabledState = (
+    btn: HTMLButtonElement,
+    source: ContextMenuItem | undefined,
+  ): void => {
+    const gated = !!(source?.builtIn || source?.command);
+    if (source && explicitDisabledSources.has(source)) {
+      if (gated && !decisionForItem(source).allowed) btn.dataset.policyDisabled = 'true';
+      setContextMenuItemDisabled(btn, true, source.disabledReason ?? null);
+    } else if (source && gated) {
+      const decision = decisionForItem(source);
+      if (!decision.allowed) markPolicyDisabled(btn, decision);
+    }
+  };
+
   const activePanel = (): HTMLElement => (focusPanel === 'sub' ? sub : root);
 
   const panelItems = (panel: HTMLElement): HTMLButtonElement[] =>
@@ -513,13 +529,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       const source = entry.source;
       if (source) activeItemSources.set(entry.id, source);
       const btn = createContextSubmenuButton(entry, ownerDocument);
-      if (source && explicitDisabledSources.has(source)) {
-        setContextMenuItemDisabled(btn, true, source.disabledReason ?? null);
-      } else if ((source?.builtIn || source?.command) && !decisionForItem(source).allowed) {
-        const decision = decisionForItem(source);
-        btn.dataset.policyDisabled = 'true';
-        setContextMenuItemDisabled(btn, true, decisionReason(decision));
-      }
+      applySourceDisabledState(btn, source);
       onPointerArrive(btn, () => {
         if (isMenuItemDisabled(btn)) {
           if (panel === 'root' && openSub && openSub.parentBtn !== btn) scheduleSubClose();
@@ -545,14 +555,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     if (source) activeItemSources.set(entry.id, source);
     if (disabledIds.has(entry.id)) {
       setContextMenuItemDisabled(btn, true, strings.contextMenu.pasteSpecialRequiresCopiedCells);
-    } else if (source && explicitDisabledSources.has(source)) {
-      if ((source.builtIn || source.command) && !decisionForItem(source).allowed) {
-        btn.dataset.policyDisabled = 'true';
-      }
-      setContextMenuItemDisabled(btn, true, source.disabledReason ?? null);
-    } else if (source?.builtIn || source?.command) {
-      const decision = decisionForItem(source);
-      if (!decision.allowed) markPolicyDisabled(btn, decision);
+    } else {
+      applySourceDisabledState(btn, source);
     }
     btn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -655,6 +659,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
             !!deps.onOpenPivotFieldList,
             deps.isPivotFieldListOpen ? !deps.isPivotFieldListOpen() : undefined,
           ),
+          mac ? 'mac' : 'default',
         )
       : kind === 'row'
         ? mac
