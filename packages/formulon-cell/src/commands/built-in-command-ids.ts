@@ -389,6 +389,7 @@ export const BUILT_IN_COMMAND_IDS = [
   'pivotFilterValue',
   'pivotGrandTotals',
   'pivotGroup',
+  'pivotGroupSelection',
   'pivotHeaders',
   'pivotInsertSlicer',
   'pivotListFormulas',

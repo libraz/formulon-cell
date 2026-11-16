@@ -544,6 +544,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<
   pivotFilterTop10: 'pivot',
   pivotFilterValue: 'pivot',
   pivotGroup: 'pivot',
+  pivotGroupSelection: 'pivot',
   pivotHeaders: 'pivot',
   pivotListFormulas: 'sheet',
   pivotMove: 'pivot',

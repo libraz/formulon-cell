@@ -3,6 +3,7 @@ import { parseLocalizedNumericInput } from '../commands/coerce-input.js';
 import { parseDateTimeInput } from '../commands/input-grammar.js';
 import { formatNumber } from '../format/number-format.js';
 import type { Strings } from '../i18n/strings.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   appendDialogActions,
   appendDialogFrame,
@@ -163,8 +164,8 @@ function byControls(
     sync(okBtn) {
       // Number of days applies to Days alone; OK needs a period.
       const mask = periods();
-      days.disabled = mask !== PivotDatePeriod.Days;
-      okBtn.disabled = mask === 0;
+      projectDisabledState(days, mask !== PivotDatePeriod.Days, null);
+      projectDisabledState(okBtn, mask === 0, null);
     },
     read(bounds) {
       const mask = periods();
