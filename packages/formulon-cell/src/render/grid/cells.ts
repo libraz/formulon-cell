@@ -43,7 +43,7 @@ import {
   paintFilterButton,
   pivotFieldButtonSize,
 } from '../painters/filter-button.js';
-import { pivotCellButtons } from '../painters/pivot-cell-buttons.js';
+import { type PivotCellButton, pivotCellButtons } from '../painters/pivot-cell-buttons.js';
 import { paintPivotCollapseButton, pivotOutlineIndent } from '../painters/pivot-outline-button.js';
 import { paintPivotPlaceholder } from '../painters/pivot-placeholder.js';
 import {
@@ -129,6 +129,8 @@ export interface CellPaintResult {
 
 /** Horizontal extent of an overflow candidate's single-line run, laid out as
  *  `paintCellText` lays it out. */
+const NO_PIVOT_BUTTONS: readonly PivotCellButton[] = [];
+
 const overflowRunSpan = (
   ctx: CanvasRenderingContext2D,
   p: Parameters<typeof paintCellText>[0],
@@ -788,14 +790,12 @@ export function paintCells(
             ?.direction,
         });
       }
-      for (const button of pivotCellButtons(
-        pivots,
-        data.sheetIndex,
-        r,
-        c,
-        bounds,
-        pivotButtonMetrics,
-      )) {
+      // Most cells carry no report button; skip the lookup for them.
+      const pivotButtons =
+        pivotButton || outline?.collapse
+          ? pivotCellButtons(pivots, data.sheetIndex, r, c, bounds, pivotButtonMetrics)
+          : NO_PIVOT_BUTTONS;
+      for (const button of pivotButtons) {
         if (button.kind === 'outline') {
           paintPivotCollapseButton(ctx, button.rect, ptPx, cellCtx.dpr ?? 1, button.collapsed);
         } else if (!filterHeader) {
