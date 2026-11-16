@@ -12,12 +12,13 @@ import {
 import type { History } from '../commands/history.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { addrKey, formatA1Cell } from '../engine/address.js';
-import type { Addr, Range } from '../engine/types.js';
+import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { sameAddr } from '../store/direct-format.js';
+import { rangeOfAddr } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { createDialogSelect, type DialogSelectOption } from '../toolbar/dialogs/form-controls.js';
 import { showMessage } from '../toolbar/dialogs/prompt.js';
@@ -54,14 +55,6 @@ export interface FindReplaceHandle {
 }
 
 type FindTab = 'find' | 'replace';
-
-const cellRange = (addr: Addr): Range => ({
-  sheet: addr.sheet,
-  r0: addr.row,
-  c0: addr.col,
-  r1: addr.row,
-  c1: addr.col,
-});
 
 export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   const { host, store, wb } = deps;
@@ -538,7 +531,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
           const apply = (): void => {
             if (replaceOne(wb, match, next, store, o.locale, o.lookIn)) deps.onAfterCommit?.();
           };
-          if (!deferForAllowedRangeUnlock(store, [cellRange(match.addr)], apply)) apply();
+          if (!deferForAllowedRangeUnlock(store, [rangeOfAddr(match.addr)], apply)) apply();
         }
       }
     }
@@ -555,7 +548,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     remember(o.query);
     const history = deps.history ?? null;
     const restricted = navigationRestricted();
-    const targets = findAll(store.getState(), o).map((m) => cellRange(m.addr));
+    const targets = findAll(store.getState(), o).map((m) => rangeOfAddr(m.addr));
     if (deferForAllowedRangeUnlock(store, targets, doReplaceAll)) return;
     if (history) history.begin();
     let n = 0;

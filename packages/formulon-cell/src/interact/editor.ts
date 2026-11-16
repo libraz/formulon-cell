@@ -12,6 +12,8 @@ import { deferForAllowedRangeUnlock, isCellWritable } from '../commands/protecti
 import { dblClickRange, editorRefHighlights, extractRefs, rotateRefAt } from '../commands/refs.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
+import { rangeOfAddr } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { type ArgHelperHandle, type ArgHelperLabels, attachArgHelper } from './arg-helper.js';
 import {
@@ -30,11 +32,18 @@ import {
   paintEditorCellFormat,
   positionEditorOverCell,
 } from './editor-cell-surface.js';
-import { handleFormulaAutocompleteKey } from './formula-autocomplete-key.js';
 import {
+  dismissFormulaAutocomplete,
+  handleFormulaAutocompleteKey,
+} from './formula-autocomplete-key.js';
+import {
+  caretSnapshot,
   FormulaDraftHistory,
   type FormulaDraftHistoryState,
+  type FormulaDraftMode,
   type FormulaDraftSnapshot,
+  historyActionForInputType,
+  historyActionForKey,
 } from './formula-draft-history.js';
 import {
   createFormulaEditLease,
@@ -49,6 +58,7 @@ import {
 } from './formula-edit-navigation.js';
 import { classifyFormulaReferenceArrow } from './formula-reference-arrow.js';
 import {
+  type ActiveReferenceGesture,
   createFormulaReferenceGesture,
   type FormulaReferenceGesture,
 } from './formula-reference-gesture.js';
@@ -63,7 +73,7 @@ import {
   SELECTION_INPUT_LIMIT_MESSAGE,
   writeSelectionInput,
 } from './selection-input.js';
-import { advanceAfterCommit } from './selection-navigation.js';
+import { advanceAfterCommit, type CommitAdvance } from './selection-navigation.js';
 import {
   workbookArgHelperCatalog,
   workbookAutocompleteCatalog,
@@ -81,12 +91,6 @@ const policyRejection = (operation: string): { severity: 'stop'; message: string
   severity: 'stop',
   message: `The ${operation} operation is not permitted for this cell.`,
 });
-
-interface ActiveReferenceGesture {
-  gesture: FormulaReferenceGesture;
-  value: string;
-  caret: number;
-}
 
 export interface EditorDeps {
   host: HTMLElement;
@@ -108,10 +112,8 @@ export interface EditorDeps {
   getCustomFunctionArgs?: (name: string) => readonly string[] | undefined;
 }
 
-export type FormulaArrowMode = 'edit' | 'point';
-
 export interface EditorBeginOptions {
-  mode?: FormulaArrowMode;
+  mode?: FormulaDraftMode;
   /** Client x of the click that opened the editor; the caret goes to the
    *  character boundary under it instead of the end of the text. */
   caretClientX?: number;
@@ -175,7 +177,7 @@ export class InlineEditor {
 
   private pointNavigation: FormulaReferenceNavigationState | null = null;
 
-  private arrowMode: FormulaArrowMode = 'edit';
+  private arrowMode: FormulaDraftMode = 'edit';
 
   private editBaseline = '';
 
@@ -244,13 +246,7 @@ export class InlineEditor {
     const result = picked.insert(ref);
     this.referenceGesture =
       options?.phase && gesture ? { gesture, value: result.text, caret: result.caret } : null;
-    const after: FormulaDraftSnapshot = {
-      value: result.text,
-      start: result.caret,
-      end: result.caret,
-      direction: 'none',
-      mode: this.arrowMode,
-    };
+    const after = caretSnapshot(result.text, result.caret, this.arrowMode);
     if (options?.phase) {
       this.draftHistory.updateGroup(after, 'reference', historyBefore);
     } else {
@@ -286,13 +282,7 @@ export class InlineEditor {
     const caret = target.start + (qualifier?.[0].length ?? 0) + pinned.length;
     this.referenceGesture = null;
     this.pointNavigation = null;
-    const after: FormulaDraftSnapshot = {
-      value: text,
-      start: caret,
-      end: caret,
-      direction: 'none',
-      mode: this.arrowMode,
-    };
+    const after = caretSnapshot(text, caret, this.arrowMode);
     if (options?.phase) this.draftHistory.updateGroup(after, 'reference', historyBefore);
     else this.draftHistory.finishCommand(after);
     el.value = text;
@@ -369,7 +359,7 @@ export class InlineEditor {
     this.referenceGesture = null;
     const s = this.deps.store.getState();
     const a = s.selection.active;
-    const cell = { sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col };
+    const cell = rangeOfAddr(a);
     if (deferForAllowedRangeUnlock(this.deps.store, [cell], () => this.begin(seed, options)))
       return;
     // A locked cell of a protected sheet refuses edit mode up front, as the
@@ -446,7 +436,7 @@ export class InlineEditor {
     focusSheet(this.deps.host, { preventScroll: true });
   }
 
-  commit(advance: 'down' | 'right' | 'up' | 'left' | 'none' = 'down'): void {
+  commit(advance: CommitAdvance = 'down'): void {
     this.draftHistory.endGroup();
     this.referenceGesture = null;
     this.pointNavigation = null;
@@ -488,13 +478,10 @@ export class InlineEditor {
   }
 
   private isMacPlatform(): boolean {
-    return (
-      (this.deps.host.closest<HTMLElement>('.fc-host') ?? this.deps.host).dataset.fcPlatform ===
-      'mac'
-    );
+    return isMacHost(this.deps.host);
   }
 
-  private advanceAfterCommit(advance: 'down' | 'right' | 'up' | 'left' | 'none'): void {
+  private advanceAfterCommit(advance: CommitAdvance): void {
     if (advance !== 'none') advanceAfterCommit(this.deps.store, advance, this.isMacPlatform());
   }
 
@@ -605,15 +592,7 @@ export class InlineEditor {
   }
 
   private handleDraftHistoryKey(event: KeyboardEvent): boolean {
-    const oneModifier = event.ctrlKey !== event.metaKey;
-    if (!oneModifier || event.altKey) return false;
-    const key = event.key.toLowerCase();
-    const action =
-      (key === 'z' && event.shiftKey) || (key === 'y' && !event.shiftKey)
-        ? 'redo'
-        : key === 'z' && !event.shiftKey
-          ? 'undo'
-          : null;
+    const action = historyActionForKey(event);
     if (!action) return false;
     event.preventDefault();
     event.stopPropagation();
@@ -622,12 +601,7 @@ export class InlineEditor {
   }
 
   private readonly onBeforeInput = (event: InputEvent): void => {
-    const action =
-      event.inputType === 'historyUndo'
-        ? 'undo'
-        : event.inputType === 'historyRedo'
-          ? 'redo'
-          : null;
+    const action = historyActionForInputType(event.inputType);
     if (action) {
       if (this.composing) return;
       if (event.cancelable) {
@@ -665,8 +639,7 @@ export class InlineEditor {
       this.draftHistory.observeSelection(this.captureDraftSnapshot());
       this.referenceGesture = null;
       this.pointNavigation = null;
-      if (this.autocomplete?.dismiss) this.autocomplete.dismiss();
-      else this.autocomplete?.close();
+      if (this.autocomplete) dismissFormulaAutocomplete(this.autocomplete);
       return;
     }
     if (
@@ -829,13 +802,7 @@ export class InlineEditor {
 
   private readonly onInput = (rawEvent?: Event): void => {
     const event = rawEvent as InputEvent | undefined;
-    const historyAction =
-      this.pendingHistoryInput ??
-      (event?.inputType === 'historyUndo'
-        ? 'undo'
-        : event?.inputType === 'historyRedo'
-          ? 'redo'
-          : null);
+    const historyAction = this.pendingHistoryInput ?? historyActionForInputType(event?.inputType);
     if (this.composing) {
       this.pendingHistoryInput = null;
       this.ignoredHistoryInput = null;
@@ -910,21 +877,14 @@ export class InlineEditor {
       this.draftHistory.beginGroup(historyBefore, 'reference');
     }
     this.draftHistory.updateGroup(
-      {
-        value: result.value,
-        start: result.caret,
-        end: result.caret,
-        direction: 'none',
-        mode: this.arrowMode,
-      },
+      caretSnapshot(result.value, result.caret, this.arrowMode),
       'reference',
       historyBefore,
     );
     input.setSelectionRange(result.caret, result.caret);
     this.syncInputState();
     // The programmatic edit must not reopen suggestions that swallow the next arrow.
-    if (this.autocomplete?.dismiss) this.autocomplete.dismiss();
-    else this.autocomplete?.close();
+    if (this.autocomplete) dismissFormulaAutocomplete(this.autocomplete);
     scrollActiveIntoView(this.deps.store, result.tip);
     return true;
   }
@@ -1092,7 +1052,7 @@ export class InlineEditor {
    * this returned element instead. */
   private restoreFromLease(
     snapshot: Readonly<FormulaEditLeaseSnapshot>,
-    restoredArrowMode: FormulaArrowMode,
+    restoredArrowMode: FormulaDraftMode,
     restoredHistory: FormulaDraftHistoryState,
   ): HTMLElement | null {
     if (this.input || this.deps.wb !== snapshot.workbook) return null;

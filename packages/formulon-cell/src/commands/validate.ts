@@ -1,8 +1,17 @@
-import { ComparisonOperator, ValidationErrorStyle, ValidationType } from '@libraz/formulon';
+import { ValidationErrorStyle } from '@libraz/formulon';
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import { makeRangeResolver, type RangeResolver } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
-import { storedValidationFormulas, syncValidationsToEngine } from '../engine/validation-sync.js';
+import {
+  DV_TYPE,
+  DV_TYPE_CUSTOM,
+  DV_TYPE_LIST,
+  ERROR_STYLE_ORDINAL,
+  OP_ORDINAL,
+  storedValidationFormulas,
+  stripEquals,
+  syncValidationsToEngine,
+} from '../engine/validation-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { subtractFromRangeValidations } from '../store/range-validations.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
@@ -30,16 +39,7 @@ type ListValidation = Extract<CellValidation, { kind: 'list' }>;
  * upstream evaluator resolves their formulas against the saved workbook value.
  * A list source is safe once the synchronized engine rule is checked below. */
 export function nativeValidationSupports(validation: CellValidation, input: CoercedInput): boolean {
-  if (input.kind === 'formula') return false;
-  if (validation.kind === 'custom') return false;
-  if (validation.kind === 'list') return true;
-  return (
-    validation.kind === 'whole' ||
-    validation.kind === 'decimal' ||
-    validation.kind === 'date' ||
-    validation.kind === 'time' ||
-    validation.kind === 'textLength'
-  );
+  return input.kind !== 'formula' && validation.kind !== 'custom';
 }
 
 /** Evaluate a proposed value with formulon's typed validation API. `null`
@@ -52,7 +52,6 @@ export function nativeValidationOutcome(
   validation: CellValidation,
 ): ValidationOutcome | null {
   if (!nativeValidationSupports(validation, input)) return null;
-  if (typeof wb.validateValue !== 'function') return null;
   const value = coercedInputAsCellValue(input);
   const result = wb.validateValue(addr.sheet, addr.row, addr.col, value);
   if (!result?.hasRule) return null;
@@ -78,31 +77,17 @@ function validationMatchesEngineRule(
   validation: CellValidation,
   ruleIndex: number,
 ): boolean {
-  if (typeof wb.getValidationsForSheet !== 'function') return false;
   const entries = wb.getValidationsForSheet(addr.sheet);
   const entry = entries[ruleIndex];
   if (!entry?.ranges.some((range) => rangeContainsAddr(range, addr))) return false;
   const type =
-    validation.kind === 'whole'
-      ? ValidationType.Whole
-      : validation.kind === 'decimal'
-        ? ValidationType.Decimal
-        : validation.kind === 'list'
-          ? ValidationType.List
-          : validation.kind === 'date'
-            ? ValidationType.Date
-            : validation.kind === 'time'
-              ? ValidationType.Time
-              : validation.kind === 'textLength'
-                ? ValidationType.TextLength
-                : ValidationType.Custom;
+    validation.kind === 'list'
+      ? DV_TYPE_LIST
+      : validation.kind === 'custom'
+        ? DV_TYPE_CUSTOM
+        : DV_TYPE[validation.kind];
   if (entry.type !== type) return false;
-  const expectedErrorStyle =
-    validation.errorStyle === 'warning'
-      ? ValidationErrorStyle.Warning
-      : validation.errorStyle === 'information'
-        ? ValidationErrorStyle.Information
-        : ValidationErrorStyle.Stop;
+  const expectedErrorStyle = ERROR_STYLE_ORDINAL[validation.errorStyle ?? 'stop'];
   if (entry.errorStyle !== expectedErrorStyle) return false;
   if (entry.allowBlank !== (validation.allowBlank !== false)) return false;
   if (entry.showErrorMessage !== (validation.showErrorMessage !== false)) return false;
@@ -118,26 +103,11 @@ function validationMatchesEngineRule(
   if (validation.kind === 'list') {
     if (stored) return true;
     if (Array.isArray(validation.source)) {
-      return normalizeListFormula(entry.formula1) === `"${validation.source.join(',')}"`;
+      return stripEquals(entry.formula1) === `"${validation.source.join(',')}"`;
     }
-    return normalizeListFormula(entry.formula1) === normalizeListFormula(validation.source.ref);
+    return stripEquals(entry.formula1) === stripEquals(validation.source.ref);
   }
-  const op =
-    validation.op === 'between'
-      ? ComparisonOperator.Between
-      : validation.op === 'notBetween'
-        ? ComparisonOperator.NotBetween
-        : validation.op === '='
-          ? ComparisonOperator.Equal
-          : validation.op === '<>'
-            ? ComparisonOperator.NotEqual
-            : validation.op === '>'
-              ? ComparisonOperator.GreaterThan
-              : validation.op === '<'
-                ? ComparisonOperator.LessThan
-                : validation.op === '>='
-                  ? ComparisonOperator.GreaterThanOrEqual
-                  : ComparisonOperator.LessThanOrEqual;
+  const op = OP_ORDINAL[validation.op];
   if (entry.op !== op) return false;
   if (stored) return true;
   if (!boundMatches(entry.formula1, validation.aFormula, validation.a)) return false;
@@ -162,10 +132,6 @@ function normalizeFormula(formula: string): string {
   return formula.trim().replace(/^=/, '').replace(/\s+/g, '').toLowerCase();
 }
 
-function normalizeListFormula(formula: string): string {
-  return formula.trim().replace(/^=/, '').trim();
-}
-
 function coercedInputAsCellValue(input: CoercedInput): CellValue {
   switch (input.kind) {
     case 'number':
@@ -183,11 +149,12 @@ function coercedInputAsCellValue(input: CoercedInput): CellValue {
   }
 }
 
+const INVALID_CELL_PAGE_SIZE = 512;
+
 /** Enumerate native invalid cells page by page. `null` signals an older
  * engine, allowing the existing cell-format scan to remain the fallback. */
 export function listInvalidValidationCells(wb: WorkbookHandle, sheet: number): Addr[] | null {
-  if (!wb.capabilities?.validationEvaluation || typeof wb.listInvalidCells !== 'function')
-    return null;
+  if (!wb.capabilities.validationEvaluation) return null;
   const out: Addr[] = [];
   let cursor: number | null = null;
   const seenCursors = new Set<number>();
@@ -196,7 +163,7 @@ export function listInvalidValidationCells(wb: WorkbookHandle, sheet: number): A
       if (seenCursors.has(cursor)) return null;
       seenCursors.add(cursor);
     }
-    const page = wb.listInvalidCells(sheet, cursor, 512);
+    const page = wb.listInvalidCells(sheet, cursor, INVALID_CELL_PAGE_SIZE);
     if (!page) return null;
     out.push(...page.cells);
     if (page.nextCursor !== null && page.cells.length === 0) return null;
@@ -330,6 +297,13 @@ export function resolveListValues(
 }
 
 /**
+ * Evaluates a custom-validation formula for the cell under test and returns
+ * whether it is satisfied. Returns `null` when evaluation is unavailable (e.g.
+ * the stub engine), in which case the validator accepts the input for parity.
+ */
+export type CustomValidationEvaluator = (formula: string) => boolean | null;
+
+/**
  * Test a coerced cell input against a `CellValidation` rule. Returns
  * `{ ok: true }` when the input is acceptable; otherwise an outcome carrying
  * the configured severity (stop/warning/information) plus a human-readable
@@ -341,13 +315,6 @@ export function resolveListValues(
  * the same; the constraint is on the literal user-typed value, not on
  * downstream calculation results.
  */
-/**
- * Evaluates a custom-validation formula for the cell under test and returns
- * whether it is satisfied. Returns `null` when evaluation is unavailable (e.g.
- * the stub engine), in which case the validator accepts the input for parity.
- */
-export type CustomValidationEvaluator = (formula: string) => boolean | null;
-
 export function validateAgainst(
   validation: CellValidation,
   input: CoercedInput,

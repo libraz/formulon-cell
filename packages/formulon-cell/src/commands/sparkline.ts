@@ -4,7 +4,7 @@ import { addrKey, parseAddrKey, quoteSheetName } from '../engine/address.js';
 import { argbFromCssColor } from '../engine/theme-color.js';
 import type { Addr, Range } from '../engine/types.js';
 import { DEFAULT_NEGATIVE_COLOR, DEFAULT_SPARKLINE_COLOR } from '../render/painters/controls.js';
-import { rangeContainsAddr } from '../store/selection-geometry.js';
+import { rangeContainsAddr, rangeOfAddr } from '../store/selection-geometry.js';
 import { cloneSparklineSettings, withSparklineMembers } from '../store/sparkline-slice.js';
 import {
   mutators,
@@ -286,7 +286,7 @@ export function clearSparkline(
   addr: Addr,
   history: History | null = null,
 ): boolean {
-  const range = { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col };
+  const range = rangeOfAddr(addr);
   return (
     clearSparklinesAction(
       { store, history, origin: 'instanceApi', commandId: 'sparklineClear' },

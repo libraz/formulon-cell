@@ -16,6 +16,14 @@ export interface FormulaAutocompleteKeyOptions {
   formulaEdit: boolean;
 }
 
+/** Close the list and suppress it until the text or caret changes; plain close when it cannot. */
+export const dismissFormulaAutocomplete = (
+  autocomplete: Pick<FormulaAutocompleteKeyTarget, 'close' | 'dismiss'>,
+): void => {
+  if (autocomplete.dismiss) autocomplete.dismiss();
+  else autocomplete.close();
+};
+
 const unmodified = (event: KeyboardEvent): boolean =>
   !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
 

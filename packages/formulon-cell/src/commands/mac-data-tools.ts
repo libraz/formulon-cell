@@ -221,14 +221,6 @@ export function parseMacRange(
   };
 }
 
-const addrRange = (addr: Addr): Range => ({
-  sheet: addr.sheet,
-  r0: addr.row,
-  c0: addr.col,
-  r1: addr.row,
-  c1: addr.col,
-});
-
 const cellAddresses = (range: Range): Addr[] => {
   const out: Addr[] = [];
   for (let row = range.r0; row <= range.r1; row += 1) {
@@ -1311,4 +1303,4 @@ export function replaceMacSubtotals(
   }
 }
 
-export { addrRange, cellPatchFromSnapshot, cellSnapshot, sameSnapshot };
+export { cellPatchFromSnapshot, cellSnapshot, sameSnapshot };

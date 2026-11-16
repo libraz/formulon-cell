@@ -18,6 +18,7 @@ import {
   cloneRange,
   rangeContainsAddr,
   rangeContainsRange,
+  rangeOfAddr,
   rangesIntersect,
   sameRange,
 } from '../store/selection-geometry.js';
@@ -413,9 +414,7 @@ function syncNavigationSelection(store: SpreadsheetStore): void {
   const anchor = firstAllowedAddress(store, state.selection.anchor) ?? active;
   const currentRange = clampNavigationRange(store, state.selection.range);
   const range =
-    currentRange && rangeContainsAddr(currentRange, active)
-      ? currentRange
-      : { sheet: active.sheet, r0: active.row, c0: active.col, r1: active.row, c1: active.col };
+    currentRange && rangeContainsAddr(currentRange, active) ? currentRange : rangeOfAddr(active);
   const extraRanges = (state.selection.extraRanges ?? [])
     .map((extra) => clampNavigationRange(store, extra))
     .filter((extra): extra is Range => extra !== null);

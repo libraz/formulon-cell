@@ -6,7 +6,7 @@ import { quoteSheetName } from '../engine/address.js';
 import { addrKey, type WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { isSingleCell } from '../store/selection-geometry.js';
+import { isSingleCell, rangeOfAddr } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { showPrompt } from '../toolbar/dialogs/prompt.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -194,7 +194,7 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
     const state = store.getState();
     const addr = state.selection.active;
     const wb = getWb() ?? undefined;
-    const cell = { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col };
+    const cell = rangeOfAddr(addr);
     runAfterAllowedRangeUnlock(store, [cell], () => {
       setHyperlinkAction(
         {

@@ -32,7 +32,7 @@ import type { EngineDrawingAnchor, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { EngineChartInfo } from '../engine/workbook-handle-charts.js';
 import { cellRectUnclamped, layoutForView } from '../render/geometry.js';
-import { rangesIntersect, sameRange } from '../store/selection-geometry.js';
+import { rangeOfAddr, rangesIntersect, sameRange } from '../store/selection-geometry.js';
 import { cloneSessionChart } from '../store/sheet-object-mutators.js';
 import {
   mutators,
@@ -754,7 +754,7 @@ export function pasteSessionChart(
   offset: { x: number; y: number } = { x: 0, y: 0 },
 ): SessionChart | null {
   if (!wb.capabilities.charts) return null;
-  const cell = { sheet: at.sheet, r0: at.row, c0: at.col, r1: at.row, c1: at.col };
+  const cell = rangeOfAddr(at);
   const intent = chartIntent([cell], 'chartPaste', authorization);
   return writeChart(store, history, intent, null, () => {
     return placeChartCopy(

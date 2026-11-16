@@ -43,6 +43,17 @@ const MAX_TRANSACTIONS = 100;
 
 const cloneSnapshot = (snapshot: FormulaDraftSnapshot): FormulaDraftSnapshot => ({ ...snapshot });
 
+const cloneGroup = (group: ActiveGroup): ActiveGroup => ({
+  identity: group.identity,
+  before: cloneSnapshot(group.before),
+  after: cloneSnapshot(group.after),
+});
+
+const cloneComposition = (composition: CompositionState): CompositionState => ({
+  before: cloneSnapshot(composition.before),
+  after: cloneSnapshot(composition.after),
+});
+
 const cloneTransaction = (transaction: Transaction): Transaction => ({
   ...transaction,
   before: cloneSnapshot(transaction.before),
@@ -55,6 +66,31 @@ const sameSnapshot = (a: FormulaDraftSnapshot, b: FormulaDraftSnapshot): boolean
   a.end === b.end &&
   a.direction === b.direction &&
   a.mode === b.mode;
+
+/** A snapshot with the caret collapsed at `caret`. */
+export const caretSnapshot = (
+  value: string,
+  caret: number,
+  mode: FormulaDraftMode,
+): FormulaDraftSnapshot => ({ value, start: caret, end: caret, direction: 'none', mode });
+
+export type DraftHistoryAction = 'undo' | 'redo';
+
+/** The history action an Undo/Redo key chord asks for, or null for any other key. */
+export const historyActionForKey = (
+  event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>,
+): DraftHistoryAction | null => {
+  if (event.ctrlKey === event.metaKey || event.altKey) return null;
+  const key = event.key.toLowerCase();
+  if ((key === 'z' && event.shiftKey) || (key === 'y' && !event.shiftKey)) return 'redo';
+  return key === 'z' && !event.shiftKey ? 'undo' : null;
+};
+
+/** The history action a native `historyUndo`/`historyRedo` input type asks for. */
+export const historyActionForInputType = (
+  inputType: string | undefined,
+): DraftHistoryAction | null =>
+  inputType === 'historyUndo' ? 'undo' : inputType === 'historyRedo' ? 'redo' : null;
 
 const fallbackSnapshot = (): FormulaDraftSnapshot => ({
   value: '',
@@ -110,19 +146,8 @@ export class FormulaDraftHistory {
       observed: cloneSnapshot(this.observed),
       inputBefore: this.inputBefore ? cloneSnapshot(this.inputBefore) : null,
       commandBefore: this.commandBefore ? cloneSnapshot(this.commandBefore) : null,
-      group: this.group
-        ? {
-            identity: this.group.identity,
-            before: cloneSnapshot(this.group.before),
-            after: cloneSnapshot(this.group.after),
-          }
-        : null,
-      composition: this.composition
-        ? {
-            before: cloneSnapshot(this.composition.before),
-            after: cloneSnapshot(this.composition.after),
-          }
-        : null,
+      group: this.group ? cloneGroup(this.group) : null,
+      composition: this.composition ? cloneComposition(this.composition) : null,
     };
   }
 
@@ -132,19 +157,8 @@ export class FormulaDraftHistory {
     this.observed = cloneSnapshot(state.observed);
     this.inputBefore = state.inputBefore ? cloneSnapshot(state.inputBefore) : null;
     this.commandBefore = state.commandBefore ? cloneSnapshot(state.commandBefore) : null;
-    this.group = state.group
-      ? {
-          identity: state.group.identity,
-          before: cloneSnapshot(state.group.before),
-          after: cloneSnapshot(state.group.after),
-        }
-      : null;
-    this.composition = state.composition
-      ? {
-          before: cloneSnapshot(state.composition.before),
-          after: cloneSnapshot(state.composition.after),
-        }
-      : null;
+    this.group = state.group ? cloneGroup(state.group) : null;
+    this.composition = state.composition ? cloneComposition(state.composition) : null;
   }
 
   get isCommandPending(): boolean {

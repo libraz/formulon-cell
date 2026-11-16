@@ -18,17 +18,20 @@ import type { EngineSyncOptions } from './cell-format-sync.js';
 import type { Addr, Range } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
-const DV_TYPE: Record<Exclude<CellValidation['kind'], 'list' | 'custom'>, ValidationType> = {
+export const DV_TYPE: Record<Exclude<CellValidation['kind'], 'list' | 'custom'>, ValidationType> = {
   whole: ValidationType.Whole,
   decimal: ValidationType.Decimal,
   date: ValidationType.Date,
   time: ValidationType.Time,
   textLength: ValidationType.TextLength,
 };
-const DV_TYPE_LIST = ValidationType.List;
-const DV_TYPE_CUSTOM = ValidationType.Custom;
+const DV_TYPE_FROM_ORDINAL = Object.fromEntries(
+  Object.entries(DV_TYPE).map(([kind, ordinal]) => [ordinal, kind]),
+) as Record<number, keyof typeof DV_TYPE>;
+export const DV_TYPE_LIST = ValidationType.List;
+export const DV_TYPE_CUSTOM = ValidationType.Custom;
 
-const OP_ORDINAL: Record<ValidationOp, ComparisonOperator> = {
+export const OP_ORDINAL: Record<ValidationOp, ComparisonOperator> = {
   between: ComparisonOperator.Between,
   notBetween: ComparisonOperator.NotBetween,
   '=': ComparisonOperator.Equal,
@@ -42,7 +45,7 @@ const OP_FROM_ORDINAL = Object.fromEntries(
   Object.entries(OP_ORDINAL).map(([op, ordinal]) => [ordinal, op]),
 ) as Record<number, ValidationOp>;
 
-const ERROR_STYLE_ORDINAL: Record<ValidationErrorStyle, EngineErrorStyle> = {
+export const ERROR_STYLE_ORDINAL: Record<ValidationErrorStyle, EngineErrorStyle> = {
   stop: EngineErrorStyle.Stop,
   warning: EngineErrorStyle.Warning,
   information: EngineErrorStyle.Information,
@@ -241,22 +244,8 @@ function coalesceCells(sheet: number, cells: readonly Addr[]): Range[] {
   return out;
 }
 
-interface EngineValidationEntry {
-  ranges: Range[];
-  type: number;
-  op: number;
-  errorStyle: number;
-  allowBlank: boolean;
-  showInputMessage: boolean;
-  showErrorMessage: boolean;
-  showDropDown: boolean;
-  formula1: string;
-  formula2: string;
-  errorTitle: string;
-  errorMessage: string;
-  promptTitle: string;
-  promptMessage: string;
-}
+type EngineValidationEntry = ReturnType<WorkbookHandle['getValidationsForSheet']>[number];
+type EngineValidationInput = Parameters<WorkbookHandle['addValidationEntry']>[1];
 
 function decodeValidation(v: EngineValidationEntry): CellValidation | null {
   // Only surface fields that depart from desktop defaults so round-tripping a
@@ -309,34 +298,14 @@ function decodeValidation(v: EngineValidationEntry): CellValidation | null {
   }
 }
 
-function ordinalToBoundedKind(
-  ordinal: number,
-): 'whole' | 'decimal' | 'date' | 'time' | 'textLength' | null {
-  for (const [k, v] of Object.entries(DV_TYPE) as [keyof typeof DV_TYPE, ValidationType][]) {
-    if (v === ordinal) return k;
-  }
-  return null;
+function ordinalToBoundedKind(ordinal: number): keyof typeof DV_TYPE | null {
+  return DV_TYPE_FROM_ORDINAL[ordinal] ?? null;
 }
 
 function encodeValidation(
   validation: CellValidation,
   ranges: Range[],
-): {
-  ranges: Range[];
-  type: ValidationType;
-  op?: ComparisonOperator;
-  errorStyle?: EngineErrorStyle;
-  allowBlank?: boolean;
-  showInputMessage?: boolean;
-  showErrorMessage?: boolean;
-  showDropDown?: boolean;
-  formula1?: string;
-  formula2?: string;
-  errorTitle?: string;
-  errorMessage?: string;
-  promptTitle?: string;
-  promptMessage?: string;
-} | null {
+): EngineValidationInput | null {
   const metaPayload = encodeMeta(validation);
   switch (validation.kind) {
     case 'list':
@@ -353,7 +322,7 @@ function encodeValidation(
         type: DV_TYPE_CUSTOM,
         // Formulon's public validation API consumes the raw OOXML formula
         // without the optional leading `=`.
-        formula1: validation.formula.trim().replace(/^=/, '').trim(),
+        formula1: stripEquals(validation.formula),
         ...metaPayload,
       };
     default: {
@@ -389,15 +358,9 @@ function encodeMeta(validation: ValidationMeta): {
     ...(validation.errorStyle !== undefined
       ? { errorStyle: ERROR_STYLE_ORDINAL[validation.errorStyle] }
       : {}),
-    ...(validation.allowBlank !== undefined
-      ? { allowBlank: validation.allowBlank }
-      : { allowBlank: true }),
-    ...(validation.showInputMessage !== undefined
-      ? { showInputMessage: validation.showInputMessage }
-      : { showInputMessage: true }),
-    ...(validation.showErrorMessage !== undefined
-      ? { showErrorMessage: validation.showErrorMessage }
-      : { showErrorMessage: true }),
+    allowBlank: validation.allowBlank ?? true,
+    showInputMessage: validation.showInputMessage ?? true,
+    showErrorMessage: validation.showErrorMessage ?? true,
     ...(validation.showDropdown === false ? { showDropDown: false } : {}),
     ...(validation.errorTitle ? { errorTitle: validation.errorTitle } : {}),
     ...(validation.errorMessage ? { errorMessage: validation.errorMessage } : {}),
@@ -429,7 +392,7 @@ function parseListFormulaSource(formula: string): string | null {
   return trimmed || null;
 }
 
-function stripEquals(formula: string): string {
+export function stripEquals(formula: string): string {
   return formula.trim().replace(/^=/, '').trim();
 }
 

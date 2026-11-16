@@ -2,7 +2,6 @@ import {
   buildFunctionCatalog,
   type CatalogFunctionCategory,
   type FunctionCatalogEntry,
-  type FunctionCatalogReader,
   type FunctionCatalogSnapshot,
   type FunctionCategory,
   functionSyntax,
@@ -17,7 +16,11 @@ import type { Addr } from '../engine/types.js';
 import { formatCell, fromEngineValue } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
-import type { ExternalFormulaDraftHandle, FormulaBarController } from '../mount/formula-bar.js';
+import type {
+  ExternalFormulaDraftHandle,
+  ExternalFormulaDraftView,
+  FormulaBarController,
+} from '../mount/formula-bar.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { visibleFocusReturn } from '../toolbar/ribbon/fit-ribbon.js';
@@ -97,24 +100,16 @@ interface CommitSnapshot {
   name: string;
   args: string[];
   raw: string;
-  result: string;
   caret: number;
 }
 
 interface DraftBinding {
   handle: ExternalFormulaDraftHandle;
   unsubscribe: () => void;
-  leased: boolean;
 }
 
-interface DraftView {
-  raw: string;
-  caret: {
-    start: number;
-    end: number;
-    direction: HTMLTextAreaElement['selectionDirection'];
-  };
-}
+const PALETTE_WIDTH_PX = 300;
+
 const connectedElement = (value: Element | null): HTMLElement | null =>
   value instanceof HTMLElement && value.isConnected ? value : null;
 
@@ -122,8 +117,8 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   const root = document.createElement('aside');
   root.className = 'fc-mac-formula-palette';
   root.setAttribute('role', 'complementary');
-  root.style.inlineSize = '300px';
-  root.style.flexBasis = '300px';
+  root.style.inlineSize = `${PALETTE_WIDTH_PX}px`;
+  root.style.flexBasis = `${PALETTE_WIDTH_PX}px`;
   root.hidden = true;
   deps.dock.appendChild(root);
   markSurface(root, 'pane');
@@ -172,7 +167,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
 
   const currentDraftBinding = (): DraftBinding | null => activeDraft;
 
-  const view = createMacFormulaPaletteView(root, {
+  const paletteView = createMacFormulaPaletteView(root, {
     labels: () => labels,
     pickerState: () => pickerViewState(),
     argumentsState: () => argumentsViewState(),
@@ -218,30 +213,22 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   const isClosed = (): boolean => mode === 'closed';
 
   const readCatalog = (): FunctionCatalogSnapshot => {
-    let reader: FunctionCatalogReader | null = null;
+    const ordinal = activeCatalogLocale();
+    const tag = catalogLocaleTag(deps.getLocale());
     try {
-      reader = deps.getWb();
-      return buildFunctionCatalog(
-        reader,
-        catalogLocaleOrdinal(deps.getLocale()),
-        catalogLocaleTag(deps.getLocale()),
-      );
+      return buildFunctionCatalog(deps.getWb(), ordinal, tag);
     } catch {
-      return buildFunctionCatalog(
-        null,
-        catalogLocaleOrdinal(deps.getLocale()),
-        catalogLocaleTag(deps.getLocale()),
-      );
+      return buildFunctionCatalog(null, ordinal, tag);
     }
   };
 
   const resolveProjectedName = (rawName: string): string | null =>
     resolveCatalogFunctionName(catalog, safeWorkbook(), rawName, activeCatalogLocale());
 
-  const activeEndpoint = (view: DraftView): number =>
+  const activeEndpoint = (view: ExternalFormulaDraftView): number =>
     view.caret.direction === 'backward' ? view.caret.start : view.caret.end;
 
-  const reprojectDraft = (view: DraftView): ProjectedFormulaCall | null => {
+  const reprojectDraft = (view: ExternalFormulaDraftView): ProjectedFormulaCall | null => {
     currentCaret = activeEndpoint(view);
     callProjection = projectFormulaCallAtCaret(
       view.raw,
@@ -292,12 +279,12 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   };
 
   const clearRoot = (): void => {
-    while (root.firstChild) root.removeChild(root.firstChild);
+    root.replaceChildren();
   };
 
   const selectedDescription = (): string => {
     if (!selectedEntry) return '';
-    return textForEntry(selectedEntry) ?? '';
+    return textForEntry(selectedEntry);
   };
 
   const selectedSyntax = (): string =>
@@ -358,6 +345,12 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     root.setAttribute('aria-label', labels.title);
   };
 
+  /** The argument input at `index`, or the first one when no index is given. */
+  const argumentField = (index?: number): HTMLInputElement | null | undefined =>
+    argumentsRefs?.fields.querySelector<HTMLInputElement>(
+      index === undefined ? 'input[data-argument-index]' : `input[data-argument-index="${index}"]`,
+    );
+
   const updateFieldValues = (): void => {
     const fields = argumentsRefs?.fields.querySelectorAll<HTMLInputElement>(
       'input[data-argument-index]',
@@ -368,42 +361,39 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     });
   };
 
-  const renderPreview = (): void => {
-    const preview = argumentsRefs?.preview;
-    if (!preview || !selectedEntry) return;
-    preview.textContent = '';
+  const previewText = (entry: FunctionCatalogEntry): string => {
     const pendingRequired =
-      synchronized && args.slice(0, selectedEntry.minArity).some((value) => value.trim() === '');
-    if (pendingRequired || !currentRaw.trim().startsWith('=')) {
-      preview.textContent = labels.pending;
-      return;
-    }
+      synchronized && args.slice(0, entry.minArity).some((value) => value.trim() === '');
+    if (pendingRequired || !currentRaw.trim().startsWith('=')) return labels.pending;
     try {
       const workbook = safeWorkbook();
-      if (!workbook) {
-        preview.textContent = labels.pending;
-        return;
-      }
+      if (!workbook) return labels.pending;
       const canonicalRaw =
         typeof workbook.canonicalizeLocalizedFormula === 'function'
           ? workbook.canonicalizeLocalizedFormula(currentRaw)
           : currentRaw;
       const result = workbook.evaluateFormulaText(currentAnchor(), canonicalRaw);
-      if (!result) {
-        preview.textContent = labels.pending;
-        return;
-      }
-      preview.textContent = formatCell(fromEngineValue(result), deps.getLocale());
+      if (!result) return labels.pending;
+      return formatCell(fromEngineValue(result), deps.getLocale());
     } catch {
-      preview.textContent = labels.pending;
+      return labels.pending;
     }
+  };
+
+  const renderPreview = (): void => {
+    const preview = argumentsRefs?.preview;
+    if (!preview || !selectedEntry) return;
+    preview.textContent = previewText(selectedEntry);
   };
 
   const sameArgs = (left: readonly string[], right: readonly string[]): boolean =>
     left.length === right.length && left.every((value, index) => value === right[index]);
 
   /** Adopt one authoritative draft snapshot without causing a render loop. */
-  const adoptDraftView = (view: DraftView, preserveArgument?: number | null): boolean => {
+  const adoptDraftView = (
+    view: ExternalFormulaDraftView,
+    preserveArgument?: number | null,
+  ): boolean => {
     const previousName = selectedName;
     const previousArgs = args;
     const previousProjection = callProjection;
@@ -538,18 +528,8 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     guardedUnavailable ||
     (selectedEntry !== null && isFunctionUnavailableForInsertion(selectedEntry.availability));
 
-  /** Drop a stale workbook/context without running the user cancel/restore path. */
-  const discardSessionInertly = (): void => {
-    const binding = activeDraft;
-    if (binding) {
-      guarding = true;
-      try {
-        binding.handle.discard();
-      } finally {
-        guarding = false;
-      }
-      return;
-    }
+  /** Tear the session down to its closed state, releasing the mirror and the recent-list subscription. */
+  const closeSessionState = (): void => {
     mode = 'closed';
     resetFunctionSelection();
     resetPickerSelection();
@@ -564,6 +544,21 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     restoredFocusTarget = null;
     anchor = null;
     sessionWb = null;
+  };
+
+  /** Drop a stale workbook/context without running the user cancel/restore path. */
+  const discardSessionInertly = (): void => {
+    const binding = activeDraft;
+    if (binding) {
+      guarding = true;
+      try {
+        binding.handle.discard();
+      } finally {
+        guarding = false;
+      }
+      return;
+    }
+    closeSessionState();
   };
 
   /** Keep the authoritative draft alive while a same-workbook catalog entry is withdrawn. */
@@ -626,7 +621,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     if (activeDraft === binding) currentRaw = raw;
   };
 
-  const handleRawUpdate = (binding: DraftBinding, view: DraftView): void => {
+  const handleRawUpdate = (binding: DraftBinding, view: ExternalFormulaDraftView): void => {
     if (activeDraft !== binding) return;
     const viewCaret = activeEndpoint(view);
     const preserveArgument = paletteWriteFocusIndex;
@@ -677,20 +672,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     if (outcome === 'discarded') {
       activeDraft = null;
       binding.unsubscribe();
-      recentUnsubscribe?.();
-      recentUnsubscribe = null;
-      notifyMirror(null);
-      mode = 'closed';
-      resetFunctionSelection();
-      resetPickerSelection();
-      postCommit = null;
-      restoredFocusTarget = null;
-      sessionWb = null;
-      anchor = null;
-      pickerRefs = null;
-      argumentsRefs = null;
-      clearRoot();
-      updateDataset();
+      closeSessionState();
       return;
     }
     const committedName = selectedName;
@@ -703,7 +685,6 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
         ? callProjection
         : null;
     const committedArgs = [...(committedProjection?.args ?? args)];
-    const committedResult = argumentsRefs?.preview.textContent ?? labels.pending;
     const committedCount = explicitArgumentCount;
     const committedPreservesCount = preserveExplicitArgumentCount;
     const parsed =
@@ -733,7 +714,6 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
         name: committedName,
         args: stored ? [...stored.args] : committedArgs,
         raw: stored?.raw ?? committedRaw,
-        result: committedResult,
         caret: stored?.caret ?? committedProjection?.span.call.end ?? currentCaret,
       };
       mode = 'arguments-committed';
@@ -776,7 +756,6 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     binding = {
       handle,
       unsubscribe: () => {},
-      leased: lease !== undefined,
     };
     activeDraft = binding;
     const initialView = handle.snapshot();
@@ -928,12 +907,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   };
 
   const onArgumentInput = (index: number, value: string, sourceField?: HTMLInputElement): void => {
-    if (
-      sourceField &&
-      argumentsRefs?.fields.querySelector<HTMLInputElement>(
-        `input[data-argument-index="${index}"]`,
-      ) !== sourceField
-    ) {
+    if (sourceField && argumentField(index) !== sourceField) {
       return;
     }
     focusedArgument = index;
@@ -945,7 +919,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   };
 
   const updatePickerList = (): void => {
-    if (pickerRefs) view.renderPickerList();
+    if (pickerRefs) paletteView.renderPickerList();
   };
 
   const pickEntry = (name: string): void => {
@@ -972,15 +946,13 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     }));
     if (!appended) return;
     renderArguments();
-    argumentsRefs?.fields
-      .querySelector<HTMLInputElement>(`input[data-argument-index="${focusedArgument}"]`)
-      ?.focus();
+    argumentField(focusedArgument)?.focus();
   };
 
   const renderArguments = (): void => {
     clearRoot();
     updateDataset();
-    argumentsRefs = view.renderArguments();
+    argumentsRefs = paletteView.renderArguments();
     updateDataset();
     updateFieldValues();
     renderPreview();
@@ -989,7 +961,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   const renderPicker = (): void => {
     clearRoot();
     updateDataset();
-    pickerRefs = view.renderPicker();
+    pickerRefs = paletteView.renderPicker();
     argumentsRefs = null;
     updateDataset();
   };
@@ -1022,6 +994,14 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     mode = 'picker';
     render();
     pickerRefs?.search.focus();
+  };
+
+  const initialArgsFor = (name: string, entry: FunctionCatalogEntry): string[] => {
+    const initial = deps.getInitialArguments?.(name) ?? [];
+    return Array.from(
+      { length: argumentFieldCount(entry, initial.length) },
+      (_, index) => initial[index] ?? '',
+    );
   };
 
   const insertSelected = (
@@ -1079,13 +1059,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
         return;
       }
 
-      const initial = deps.getInitialArguments?.(requestedName) ?? [];
-      const count = Math.max(
-        requestedEntry.minArity,
-        requestedEntry.argumentLabels.length,
-        initial.length,
-      );
-      const initialArgs = Array.from({ length: count }, (_, index) => initial[index] ?? '');
+      const initialArgs = initialArgsFor(requestedName, requestedEntry);
       const replaced = replaceProjectedFormulaCall(
         raw,
         projection,
@@ -1109,10 +1083,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       postCommit = null;
       setDraftRaw(replaced.raw, false, replaced.caret);
       render();
-      const first = argumentsRefs?.fields.querySelector<HTMLInputElement>(
-        'input[data-argument-index="0"]',
-      );
-      first?.focus();
+      argumentField(0)?.focus();
       return;
     }
 
@@ -1122,13 +1093,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     pickerSelectionEntry = null;
     if (!liveEntryGuard()) return;
     if (!activeDraft && !startDraft('=')) return;
-    const initial = deps.getInitialArguments?.(selectedName) ?? [];
-    const count = Math.max(
-      selectedEntry.minArity,
-      selectedEntry.argumentLabels.length,
-      initial.length,
-    );
-    args = Array.from({ length: count }, (_, index) => initial[index] ?? '');
+    args = initialArgsFor(selectedName, selectedEntry);
     explicitArgumentCount = null;
     preserveExplicitArgumentCount = false;
     synchronized = true;
@@ -1142,10 +1107,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     mode = 'arguments-editing';
     postCommit = null;
     render();
-    const first = argumentsRefs?.fields.querySelector<HTMLInputElement>(
-      'input[data-argument-index="0"]',
-    );
-    first?.focus();
+    argumentField(0)?.focus();
   };
 
   const focusCurrentSurface = (): void => {
@@ -1153,16 +1115,16 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       pickerRefs?.search.focus();
       return;
     }
-    const field =
-      argumentsRefs?.fields.querySelector<HTMLInputElement>(
-        `input[data-argument-index="${focusedArgument}"]`,
-      ) ?? argumentsRefs?.fields.querySelector<HTMLInputElement>('input[data-argument-index]');
-    field?.focus();
+    (argumentField(focusedArgument) ?? argumentField())?.focus();
+  };
+
+  const reloadLabels = (next: Strings = deps.getStrings()): void => {
+    strings = next;
+    labels = paletteStrings(strings);
   };
 
   const rereadOpenCatalog = (): boolean => {
-    strings = deps.getStrings();
-    labels = paletteStrings(strings);
+    reloadLabels();
     const live = safeWorkbook();
     catalog = readCatalog();
     reconcilePickerSelection();
@@ -1185,10 +1147,10 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   const adoptProjectedCall = (
     projection: ProjectedFormulaCall,
     entry: FunctionCatalogEntry,
-  ): boolean => {
+  ): void => {
     selectedName = entry.canonicalName;
     selectedEntry = entry;
-    if (!liveEntryGuard()) return false;
+    if (!liveEntryGuard()) return;
     args = [...projection.args];
     explicitArgumentCount = projection.args.length;
     preserveExplicitArgumentCount = true;
@@ -1200,13 +1162,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     mode = 'arguments-editing';
     postCommit = null;
     render();
-    const field = argumentsRefs?.fields.querySelector<HTMLInputElement>(
-      `input[data-argument-index="${focusedArgument}"]`,
-    );
-    (
-      field ?? argumentsRefs?.fields.querySelector<HTMLInputElement>('input[data-argument-index]')
-    )?.focus();
-    return true;
+    focusCurrentSurface();
   };
 
   const applyOpenRequest = (seedName?: string, options?: FxDialogOpenOptions): void => {
@@ -1232,7 +1188,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
         pickerCategory = options.category;
         pickerSelectionName = null;
         pickerSelectionEntry = null;
-        if (mode !== 'picker') mode = 'picker';
+        mode = 'picker';
       }
       render();
       focusCurrentSurface();
@@ -1373,29 +1329,11 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
 
   const refresh = (): void => {
     if (detached) return;
-    strings = deps.getStrings();
-    labels = paletteStrings(strings);
-    if (safeWorkbook() !== sessionWb) {
-      discardSessionInertly();
-      return;
-    }
-    catalog = readCatalog();
-    reconcilePickerSelection();
-    if (mode !== 'picker' && selectedEntryWithdrawn()) {
-      showGuardedPicker(labels.unavailable);
-      return;
-    }
-    selectedEntry = selectedName ? (catalog.entries.get(selectedName) ?? null) : null;
-    guardedUnavailable = false;
-    const binding = activeDraft;
-    const view = binding?.handle.snapshot();
-    if (binding && view) handleRawUpdate(binding, view);
-    render();
+    if (rereadOpenCatalog()) render();
   };
 
   const setStrings = (next: Strings): void => {
-    strings = next;
-    labels = paletteStrings(strings);
+    reloadLabels(next);
     // Locale changes update both the dictionary and the workbook profile.
     // Re-read metadata here so provider descriptions for zh/ko/th do not stay
     // on the previous language while the palette remains mounted.

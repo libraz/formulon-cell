@@ -20,11 +20,18 @@ import { isMacHost } from '../extensions/ui-options.js';
 import type { Strings } from '../i18n/strings.js';
 import type { AutocompleteInsertOutcome } from '../interact/autocomplete.js';
 import { focusSheet } from '../interact/dialog-focus.js';
-import { handleFormulaAutocompleteKey } from '../interact/formula-autocomplete-key.js';
 import {
+  dismissFormulaAutocomplete,
+  handleFormulaAutocompleteKey,
+} from '../interact/formula-autocomplete-key.js';
+import {
+  caretSnapshot,
   FormulaDraftHistory,
   type FormulaDraftHistoryState,
+  type FormulaDraftMode,
   type FormulaDraftSnapshot,
+  historyActionForInputType,
+  historyActionForKey,
 } from '../interact/formula-draft-history.js';
 import {
   createFormulaEditLease,
@@ -39,6 +46,7 @@ import {
 } from '../interact/formula-edit-navigation.js';
 import { classifyFormulaReferenceArrow } from '../interact/formula-reference-arrow.js';
 import {
+  type ActiveReferenceGesture,
   createFormulaReferenceGesture,
   type FormulaReferenceGesture,
 } from '../interact/formula-reference-gesture.js';
@@ -56,8 +64,9 @@ import {
   SELECTION_INPUT_LIMIT_MESSAGE,
   writeSelectionInput,
 } from '../interact/selection-input.js';
-import { advanceAfterCommit } from '../interact/selection-navigation.js';
+import { advanceAfterCommit, type CommitAdvance } from '../interact/selection-navigation.js';
 import { sameAddr } from '../store/direct-format.js';
+import { rangeOfAddr } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import type { EditorRefHighlight } from '../store/types.js';
@@ -81,14 +90,6 @@ interface FormulaArgHelper {
   setComposing?(composing: boolean): void;
 }
 
-interface ActiveReferenceGesture {
-  gesture: FormulaReferenceGesture;
-  value: string;
-  caret: number;
-}
-
-type FormulaBarArrowMode = 'edit' | 'point';
-
 interface AttachFormulaBarInput {
   formulabar: HTMLElement;
   fxAccept: HTMLButtonElement;
@@ -105,7 +106,7 @@ interface AttachFormulaBarInput {
   wb: () => WorkbookHandle;
 }
 
-interface ExternalFormulaDraftView {
+export interface ExternalFormulaDraftView {
   raw: string;
   caret: {
     start: number;
@@ -157,7 +158,7 @@ export interface FormulaBarController {
   suspendForFormulaPalette(context: FormulaEditLeaseContext): FormulaEditLease | null;
   cancelFx(): void;
   discardFx(): void;
-  commitFx(advance: 'down' | 'right' | 'up' | 'left' | 'none'): boolean;
+  commitFx(advance: CommitAdvance): boolean;
   detach(): void;
   insertRefAtCaret(ref: string, options?: { phase: 'start' | 'update' }): void;
   beforeAutocompleteInsert?(): void;
@@ -165,7 +166,6 @@ export interface FormulaBarController {
   isEditing(): boolean;
   isFormulaEdit(): boolean;
   editedCell(): Addr;
-  refreshActions(): void;
   syncFxRefs(): void;
 }
 
@@ -191,7 +191,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   let composing = false;
   let referenceGesture: ActiveReferenceGesture | null = null;
   let pointNavigation: FormulaReferenceNavigationState | null = null;
-  let arrowMode: FormulaBarArrowMode = 'edit';
+  let arrowMode: FormulaDraftMode = 'edit';
   let leaseGeneration = 0;
   let currentLease: FormulaEditLease | null = null;
   let suspended = false;
@@ -211,32 +211,42 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     pendingHistoryInput = null;
     ignoredHistoryInput = null;
   };
+  /** Drop the local edit markers and draft history; the caller owns refs and arrow mode. */
+  const goInert = (): void => {
+    fxEditing = false;
+    editingAnchor = null;
+    commitRejected = false;
+    fxBaseline = fxInput.value;
+    clearHistoryInput();
+    draftHistory.clear();
+  };
   const clearReferenceState = (): void => {
     referenceGesture = null;
     pointNavigation = null;
   };
   const dismissAutocomplete = (): void => {
-    const autocomplete = getAutocomplete();
-    if (autocomplete.dismiss) autocomplete.dismiss();
-    else autocomplete.close();
+    dismissFormulaAutocomplete(getAutocomplete());
   };
 
   const isMacPlatform = (): boolean => isMacHost(host);
 
+  const externalDraftClosed = (): boolean =>
+    externalDraft !== null && externalDraft.status !== 'open';
+
   const isFormulaEdit = (): boolean => fxEditing && fxInput.value.trimStart().startsWith('=');
   const draftActive = (): boolean => fxEditing || externalDraft?.status === 'open';
 
-  const captureDraftSnapshot = (): FormulaDraftSnapshot => {
-    const value = fxInput.value;
-    const start = fxInput.selectionStart ?? value.length;
-    const end = fxInput.selectionEnd ?? start;
+  const caretOf = (): ExternalFormulaDraftView['caret'] => {
+    const length = fxInput.value.length;
     return {
-      value,
-      start,
-      end,
+      start: fxInput.selectionStart ?? length,
+      end: fxInput.selectionEnd ?? length,
       direction: fxInput.selectionDirection,
-      mode: arrowMode,
     };
+  };
+
+  const captureDraftSnapshot = (): FormulaDraftSnapshot => {
+    return { value: fxInput.value, ...caretOf(), mode: arrowMode };
   };
 
   const applyDraftSnapshot = (snapshot: FormulaDraftSnapshot): void => {
@@ -258,15 +268,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
 
   const handleDraftHistoryKey = (event: KeyboardEvent): boolean => {
     if (!draftActive()) return false;
-    const oneModifier = event.ctrlKey !== event.metaKey;
-    if (!oneModifier || event.altKey) return false;
-    const key = event.key.toLowerCase();
-    const action =
-      (key === 'z' && event.shiftKey) || (key === 'y' && !event.shiftKey)
-        ? 'redo'
-        : key === 'z' && !event.shiftKey
-          ? 'undo'
-          : null;
+    const action = historyActionForKey(event);
     if (!action) return false;
     event.preventDefault();
     event.stopPropagation();
@@ -302,7 +304,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     editingAnchor ?? externalDraft?.anchor ?? store.getState().selection.active;
 
   const syncFxRefs = (): void => {
-    if (detached || (externalDraft && externalDraft.status !== 'open')) return;
+    if (detached || externalDraftClosed()) return;
     const refs = editorRefHighlights(
       fxInput.value,
       draftAnchor(),
@@ -329,12 +331,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   const finishEditing = (): void => {
     clearReferenceState();
     arrowMode = 'edit';
-    fxEditing = false;
-    editingAnchor = null;
-    commitRejected = false;
-    fxBaseline = fxInput.value;
-    clearHistoryInput();
-    draftHistory.clear();
+    goInert();
     refreshActions();
     clearFxRefs();
     closeFormulaHelpers();
@@ -342,7 +339,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
 
   const restoreFromLease = (
     snapshot: Readonly<FormulaEditLeaseSnapshot>,
-    restoredArrowMode: FormulaBarArrowMode,
+    restoredArrowMode: FormulaDraftMode,
     restoredHistory: FormulaDraftHistoryState,
   ): HTMLElement | null => {
     if (detached || wb() !== snapshot.workbook) return null;
@@ -411,11 +408,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       anchor: { ...anchor },
       raw: fxInput.value,
       baseline: fxBaseline,
-      caret: {
-        start: fxInput.selectionStart ?? fxInput.value.length,
-        end: fxInput.selectionEnd ?? fxInput.value.length,
-        direction: fxInput.selectionDirection,
-      },
+      caret: caretOf(),
       selection: state.selection,
       editorMode: state.ui.editor,
       editorRefs: state.ui.editorRefs,
@@ -463,14 +456,13 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     return lease;
   };
 
+  const workbookLive = (workbook: WorkbookHandle): boolean =>
+    Number.isInteger(workbook.sheetCount) && workbook.sheetCount >= 0;
+
   const externalDraftWorkbookCurrent = (draft: ExternalDraftState): boolean => {
     try {
       const current = wb();
-      return (
-        current === draft.workbook &&
-        Number.isInteger(current.sheetCount) &&
-        current.sheetCount >= 0
-      );
+      return current === draft.workbook && workbookLive(current);
     } catch {
       return false;
     }
@@ -487,26 +479,17 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     }
     return {
       raw: fxInput.value,
-      caret: {
-        start: fxInput.selectionStart ?? fxInput.value.length,
-        end: fxInput.selectionEnd ?? fxInput.value.length,
-        direction: fxInput.selectionDirection,
-      },
+      caret: caretOf(),
     };
   };
 
   const makeExternalDraftInert = (): void => {
     // Drop only the discarded draft's local ownership markers. Clear its refs
     // by identity so a newer owner survives a synchronous discard re-entry.
-    fxEditing = false;
-    editingAnchor = null;
-    commitRejected = false;
-    fxBaseline = fxInput.value;
+    goInert();
     suspended = false;
     referenceGesture = null;
     clearFxRefs();
-    clearHistoryInput();
-    draftHistory.clear();
   };
 
   /** After a commit the bar shows the cell as the engine stored it, which may be respelled,
@@ -528,8 +511,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     }
     if (!detached) {
       try {
-        const current = wb();
-        if (Number.isInteger(current.sheetCount) && current.sheetCount >= 0) {
+        if (workbookLive(wb())) {
           updateChrome();
           fxBaseline = fxInput.value;
         }
@@ -655,8 +637,16 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     if (r.text !== fxInput.value) applyRecordedEdit(r.text, r.caret, r.caret, 'f4');
   };
 
-  const discardStaleLeaseDraft = (draft: ExternalDraftState): void => {
+  const discardDraft = (draft: ExternalDraftState): void => {
     finishExternalDraft(draft, 'discarded', false, false);
+  };
+
+  /** Discard the external draft when its workbook or lease went stale; true when it did. */
+  const guardStaleDraft = (): boolean => {
+    const draft = externalDraft;
+    if (!draft || !externalDraftStale(draft)) return false;
+    discardDraft(draft);
+    return true;
   };
 
   const currentDraftValue = (draft: ExternalDraftState): string =>
@@ -665,7 +655,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   const syncExternalInput = (draft: ExternalDraftState, raw: string, caret?: number): void => {
     if (detached || externalDraft !== draft || draft.status !== 'open') return;
     if (externalDraftStale(draft)) {
-      discardStaleLeaseDraft(draft);
+      discardDraft(draft);
       return;
     }
     const nextCaret = Math.max(0, Math.min(caret ?? raw.length, raw.length));
@@ -694,7 +684,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     else console.warn(`formulon-cell: formula-bar commit rejected: ${message}`);
   };
 
-  const moveAfterCommit = (advance: 'down' | 'right' | 'up' | 'left' | 'none'): void => {
+  const moveAfterCommit = (advance: CommitAdvance): void => {
     if (advance === 'none') return;
     const controller = interactionControllerFor(store);
     if (controller?.policy?.selection === false) return;
@@ -882,7 +872,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     clearReferenceState();
     if (detached || externalDraft !== draft || draft.status !== 'open') return false;
     if (externalDraftStale(draft)) {
-      discardStaleLeaseDraft(draft);
+      discardDraft(draft);
       return false;
     }
     const raw = fxInput.value;
@@ -901,7 +891,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       draft.cancelMode === 'discard' ||
       externalDraftStale(draft);
     if (contextDiscarded) {
-      discardStaleLeaseDraft(draft);
+      discardDraft(draft);
       return committed;
     }
     if (committed) {
@@ -929,7 +919,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     }
     if (draft.status !== 'open') return;
     if (externalDraftStale(draft)) {
-      discardStaleLeaseDraft(draft);
+      discardDraft(draft);
       return;
     }
     // Only a user cancellation may restore a leased owner.
@@ -945,10 +935,10 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       return;
     }
     if (draft.status !== 'open') return;
-    finishExternalDraft(draft, 'discarded', false, false);
+    discardDraft(draft);
   }
 
-  const commitFx = (advance: 'down' | 'right' | 'up' | 'left' | 'none'): boolean => {
+  const commitFx = (advance: CommitAdvance): boolean => {
     draftHistory.endGroup();
     clearReferenceState();
     if (externalDraft) {
@@ -958,7 +948,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     commitRejected = false;
     const a = editingAnchor ?? store.getState().selection.active;
     // A password-guarded range under the cell is unlocked first; the commit then repeats.
-    const cell = { sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col };
+    const cell = rangeOfAddr(a);
     // One deferred commit at a time; it keeps its Enter / Tab direction.
     if (commitDeferred) return false;
     if (
@@ -1018,13 +1008,8 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     // System boundaries abandon a regular formula-bar edit in place. Do not
     // move focus while the host replaces the context; clear only refs still
     // owned by this edit.
-    fxEditing = false;
-    editingAnchor = null;
-    commitRejected = false;
-    fxBaseline = fxInput.value;
+    goInert();
     suspended = false;
-    clearHistoryInput();
-    draftHistory.clear();
     clearFxRefs();
     refreshDiscardedChrome();
   };
@@ -1064,7 +1049,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   const refuseLockedCell = (event: InputEvent): boolean => {
     if (!/^(insert|delete)/.test(event.inputType)) return false;
     const a = store.getState().selection.active;
-    const cell = { sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col };
+    const cell = rangeOfAddr(a);
     if (deferForAllowedRangeUnlock(store, [cell], () => fxInput.focus())) {
       event.preventDefault();
       return true;
@@ -1079,15 +1064,13 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   };
 
   const onFxBeforeInput = (event: InputEvent): void => {
-    if (detached || (externalDraft && externalDraft.status !== 'open')) {
+    if (detached || externalDraftClosed()) {
       clearHistoryInput();
       event.preventDefault();
       event.stopPropagation();
       return;
     }
-    const currentDraft = externalDraft;
-    if (currentDraft && externalDraftStale(currentDraft)) {
-      discardStaleLeaseDraft(currentDraft);
+    if (guardStaleDraft()) {
       clearHistoryInput();
       event.preventDefault();
       event.stopPropagation();
@@ -1095,12 +1078,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     }
     if (!externalDraft && refuseLockedCell(event)) return;
     if (!fxEditing && !externalDraft) return;
-    const action =
-      event.inputType === 'historyUndo'
-        ? 'undo'
-        : event.inputType === 'historyRedo'
-          ? 'redo'
-          : null;
+    const action = historyActionForInputType(event.inputType);
     if (action) {
       if (composing) return;
       if (event.cancelable) {
@@ -1119,27 +1097,19 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
 
   const onFxInput = (rawEvent?: Event): void => {
     if (detached) return;
-    if (externalDraft && externalDraft.status !== 'open') {
+    if (externalDraftClosed()) {
       const snapshot = draftHistory.current();
       fxInput.value = snapshot.value;
       fxInput.setSelectionRange(snapshot.start, snapshot.end, snapshot.direction);
       clearHistoryInput();
       return;
     }
-    const currentDraft = externalDraft;
-    if (currentDraft && externalDraftStale(currentDraft)) {
-      discardStaleLeaseDraft(currentDraft);
+    if (guardStaleDraft()) {
       clearHistoryInput();
       return;
     }
     const event = rawEvent as InputEvent | undefined;
-    const historyAction =
-      pendingHistoryInput ??
-      (event?.inputType === 'historyUndo'
-        ? 'undo'
-        : event?.inputType === 'historyRedo'
-          ? 'redo'
-          : null);
+    const historyAction = pendingHistoryInput ?? historyActionForInputType(event?.inputType);
     if (composing) {
       clearHistoryInput();
       clearReferenceState();
@@ -1173,14 +1143,14 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   };
 
   const onFxCompositionStart = (): void => {
-    if (detached || (externalDraft && externalDraft.status !== 'open')) {
+    if (detached || externalDraftClosed()) {
       composing = false;
       return;
     }
     const currentDraft = externalDraft;
     if (currentDraft && externalDraftStale(currentDraft)) {
       composing = false;
-      discardStaleLeaseDraft(currentDraft);
+      discardDraft(currentDraft);
       return;
     }
     composing = true;
@@ -1193,12 +1163,8 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
 
   const onFxCompositionEnd = (): void => {
     composing = false;
-    if (detached || (externalDraft && externalDraft.status !== 'open')) return;
-    const currentDraft = externalDraft;
-    if (currentDraft && externalDraftStale(currentDraft)) {
-      discardStaleLeaseDraft(currentDraft);
-      return;
-    }
+    if (detached || externalDraftClosed()) return;
+    if (guardStaleDraft()) return;
     draftHistory.endComposition(captureDraftSnapshot());
     getAutocomplete().setComposing?.(false);
     getArgHelper()?.setComposing?.(false);
@@ -1206,7 +1172,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   };
 
   const onFxKeyUp = (): void => {
-    if (detached || (externalDraft && externalDraft.status !== 'open')) return;
+    if (detached || externalDraftClosed()) return;
     refreshHelpersAfterSelection();
     notifyExternalInput();
   };
@@ -1245,7 +1211,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     ) {
       pointNavigation = null;
     }
-    if (!fxEditing || detached || (externalDraft && externalDraft.status !== 'open')) return;
+    if (!fxEditing || detached || externalDraftClosed()) return;
     getAutocomplete().refresh();
     getArgHelper()?.refresh();
   };
@@ -1278,13 +1244,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       draftHistory.beginGroup(historyBefore, 'reference');
     }
     draftHistory.updateGroup(
-      {
-        value: result.value,
-        start: result.caret,
-        end: result.caret,
-        direction: 'none',
-        mode: arrowMode,
-      },
+      caretSnapshot(result.value, result.caret, arrowMode),
       'reference',
       historyBefore,
     );
@@ -1299,7 +1259,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   const onFxKey = (e: KeyboardEvent): void => {
     if (detached) return;
     if (composing || e.isComposing || e.key === 'Process') return;
-    if (externalDraft && externalDraft.status !== 'open') {
+    if (externalDraftClosed()) {
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
@@ -1441,7 +1401,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   };
 
   const insertRefAtCaret = (ref: string, options?: { phase: 'start' | 'update' }): void => {
-    if (detached || (externalDraft && externalDraft.status !== 'open')) return;
+    if (detached || externalDraftClosed()) return;
     const historyBefore = captureDraftSnapshot();
     if (options?.phase === 'start') {
       draftHistory.beginGroup(historyBefore, 'reference');
@@ -1480,13 +1440,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     const result = picked.insert(ref);
     referenceGesture =
       options?.phase && gesture ? { gesture, value: result.text, caret: result.caret } : null;
-    const after: FormulaDraftSnapshot = {
-      value: result.text,
-      start: result.caret,
-      end: result.caret,
-      direction: 'none',
-      mode: arrowMode,
-    };
+    const after = caretSnapshot(result.text, result.caret, arrowMode);
     if (options?.phase) {
       draftHistory.updateGroup(after, 'reference', historyBefore);
     } else {
@@ -1571,7 +1525,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       subscribe: (listener) => {
         if (detached || externalDraft !== draft || draft.status !== 'open') return () => {};
         if (externalDraftStale(draft)) {
-          discardStaleLeaseDraft(draft);
+          discardDraft(draft);
           return () => {};
         }
         draft.listeners.add(listener);
@@ -1648,7 +1602,6 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     isEditing: () => fxEditing,
     isFormulaEdit,
     editedCell: draftAnchor,
-    refreshActions,
     syncFxRefs,
     suspendForFormulaPalette,
   };

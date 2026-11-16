@@ -109,8 +109,13 @@ const isNameChar = (ch: string, first: boolean): boolean => {
  *  even though it is not a reference itself. */
 const RESERVED_PREFIX = /^(?:R\d+C\d*|R\d*C\d+|_xlnm\.)/i;
 
+const RESERVED_WORD = /^(?:true|false|[rc])$/i;
+
+/** Longest defined name; sanitizing stops one short so a trailing `_` still fits. */
+const MAX_DEFINED_NAME_LENGTH = 255;
+
 const isReservedName = (name: string): boolean =>
-  /^(?:true|false|[rc])$/i.test(name) || RESERVED_PREFIX.test(name) || looksLikeCellRef(name);
+  RESERVED_WORD.test(name) || RESERVED_PREFIX.test(name) || looksLikeCellRef(name);
 
 /**
  * Validate a defined name against spreadsheet naming rules. Surrounding
@@ -121,7 +126,7 @@ const isReservedName = (name: string): boolean =>
  */
 export function isValidDefinedName(raw: string): boolean {
   const name = foldName(raw.trim());
-  if (!name || name.length > 255) return false;
+  if (!name || name.length > MAX_DEFINED_NAME_LENGTH) return false;
   if (isReservedName(name)) return false;
   let first = true;
   for (const ch of name) {
@@ -139,11 +144,7 @@ export const isSameDefinedName = (a: string, b: string): boolean => nameKey(a) =
 
 /** Whether `wb` already has a name equal to `name` (ignoring case and width) in the given scope. */
 export function definedNameExists(wb: WorkbookHandle, name: string, localSheetId = -1): boolean {
-  const key = nameKey(name);
-  for (const entry of wb.definedNames()) {
-    if (entry.localSheetId === localSheetId && nameKey(entry.name) === key) return true;
-  }
-  return false;
+  return findDefinedName(wb, name, localSheetId) !== undefined;
 }
 
 /** The text label of a cell; a number, a boolean, an error or a blank cell labels nothing. */
@@ -163,20 +164,23 @@ export const sanitizeName = (raw: string): string => {
   const folded = foldName(raw.trim()).replace(/^=+/, '').replace(/\s+/g, '_');
   let body = '';
   for (const ch of folded) body += isNameChar(ch, false) ? ch : '_';
-  body = body.slice(0, 254);
+  body = body.slice(0, MAX_DEFINED_NAME_LENGTH - 1);
   if (!body) return '';
-  if (isA1CellRef(body) || /^(?:true|false|[rc])$/i.test(body)) return `${body}_`;
+  if (isA1CellRef(body) || RESERVED_WORD.test(body)) return `${body}_`;
   const first = [...body][0] ?? '';
   return isNameChar(first, true) && !isReservedName(body) ? body : `_${body}`;
 };
 
+const snapshotKey = (entry: DefinedNameEntry): string =>
+  `${entry.localSheetId}:${entry.name.toLowerCase()}`;
+
+const attrsOf = (entry: DefinedNameEntry): DefinedNameAttrs => ({
+  comment: entry.comment ?? '',
+  hidden: !!entry.hidden,
+});
+
 const captureDefinedNamesSnapshot = (wb: WorkbookHandle): DefinedNamesSnapshot =>
-  new Map(
-    [...wb.definedNames()].map((entry) => [
-      `${entry.localSheetId}:${entry.name.toLowerCase()}`,
-      { ...entry },
-    ]),
-  );
+  new Map(listDefinedNames(wb).map((entry) => [snapshotKey(entry), { ...entry }]));
 
 const sameDefinedNamesSnapshot = (a: DefinedNamesSnapshot, b: DefinedNamesSnapshot): boolean => {
   if (a.size !== b.size) return false;
@@ -197,17 +201,13 @@ const sameDefinedNamesSnapshot = (a: DefinedNamesSnapshot, b: DefinedNamesSnapsh
 };
 
 const applyDefinedNamesSnapshot = (wb: WorkbookHandle, snap: DefinedNamesSnapshot): void => {
-  for (const entry of [...wb.definedNames()]) {
-    const key = `${entry.localSheetId}:${entry.name.toLowerCase()}`;
-    if (!snap.has(key)) wb.setDefinedNameEntry(entry.name, '', entry.localSheetId);
+  for (const entry of listDefinedNames(wb)) {
+    if (!snap.has(snapshotKey(entry))) wb.setDefinedNameEntry(entry.name, '', entry.localSheetId);
   }
   for (const entry of snap.values()) {
     wb.setDefinedNameEntry(entry.name, entry.formula, entry.localSheetId);
     if (wb.capabilities.definedNameAttrs) {
-      wb.setDefinedNameAttrs(entry.name, entry.localSheetId, {
-        comment: entry.comment ?? '',
-        hidden: !!entry.hidden,
-      });
+      wb.setDefinedNameAttrs(entry.name, entry.localSheetId, attrsOf(entry));
     }
   }
   // Undo/redo of a name change must recompute dependents too.
@@ -256,7 +256,7 @@ export function moveDefinedNamesForCut(
   };
   let changed = false;
   recordDefinedNamesChange(history, wb, () => {
-    for (const entry of [...wb.definedNames()]) {
+    for (const entry of listDefinedNames(wb)) {
       // The ref rewriter only tokenizes formula text, which starts with `=`.
       const hasEquals = entry.formula.startsWith('=');
       const moved = adjustFormulaForCutPasteMove(
@@ -269,10 +269,7 @@ export function moveDefinedNamesForCut(
       if (next === entry.formula) continue;
       if (wb.setDefinedNameEntry(entry.name, next, entry.localSheetId)) changed = true;
       if (wb.capabilities.definedNameAttrs && (entry.comment || entry.hidden)) {
-        wb.setDefinedNameAttrs(entry.name, entry.localSheetId, {
-          comment: entry.comment ?? '',
-          hidden: !!entry.hidden,
-        });
+        wb.setDefinedNameAttrs(entry.name, entry.localSheetId, attrsOf(entry));
       }
     }
   });
@@ -345,6 +342,17 @@ export function listDefinedNames(wb: WorkbookHandle): DefinedNameEntry[] {
   return [...wb.definedNames()];
 }
 
+/** The defined name equal to `name` (ignoring case and width) in the given scope. */
+function findDefinedName(
+  wb: WorkbookHandle,
+  name: string,
+  localSheetId: number,
+): DefinedNameEntry | undefined {
+  return listDefinedNames(wb).find(
+    (e) => e.localSheetId === localSheetId && isSameDefinedName(e.name, name),
+  );
+}
+
 /** Whether the workbook has a name the Name Manager lists: any scope, hidden names excluded. */
 export function hasListedDefinedNames(wb: WorkbookHandle): boolean {
   for (const entry of wb.definedNames()) if (!entry.hidden) return true;
@@ -367,7 +375,7 @@ export function upsertDefinedName(
   if (!wb.capabilities.definedNameMutate) return { ok: false, reason: 'unsupported' };
   // Redefining a name under another casing renames it to the new spelling
   // (Excel: adding `DUP` over `dup` stores `DUP`); its note and hidden flag stay.
-  const previous = [...wb.definedNames()].find(
+  const previous = listDefinedNames(wb).find(
     (e) =>
       e.localSheetId === localSheetId &&
       isSameDefinedName(e.name, trimmedName) &&
@@ -396,9 +404,7 @@ export function upsertDefinedName(
   // so dependent cells and a subsequent save reflect the new target.
   wb.recalcAuto();
   // The entry is the name as the engine stored it, read back: its formula may be respelled.
-  const written = [...wb.definedNames()].find(
-    (e) => e.localSheetId === localSheetId && isSameDefinedName(e.name, trimmedName),
-  );
+  const written = findDefinedName(wb, trimmedName, localSheetId);
   return {
     ok: true,
     entry: {

@@ -1,3 +1,5 @@
+/** In-cell editor DOM surface: placement, sizing, alignment and cell-format painting. */
+
 import { coerceInput, inputLocaleForWorkbook, workbookDate1904 } from '../commands/coerce-input.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { Addr } from '../engine/types.js';
@@ -13,9 +15,7 @@ import {
 } from '../render/painters/text.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import { renderScale } from '../store/render-scale.js';
-import type { SpreadsheetStore } from '../store/store.js';
-
-/** In-cell editor DOM surface: placement, sizing, alignment and cell-format painting. */
+import type { SpreadsheetStore, State } from '../store/store.js';
 
 /** The editor dependencies the surface helpers read. */
 export interface EditorSurfaceDeps {
@@ -27,7 +27,7 @@ export interface EditorSurfaceDeps {
 /** The rect the editor covers for `addr`: the whole merge when the cell is
  *  part of one, as the spreadsheet edits a merge across its full area. */
 const editedCellRect = (
-  state: ReturnType<SpreadsheetStore['getState']>,
+  state: State,
   layout: ReturnType<typeof layoutForView>,
   addr: Addr,
 ): Rect => {
@@ -44,6 +44,9 @@ const editedCellRect = (
     h: Math.max(a.y + a.h, b.y + b.h) - y0,
   };
 };
+
+const EDITOR_VERTICAL_PADDING_PX = 4;
+const EDITOR_LINE_HEIGHT_RATIO = 1.25;
 
 export const fitEditorToContent = (
   input: HTMLTextAreaElement | null,
@@ -157,14 +160,14 @@ export const paintEditorCellFormat = (
     fmt?.fontSize !== undefined && Number.isFinite(fmt.fontSize)
       ? fontSizeWithVerticalAlign(fmt.fontSize, fmt.fontVertAlign) * zoom
       : undefined;
-  input.style.lineHeight = visualSize ? `${visualSize * 1.25}px` : '';
+  input.style.lineHeight = visualSize ? `${visualSize * EDITOR_LINE_HEIGHT_RATIO}px` : '';
   if (visualSize && fmt?.fontVertAlign) {
     // A textarea ignores `vertical-align` for its text run. Keep the input
     // box welded to the cell and move only the run by balancing its top and
     // bottom padding around the same baseline offset as the canvas painter.
     const offset = cellTextVerticalOffset(visualSize, fmt.fontVertAlign);
-    input.style.paddingTop = `${Math.max(0, 4 + offset)}px`;
-    input.style.paddingBottom = `${Math.max(0, 4 - offset)}px`;
+    input.style.paddingTop = `${Math.max(0, EDITOR_VERTICAL_PADDING_PX + offset)}px`;
+    input.style.paddingBottom = `${Math.max(0, EDITOR_VERTICAL_PADDING_PX - offset)}px`;
   } else {
     input.style.paddingTop = '';
     input.style.paddingBottom = '';
@@ -189,7 +192,6 @@ export const positionEditorOverCell = (
   const layout = layoutForView(state);
   const cell = editedCellRect(state, layout, addr);
   const r = selectionOutlineFrame(cell, layout.rtl);
-  if (!input) return;
   // A cell scrolled off the leading edge sits behind the frozen band and the
   // headers. Park the editor outside the grid's clip rect instead of letting
   // it hang over that chrome — it keeps DOM focus (and the caret, and any IME

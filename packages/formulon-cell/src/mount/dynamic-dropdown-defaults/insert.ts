@@ -15,6 +15,7 @@ import { openHyperlinkDialogFrom, openPivotTableDialogFrom } from '../../interac
 import { focusSheet } from '../../interact/dialog-focus.js';
 import { executeRibbonHyperlinkAction } from '../../interact/ribbon-hyperlink.js';
 import type { SpreadsheetInstance } from '../../mount.js';
+import { rangeOfAddr } from '../../store/selection-geometry.js';
 import { mutators, type SessionChartKind } from '../../store/store.js';
 import { showSymbolDialog } from '../../toolbar/dialogs/symbol.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
@@ -201,7 +202,7 @@ const buildPivotTableAction =
 
 const insertSymbolAtActiveCell = (instance: SpreadsheetInstance, symbol: string): void => {
   const addr = instance.store.getState().selection.active;
-  const cell = { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col };
+  const cell = rangeOfAddr(addr);
   runAfterAllowedRangeUnlock(instance.store, [cell], () => {
     const target = instance.store.getState().selection.active;
     if (!isCellWritable(instance.store.getState(), target)) {

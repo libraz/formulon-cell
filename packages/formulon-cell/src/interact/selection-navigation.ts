@@ -29,6 +29,9 @@ import {
 
 export type SelectionNavigationDirection = 'down' | 'up' | 'right' | 'left';
 
+/** Where the active cell moves after a commit; `none` stays put. */
+export type CommitAdvance = SelectionNavigationDirection | 'none';
+
 const contains = (range: Range, addr: Addr): boolean =>
   range.sheet === addr.sheet &&
   addr.row >= range.r0 &&

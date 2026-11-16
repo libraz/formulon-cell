@@ -12,6 +12,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { formulaCallsTable } from '../engine/workbook-handle-data-tables.js';
 import { directCellFormat } from '../store/direct-format.js';
 import { validationAt } from '../store/range-validations.js';
+import { rangeOfAddr } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { correctTypedEntry } from './autocorrect.js';
 import { extendTablesForEntry } from './clipboard/table-extension.js';
@@ -75,6 +76,37 @@ export interface CellInputCommit {
 export const inputOperation = (raw: string, forceText = false): CellInputOperation =>
   !forceText && raw.trimStart().startsWith('=') ? 'formulaEdit' : 'valueEdit';
 
+/** The font a cell takes from its row/column/sheet when it has none of its own. */
+const inheritedFontFor = (
+  state: ReturnType<SpreadsheetStore['getState']>,
+  anchor: Addr,
+  directInputAxis: ReturnType<typeof nativeAxisFontFormatFor>,
+): { fontFamily?: string; fontSize?: number } | undefined => {
+  const patch = sheetFontPatchFor(state, anchor.sheet);
+  // A saved row/column XF is pinned back after the value write. Keep
+  // that raw axis implicit; materialising its paint projection as a
+  // store format would turn a future inherited cell into a direct XF.
+  if (!patch || directInputAxis) return undefined;
+  const direct = state.format.formats.get(addrKey(anchor));
+  const inherited: { fontFamily?: string; fontSize?: number } = {};
+  if (patch.fontFamily !== undefined && direct?.fontFamily === undefined) {
+    inherited.fontFamily = patch.fontFamily;
+  }
+  if (patch.fontSize !== undefined && direct?.fontSize === undefined) {
+    inherited.fontSize = patch.fontSize;
+  }
+  return Object.keys(inherited).length > 0 ? inherited : undefined;
+};
+
+const validationAlert = (
+  outcome: { severity: CellInputAlert['severity']; message: string },
+  validation: { errorTitle?: string } | null | undefined,
+): CellInputAlert => ({
+  severity: outcome.severity,
+  title: validation?.errorTitle,
+  message: outcome.message,
+});
+
 /** Write one typed entry to the active cell. */
 export function commitCellInput({
   store,
@@ -104,49 +136,16 @@ export function commitCellInput({
     operation = inputOperation(raw, effectiveFormat?.numFmt?.kind === 'text');
     inputLocale = inputLocaleForWorkbook(wb);
     directInputAxis = controller ? undefined : nativeAxisFontFormatFor(wb, anchor);
-    directInputFont = controller
-      ? undefined
-      : (() => {
-          const patch = sheetFontPatchFor(state, anchor.sheet);
-          // A saved row/column XF is pinned back after the value write. Keep
-          // that raw axis implicit; materialising its paint projection as a
-          // store format would turn a future inherited cell into a direct XF.
-          if (!patch || directInputAxis) return undefined;
-          const candidate = patch;
-          const direct = state.format.formats.get(addrKey(anchor));
-          const inherited: { fontFamily?: string; fontSize?: number } = {};
-          if (candidate.fontFamily !== undefined && direct?.fontFamily === undefined) {
-            inherited.fontFamily = candidate.fontFamily;
-          }
-          if (candidate.fontSize !== undefined && direct?.fontSize === undefined) {
-            inherited.fontSize = candidate.fontSize;
-          }
-          return Object.keys(inherited).length > 0 ? inherited : undefined;
-        })();
-    if (
-      wb.pivotOverlapsRange({
-        sheet: anchor.sheet,
-        r0: anchor.row,
-        c0: anchor.col,
-        r1: anchor.row,
-        c1: anchor.col,
-      })
-    ) {
+    directInputFont = controller ? undefined : inheritedFontFor(state, anchor, directInputAxis);
+    const cell = rangeOfAddr(anchor);
+    if (wb.pivotOverlapsRange(cell)) {
       return { status: 'rejected', operation, alert: pivotGuardAlert(wb) };
     }
-    if (
-      dataTableOccupies(wb, {
-        sheet: anchor.sheet,
-        r0: anchor.row,
-        c0: anchor.col,
-        r1: anchor.row,
-        c1: anchor.col,
-      })
-    ) {
+    if (dataTableOccupies(wb, cell)) {
       return { status: 'rejected', operation, alert: dataTableGuardAlert(wb) };
     }
-    const typed = coerceInputForCell(state, anchor, raw, inputLocale, wb);
-    if (typed.kind === 'formula' && formulaCallsTable(typed.text)) {
+    const coerced = coerceInputForCell(state, anchor, raw, inputLocale, wb);
+    if (coerced.kind === 'formula' && formulaCallsTable(coerced.text)) {
       return { status: 'rejected', operation, alert: tableFunctionAlert(wb) };
     }
     const mergeCells = mergeCellsFor(state, addr);
@@ -169,21 +168,11 @@ export function commitCellInput({
     if (controller) {
       // The controller blocks `stop` rules itself but reports neither the
       // rule's title nor non-blocking outcomes, so validate up front.
-      const validation = ruleValidation;
-      const outcome = validation
-        ? validateCoercedInput(
-            wb,
-            anchor,
-            coerceInputForCell(state, anchor, raw, inputLocale, wb),
-            validation,
-          )
+      const outcome = ruleValidation
+        ? validateCoercedInput(wb, anchor, coerced, ruleValidation)
         : { ok: true as const };
       if (!outcome.ok) {
-        const alert = {
-          severity: outcome.severity,
-          title: validation?.errorTitle,
-          message: outcome.message,
-        };
+        const alert = validationAlert(outcome, ruleValidation);
         if (outcome.severity === 'stop') return { status: 'rejected', operation, alert };
         notice = alert;
       }
@@ -208,11 +197,7 @@ export function commitCellInput({
     }
     const outcome = writeInputValidated(wb, anchor, raw, ruleValidation, store, inputLocale);
     if (!outcome.ok) {
-      const alert = {
-        severity: outcome.severity,
-        title: ruleValidation?.errorTitle,
-        message: outcome.message,
-      };
+      const alert = validationAlert(outcome, ruleValidation);
       if (outcome.severity === 'stop') return { status: 'rejected', operation, alert };
       notice = alert;
     }

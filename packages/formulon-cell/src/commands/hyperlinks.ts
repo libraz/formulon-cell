@@ -2,6 +2,7 @@ import { addrKey, parseAddrKey } from '../engine/address.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeOfAddr } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
@@ -127,7 +128,7 @@ export function setHyperlink(
     warnProtected(addr);
     return;
   }
-  const range = { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col };
+  const range = rangeOfAddr(addr);
   const next = target.trim();
   const prev = store.getState().format.formats.get(addrKey(addr));
   const display = options.display ?? prev?.hyperlinkDisplay;

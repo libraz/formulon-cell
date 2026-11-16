@@ -16,10 +16,11 @@ import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
-import { selectionRangeList } from '../store/selection-geometry.js';
+import { rangeOfAddr, selectionRangeList } from '../store/selection-geometry.js';
 import { selectionExtendEnd } from '../store/selection-mutators.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { clamp, jumpToDataEdge, lastUsedCell } from './data-edge-navigation.js';
+import type { FormulaDraftMode } from './formula-draft-history.js';
 import {
   clampNavigationAddr,
   isNavigationAddrAllowed,
@@ -48,7 +49,7 @@ export interface KeyboardDeps {
   history?: import('../commands/history.js').History | null;
   /** Called when the user enters edit mode — playground / editor element
    *  consumes this to position the editor input. */
-  onBeginEdit: (seed: string, options?: { mode?: 'edit' | 'point' }) => void;
+  onBeginEdit: (seed: string, options?: { mode?: FormulaDraftMode }) => void;
   onClearActive: () => void;
   /** Called after Cmd/Ctrl+Z or Cmd/Ctrl+Y reached the workbook. The host
    *  needs to refresh its cached cell map. */
@@ -447,7 +448,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       // controller always owns the mounted write.
       if (controller) {
         e.preventDefault();
-        const cell = { sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col };
+        const cell = rangeOfAddr(a);
         runAfterAllowedRangeUnlock(store, [cell], () => {
           const result = controller.execute({
             type: 'cellBatch',
@@ -463,7 +464,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
         return;
       }
       e.preventDefault();
-      const cell = { sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col };
+      const cell = rangeOfAddr(a);
       runAfterAllowedRangeUnlock(store, [cell], () => {
         if (!isCellWritable(store.getState(), a)) {
           warnProtected(a);

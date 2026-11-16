@@ -14,6 +14,15 @@ export const cloneRange = (range: Range): Range => ({
   c1: range.c1,
 });
 
+/** The one-cell range covering `addr`. */
+export const rangeOfAddr = (addr: Addr): Range => ({
+  sheet: addr.sheet,
+  r0: addr.row,
+  c0: addr.col,
+  r1: addr.row,
+  c1: addr.col,
+});
+
 /** `range` with its corners ordered, so `r0 <= r1` and `c0 <= c1`. */
 export const normalizeRange = (range: Range): Range => ({
   sheet: range.sheet,

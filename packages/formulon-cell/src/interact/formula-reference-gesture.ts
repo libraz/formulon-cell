@@ -3,6 +3,12 @@ import {
   insertFormulaReference,
 } from '../commands/formula-reference-input.js';
 
+export interface ActiveReferenceGesture {
+  gesture: FormulaReferenceGesture;
+  value: string;
+  caret: number;
+}
+
 export interface FormulaReferenceGesture {
   /** Replaces the original formula span with the current reference or range. */
   insert(ref: string): { text: string; caret: number };
