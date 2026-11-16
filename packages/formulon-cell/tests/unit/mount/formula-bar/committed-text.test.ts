@@ -4,8 +4,8 @@ import { mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/index.js';
 import { asExternalDraftController, attachFormulaBarHarness } from './fixtures.js';
 
-// The engine stores a formula in its own spelling (here the number literal 1.50 as 1.5; on
-// newer engines also the function name's case), so the bar must show what was stored.
+// The engine stores a formula in its own spelling (`=sum(1.50,2)` is stored as `=SUM(1.5,2)`),
+// so the bar must show what was stored.
 const TYPED = '=sum(1.50,2)';
 
 describe('mount/formula-bar — the committed text is the stored formula', () => {
