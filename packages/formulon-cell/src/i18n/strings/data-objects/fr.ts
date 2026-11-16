@@ -667,8 +667,8 @@ export const dataObjectsFr: DataObjectsStrings = {
     years: 'Années',
   },
   pivotShowDetailDialog: {
-    title: 'Afficher les détails',
-    prompt: 'Choisissez le champ contenant les détails à afficher\u00a0:',
+    title: 'Afficher',
+    prompt: 'Sélectionnez le champ contenant le détail que vous voulez afficher.',
   },
   slicer: {
     title: 'Segment',

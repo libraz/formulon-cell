@@ -652,8 +652,8 @@ export const dataObjectsKo: DataObjectsStrings = {
     years: '연',
   },
   pivotShowDetailDialog: {
-    title: '세부 정보 표시',
-    prompt: '표시할 세부 정보가 포함된 필드를 선택하세요.',
+    title: '하위 수준 표시',
+    prompt: '세부 정보를 표시할 필드를 선택하세요.',
   },
   slicer: {
     title: '슬라이서',

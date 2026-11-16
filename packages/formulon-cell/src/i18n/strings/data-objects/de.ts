@@ -669,8 +669,8 @@ export const dataObjectsDe: DataObjectsStrings = {
     years: 'Jahre',
   },
   pivotShowDetailDialog: {
-    title: 'Detail anzeigen',
-    prompt: 'Wählen Sie das Feld mit den Details aus, die angezeigt werden sollen:',
+    title: 'Detail einblenden',
+    prompt: 'Wählen Sie das Feld mit dem Detail aus, das Sie anzeigen möchten.',
   },
   slicer: {
     title: 'Datenschnitt',

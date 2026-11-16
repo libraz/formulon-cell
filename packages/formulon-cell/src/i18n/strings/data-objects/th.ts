@@ -641,7 +641,7 @@ export const dataObjectsTh: DataObjectsStrings = {
   },
   pivotShowDetailDialog: {
     title: 'แสดงรายละเอียด',
-    prompt: 'เลือกเขตข้อมูลที่มีรายละเอียดที่คุณต้องการแสดง:',
+    prompt: 'เลือกเขตข้อมูลที่มีรายละเอียดที่คุณต้องการแสดง',
   },
   slicer: {
     title: 'ตัวแบ่งส่วนข้อมูล',

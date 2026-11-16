@@ -657,7 +657,7 @@ export const dataObjectsEn: DataObjectsStrings = {
   },
   pivotShowDetailDialog: {
     title: 'Show Detail',
-    prompt: 'Choose the field containing the detail you want to show:',
+    prompt: 'Choose the field containing the detail you want to show.',
   },
   slicer: {
     title: 'Slicer',
