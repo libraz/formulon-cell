@@ -9,6 +9,7 @@ import { addrKey } from '../../engine/address.js';
 import { isMacHost } from '../../extensions/ui-options.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
 import { runCellShiftFlow } from '../../interact/cell-shift-dialog.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { sheetTabColorActionForColor, sheetTabColorByAction } from '../../sheet-tab-colors.js';
 import { isWholeColumnRange, isWholeRowRange } from '../../store/selection-geometry.js';
@@ -104,7 +105,7 @@ const buildCellInsertAction =
           );
           if (inserted.status === 'applied') {
             mutators.refreshActiveSheetCells(instance.store, instance.workbook);
-            instance.host.focus();
+            focusSheet(instance.host);
             return;
           }
           return;
@@ -113,7 +114,7 @@ const buildCellInsertAction =
       if (!hasActiveCopy(instance) && (isWholeRowRange(range) || isWholeColumnRange(range))) {
         handleInsertCellsAction(instance, isWholeRowRange(range) ? 'rows' : 'cols');
         mutators.refreshActiveSheetCells(instance.store, instance.workbook);
-        instance.host.focus();
+        focusSheet(instance.host);
         return;
       }
       runCellShiftFlow(
@@ -124,7 +125,7 @@ const buildCellInsertAction =
         range,
         () => {
           mutators.refreshActiveSheetCells(instance.store, instance.workbook);
-          instance.host.focus();
+          focusSheet(instance.host);
         },
       );
       return;
@@ -139,7 +140,7 @@ const buildCellInsertAction =
     const next = mapped[action];
     if (!next) return;
     handleInsertCellsAction(instance, next);
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 /** Excel for Mac leaves Hide Sheet and Delete Sheet enabled on a one-sheet workbook and answers with an alert. */
@@ -162,7 +163,7 @@ const buildCellDeleteAction =
       if (isWholeRowRange(range) || isWholeColumnRange(range)) {
         handleDeleteCellsAction(instance, isWholeRowRange(range) ? 'rows' : 'cols');
         mutators.refreshActiveSheetCells(instance.store, instance.workbook);
-        instance.host.focus();
+        focusSheet(instance.host);
         return;
       }
       runCellShiftFlow(
@@ -173,7 +174,7 @@ const buildCellDeleteAction =
         range,
         () => {
           mutators.refreshActiveSheetCells(instance.store, instance.workbook);
-          instance.host.focus();
+          focusSheet(instance.host);
         },
       );
       return;
@@ -190,7 +191,7 @@ const buildCellDeleteAction =
     const next = mapped[action];
     if (!next) return;
     handleDeleteCellsAction(instance, next);
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 const buildCellFormatAction =
@@ -244,9 +245,9 @@ const buildCellFormatAction =
         }),
       sheetTabColorByAction,
       projectFormatToolbar: opts.projectFormatToolbar ?? noop,
-      focusSheet: () => instance.host.focus(),
+      focusSheet: () => focusSheet(instance.host),
     });
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 /** The built-in command behind a Home > Format menu action that writes sheets or protection. */

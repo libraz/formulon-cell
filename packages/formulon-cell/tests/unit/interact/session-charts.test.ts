@@ -32,6 +32,7 @@ import {
   type SessionChart,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 const projection = vi.hoisted(() => ({
   /** Id of a chart seeded straight into the store, with no workbook object behind it. */
@@ -1913,7 +1914,7 @@ describe('attachSessionCharts', () => {
       chart.nativeObjectId,
     );
     expect(host.querySelector('.fc-chart')).toBeNull();
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
     expect(history.undo()).toBe(true);
     expect(store.getState().charts.charts.map((entry) => entry.id)).toEqual([chart.id]);
     handle.detach();
@@ -2131,7 +2132,7 @@ describe('attachSessionCharts', () => {
     fireKey(panel(), 'Delete');
     expect(store.getState().charts.charts).toHaveLength(0);
     expect(host.querySelector('.fc-chart')).toBeNull();
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
     handle.detach();
   });
 
@@ -2303,7 +2304,7 @@ describe('attachSessionCharts', () => {
     expect(history.undo()).toBe(true);
     expect(store.getState().charts.charts.map((entry) => entry.id)).toEqual([chart.id]);
     // Undo takes the focused copy away; the keyboard goes back to the sheet.
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
 
     host.removeEventListener('keydown', onGridKey);
     handle.detach();
@@ -2337,7 +2338,7 @@ describe('attachSessionCharts', () => {
     const escaped = fireKey(panel(), 'Escape');
     expect(escaped.defaultPrevented).toBe(true);
     expect(panel().classList.contains('fc-chart--selected')).toBe(false);
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
     handle.detach();
   });
 

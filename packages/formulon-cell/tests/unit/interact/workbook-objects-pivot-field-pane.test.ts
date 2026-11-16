@@ -6,6 +6,7 @@ import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import { attachWorkbookObjectsPanel } from '../../../src/interact/workbook-objects.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 const setup = async () => {
   const wb = await WorkbookHandle.createDefault();
@@ -424,7 +425,7 @@ describe('PivotTable Fields pane', () => {
       .querySelector('.fc-objects')
       ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(handle.isPivotFieldListOpen()).toBe(true);
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
     handle.detach();
     wb.dispose();
   });
@@ -479,7 +480,7 @@ describe('PivotTable Fields pane', () => {
       new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
     );
     expect(handle.isPivotFieldListOpen()).toBe(true);
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
     handle.detach();
     wb.dispose();
   });

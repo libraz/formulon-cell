@@ -5,6 +5,7 @@ import {
 import { ribbonStyleTarget } from '../../commands/table-style-actions.js';
 import { builtinTableStyleElements } from '../../engine/builtin-table-styles.js';
 import { dictionaries } from '../../i18n/strings.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import { tableStyleSwatchGrid } from './menus/styles.js';
 import {
   blockedUnlessPermitted,
@@ -58,7 +59,8 @@ export const createTableStyleGallery = (opts: RibbonStyleGalleryOptions): HTMLDi
       const picked = target();
       if (!picked) return;
       picked.apply(id);
-      getInst()?.host.focus();
+      const sheetHost = getInst()?.host;
+      if (sheetHost) focusSheet(sheetHost);
     },
     more: { arrow: opts.arrow, menu: opts.menu },
   });

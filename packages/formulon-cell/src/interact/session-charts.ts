@@ -39,6 +39,7 @@ import {
   partKeepsChartHandles,
 } from './chart-part-selection.js';
 import { createInteractionButton } from './chip-button.js';
+import { focusSheet } from './dialog-focus.js';
 import {
   appendDrawingHandles,
   createObjectSelectionPublisher,
@@ -497,7 +498,7 @@ export function attachSessionCharts(deps: {
         origin: 'keyboard',
         commandId: 'chartDelete',
       });
-    host.focus({ preventScroll: true });
+    focusSheet(host, { preventScroll: true });
   };
 
   /** The engine cannot re-anchor an absolutely positioned object. */
@@ -626,7 +627,7 @@ export function attachSessionCharts(deps: {
       if (settings.isOpen()) return;
       e.preventDefault();
       deselect();
-      host.focus({ preventScroll: true });
+      focusSheet(host, { preventScroll: true });
       return;
     }
     selectChart(chart.id, panel);

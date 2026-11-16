@@ -1,4 +1,5 @@
 import type { Locale } from '../i18n/strings.js';
+import { focusSheet as focusSheetElement } from '../interact/dialog-focus.js';
 // Default factories the toolbar uses when the host doesn't supply its own.
 //
 // `Spreadsheet.mountToolbar(host, instance, opts)` only requires `helpers`,
@@ -125,7 +126,7 @@ export function createDefaultRibbonHelpers(
   const lang = resolveLang(instance, opts);
   const ribbonText = toolbarText(lang);
   const pageScaleText = pageScaleMenuText(lang);
-  const focusSheet = opts.focusSheet ?? ((): void => instance.host.focus());
+  const focusSheet = opts.focusSheet ?? ((): void => focusSheetElement(instance.host));
   const refreshCells = opts.refreshCells ?? ((): void => undefined);
   const projectFormatToolbar = opts.projectFormatToolbar ?? ((): void => undefined);
   const getInst = (): SpreadsheetInstance => instance;
@@ -332,7 +333,7 @@ export function createDefaultRibbonHooks(
       items,
       ...reportDialogLabels(strings),
     });
-    instance.host.focus();
+    focusSheetElement(instance.host);
   };
   const showReviewReport = (
     title: string,
@@ -368,7 +369,7 @@ export function createDefaultRibbonHooks(
         else showOutlineDetail(store, history, range, workbook);
       });
     }
-    instance.host.focus();
+    focusSheetElement(instance.host);
   };
   return {
     clipboard: {
@@ -506,21 +507,21 @@ export function createDefaultRibbonHooks(
       save: () => {
         const name = nextSheetViewName(instance.store, instance.i18n.strings.viewToolbar.views);
         saveSheetView(instance.store, name.id, name.name, undefined, instance.history);
-        instance.host.focus();
+        focusSheetElement(instance.host);
       },
       create: () => {
         newSheetView(instance.store, instance.history);
-        instance.host.focus();
+        focusSheetElement(instance.host);
       },
       keep: () => {
         const name = nextSheetViewName(instance.store, instance.i18n.strings.viewToolbar.views);
         keepSheetView(instance.store, name.id, name.name, instance.history);
-        instance.host.focus();
+        focusSheetElement(instance.host);
       },
       exit: () => {
         exitSheetView(instance.store, instance.history);
         opts.refreshCells?.();
-        instance.host.focus();
+        focusSheetElement(instance.host);
       },
       options: () => {
         openSheetViewOptionsDialog(instance, { onViewChanged: () => opts.refreshCells?.() });
@@ -529,7 +530,7 @@ export function createDefaultRibbonHooks(
         const id = instance.store.getState().sheetViews.activeViewId;
         if (id) deleteSheetView(instance.store, id, instance.history);
         opts.refreshCells?.();
-        instance.host.focus();
+        focusSheetElement(instance.host);
       },
       zoomDialog: async () => {
         const strings = instance.i18n.strings.ribbon;
@@ -554,7 +555,7 @@ export function createDefaultRibbonHooks(
               : choice.percent / 100;
           setSheetZoom(instance.store, zoom, instance.workbook);
           opts.refreshZoom?.();
-          instance.host.focus();
+          focusSheetElement(instance.host);
           return;
         }
         const next = await showZoomDialog({
@@ -569,7 +570,7 @@ export function createDefaultRibbonHooks(
         if (next === null) return;
         setSheetZoom(instance.store, next / 100, instance.workbook);
         opts.refreshZoom?.();
-        instance.host.focus();
+        focusSheetElement(instance.host);
       },
     },
   };

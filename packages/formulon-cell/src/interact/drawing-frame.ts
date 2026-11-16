@@ -1,5 +1,6 @@
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { ChartSourceHighlight, SelectedObject, State } from '../store/types.js';
+import { focusSheet } from './dialog-focus.js';
 
 /** A drawing object's frame in grid pixels. */
 export interface DrawingFrame {
@@ -71,7 +72,8 @@ export const focusPanel = (
   const panel = Array.from(root.querySelectorAll<HTMLElement>(selector)).find(
     (candidate) => candidate.dataset[key] === id,
   );
-  (panel ?? host).focus({ preventScroll: true });
+  if (panel) panel.focus({ preventScroll: true });
+  else focusSheet(host, { preventScroll: true });
 };
 
 /** The frame `start` takes when `handle` is dragged by (dx, dy); a corner

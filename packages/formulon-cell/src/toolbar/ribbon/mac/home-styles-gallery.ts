@@ -9,6 +9,7 @@ import {
 import { runAfterAllowedRangeUnlock, selectionEditRanges } from '../../../commands/protection.js';
 import { dictionaries } from '../../../i18n/strings.js';
 import { createInteractionChipButton } from '../../../interact/chip-button.js';
+import { focusSheet } from '../../../interact/dialog-focus.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
 import type { ToolbarLang } from '../../ribbon-model.js';
 import { paintCellStyleChip } from '../menus/styles.js';
@@ -82,7 +83,7 @@ export const createMacCellStylesGallery = (opts: MacCellStylesGalleryOptions): H
             getWorkbook: () => current.workbook,
             getFallbackProfile: () => profile(current),
           });
-          current.host.focus();
+          focusSheet(current.host);
         },
       );
     });

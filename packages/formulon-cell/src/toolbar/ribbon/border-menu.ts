@@ -1,4 +1,5 @@
 import { openFormatDialogFrom } from '../../interact/dialog-entry.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 // Wires the integrated dropdown built by createBordersMenu(): edge / frame
 // / combined presets, "More borders..." entry, and the "border-draw" block
 // which arms the border-draw controller (drives pointer-edge editing on
@@ -211,7 +212,7 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
     }
     closeBorderMenu();
     refreshBorderMenuState();
-    ctx.sheetEl.focus();
+    focusSheet(ctx.sheetEl);
   };
 
   borderMenu?.querySelectorAll<HTMLButtonElement>('[data-border-preset]').forEach((btn) => {

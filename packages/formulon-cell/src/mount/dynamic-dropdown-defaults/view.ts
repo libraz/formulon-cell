@@ -1,3 +1,4 @@
+import { focusSheet } from '../../interact/dialog-focus.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { setMenuIcon } from '../../toolbar/ribbon/menus/general.js';
@@ -18,7 +19,7 @@ const buildFreezeAction =
     const next = freezeActionFromMenu(action);
     if (!next) return;
     handleFreezeAction(instance, next);
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 const updateFreezeMenu =

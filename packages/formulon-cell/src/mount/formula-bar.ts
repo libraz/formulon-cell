@@ -18,6 +18,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import type { Strings } from '../i18n/strings.js';
 import type { AutocompleteInsertOutcome } from '../interact/autocomplete.js';
+import { focusSheet } from '../interact/dialog-focus.js';
 import { handleFormulaAutocompleteKey } from '../interact/formula-autocomplete-key.js';
 import {
   FormulaDraftHistory,
@@ -574,7 +575,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       }
       finishEditing();
       if (focusHost && !detached) {
-        host.focus();
+        focusSheet(host);
         updateChrome();
       }
     }
@@ -734,7 +735,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       }
       mutators.refreshActiveSheetCells(store, wb());
       finishEditing();
-      host.focus();
+      focusSheet(host);
       return;
     }
 
@@ -766,7 +767,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     const currentWb = wb();
     mutators.refreshActiveSheetCells(store, currentWb);
     finishEditing();
-    host.focus();
+    focusSheet(host);
   };
 
   const commitRawAt = (a: Addr, raw: string, draft?: ExternalDraftState): boolean => {
@@ -914,7 +915,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     if (!commitRawAt(a, fxInput.value)) return false;
     finishEditing();
     moveAfterCommit(advance);
-    host.focus();
+    focusSheet(host);
     return true;
   };
 
@@ -936,7 +937,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     clearFxRefs();
     closeFormulaHelpers();
     refreshActions();
-    host.focus();
+    focusSheet(host);
     updateChrome();
   };
 

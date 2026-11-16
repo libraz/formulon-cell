@@ -17,6 +17,7 @@ import {
   focusAndSelectInput,
   showDialogError,
 } from '../../../src/interact/dialog-shell.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 describe('interact/dialog-shell', () => {
   let host: HTMLElement;
@@ -70,7 +71,7 @@ describe('interact/dialog-shell', () => {
     shell.close();
 
     expect(shell.isOpen()).toBe(false);
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
     shell.dispose();
   });
 

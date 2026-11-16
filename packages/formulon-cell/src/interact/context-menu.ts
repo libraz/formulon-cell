@@ -90,6 +90,7 @@ import {
 } from './context-menu-structure.js';
 import { type MenuTarget, resolveContextMenuTarget } from './context-menu-target.js';
 import { openCommentDialogFrom } from './dialog-entry.js';
+import { focusSheet } from './dialog-focus.js';
 import { withDialogAnchor } from './dialog-placement.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { panelSize, placePanel, VIEWPORT_PANEL_PAD, viewportSize } from './overlay-position.js';
@@ -307,7 +308,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const focusTarget = restoreFocusEl;
     restoreFocusEl = null;
     if (restoreFocus) {
-      (focusTarget ?? host).focus({ preventScroll: true });
+      if (focusTarget) focusTarget.focus({ preventScroll: true });
+      else focusSheet(host, { preventScroll: true });
     }
   };
 
@@ -322,7 +324,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       root.contains(ownerDocument.activeElement) || sub.contains(ownerDocument.activeElement);
     hide(false);
     // Focus the host before the action so keyboard undo works and an opened dialog keeps focus.
-    if (menuHadFocus) host.focus({ preventScroll: true });
+    if (menuHadFocus) focusSheet(host, { preventScroll: true });
     withDialogAnchor(anchor, action);
   };
 

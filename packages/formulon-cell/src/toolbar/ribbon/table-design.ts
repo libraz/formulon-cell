@@ -6,6 +6,7 @@ import {
   TABLE_OPTION_COMMANDS,
 } from '../../commands/table-design.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { showMessage } from '../dialogs/prompt.js';
 import { projectDisabledState } from '../menu-a11y.js';
@@ -73,11 +74,13 @@ export const createTableNameInput = (
     if (event.key === 'Enter') {
       event.preventDefault();
       commit();
-      ctx.getInst()?.host.focus();
+      const sheetHost = ctx.getInst()?.host;
+      if (sheetHost) focusSheet(sheetHost);
     } else if (event.key === 'Escape') {
       event.preventDefault();
       revert();
-      ctx.getInst()?.host.focus();
+      const sheetHost = ctx.getInst()?.host;
+      if (sheetHost) focusSheet(sheetHost);
     }
   });
   revert();

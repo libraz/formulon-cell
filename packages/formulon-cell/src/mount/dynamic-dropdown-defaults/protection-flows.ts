@@ -8,6 +8,7 @@ import {
   setSheetProtectionAction,
 } from '../../commands/protection-actions.js';
 import type { DialogEntry } from '../../interact/dialog-entry.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { showMessage } from '../../toolbar/dialogs/prompt.js';
 import {
@@ -118,14 +119,14 @@ export async function protectSheetFlow(
     ),
   });
   if (!result) {
-    instance.host.focus();
+    focusSheet(instance.host);
     return;
   }
   setSheetProtectionAction(protectionContext(instance, entry), sheetOf(instance), true, {
     password: result.password,
     permissions: result.permissions,
   });
-  instance.host.focus();
+  focusSheet(instance.host);
 }
 
 /** Unprotect the active sheet, asking for its password when it has one. */
@@ -143,7 +144,7 @@ export async function unprotectSheetFlow(
       cancel: strings.pageSetup.cancel,
     });
     if (password === null) {
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     const matches = await verifySheetProtectionPassword(instance.store.getState(), sheet, password);
@@ -153,12 +154,12 @@ export async function unprotectSheetFlow(
         message: strings.ribbonMenu.workbookIncorrectPassword,
         okLabel: strings.pageSetup.ok,
       });
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
   }
   setSheetProtectionAction(protectionContext(instance, entry), sheet, false);
-  instance.host.focus();
+  focusSheet(instance.host);
 }
 
 /** Protect Sheet or Unprotect Sheet, whichever the active sheet needs. */

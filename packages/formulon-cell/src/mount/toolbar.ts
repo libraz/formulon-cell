@@ -7,6 +7,7 @@ import { selectedSessionIllustration } from '../commands/session-illustration.js
 import { activeTableOverlay } from '../commands/table-design.js';
 import { addrKey } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
+import { focusSheet as focusSheetElement } from '../interact/dialog-focus.js';
 import { onOutsidePress } from '../interact/outside-press.js';
 import { registerOverlayOwner } from '../interact/overlay-portal.js';
 import { attachRibbonScreenTips } from '../interact/ribbon-screen-tip.js';
@@ -348,7 +349,7 @@ export function runRibbonCommand(instance: SpreadsheetInstance, id: string): boo
       formulaBarVisible: instance.store.getState().ui.formulaBarVisible !== false,
     },
     runtime: {
-      focusSheet: () => instance.host.focus(),
+      focusSheet: () => focusSheetElement(instance.host),
       refreshCells,
       refreshZoom: () => undefined,
       projectFormatToolbar: () => undefined,
@@ -536,7 +537,8 @@ export function mountToolbar(
   const focusSheet =
     opts.focusSheet ??
     ((): void => {
-      getInstance()?.host.focus();
+      const sheetHost = getInstance()?.host;
+      if (sheetHost) focusSheetElement(sheetHost);
     });
   const refreshCells = opts.refreshCells ?? ((): void => undefined);
   const refreshZoom = opts.refreshZoom ?? ((): void => undefined);

@@ -24,6 +24,7 @@ import { isDataTableFormula } from '../engine/workbook-handle-data-tables.js';
 import { type SpreadsheetEmitter, selectionEquals } from '../events.js';
 import { formatNumber } from '../format/number-format.js';
 import type { Strings } from '../i18n/strings.js';
+import { focusSheet } from '../interact/dialog-focus.js';
 import { scrollActiveIntoView } from '../interact/navigation-policy.js';
 import { onOutsidePress } from '../interact/outside-press.js';
 import { overlayPortalFor } from '../interact/overlay-portal.js';
@@ -591,7 +592,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     const row = table.range.r0 + (table.showHeader ? 1 : 0);
     mutators.setActive(store, { sheet: sheetIdx, row, col: table.range.c0 });
     scrollActiveIntoView(store, store.getState().selection.active);
-    host.focus();
+    focusSheet(host);
   };
 
   const applyNameBoxValue = (raw: string): boolean => {
@@ -610,7 +611,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       }));
     }
     scrollActiveIntoView(store, store.getState().selection.active);
-    host.focus();
+    focusSheet(host);
     return true;
   };
 
@@ -633,7 +634,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       () => upsertDefinedName(wb, raw, formula),
     );
     if (!written.ok || !written.value.ok) return false;
-    host.focus();
+    focusSheet(host);
     return true;
   };
 
@@ -791,7 +792,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       e.preventDefault();
       e.stopPropagation();
       closeNameMenu();
-      host.focus();
+      focusSheet(host);
       updateChrome();
     }
   };

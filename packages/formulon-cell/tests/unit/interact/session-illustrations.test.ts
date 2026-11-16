@@ -18,6 +18,7 @@ import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachSessionIllustrations } from '../../../src/interact/session-illustrations.js';
 import { cellRectUnclamped, layoutForView } from '../../../src/render/geometry.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 const firePointer = (
   target: EventTarget,
@@ -238,7 +239,7 @@ describe('attachSessionIllustrations', () => {
     fireKey(host.querySelector<HTMLElement>('.fc-illustration') ?? overlay, 'Delete');
     expect(store.getState().illustrations.illustrations).toHaveLength(0);
     expect(host.querySelector('.fc-illustration')).toBeNull();
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
     expect(history.undo()).toBe(true);
     expect(store.getState().illustrations.illustrations.map((item) => item.id)).toEqual([
       'shape-1',
@@ -385,7 +386,7 @@ describe('attachSessionIllustrations', () => {
     const escaped = fireKey(overlay(), 'Escape');
     expect(escaped.defaultPrevented).toBe(true);
     expect(store.getState().ui.selectedObject).toBeNull();
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
 
     handle.detach();
     host.remove();

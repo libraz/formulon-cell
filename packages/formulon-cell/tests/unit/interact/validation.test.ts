@@ -16,6 +16,7 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -202,7 +203,7 @@ describe('attachValidationList', () => {
     expect(handle.openPickList()).toBe(true);
     menuButton.remove();
     items()[0]?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
     handle.detach();
   });
 

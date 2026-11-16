@@ -20,6 +20,7 @@ import { sameRange } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { focusSheet } from './dialog-focus.js';
 import { appendDialogButton, bindPaneEscape, markSurface } from './dialog-shell.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
 
@@ -289,7 +290,7 @@ export function attachAccessibilityPane(deps: AccessibilityPaneDeps): Accessibil
   const close = (): void => {
     root.hidden = true;
     syncDock();
-    host.focus();
+    focusSheet(host);
   };
   closeBtn.addEventListener('click', close);
 

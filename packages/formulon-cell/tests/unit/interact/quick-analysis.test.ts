@@ -6,6 +6,7 @@ import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js'
 import { defaultStrings } from '../../../src/i18n/strings.js';
 import { attachQuickAnalysis } from '../../../src/interact/quick-analysis.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -346,7 +347,7 @@ describe('attachQuickAnalysis', () => {
     root?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
     expect(root?.hidden).toBe(true);
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
     handle.detach();
   });
 

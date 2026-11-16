@@ -12,6 +12,7 @@ import {
 import { createDialogShell } from '../../../src/interact/dialog-shell.js';
 import { disposeOverlayPortal } from '../../../src/interact/overlay-portal.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 describe('openCellShiftDialog', () => {
   let host: HTMLElement;
@@ -60,7 +61,7 @@ describe('openCellShiftDialog', () => {
 
       expect(onSubmit).toHaveBeenCalledExactlyOnceWith(defaultValue);
       expect(document.querySelector('.fc-cellshift')).toBeNull();
-      expect(document.activeElement).toBe(host);
+      expect(document.activeElement).toBe(sheetFocusTarget(host));
     },
   );
 
@@ -131,7 +132,7 @@ describe('openCellShiftDialog', () => {
     );
 
     expect(document.querySelector('.fc-cellshift')).toBeNull();
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
   });
 
   it('Escape closes this dialog while leaving an older dialog open', () => {
@@ -169,7 +170,7 @@ describe('openCellShiftDialog', () => {
 
     expect(onSubmit).not.toHaveBeenCalled();
     expect(document.querySelector('.fc-cellshift')).toBeNull();
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
   });
 
   it('Enter on the selected radio submits once after removing the dialog', () => {

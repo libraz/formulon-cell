@@ -38,6 +38,7 @@ import {
 } from '../../engine/protection-sync.js';
 import { isMacHost } from '../../extensions/ui-options.js';
 import { type DialogEntry, openCommentDialogFrom } from '../../interact/dialog-entry.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import { isNavigationAddrAllowed } from '../../interact/navigation-policy.js';
 import { createRangePickFormatter } from '../../interact/range-pick-format.js';
 import type { SpreadsheetInstance } from '../../mount.js';
@@ -311,7 +312,7 @@ const buildProtectAction =
       ) {
         setWorkbookProtectionAction(protectionContext(instance, entry), false);
       }
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     if (action === 'allow-edit-ranges' || action === 'clear-allowed-edit-ranges') {
@@ -319,7 +320,7 @@ const buildProtectAction =
       const strings = instance.i18n.strings;
       // Allowed ranges are fixed while the sheet is protected, as on desktop.
       if (isSheetProtected(instance.store.getState(), instance.store.getState().data.sheetIndex)) {
-        instance.host.focus();
+        focusSheet(instance.host);
         return;
       }
       if (action === 'allow-edit-ranges') {
@@ -327,7 +328,7 @@ const buildProtectAction =
           await protectSheetFlow(instance, entry);
           return;
         }
-        instance.host.focus();
+        focusSheet(instance.host);
         return;
       }
       // Clearing every range asks for each guarded range's password first.
@@ -338,7 +339,7 @@ const buildProtectAction =
       for (const entry of sheetRanges) {
         const guarded = allowedEditRangeHasPassword(instance.store.getState(), entry.id);
         if (guarded && !(await unlockAllowedRange(instance, entry.id))) {
-          instance.host.focus();
+          focusSheet(instance.host);
           return;
         }
       }
@@ -419,7 +420,7 @@ const buildReviewCommentAction =
           origin: 'ribbon',
           commandId: 'deleteCommentReview',
         });
-        instance.host.focus();
+        focusSheet(instance.host);
         return;
       case 'new-note':
         openCommentDialogFrom(instance.store, 'note', entry);
@@ -435,7 +436,7 @@ const buildReviewCommentAction =
           workbook: instance.workbook,
           action: action === 'toggle-note' ? 'toggle-active' : 'toggle-all',
         });
-        instance.host.focus();
+        focusSheet(instance.host);
         return;
       case 'convert-notes':
         void convertNotesFrom(instance, 'notesReview');
@@ -490,7 +491,7 @@ export async function convertNotesFrom(
       commandId,
     });
   }
-  instance.host.focus();
+  focusSheet(instance.host);
 }
 
 type ReviewDropdownDefaults = Pick<

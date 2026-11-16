@@ -9,6 +9,7 @@ import {
 } from '../../commands/validation-actions.js';
 import { parseAddrKey } from '../../engine/address.js';
 import { openDataValidationDialogFrom } from '../../interact/dialog-entry.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { rangeValidationsIntersect } from '../../store/range-validations.js';
 import { rangeContainsAddr } from '../../store/selection-geometry.js';
@@ -37,7 +38,7 @@ const buildTextToColumnsAction =
       } finally {
         instance.history.end();
       }
-      instance.host.focus();
+      focusSheet(instance.host);
     });
   };
 
@@ -87,7 +88,7 @@ const buildTextToColumnsCustom =
       previewRows,
     });
     if (result === null) {
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     const selected = normalizedSelectionRange(instance);
@@ -117,7 +118,7 @@ const buildTextToColumnsCustom =
       } finally {
         instance.history.end();
       }
-      instance.host.focus();
+      focusSheet(instance.host);
     });
   };
 
@@ -141,19 +142,19 @@ const buildDataValidationAction =
     const range = normalizedSelectionRange(instance);
     if (action === 'clear-circles') {
       clearValidationCirclesAction(ctx, range);
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     if (action === 'clear-rules') {
       runAfterAllowedRangeUnlock(instance.store, [range], () => {
         clearValidationRules(ctx, range);
-        instance.host.focus();
+        focusSheet(instance.host);
       });
       return;
     }
     if (action !== 'circle-invalid') return;
     circleInvalidData(ctx, range);
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 const updateDataValidationMenu =

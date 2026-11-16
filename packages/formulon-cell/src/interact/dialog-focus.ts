@@ -94,6 +94,11 @@ export function advanceDialogTab(root: HTMLElement, event: KeyboardEvent): boole
   return true;
 }
 
+/** Moves keyboard focus to the sheet of the mounted spreadsheet `host`. */
+export function focusSheet(host: HTMLElement, options?: FocusOptions): void {
+  host.focus(options);
+}
+
 /**
  * Hands focus to the sheet after a dialog closes, as the desktop app does: not
  * back to the control that opened it, and never to the document body.
@@ -101,6 +106,6 @@ export function advanceDialogTab(root: HTMLElement, event: KeyboardEvent): boole
 export function focusSheetAfterDialog(host: HTMLElement): void {
   // A disposed sheet has nowhere to take focus.
   if (!host.isConnected) return;
-  host.focus({ preventScroll: true });
+  focusSheet(host, { preventScroll: true });
   console.assert(host.ownerDocument.activeElement === host, 'the sheet host did not take focus');
 }

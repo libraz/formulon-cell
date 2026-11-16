@@ -11,6 +11,7 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { focusMenuItem, handleMenuKeydown, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
+import { focusSheet } from './dialog-focus.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { placePanel } from './overlay-position.js';
@@ -73,7 +74,8 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
     document.removeEventListener('keydown', onDocKey, true);
     window.removeEventListener('scroll', onScroll, true);
     if (restoreFocus) {
-      (focusTarget ?? host).focus({ preventScroll: true });
+      if (focusTarget) focusTarget.focus({ preventScroll: true });
+      else focusSheet(host, { preventScroll: true });
     }
   };
 

@@ -12,6 +12,7 @@ import { parseRangeRef } from '../../../engine/range-resolver.js';
 import type { Addr, Range } from '../../../engine/types.js';
 import type { EngineHyperlinkRecord } from '../../../engine/workbook-handle-annotations.js';
 import { openPivotTableDialogFrom } from '../../../interact/dialog-entry.js';
+import { focusSheet } from '../../../interact/dialog-focus.js';
 import {
   appendDialogFrame,
   createDialogButton,
@@ -414,7 +415,7 @@ const openMacAutomationResult = (
     closed = true;
     unregister?.();
     shell.dispose();
-    instance.host.focus();
+    focusSheet(instance.host);
   };
   shell = createDialogShell({
     host: instance.host,
@@ -1003,7 +1004,7 @@ export async function openMacAutomationGallery(instance: SpreadsheetInstance): P
       closed = true;
       unregister?.();
       shell.dispose();
-      instance.host.focus();
+      focusSheet(instance.host);
       resolve();
     };
     shell = createDialogShell({

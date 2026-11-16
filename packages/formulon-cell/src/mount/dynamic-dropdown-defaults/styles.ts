@@ -40,6 +40,7 @@ import { builtinPivotStyleElements } from '../../engine/pivot-style.js';
 import type { Range } from '../../engine/types.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
 import { type DialogEntry, openFormatDialogFrom } from '../../interact/dialog-entry.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import { attachFormatDialog, type FormatDialogHandle } from '../../interact/format-dialog.js';
 import { createRangePickFormatter } from '../../interact/range-pick-format.js';
 import type { SpreadsheetInstance } from '../../mount.js';
@@ -162,7 +163,7 @@ const buildConditionalMenuAction =
       action === 'clear' ? 'clear-selection' : action,
       panel,
     );
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 const buildTableStyleAction =
@@ -177,7 +178,7 @@ const buildTableStyleAction =
     }
     // Inside a table the gallery restyles it; a refused restyle is silent.
     table.apply(style);
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 /** Each kind's gallery menu: the item attribute that names a style, and its Clear footer. */
@@ -283,7 +284,7 @@ export const showCreateTableDialog = async (
       : {}),
   });
   if (!result) {
-    instance.host.focus();
+    focusSheet(instance.host);
     return;
   }
   const range = parsedRange(result.range);
@@ -292,7 +293,7 @@ export const showCreateTableDialog = async (
   if (options.clearFormatting && !tableChangeAllowed(ctx, range)) return;
   // A range over another table creates nothing, so it clears nothing either.
   if (overlapsTable(instance.store.getState(), range)) {
-    instance.host.focus();
+    focusSheet(instance.host);
     return;
   }
   const create = (): boolean =>
@@ -317,7 +318,7 @@ export const showCreateTableDialog = async (
   // The engine can still refuse the table; its formatting then stays as it was.
   if (options.clearFormatting) afterClearingFormatting(ctx, range, create);
   else create();
-  instance.host.focus();
+  focusSheet(instance.host);
 };
 
 /** The first `template` name, numbered from 1, that no custom table or PivotTable style, and no
@@ -414,7 +415,7 @@ export const openNewTableStyle = async (
     },
   });
   if (value) saveNewStyle(instance, kind, value);
-  instance.host.focus();
+  focusSheet(instance.host);
 };
 
 /** Modify or Duplicate from a style gallery chip's context menu, for a table or PivotTable style.
@@ -468,7 +469,7 @@ export const openTableStyleEditor = async (
   } else if (value) {
     saveNewStyle(instance, kind, value);
   }
-  instance.host.focus();
+  focusSheet(instance.host);
 };
 
 const buildCellStyleAction =
@@ -485,7 +486,7 @@ const buildCellStyleAction =
           getFallbackProfile: () =>
             cellStyleFallbackProfileForPlatform(instance.host.dataset.fcPlatform),
         });
-        instance.host.focus();
+        focusSheet(instance.host);
       },
     );
   };
@@ -510,7 +511,7 @@ const buildTableStyleFooterAction =
     if (action === 'clear-table-style' || action === 'clear-pivot-style') {
       const kind = action === 'clear-table-style' ? 'table' : 'pivot';
       ribbonStyleTarget(instance, kind, STYLES_MENU[kind].commandId)?.clear();
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     if (action === 'new-table-style' || action === 'new-pivot-style') {
@@ -526,14 +527,14 @@ const buildTableStyleFooterAction =
         ? strings.workbookObjects.compatibilityDetails.pivotAuthoring
         : strings.workbookObjects.compatibilityDetails.formatAsTable;
     await showInstanceReport(instance, label, [{ severity: 'info', label, detail }]);
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 const buildPivotTableStyleAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyPivotTableStyleFromRibbon'] =>
   (styleId) => {
     ribbonStyleTarget(instance, 'pivot', STYLES_MENU.pivot.commandId)?.apply(styleId);
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 const buildCellStyleFooterAction =
@@ -575,7 +576,7 @@ const buildCellStyleFooterAction =
           { include: value.include },
         );
       }
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     if (action === 'merge-cell-style') {
@@ -595,7 +596,7 @@ const buildCellStyleFooterAction =
           detail,
         },
       ]);
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     const label = strings.ribbonMenu.cellStyleNew;
@@ -606,7 +607,7 @@ const buildCellStyleFooterAction =
         detail: strings.workbookObjects.compatibilityDetails.cellFormatting,
       },
     ]);
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 type StylesDropdownDefaults = Pick<

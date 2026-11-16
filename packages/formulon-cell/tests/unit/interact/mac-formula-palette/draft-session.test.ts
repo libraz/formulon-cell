@@ -4,6 +4,7 @@ import { defaultStrings } from '../../../../src/i18n/strings.js';
 import type { FormulaBarController } from '../../../../src/mount/formula-bar.js';
 import { mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/index.js';
+import { sheetFocusTarget } from '../../../test-utils/sheet-focus.js';
 import { type PaletteSetupArgs, paletteRoot, setupPalette } from './fixtures.js';
 
 describe('interact/mac-formula-palette draft session', () => {
@@ -231,7 +232,7 @@ describe('interact/mac-formula-palette draft session', () => {
     expect(beginDraft.mock.calls[0]?.[0]).toEqual(initialAnchor);
 
     palette.close();
-    expect(document.activeElement).toBe(sheet.host);
+    expect(document.activeElement).toBe(sheetFocusTarget(sheet.host));
   });
 
   it('replaces a synchronized editing draft on a repeat seeded open without writing the cell', () => {

@@ -8,6 +8,7 @@ import {
   createSpreadsheetStore,
   type SpreadsheetStore,
 } from '../../../../src/store/store.js';
+import { sheetFocusTarget } from '../../../test-utils/sheet-focus.js';
 import { trackConnectedListenerLeaks } from '../connected-listener-leaks.js';
 import { flushRaf, setActive } from './fixtures.js';
 
@@ -182,7 +183,7 @@ describe('attachFormatDialog', () => {
     handle.close();
     const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg');
     expect(overlay?.hidden).toBe(true);
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
     handle.detach();
   });
 

@@ -6,6 +6,7 @@ import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { MAC_CONTEXT_LABELS } from '../toolbar/ribbon/mac/labels-data.js';
 import { toolbarLangForLocale } from '../toolbar/ribbon/mac/locale.js';
+import { focusSheet } from './dialog-focus.js';
 import { appendDialogButton } from './dialog-shell.js';
 import { isNavigationAddrAllowed, subscribeNavigationPolicy } from './navigation-policy.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
@@ -121,7 +122,7 @@ export function attachCommentsPane(deps: CommentsPaneDeps): CommentsPaneHandle {
   });
   closeBtn.addEventListener('click', () => {
     mutators.setCommentsPaneOpen(store, false);
-    host.focus();
+    focusSheet(host);
   });
   if (!root.hidden) render();
   if (dock) syncTaskpaneDock(dock);

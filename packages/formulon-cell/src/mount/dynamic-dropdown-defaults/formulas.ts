@@ -37,6 +37,7 @@ import type { Range } from '../../engine/types.js';
 import { isMacHost } from '../../extensions/ui-options.js';
 import { openDataTableDialogFrom } from '../../interact/data-table-dialog.js';
 import { openDefineNameDialogFrom, openNamedRangeDialogFrom } from '../../interact/dialog-entry.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import { followHyperlink } from '../../interact/hyperlink-follow.js';
 import { openMacGoalSeekDialog } from '../../interact/mac-goal-seek-dialog.js';
 import type { SpreadsheetInstance } from '../../mount.js';
@@ -63,7 +64,7 @@ const buildAutoSumFormula =
       return;
     }
     // Focus first: an editor or unlock prompt opened by AutoSum takes it over.
-    instance.host.focus();
+    focusSheet(instance.host);
     handleAutoSum(instance, fn as AutoSumFunction);
   };
 
@@ -124,12 +125,12 @@ const buildCalcOptionAction =
     if (action === 'auto' || action === 'manual' || action === 'auto-no-table') {
       const mode = action === 'auto' ? 0 : action === 'manual' ? 1 : 2;
       instance.workbook.setCalcMode(mode as 0 | 1 | 2);
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     if (action === 'calculate-now' || action === 'calculate-sheet') {
       instance.recalc();
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     if (action === 'iterative') {
@@ -143,7 +144,7 @@ const buildCalcOptionAction =
         instance.history,
         Number(version) as CompatibilityVersionCode,
       );
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     if (action === 'format-stale') {
@@ -152,7 +153,7 @@ const buildCalcOptionAction =
         instance.store,
         !instance.store.getState().ui.formatStaleValues,
       );
-      instance.host.focus();
+      focusSheet(instance.host);
     }
   };
 
@@ -261,7 +262,7 @@ const buildFormulaAuditAction =
         action === 'clear-precedents' ? 'precedent' : 'dependent',
         instance.history,
       );
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     const map: Record<string, 'errorChecking' | 'traceError' | 'ignoreError'> = {
@@ -288,7 +289,7 @@ const buildFormulaAuditAction =
     if (result.kind === 'report') {
       await showInstanceReport(instance, result.report.title, result.report.items);
     }
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 const updateErrorCheckingMenu =
@@ -364,7 +365,7 @@ const buildSelectCircularReference =
     if (sheet === undefined || row === undefined || col === undefined) return;
     const target = `#${quoteSheetName(instance.workbook.sheetName(sheet))}!${formatA1Cell(row, col, true)}`;
     followHyperlink({ store: instance.store, wb: instance.workbook }, target);
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 const updateClearArrowsMenu =
@@ -513,7 +514,7 @@ const insertNameInActiveCell = (instance: SpreadsheetInstance, name: string): vo
   runAfterAllowedRangeUnlock(instance.store, [cell], () => {
     insertDefinedNameFormula(instance.store.getState(), instance.workbook, name, instance.store);
     mutators.refreshActiveSheetCells(instance.store, instance.workbook);
-    instance.host.focus();
+    focusSheet(instance.host);
   });
 };
 
@@ -532,7 +533,7 @@ const buildDefinedNameAction =
     }
     if (action === 'create-from-selection') {
       await createNamesFromSelection(instance);
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     if (action.startsWith(INSERT_NAME_ACTION_PREFIX)) {
@@ -558,7 +559,7 @@ const buildDefinedNameAction =
         cancelLabel: instance.i18n.strings.hyperlinkDialog.cancel,
       });
       if (!selected) {
-        instance.host.focus();
+        focusSheet(instance.host);
         return;
       }
       insertNameInActiveCell(instance, selected);

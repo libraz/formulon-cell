@@ -13,6 +13,7 @@ import { clearSheetBackgroundImage, setSheetBackgroundImage } from '../../comman
 import { formatA1Range } from '../../engine/address.js';
 import { workbookThemeMatchesPreset } from '../../engine/workbook-theme-presets.js';
 import type { ThemeName } from '../../extensions/types.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { getPageSetup } from '../../store/store.js';
 import { pickImageFileDataUrl } from '../../toolbar/dialogs/image-file.js';
@@ -31,7 +32,7 @@ const buildWorkbookTheme =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyWorkbookTheme'] =>
   (presetId) => {
     applyWorkbookTheme(instance, presetId);
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 /** Normalize the grid's stored theme to the `ThemeName` vocabulary the
@@ -101,7 +102,7 @@ const buildPrintAreaAction =
       else if (action === 'add') addPrintArea(instance.store, sheet, area, instance.history);
       else setPrintArea(instance.store, sheet, area, instance.history);
     });
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 const updatePrintAreaMenu =
@@ -129,7 +130,7 @@ const buildPageBreakAction =
     pageSetupWrite(ribbonPageSetup(instance, 'pageBreaks'), range.sheet, undefined, () => {
       writePageBreaks(instance, range, action);
     });
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 /** Insert, remove or reset manual page breaks at `range` as the Breaks menu `action` asks. */
@@ -201,18 +202,18 @@ const buildSheetBackgroundAction =
       pageSetupWrite(background, sheet, undefined, () =>
         clearSheetBackgroundImage(instance.store, sheet, instance.history),
       );
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     const picked = await pickImageFileDataUrl();
     if (!picked) {
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     pageSetupWrite(background, sheet, undefined, () =>
       setSheetBackgroundImage(instance.store, sheet, picked.src, instance.history),
     );
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 type PageLayoutDropdownDefaults = Pick<

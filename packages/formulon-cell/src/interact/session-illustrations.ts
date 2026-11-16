@@ -29,6 +29,7 @@ import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import type { SessionShapeKind, State } from '../store/types.js';
 import { SVG_NS } from '../svg-namespace.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { focusSheet } from './dialog-focus.js';
 import {
   appendDrawingHandles,
   appendRotationHandle,
@@ -463,7 +464,7 @@ export function attachSessionIllustrations(deps: {
     if (event.key === 'Escape') {
       event.preventDefault();
       deselect();
-      host.focus({ preventScroll: true });
+      focusSheet(host, { preventScroll: true });
       return;
     }
     if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
@@ -482,7 +483,7 @@ export function attachSessionIllustrations(deps: {
         getWb() ?? undefined,
         illustrationAuthorization('sessionIllustration.delete', 'keyboard'),
       );
-      host.focus({ preventScroll: true });
+      focusSheet(host, { preventScroll: true });
       return;
     }
     if (!isEditable(item)) return;

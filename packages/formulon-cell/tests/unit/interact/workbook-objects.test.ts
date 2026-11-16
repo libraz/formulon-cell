@@ -16,6 +16,7 @@ import {
 } from '../../../src/interact/workbook-objects.js';
 import type { SessionIllustration } from '../../../src/store/store.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -940,7 +941,7 @@ describe('attachWorkbookObjectsPanel', () => {
     root?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
     expect(root?.hidden).toBe(true);
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
     handle.detach();
   });
 

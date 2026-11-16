@@ -3,6 +3,7 @@ import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js'
 import { defaultStrings, ja } from '../../../src/i18n/strings.js';
 import { attachFindReplace } from '../../../src/interact/find-replace.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -170,7 +171,7 @@ describe('the Mac find panel', () => {
     m.handle.open();
     m.input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(m.panel()?.hidden).toBe(true);
-    expect(document.activeElement).toBe(m.host);
+    expect(document.activeElement).toBe(sheetFocusTarget(m.host));
   });
 });
 

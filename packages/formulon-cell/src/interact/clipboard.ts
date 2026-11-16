@@ -40,6 +40,7 @@ import { formatBoolean, formatCell, formatEditableNumber } from '../engine/value
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import type { DialogEntry } from './dialog-entry.js';
+import { focusSheet } from './dialog-focus.js';
 import { navigationBoundsFor } from './navigation-policy.js';
 import type { PasteOptionsActivation } from './paste-options.js';
 
@@ -98,7 +99,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     snapshotText = null;
     payloadRevision = null;
     mutators.setCopyRange(store, null);
-    if (mode === 'cut') host.focus({ preventScroll: true });
+    if (mode === 'cut') focusSheet(host, { preventScroll: true });
     return text;
   };
 

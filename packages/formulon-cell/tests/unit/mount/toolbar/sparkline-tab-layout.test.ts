@@ -8,6 +8,7 @@ import {
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
+import { sheetFocusTarget } from '../../../test-utils/sheet-focus.js';
 import { scaledTimeout } from '../../../timeouts.js';
 import { stubHelpers } from './fixtures.js';
 
@@ -215,7 +216,7 @@ describe('Sparkline tab layout', () => {
     pick(String(BlanksAs.Zero));
     expect(settings()?.emptyCellsAs).toBe(BlanksAs.Zero);
     // The pick hands focus back to the grid, so Cmd+Z undoes it rather than the name box.
-    expect(document.activeElement).toBe(sheet.instance.host);
+    expect(document.activeElement).toBe(sheetFocusTarget(sheet.instance.host));
     openEditData();
     expect(checked(String(BlanksAs.Zero))).toBe('true');
     expect(checked(String(BlanksAs.Gap))).toBe('false');

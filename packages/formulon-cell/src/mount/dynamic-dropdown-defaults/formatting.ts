@@ -7,6 +7,7 @@ import {
 import { toggleShowPhonetic } from '../../commands/phonetic.js';
 import { recordRepeatableFormatChange } from '../../commands/slice-history.js';
 import { openFormatDialogFrom } from '../../interact/dialog-entry.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { directCellFormat } from '../../store/direct-format.js';
 import type { CellFormat } from '../../store/store.js';
@@ -25,7 +26,7 @@ const buildUnderlineAction =
         { origin: 'ribbon', commandId: 'underline' },
       );
     });
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 const buildPhoneticAction =
@@ -63,7 +64,7 @@ const buildWrapAction =
         commandId: 'wrap',
       });
     });
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 const buildTextOrientation =
@@ -94,7 +95,7 @@ const buildTextOrientation =
         'textOrientation',
       );
     });
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 const buildMergeAction =
@@ -120,7 +121,7 @@ const buildMergeAction =
       },
       action,
     ).then((applied) => {
-      if (applied) instance.host.focus();
+      if (applied) focusSheet(instance.host);
     });
   };
 
@@ -168,7 +169,7 @@ const buildCurrencyPresetAction =
         'currency',
       );
     });
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 const buildCurrencyFooterAction =

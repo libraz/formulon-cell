@@ -5,6 +5,7 @@ import {
 import { ribbonStyleTarget } from '../../commands/table-style-actions.js';
 import { builtinPivotStyleElements } from '../../engine/pivot-style.js';
 import type { StyleElementFormat, StyleElementFormats } from '../../engine/table-style-elements.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import type { ToolbarLang } from '../ribbon-model.js';
 import {
   blockedUnlessPermitted,
@@ -153,7 +154,8 @@ export const createPivotStyleGallery = (opts: RibbonStyleGalleryOptions): HTMLDi
       const picked = target();
       if (!picked) return;
       picked.apply(id);
-      getInst()?.host.focus();
+      const sheetHost = getInst()?.host;
+      if (sheetHost) focusSheet(sheetHost);
     },
     more: { arrow: opts.arrow, menu: opts.menu },
   });

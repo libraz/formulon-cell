@@ -22,6 +22,7 @@ import {
   collectAutocompleteNames,
   pickListValues,
 } from './autocomplete.js';
+import { focusSheet } from './dialog-focus.js';
 import { caretIndexAtClientX } from './editor-caret.js';
 import {
   alignEditorText,
@@ -437,7 +438,7 @@ export class InlineEditor {
     // Removing the focused input drops focus to <body>; without this, the
     // host's keydown listener stops receiving navigation keys until the
     // user clicks back in.
-    this.deps.host.focus({ preventScroll: true });
+    focusSheet(this.deps.host, { preventScroll: true });
   }
 
   commit(advance: 'down' | 'right' | 'up' | 'left' | 'none' = 'down'): void {
@@ -1059,7 +1060,7 @@ export class InlineEditor {
     this.ignoredHistoryInput = null;
     if (!preserveHistory) this.draftHistory.clear();
     if (!input) {
-      if (focusHost) this.deps.host.focus({ preventScroll: true });
+      if (focusHost) focusSheet(this.deps.host, { preventScroll: true });
       return;
     }
     for (const [type, listener] of this.inputListeners()) {
@@ -1067,7 +1068,7 @@ export class InlineEditor {
     }
     input.remove();
     this.input = null;
-    if (focusHost) this.deps.host.focus({ preventScroll: true });
+    if (focusHost) focusSheet(this.deps.host, { preventScroll: true });
   }
 
   private invalidateLease(): void {

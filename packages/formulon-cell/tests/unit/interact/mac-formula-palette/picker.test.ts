@@ -6,6 +6,7 @@ import { defaultStrings } from '../../../../src/i18n/strings.js';
 import { attachMacFormulaPalette } from '../../../../src/interact/mac-formula-palette.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/index.js';
+import { sheetFocusTarget } from '../../../test-utils/sheet-focus.js';
 import { type PaletteSetupArgs, paletteRoot, setupPalette } from './fixtures.js';
 
 describe('interact/mac-formula-palette picker', () => {
@@ -45,7 +46,7 @@ describe('interact/mac-formula-palette picker', () => {
     palette.close();
     expect(palette.isOpen()).toBe(false);
     expect(dock.hidden).toBe(true);
-    expect(document.activeElement).toBe(sheet.host);
+    expect(document.activeElement).toBe(sheetFocusTarget(sheet.host));
     expect(mirror).toHaveBeenLastCalledWith(expect.any(Object), null);
     palette.open();
     palette.detach();
@@ -65,7 +66,7 @@ describe('interact/mac-formula-palette picker', () => {
     opener.focus();
     palette.open();
     palette.close();
-    expect(document.activeElement).toBe(sheet.host);
+    expect(document.activeElement).toBe(sheetFocusTarget(sheet.host));
 
     outside.remove();
   });
@@ -76,7 +77,7 @@ describe('interact/mac-formula-palette picker', () => {
     const search = paletteRoot(palette).querySelector<HTMLInputElement>('input[type="search"]');
     expect(document.activeElement).toBe(search);
     palette.discard();
-    expect(document.activeElement).not.toBe(sheet.host);
+    expect(document.activeElement).not.toBe(sheetFocusTarget(sheet.host));
   });
 
   it('projects default, recent, and family picker categories without a selector', () => {

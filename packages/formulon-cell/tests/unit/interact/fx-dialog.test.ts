@@ -7,6 +7,7 @@ import { en, ja } from '../../../src/i18n/strings.js';
 import { FUNCTION_DESCRIPTIONS } from '../../../src/interact/function-catalog-text.js';
 import { attachFxDialog } from '../../../src/interact/fx-dialog.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -327,7 +328,7 @@ describe('attachFxDialog', () => {
     opener.focus();
     handle.open('COUNTIF');
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
 
     opener.focus();
     handle.open('COUNTIF');
@@ -335,7 +336,7 @@ describe('attachFxDialog', () => {
       '.fc-fmtdlg__footer > button',
     );
     footerButtons[1]?.click();
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
 
     opener.focus();
     handle.open('COUNTIF');
@@ -349,7 +350,7 @@ describe('attachFxDialog', () => {
     second.dispatchEvent(new Event('input', { bubbles: true }));
     document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
     expect(inserted).toEqual(['=COUNTIF(A1:A3, 1)']);
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
 
     handle.detach();
   });
@@ -379,7 +380,7 @@ describe('attachFxDialog', () => {
     opener.remove();
     document.body.focus();
     handle.close();
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
 
     handle.detach();
     outside.remove();

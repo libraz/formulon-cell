@@ -17,6 +17,7 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const wrap = (): HTMLElement | null => document.querySelector<HTMLElement>('.fc-cmtnote');
@@ -282,7 +283,7 @@ describe('attachCommentDialog', () => {
     const handle = attachCommentDialog({ host, store, strings: ja });
     handle.open();
     cancelBtn()?.click();
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
     handle.detach();
   });
 

@@ -23,6 +23,7 @@ import {
   openDefineNameDialogFrom,
   openPageSetupDialogFrom,
 } from '../../../interact/dialog-entry.js';
+import { focusSheet } from '../../../interact/dialog-focus.js';
 import { ensureMacInk } from '../../../interact/mac-ink.js';
 import { isNavigationAddrAllowed } from '../../../interact/navigation-policy.js';
 import { createChartVariantFromSelection } from '../../../mount/dynamic-dropdown-defaults/insert.js';
@@ -299,7 +300,7 @@ const runMacErrorCheck = (instance: SpreadsheetInstance): Promise<void> | void =
     },
   );
   if (next) {
-    instance.host.focus();
+    focusSheet(instance.host);
     return;
   }
 
@@ -308,7 +309,7 @@ const runMacErrorCheck = (instance: SpreadsheetInstance): Promise<void> | void =
     title: strings.ribbonMenu.errorChecking,
     items: [],
     ...reportDialogLabels(strings),
-  }).then(() => instance.host.focus());
+  }).then(() => focusSheet(instance.host));
 };
 
 export function dispatchMacRibbonCommand(

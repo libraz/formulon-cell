@@ -7,6 +7,7 @@ import {
   sparklineStylePresetIndex,
 } from '../../commands/sparkline-presets.js';
 import { cssOfColorSpec } from '../../engine/theme-color.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import type { ToolbarText } from '../ribbon-model.js';
 import {
   SPARKLINE_STYLE_SLOTS,
@@ -79,7 +80,7 @@ export const createSparklineStyleGallery = (opts: SparklineStyleGalleryOptions):
         },
         index,
       );
-      inst.host.focus();
+      focusSheet(inst.host);
     },
     more: { arrow: opts.arrow, menu: opts.menu },
   });

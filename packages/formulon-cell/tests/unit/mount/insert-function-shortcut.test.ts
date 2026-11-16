@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mutators } from '../../../src/store/store.js';
 import { RIBBON_KEYSHORTCUTS } from '../../../src/toolbar/ribbon-model.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 // The desktop shows Insert Function as a dialog; the Mac shows it as the Formula Builder pane.
 const dialog = (): HTMLElement | null =>
@@ -62,7 +63,7 @@ describe('Shift+F3', () => {
           new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
         );
       expect(dialog()).toBeNull();
-      expect(document.activeElement).toBe(sheet.instance.host);
+      expect(document.activeElement).toBe(sheetFocusTarget(sheet.instance.host));
     },
   );
 

@@ -7,6 +7,7 @@ import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import { attachNamedRangeDialog } from '../../../src/interact/named-range-dialog.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -374,7 +375,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(document.querySelector<HTMLElement>('.fc-namedlg')?.hidden).toBe(true);
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
     handle.detach();
   });
 
@@ -1176,10 +1177,10 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
         ?.click();
       document.querySelector<HTMLButtonElement>('.fc-namedlg-confirm button')?.click();
       handle.close();
-      expect(document.activeElement).toBe(host);
+      expect(document.activeElement).toBe(sheetFocusTarget(host));
 
       for (const frame of frames.splice(0)) frame(0);
-      expect(document.activeElement).toBe(host);
+      expect(document.activeElement).toBe(sheetFocusTarget(host));
       expect(document.querySelector<HTMLElement>('.fc-namedlg')?.hidden).toBe(true);
     } finally {
       handle.detach();

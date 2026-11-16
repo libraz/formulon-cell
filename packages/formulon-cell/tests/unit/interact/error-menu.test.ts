@@ -7,6 +7,7 @@ import { en } from '../../../src/i18n/strings/en.js';
 import { ja } from '../../../src/i18n/strings/ja.js';
 import { attachErrorMenu } from '../../../src/interact/error-menu.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -69,7 +70,7 @@ describe('attachErrorMenu', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
 
     expect(root?.style.display).toBe('none');
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement).toBe(sheetFocusTarget(host));
     handle.detach();
   });
 

@@ -7,7 +7,7 @@ import { ChartPlotType, PivotAggregation, PivotAxis } from '@libraz/formulon';
 import { type DialogId, mount, type SpreadsheetInstance } from '@libraz/formulon-cell';
 import { ribbon } from '@libraz/formulon-cell/toolbar';
 import { afterEach, describe, expect, it } from 'vitest';
-import { expectFailure, makeHost } from './helpers.js';
+import { expectFailure, makeHost, sheetFocusTarget } from './helpers.js';
 
 type Platform = 'default' | 'mac';
 
@@ -223,7 +223,7 @@ describe('dialogs', () => {
         first.focus();
         pressEscape(first);
         if (!shownSurfaces().includes(pane)) failures.push(`${id}: closed on Escape`);
-        else if (document.activeElement !== host) {
+        else if (document.activeElement !== sheetFocusTarget(host)) {
           failures.push(`${id}: focus on ${document.activeElement?.className}`);
         }
         sheet.dialogs.close(id);

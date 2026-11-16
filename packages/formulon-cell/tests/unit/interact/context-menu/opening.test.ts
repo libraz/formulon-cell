@@ -36,6 +36,7 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../../src/store/store.js';
+import { sheetFocusTarget } from '../../../test-utils/sheet-focus.js';
 import { fireContextMenu, item, miniItem, newWb, setRange, visibleMenu } from './fixtures.js';
 
 const setWindowViewport = (width: number, height: number): (() => void) => {
@@ -637,7 +638,7 @@ describe('attachContextMenu', () => {
         expect(trigger?.getAttribute('aria-expanded')).toBe('false');
         expect(trigger?.classList.contains('fc-ctxmenu__item--open')).toBe(false);
         expect(root?.querySelector('.fc-ctxmenu__item--active')).toBeNull();
-        expect(document.activeElement).toBe(host);
+        expect(document.activeElement).toBe(sheetFocusTarget(host));
         expect(vi.getTimerCount()).toBe(0);
         vi.advanceTimersByTime(260);
         expect(onFormatDialog).not.toHaveBeenCalled();
@@ -692,7 +693,7 @@ describe('attachContextMenu', () => {
       expect(shell.isOpen()).toBe(true);
       expect(document.activeElement).toBe(dialogButton);
       shell.close();
-      expect(document.activeElement).toBe(host);
+      expect(document.activeElement).toBe(sheetFocusTarget(host));
     });
 
     it('hands focus from the mini toolbar to a dialog and restores the host on Escape', () => {
@@ -717,7 +718,7 @@ describe('attachContextMenu', () => {
         new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
       );
       expect(shell.isOpen()).toBe(false);
-      expect(document.activeElement).toBe(host);
+      expect(document.activeElement).toBe(sheetFocusTarget(host));
     });
 
     it('hands focus from a custom submenu action to its dialog with a live context', () => {
@@ -765,7 +766,7 @@ describe('attachContextMenu', () => {
       expect(shell.isOpen()).toBe(true);
       expect(document.activeElement).toBe(dialogButton);
       shell.close();
-      expect(document.activeElement).toBe(host);
+      expect(document.activeElement).toBe(sheetFocusTarget(host));
     });
 
     it('keeps host focus after a non-dialog custom menu action', () => {
@@ -787,7 +788,7 @@ describe('attachContextMenu', () => {
 
       expect(action).toHaveBeenCalledTimes(1);
       expect(visibleMenu()).toBeNull();
-      expect(document.activeElement).toBe(host);
+      expect(document.activeElement).toBe(sheetFocusTarget(host));
     });
 
     it('preserves focus chosen by a custom non-dialog action', () => {
@@ -1316,7 +1317,7 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 200, 70);
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
       expect(visibleMenu()).toBeNull();
-      expect(document.activeElement).toBe(host);
+      expect(document.activeElement).toBe(sheetFocusTarget(host));
     });
 
     it.each(['Tab', 'Shift+Tab'])('%s dismisses the menu without consuming the key', (key) => {

@@ -6,6 +6,7 @@ import {
   createRibbonImageFromSelection,
   createRibbonShapeFromSelection,
 } from '../../commands/session-illustration.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { pickImageFileDataUrl } from '../../toolbar/dialogs/image-file.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
@@ -46,7 +47,7 @@ export function createIllustrationDropdownDefaults(
             : 'image/*',
         });
         // The sheet takes focus first, so the picture the insert selects can take it over.
-        instance.host.focus();
+        focusSheet(instance.host);
         if (result) {
           createRibbonImageFromSelection(
             instance.store as unknown as Parameters<typeof createRibbonImageFromSelection>[0],
@@ -78,13 +79,13 @@ export function createIllustrationDropdownDefaults(
           detail: compatibilityDetails.mediaPickers ?? compatibilityDetails.chartsDrawings,
         },
       ]);
-      instance.host.focus();
+      focusSheet(instance.host);
     };
 
   const buildShapeAction =
     (instance: SpreadsheetInstance): DynamicDropdownsCtx['insertShapeFromRibbon'] =>
     (shape) => {
-      instance.host.focus();
+      focusSheet(instance.host);
       // The file stores no line end, so an arrow could not be saved.
       if (shape === 'arrow' && instance.workbook.capabilities.shapes) {
         const strings = instance.i18n.strings;
@@ -156,7 +157,7 @@ export function createIllustrationDropdownDefaults(
           instance.workbook,
         );
       }
-      instance.host.focus();
+      focusSheet(instance.host);
     };
 
   const updateArrangeMenu =
@@ -233,7 +234,7 @@ export function createIllustrationDropdownDefaults(
             { bytes: dataUrlBytes(dataUrl), wb: instance.workbook },
             { origin: 'ribbon', commandId: 'screenshotInsert' },
           );
-          instance.host.focus();
+          focusSheet(instance.host);
           return;
         }
       } else if (action === 'screen-clipping') {
@@ -253,7 +254,7 @@ export function createIllustrationDropdownDefaults(
             { bytes: dataUrlBytes(clip.src), wb: instance.workbook },
             { origin: 'ribbon', commandId: 'screenshotInsert' },
           );
-          instance.host.focus();
+          focusSheet(instance.host);
           return;
         }
       }
@@ -275,7 +276,7 @@ export function createIllustrationDropdownDefaults(
               : (compatibilityDetails.screenshotCurrentView ?? compatibilityDetails.chartsDrawings),
         },
       ]);
-      instance.host.focus();
+      focusSheet(instance.host);
     };
 
   return {

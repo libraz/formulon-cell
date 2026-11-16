@@ -6,6 +6,7 @@ import {
   setStyleDefault,
   type TableStyleKind,
 } from '../commands/table-style-actions.js';
+import { focusSheet } from '../interact/dialog-focus.js';
 import { onOutsidePress } from '../interact/outside-press.js';
 import { focusMenuItem, handleMenuKeydown, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { menuSeparator, menuTextChip } from '../toolbar/ribbon/menus/general.js';
@@ -84,7 +85,7 @@ export function attachTableStyleContextMenu(
         setStyleDefault(instance.workbook, kind, custom?.label ?? styleId, instance.history);
         break;
     }
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
   const onContextMenu = (event: MouseEvent): void => {

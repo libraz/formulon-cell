@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { dictionaries } from '../../../../src/i18n/strings.js';
 import { createSelectColorRibbon } from '../../../../src/toolbar/ribbon/select-color.js';
 import { buildRibbonModel } from '../../../../src/toolbar/ribbon-model.js';
+import { sheetFocusTarget } from '../../../test-utils/sheet-focus.js';
 
 const cleanups: Array<() => void> = [];
 afterEach(async () => {
@@ -63,7 +64,7 @@ describe('ribbon select focus after dispatch', () => {
     sheet.tabIndex = 0;
     const control = picker(sheet);
     control.option.click();
-    expect(document.activeElement).toBe(sheet);
+    expect(document.activeElement).toBe(sheetFocusTarget(sheet));
     expect(control.openDuringDispatch()).toBe(false);
     expect(control.applied).toEqual(['24']);
   });
@@ -100,7 +101,7 @@ describe('ribbon select focus after dispatch', () => {
       sheet.tabIndex = 0;
       const control = picker(sheet, id);
       control.option.click();
-      expect(document.activeElement).toBe(sheet);
+      expect(document.activeElement).toBe(sheetFocusTarget(sheet));
       expect(control.openDuringDispatch()).toBe(false);
       expect(control.applied).toEqual([control.option.dataset.color]);
     },

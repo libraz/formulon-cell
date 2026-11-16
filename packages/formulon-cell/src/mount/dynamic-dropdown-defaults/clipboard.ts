@@ -1,4 +1,5 @@
 import { openPasteSpecialFrom } from '../../interact/dialog-entry.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import {
@@ -24,11 +25,11 @@ const buildCopyAction =
           detail: instance.i18n.strings.workbookObjects.compatibilityDetails.cellFormatting,
         },
       ]);
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     dispatchHostClipboard(instance, 'copy');
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 const buildPasteAction =

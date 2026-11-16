@@ -29,6 +29,7 @@ import {
 } from '../../components/color-palette.js';
 import { addrKey, formatA1Range } from '../../engine/address.js';
 import { cssOfColorSpec } from '../../engine/theme-color.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { sparklineColors } from '../../render/sparkline.js';
 import { showNumberPrompt } from '../../toolbar/dialogs/prompt.js';
@@ -296,7 +297,7 @@ export function createSparklineDropdownDefaults(
         clearSelectedSparklinesAction(ctxFor(SPARKLINE_COMMANDS.clear));
       }
       // A pick that opens no dialog hands focus back to the grid, as the style strip does.
-      instance.host.focus();
+      focusSheet(instance.host);
     },
 
     updateSparklineMenu(menu) {

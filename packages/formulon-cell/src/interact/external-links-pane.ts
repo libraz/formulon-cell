@@ -2,6 +2,7 @@ import { type ExternalLinkKind, listExternalLinks } from '../commands/external-l
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
+import { focusSheet } from './dialog-focus.js';
 import { appendDialogButton, bindPaneEscape, markSurface } from './dialog-shell.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
 
@@ -135,7 +136,7 @@ export function attachExternalLinksPane(deps: ExternalLinksPaneDeps): ExternalLi
 
   closeBtn.addEventListener('click', () => {
     hide();
-    host.focus();
+    focusSheet(host);
   });
 
   return {

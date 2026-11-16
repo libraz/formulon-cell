@@ -34,6 +34,7 @@ import {
   openInsertCopiedCellsFrom,
   openPasteSpecialFrom,
 } from '../interact/dialog-entry.js';
+import { focusSheet } from '../interact/dialog-focus.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { isSingleCell } from '../store/selection-geometry.js';
 import { mutators } from '../store/store.js';
@@ -81,7 +82,7 @@ export const dispatchHostClipboard = (
   kind: 'copy' | 'cut' | 'paste',
 ): void => {
   if (!instance) return;
-  instance.host.focus();
+  focusSheet(instance.host);
   if (instance.clipboard) {
     void runClipboardShortcutFrom(instance.clipboard, kind, { origin: 'ribbon', commandId: kind });
     return;

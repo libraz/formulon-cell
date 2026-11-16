@@ -1,6 +1,7 @@
 import { pageSetupWrite } from '../../commands/page-setup-actions.js';
 import type { Locale } from '../../i18n/strings.js';
 import { openFormatDialogFrom, openPageSetupDialogFrom } from '../../interact/dialog-entry.js';
+import { focusSheet as focusSheetElement } from '../../interact/dialog-focus.js';
 // Ribbon control dispatch extracted from main.ts. Owns the read/write side of
 // the ribbon: reading the current value of a control from the active cell or
 // page setup, and applying a control change (font, fill, number format,
@@ -160,7 +161,7 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
         commandId,
       );
     });
-    sheetEl.focus();
+    focusSheetElement(sheetEl);
   };
 
   const applyCustomPageScaleControl = async (
@@ -240,7 +241,7 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
       if (!applied) return;
       refreshWorkbookCells();
       projectFormatToolbar();
-      sheetEl.focus();
+      focusSheetElement(sheetEl);
     });
   };
 
@@ -293,7 +294,7 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
           ),
       );
       projectFormatToolbar();
-      sheetEl.focus();
+      focusSheetElement(sheetEl);
     } else if (id === 'orientationPreset') {
       const i = getInst();
       if (!i) return;
@@ -308,7 +309,7 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
           ),
       );
       projectFormatToolbar();
-      sheetEl.focus();
+      focusSheetElement(sheetEl);
     } else if (id === 'paperSizePreset') {
       const i = getInst();
       if (!i) return;
@@ -323,7 +324,7 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
           ),
       );
       projectFormatToolbar();
-      sheetEl.focus();
+      focusSheetElement(sheetEl);
     } else if (id === 'scaleWidth' || id === 'scaleHeight') {
       const i = getInst();
       if (!i) return;
@@ -347,7 +348,7 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
           }),
       );
       projectFormatToolbar();
-      sheetEl.focus();
+      focusSheetElement(sheetEl);
     } else if (id === 'scalePercent') {
       const i = getInst();
       if (!i) return;
@@ -367,7 +368,7 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
           }),
       );
       projectFormatToolbar();
-      sheetEl.focus();
+      focusSheetElement(sheetEl);
     } else if (id === 'sheetViewSelect') {
       const i = getInst();
       if (!i) return;

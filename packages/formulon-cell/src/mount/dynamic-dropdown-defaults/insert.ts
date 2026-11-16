@@ -12,6 +12,7 @@ import {
 } from '../../commands/protection.js';
 import { createRibbonChartFromSelection } from '../../commands/session-chart.js';
 import { openHyperlinkDialogFrom, openPivotTableDialogFrom } from '../../interact/dialog-entry.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import { executeRibbonHyperlinkAction } from '../../interact/ribbon-hyperlink.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { mutators, type SessionChartKind } from '../../store/store.js';
@@ -56,14 +57,14 @@ const buildLinksAction =
     }
     if (result.kind === 'open-url') {
       instance.followActiveHyperlink();
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     if (result.kind === 'report') {
       await showInstanceReport(instance, result.report.title, result.report.items);
       return;
     }
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 const updateLinksMenu =
@@ -110,7 +111,7 @@ export const createChartVariantFromSelection = (
   commandId = 'chartInsert',
 ): void => {
   // The sheet takes focus first, so the chart the insert selects can take it over.
-  instance.host.focus();
+  focusSheet(instance.host);
   createRibbonChartFromSelection({
     store: instance.store,
     wb: instance.workbook,
@@ -131,7 +132,7 @@ const buildRecommendedChartAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['createRecommendedChartFromSelection'] =>
   async () => {
     // The sheet takes focus first, so the chart the insert selects can take it over.
-    instance.host.focus();
+    focusSheet(instance.host);
     createRibbonChartFromSelection({
       store: instance.store,
       wb: instance.workbook,
@@ -195,7 +196,7 @@ const buildPivotTableAction =
       await showInstanceReport(instance, result.report.title, result.report.items);
       return;
     }
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 const insertSymbolAtActiveCell = (instance: SpreadsheetInstance, symbol: string): void => {
@@ -228,11 +229,11 @@ const buildSymbolAction =
         cancelLabel: instance.i18n.strings.hyperlinkDialog.cancel,
       });
       if (selected) insertSymbolAtActiveCell(instance, selected);
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     insertSymbolAtActiveCell(instance, symbol);
-    instance.host.focus();
+    focusSheet(instance.host);
   };
 
 type InsertDropdownDefaults = Pick<

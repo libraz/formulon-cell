@@ -49,6 +49,7 @@ import {
 import type { Range } from '../../engine/types.js';
 import { formatCell } from '../../engine/value.js';
 import { openNamedRangeDialogFrom } from '../../interact/dialog-entry.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import { createRangePickFormatter } from '../../interact/range-pick-format.js';
 import { executeRibbonFilterDataAction } from '../../interact/ribbon-filter-data.js';
 import type { SpreadsheetInstance } from '../../mount.js';
@@ -91,7 +92,7 @@ const buildFillDirection =
         history: instance.history,
         action: direction satisfies RibbonFillAction,
       });
-      instance.host.focus();
+      focusSheet(instance.host);
     });
   };
 
@@ -160,7 +161,7 @@ const buildFillSeries = (instance: SpreadsheetInstance): DynamicDropdownsCtx['ap
       } finally {
         instance.history.end();
       }
-      instance.host.focus();
+      focusSheet(instance.host);
     });
   };
   return apply;
@@ -240,7 +241,7 @@ const buildClearAction =
           action: clearAction,
           commands: instance.commands,
         });
-        instance.host.focus();
+        focusSheet(instance.host);
       },
     );
   };
@@ -316,7 +317,7 @@ const buildFindSelectAction =
         title: strings.ribbon.findSelect,
         reason: result.reason,
       });
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     if (result.kind === 'open-find') {
@@ -339,7 +340,7 @@ const buildFindSelectAction =
       await showInstanceReport(instance, result.report.title, result.report.items);
       return;
     }
-    if (result.kind === 'selected') instance.host.focus();
+    if (result.kind === 'selected') focusSheet(instance.host);
   };
 
 /** Text a header cell shows, or undefined when it is blank. */
@@ -392,7 +393,7 @@ const buildSortMenuAction =
             origin: 'ribbon',
             commandId: action === 'asc' ? 'sortAsc' : 'sortDesc',
           });
-          instance.host.focus();
+          focusSheet(instance.host);
         },
       );
       return;
@@ -470,7 +471,7 @@ const buildSortMenuAction =
         cancelLabel: strings.sortDialogCancel,
       });
       if (!result) {
-        instance.host.focus();
+        focusSheet(instance.host);
         return;
       }
       runAfterAllowedRangeUnlock(instance.store, [range], () => {
@@ -497,7 +498,7 @@ const buildSortMenuAction =
           origin: 'ribbon',
           commandId: 'sortData',
         });
-        instance.host.focus();
+        focusSheet(instance.host);
       });
       return;
     }
@@ -525,7 +526,7 @@ const buildSortMenuAction =
         cancelLabel: strings.sortDialogCancel,
       });
       if (!result) {
-        instance.host.focus();
+        focusSheet(instance.host);
         return;
       }
       runAfterAllowedRangeUnlock(instance.store, [range], () => {
@@ -550,12 +551,12 @@ const buildSortMenuAction =
             strings: instance.i18n.strings,
             title: strings.removeDuplicatesDialogTitle,
             reason: outcome.reason,
-          }).then(() => instance.host.focus());
+          }).then(() => focusSheet(instance.host));
           return;
         }
         const message = removeDuplicatesResultMessage(outcome, strings);
         if (!message) {
-          instance.host.focus();
+          focusSheet(instance.host);
           return;
         }
         // The Mac shows a title-less alert with one wide OK; the Windows alert is not measured
@@ -566,7 +567,7 @@ const buildSortMenuAction =
           message,
           okLabel: instance.i18n.strings.pageSetup.ok,
           alert: mac,
-        }).then(() => instance.host.focus());
+        }).then(() => focusSheet(instance.host));
       });
       return;
     }
@@ -623,7 +624,7 @@ const buildSortMenuAction =
         validateAddress,
       });
       if (!result) {
-        instance.host.focus();
+        focusSheet(instance.host);
         return;
       }
       const listRange = parseA1Range(result.listRange, range.sheet, sheetName);
@@ -632,7 +633,7 @@ const buildSortMenuAction =
         ? parseA1Range(result.copyTo, range.sheet, sheetName)
         : null;
       if (!listRange || !criteriaRange || (result.copyTo && !copyToRange)) {
-        instance.host.focus();
+        focusSheet(instance.host);
         return;
       }
       const ctx = filterContext(instance, 'filterAdvanced');
@@ -677,7 +678,7 @@ const buildSortMenuAction =
           ),
         );
       }
-      instance.host.focus();
+      focusSheet(instance.host);
       return;
     }
     const filterAction =
@@ -703,7 +704,7 @@ const buildSortMenuAction =
         context: filterContext(instance, commandId),
         action: filterAction,
       });
-      instance.host.focus();
+      focusSheet(instance.host);
     }
   };
 

@@ -14,6 +14,7 @@ import type { SpreadsheetInstance } from '../mount/types.js';
 import { isSingleCell } from '../store/selection-geometry.js';
 import { mutators } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { focusSheet } from './dialog-focus.js';
 import { appendDialogButton, appendDialogFrame, createDialogShell } from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
 
@@ -196,7 +197,7 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
 
   issue = findNext();
   if (!issue) {
-    instance.host.focus();
+    focusSheet(instance.host);
     return;
   }
 

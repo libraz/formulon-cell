@@ -1,4 +1,5 @@
 import { openPageSetupDialogFrom } from '../interact/dialog-entry.js';
+import { focusSheet as focusSheetElement } from '../interact/dialog-focus.js';
 // Default `DynamicDropdownsCtx` factory. Hosts that don't need a fully
 // custom ribbon (React / Vue / quick embed) can call this and pass the
 // result to `mountToolbar({ dynamicDropdowns })` — the toolbar's auto-wire
@@ -86,7 +87,7 @@ const buildScriptAction =
           })
         : action;
     if (raw === null) {
-      instance.host.focus();
+      focusSheetElement(instance.host);
       return;
     }
     const command = parseScriptCommand(raw);
@@ -110,7 +111,7 @@ const buildScriptAction =
           .replace('{count}', String(count)),
       },
     ]);
-    instance.host.focus();
+    focusSheetElement(instance.host);
   };
 
 const buildPdfAction =
@@ -130,7 +131,7 @@ const buildPdfAction =
     }
     instance.print('pdf');
     if (result.report) await showInstanceReport(instance, result.report.title, result.report.items);
-    instance.host.focus();
+    focusSheetElement(instance.host);
   };
 
 const buildAddInAction =
@@ -142,14 +143,14 @@ const buildAddInAction =
       addInDefaultTitle: strings.ribbon.addIn,
     });
     if (report) await showInstanceReport(instance, report.title, report.items);
-    instance.host.focus();
+    focusSheetElement(instance.host);
   };
 
 export function createDefaultDynamicDropdownsCtx(
   instance: SpreadsheetInstance,
   opts: DefaultDynamicDropdownsOptions = {},
 ): DynamicDropdownsCtx {
-  const focusSheet = opts.focusSheet ?? ((): void => instance.host.focus());
+  const focusSheet = opts.focusSheet ?? ((): void => focusSheetElement(instance.host));
   const illustrationDefaults = createIllustrationDropdownDefaults(instance);
   const clipboardDefaults = createClipboardDropdownDefaults(instance);
   const formattingDefaults = createFormattingDropdownDefaults(instance, {
