@@ -260,7 +260,32 @@ describe('shapes saved with the workbook', () => {
     expect(listShapes(wb, 0)[0]?.lineKind).toBe(ShapePaint.None);
 
     const reopened = await saved(wb);
-    expect(only(reopened.store)).toMatchObject({ opacity: 0, lineWidth: 0 });
+    expect(only(reopened.store)).toMatchObject({ opacity: 0, lineHidden: true, lineWidth: 4.5 });
+  });
+
+  it('keeps the outline weight in the file while the outline is off', async () => {
+    const { wb, store, history } = await session();
+    oval(store);
+    applySessionShapeOutlineWeight(store, only(store), 3, history, wb);
+    applySessionShapeOutline(store, only(store), null, history, wb);
+    expect(listShapes(wb, 0)[0]).toMatchObject({
+      lineKind: ShapePaint.None,
+      lineWidthEmu: 38100,
+    });
+
+    const reopened = await saved(wb);
+    expect(only(reopened.store)).toMatchObject({ lineHidden: true, lineWidth: 3 });
+    applySessionShapeOutline(
+      reopened.store,
+      only(reopened.store),
+      '#0000ff',
+      reopened.history,
+      reopened.wb,
+    );
+    expect(listShapes(reopened.wb, 0)[0]).toMatchObject({
+      lineKind: ShapePaint.Solid,
+      lineWidthEmu: 38100,
+    });
   });
 
   it('resets radius, dash and partial opacity, which the file cannot hold', async () => {

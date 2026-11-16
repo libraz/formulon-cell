@@ -72,17 +72,25 @@ export const shapeCornerRadius = (item: SessionIllustration, w: number, h: numbe
 export const shapeFillColor = (item: SessionIllustration): string | null =>
   shapeHasFill(item) && item.opacity !== 0 ? (item.color ?? DEFAULT_SHAPE_COLOR) : null;
 
+/** Whether the shape has No Outline. A zero weight also reads as off. */
+const shapeOutlineHidden = (item: SessionIllustration): boolean =>
+  item.lineHidden === true || item.lineWidth === 0;
+
 /** The outline colour of a shape, or null for No Outline. A line that has not
  *  been given an outline colour is drawn in its own colour. */
 export const shapeOutlineColor = (item: SessionIllustration): string | null => {
-  if (item.lineWidth === 0) return null;
+  if (shapeOutlineHidden(item)) return null;
   if (item.lineColor) return item.lineColor;
   return shapeHasFill(item) ? DEFAULT_SHAPE_OUTLINE_COLOR : (item.color ?? DEFAULT_SHAPE_COLOR);
 };
 
 /** The outline weight of a shape in points, or null for No Outline. */
 export const shapeOutlineWeight = (item: SessionIllustration): number | null =>
-  item.lineWidth === 0 ? null : (item.lineWidth ?? DEFAULT_SHAPE_LINE_WIDTH);
+  shapeOutlineHidden(item) ? null : shapeStoredWeight(item);
+
+/** The outline weight in points, kept while the outline is off. */
+export const shapeStoredWeight = (item: SessionIllustration): number =>
+  item.lineWidth || DEFAULT_SHAPE_LINE_WIDTH;
 
 /** The dash style of a shape's outline. */
 export const shapeOutlineDash = (item: SessionIllustration): SessionShapeLineDash =>
@@ -94,23 +102,26 @@ export const shapeFillPatch = (
   color: string | null,
 ): SessionIllustrationPatch => (color === null ? { opacity: 0 } : { color, opacity: 1 });
 
-/** A weight that turns an outline that was off back on, at the default weight. */
+/** The weight that turns an outline that was off back on: the one it had, or
+ *  none (the default) when it was never set or was typed as zero. */
 const visibleWeight = (item: SessionIllustration): number | undefined =>
-  item.lineWidth === 0 ? undefined : item.lineWidth;
+  item.lineWidth || undefined;
 
 /** The patch that gives the shape `color` as its outline, or No Outline when
- *  null. An outline that was off comes back at the default weight. */
+ *  null. The weight is kept, so the outline comes back at it. */
 export const shapeOutlinePatch = (
   item: SessionIllustration,
   color: string | null,
 ): SessionIllustrationPatch =>
-  color === null ? { lineWidth: 0 } : { lineColor: color, lineWidth: visibleWeight(item) };
+  color === null
+    ? { lineHidden: true }
+    : { lineColor: color, lineHidden: undefined, lineWidth: visibleWeight(item) };
 
 /** The patch that gives the outline `weight` points; it turns the outline on. */
 export const shapeOutlineWeightPatch = (
   _item: SessionIllustration,
   weight: number,
-): SessionIllustrationPatch => ({ lineWidth: weight });
+): SessionIllustrationPatch => ({ lineWidth: weight, lineHidden: undefined });
 
 /** The patch that gives the outline `dash`; it turns the outline on. */
 export const shapeOutlineDashPatch = (
@@ -118,6 +129,7 @@ export const shapeOutlineDashPatch = (
   dash: SessionShapeLineDash,
 ): SessionIllustrationPatch => ({
   lineDash: dash === 'solid' ? undefined : dash,
+  lineHidden: undefined,
   lineWidth: visibleWeight(item),
 });
 

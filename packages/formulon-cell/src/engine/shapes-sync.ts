@@ -6,6 +6,7 @@ import {
   shapeHasFill,
   shapeOutlineColor,
   shapeOutlineWeight,
+  shapeStoredWeight,
 } from '../commands/shape-format.js';
 import type {
   SessionIllustration,
@@ -97,8 +98,9 @@ const paintInput = (item: SessionIllustration): Pick<EngineShapeInput, 'fill' | 
   }
   const weight = shapeOutlineWeight(item);
   const outline = hexOf(shapeOutlineColor(item));
-  if (weight === null || outline === null) input.line = { none: true };
-  else input.line = { color: outline, widthPt: weight };
+  if (weight === null || outline === null) {
+    input.line = { none: true, widthPt: shapeStoredWeight(item) };
+  } else input.line = { color: outline, widthPt: weight };
   return input;
 };
 
@@ -159,12 +161,10 @@ export function shapeFromNative(
   const line = paintOf(shape.line);
   if (fill === 'solid') item.color = paintColor(shape.fill);
   else if (fill === 'none') item.opacity = 0;
-  if (line === 'none') item.lineWidth = 0;
-  else if (line === 'solid') {
-    item.lineColor = paintColor(shape.line);
-    const width = shape.line?.widthPt ?? 0;
-    if (width > 0) item.lineWidth = width;
-  }
+  if (line === 'none') item.lineHidden = true;
+  else if (line === 'solid') item.lineColor = paintColor(shape.line);
+  const width = shape.line?.widthPt ?? 0;
+  if (width > 0) item.lineWidth = width;
   if (shape.text) item.text = shape.text;
   return item;
 }
@@ -202,7 +202,9 @@ const shapeInputOf = (shape: EngineShape): EngineShapeInput | null => {
           },
         }
       : {}),
-    ...(line === 'none' ? { line: { none: true } } : {}),
+    ...(line === 'none'
+      ? { line: { none: true, ...(lineWidth !== null ? { widthPt: lineWidth } : {}) } }
+      : {}),
   };
 };
 

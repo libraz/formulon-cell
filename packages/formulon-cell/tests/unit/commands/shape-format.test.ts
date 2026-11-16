@@ -90,6 +90,26 @@ describe('shape format commands', () => {
     expect(shapeFillColor(current(item.id))).toBe(DEFAULT_SHAPE_COLOR);
   });
 
+  it('keeps the weight while the outline is off and restores it', () => {
+    const item = shape();
+    applySessionShapeOutlineWeight(store, item, 3, history);
+    applySessionShapeOutline(store, current(item.id), null, history);
+    expect(shapeOutlineColor(current(item.id))).toBeNull();
+    expect(shapeOutlineWeight(current(item.id))).toBeNull();
+    expect(current(item.id).lineWidth).toBe(3);
+
+    applySessionShapeOutline(store, current(item.id), '#00b050', history);
+    expect(shapeOutlineWeight(current(item.id))).toBe(3);
+    expect(shapeOutlineColor(current(item.id))).toBe('#00b050');
+  });
+
+  it('turns the outline on at the default weight when none was ever set', () => {
+    const item = shape();
+    applySessionShapeOutline(store, item, null, history);
+    applySessionShapeOutline(store, current(item.id), '#00b050', history);
+    expect(shapeOutlineWeight(current(item.id))).toBe(DEFAULT_SHAPE_LINE_WIDTH);
+  });
+
   it('weighs and dashes the outline, turning a missing outline back on', () => {
     const item = shape();
     expect(shapeOutlineWeight(item)).toBe(DEFAULT_SHAPE_LINE_WIDTH);
@@ -103,7 +123,7 @@ describe('shape format commands', () => {
     applySessionShapeOutline(store, current(item.id), null, history);
     applySessionShapeOutlineDash(store, current(item.id), 'longDashDot', history);
     expect(shapeOutlineDash(current(item.id))).toBe('longDashDot');
-    expect(shapeOutlineWeight(current(item.id))).toBe(DEFAULT_SHAPE_LINE_WIDTH);
+    expect(shapeOutlineWeight(current(item.id))).toBe(4.5);
 
     applySessionShapeOutlineDash(store, current(item.id), 'solid', history);
     expect(current(item.id).lineDash).toBeUndefined();

@@ -585,8 +585,10 @@ export interface SessionIllustration {
   /** A shape's outline colour. */
   lineColor?: string;
   radius?: number;
-  /** A shape's outline weight in points; 0 is No Outline. */
+  /** A shape's outline weight in points; kept while the outline is off. */
   lineWidth?: number;
+  /** The shape has No Outline; its weight stays in `lineWidth`. */
+  lineHidden?: boolean;
   /** A shape's outline dash style; unset is solid. */
   lineDash?: SessionShapeLineDash;
   /** A shape's fill opacity, opaque when unset; 0 is No Fill. */
