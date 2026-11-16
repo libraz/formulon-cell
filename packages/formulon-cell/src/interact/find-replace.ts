@@ -405,7 +405,9 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       if (store.getState().data.sheetIndex !== match.addr.sheet) return false;
     }
     mutators.setActive(store, match.addr);
-    return sameAddr(store.getState().selection.active, match.addr);
+    const landed = sameAddr(store.getState().selection.active, match.addr);
+    if (landed) mutators.setFindHighlight(store, match.addr);
+    return landed;
   };
 
   const clearResults = (): void => {
@@ -725,6 +727,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       },
       step,
       openDialog: (tab) => api.open(tab),
+      onClose: () => mutators.setFindHighlight(store, null),
     });
     return panel;
   };
@@ -751,6 +754,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     close(): void {
       lastQuery = findInput.value;
       overlay.hidden = true;
+      mutators.setFindHighlight(store, null);
       currentMatch = null;
       clearResults();
       const target = opener;

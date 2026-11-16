@@ -216,6 +216,8 @@ const operations = [
   'mac.page.printArea.add',
   'mac.page.printArea.clear',
   'mac.page.pageBreaks',
+  'mac.view.cellFocus.focusCell',
+  'mac.view.cellFocus.autoHighlight',
   'mac.view.freeze',
   'mac.view.freeze.panes',
   'mac.view.freeze.firstRow',
@@ -500,6 +502,12 @@ export function dispatchMacRibbonCommand(
         return ctx.applyPageBreakAction('remove');
       case 'mac.page.break.reset':
         return ctx.applyPageBreakAction('reset-all');
+      case 'mac.view.cellFocus.focusCell':
+        mutators.setFocusCell(instance.store, !state.ui.focusCell);
+        return true;
+      case 'mac.view.cellFocus.autoHighlight':
+        mutators.setAutoHighlight(instance.store, !state.ui.autoHighlight);
+        return true;
       case 'mac.view.freeze':
       case 'mac.view.freeze.panes':
         return ctx.applyFreezeAction(

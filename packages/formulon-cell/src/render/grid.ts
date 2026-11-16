@@ -47,6 +47,7 @@ import {
   paintPivotPlaceholders,
 } from './grid/cells.js';
 import type { ChromePaintContext } from './grid/chrome-context.js';
+import { focusBandShown, paintFocusCellBand } from './grid/focus-cell.js';
 import { paintHeaders } from './grid/headers.js';
 import { type GridHitState, gridHitState, shouldShowValidationChevron } from './grid/hit-state.js';
 import { gridLinesShown, paintFreezeDividers, paintGridLines } from './grid/lines.js';
@@ -388,6 +389,7 @@ export class GridRenderer {
 
     this.paintSheetBackground(state);
     if (gridLinesShown(state)) this.paintGridLines(state, theme, cols, rows);
+    if (focusBandShown(state)) paintFocusCellBand(this.chromeCtx(), state);
     this.paintCells(state, theme, cols, rows);
     this.hits.outlineToggles = [];
     if (state.ui.showHeaders !== false) this.paintHeaders(state, theme, cols, rows);

@@ -562,7 +562,7 @@ const viewTab = (): RibbonTabModel =>
           'show',
           NOT_IMPLEMENTED,
         ),
-        disabledCompactCommand('mac.view.cellFocus', t('cellFocus'), 'show', NOT_IMPLEMENTED),
+        compactCommand('mac.view.cellFocus', t('cellFocus'), 'show'),
       ],
       'compact',
     ),

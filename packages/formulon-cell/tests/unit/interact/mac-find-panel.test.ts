@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { defaultStrings, ja } from '../../../src/i18n/strings.js';
 import { attachFindReplace } from '../../../src/interact/find-replace.js';
+import { focusBandShown } from '../../../src/render/grid/focus-cell.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
@@ -54,7 +55,20 @@ const mount = async (platform: 'mac' | 'default', texts: [number, number, string
       .find((b) => b.textContent === label)
       ?.click();
   };
-  return { host, handle, panel, input, dialog, active, type, enter, click, menuLabels, pick };
+  return {
+    host,
+    store,
+    handle,
+    panel,
+    input,
+    dialog,
+    active,
+    type,
+    enter,
+    click,
+    menuLabels,
+    pick,
+  };
 };
 
 const SHEET = [
@@ -164,6 +178,19 @@ describe('the Mac find panel', () => {
     clear()?.click();
     expect(m.input().value).toBe('');
     expect(clear()?.hidden).toBe(true);
+  });
+
+  it('bands the cell a Return lands on with Auto-Highlight, until the panel closes', async () => {
+    const m = await mount('mac', SHEET);
+    m.handle.open();
+    m.type('banana');
+    expect(focusBandShown(m.store.getState())).toBe(false);
+    m.enter();
+    expect(m.active()).toEqual({ sheet: 0, row: 4, col: 0 });
+    expect(focusBandShown(m.store.getState())).toBe(true);
+    m.input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(m.panel()?.hidden).toBe(true);
+    expect(focusBandShown(m.store.getState())).toBe(false);
   });
 
   it('closes on Escape while it has focus, handing focus to the grid', async () => {

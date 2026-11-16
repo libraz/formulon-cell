@@ -438,6 +438,13 @@ export const projectMacRibbonState = (
         macRibbonLabelForCommand('mac.formulas.calc.formatStale', lang),
     });
   }
+  const { focusCell, autoHighlight } = instance.store.getState().ui;
+  for (const button of buttons.get('mac.view.cellFocus.focusCell') ?? []) {
+    button.setAttribute('aria-checked', String(focusCell));
+  }
+  for (const button of buttons.get('mac.view.cellFocus.autoHighlight') ?? []) {
+    button.setAttribute('aria-checked', String(autoHighlight));
+  }
   for (const version of COMPATIBILITY_VERSIONS) {
     const row = compatibilityVersionRow(version, compatVersion);
     for (const button of buttons.get(`mac.formulas.calc.compatVersion.${version}`) ?? []) {

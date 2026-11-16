@@ -70,6 +70,22 @@ export const viewMutators = {
     store.setState((s) => ({ ...s, ui: { ...s.ui, showFormulas: on } }));
   },
 
+  setFocusCell(store: SpreadsheetStore, on: boolean): void {
+    store.setState((s) => (s.ui.focusCell === on ? s : { ...s, ui: { ...s.ui, focusCell: on } }));
+  },
+
+  setAutoHighlight(store: SpreadsheetStore, on: boolean): void {
+    store.setState((s) =>
+      s.ui.autoHighlight === on ? s : { ...s, ui: { ...s.ui, autoHighlight: on } },
+    );
+  },
+
+  setFindHighlight(store: SpreadsheetStore, at: Addr | null): void {
+    store.setState((s) =>
+      s.ui.findHighlight === at ? s : { ...s, ui: { ...s.ui, findHighlight: at } },
+    );
+  },
+
   setShowAllNotes(store: SpreadsheetStore, on: boolean): void {
     store.setState((s) =>
       s.ui.showAllNotes === on ? s : { ...s, ui: { ...s.ui, showAllNotes: on } },

@@ -239,6 +239,14 @@ export interface UiSlice {
   /** Review > Show All Notes: every note is drawn whatever its own shown state. A view
    *  preference of this spreadsheet, never written to the workbook. */
   showAllNotes: boolean;
+  /** View > Focus Cell: the active cell's row and column are banded. A view preference of this
+   *  spreadsheet, never written to the workbook. */
+  focusCell: boolean;
+  /** View > Focus Cell > Show Auto-Highlight: a Find hit is banded as Focus Cell bands the active
+   *  cell. A view preference of this spreadsheet, never written to the workbook. */
+  autoHighlight: boolean;
+  /** The cell the last Find hit selected while its Find box is open; null otherwise. */
+  findHighlight: Addr | null;
   /** Formulas › Calculation Options › Format Stale Values: formula cells whose value is stale
    *  are drawn with the stale look. A host preference, never written to the workbook. */
   formatStaleValues: boolean;

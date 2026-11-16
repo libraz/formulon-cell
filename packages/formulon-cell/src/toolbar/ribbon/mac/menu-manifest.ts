@@ -676,15 +676,15 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     { id: 'mac.review.showNotes', label: 'Show All Notes' },
     { id: 'mac.review.convertNotes', label: 'Convert to Comments' },
   ]),
-  // Focus Cell is not built yet; the menu carries the desktop's three entries greyed out.
-  'mac.view.cellFocus': unavailable(
-    [
-      { id: 'mac.view.cellFocus.focusCell', label: 'Focus Cell' },
-      { id: 'mac.view.cellFocus.color', label: 'Focus Cell Color' },
-      { id: 'mac.view.cellFocus.autoHighlight', label: 'Show Auto-Highlight' },
-    ],
-    NOT_IMPLEMENTED,
-  ),
+  // Only the measured default colour is built; Focus Cell Color stays greyed out.
+  'mac.view.cellFocus': [
+    { id: 'mac.view.cellFocus.focusCell', label: 'Focus Cell', check: 'checkbox' },
+    ...unavailable(
+      [{ id: 'mac.view.cellFocus.color', label: 'Focus Cell Color' }],
+      NOT_IMPLEMENTED,
+    ),
+    { id: 'mac.view.cellFocus.autoHighlight', label: 'Show Auto-Highlight', check: 'checkbox' },
+  ],
   'mac.view.freeze': menu([
     { id: 'mac.view.freeze.panes', label: 'Freeze Panes' },
     { id: 'mac.view.freeze.firstRow', label: 'Freeze Top Row' },

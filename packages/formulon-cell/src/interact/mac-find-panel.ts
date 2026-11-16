@@ -18,6 +18,8 @@ export interface MacFindPanelDeps {
   step: (direction: 'next' | 'prev') => boolean;
   /** More Options > Advanced Search... and Replace...: the dialog on that tab. */
   openDialog: (tab: 'find' | 'replace') => void;
+  /** The panel was hidden. */
+  onClose: () => void;
 }
 
 export interface MacFindPanel {
@@ -208,6 +210,7 @@ export const createMacFindPanel = (deps: MacFindPanelDeps): MacFindPanel => {
       if (panel.hidden) return;
       dropMenu();
       panel.hidden = true;
+      deps.onClose();
       const target = opener;
       opener = null;
       if (restoreFocus) returnFocus(target, panel, deps.host);

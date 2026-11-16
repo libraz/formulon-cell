@@ -3,6 +3,8 @@ import { keepSheetView, newSheetView } from '../../../src/commands/sheet-views.j
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { Spreadsheet } from '../../../src/mount.js';
 import { mutators } from '../../../src/store/store.js';
+import type { ApplyRibbonCommandDeps } from '../../../src/toolbar/ribbon/apply-ribbon-command.js';
+import { dispatchMacRibbonCommand } from '../../../src/toolbar/ribbon/mac/dispatch.js';
 import { macRibbonLabelForCommand } from '../../../src/toolbar/ribbon/mac/labels.js';
 import { macRibbonMenuIdForCommand } from '../../../src/toolbar/ribbon/mac/menu-manifest.js';
 import { createMacRibbonMenuFactory } from '../../../src/toolbar/ribbon/mac/menus.js';
@@ -27,6 +29,12 @@ const menuItems = (commandId: string) =>
   ]);
 
 describe('Mac View tab', () => {
+  let sheet: MountedStubSheet | undefined;
+  afterEach(() => {
+    sheet?.dispose();
+    sheet = undefined;
+  });
+
   it('lays out the groups and their commands in the desktop order', () => {
     expect(viewTab()?.groups.map((group) => group.commands.map((command) => command.id))).toEqual([
       [
@@ -68,13 +76,56 @@ describe('Mac View tab', () => {
     ]);
   });
 
-  it('opens Focus Cell as a menu of its three entries, not built yet', () => {
+  it('opens Focus Cell as a menu of the band, its greyed colour and Auto-Highlight', () => {
     expect(macRibbonMenuIdForCommand('mac.view.cellFocus')).toBe('menu-mac-view-cell-focus');
+    const button = viewTab()
+      ?.groups.flatMap((group) => group.commands)
+      .find((command) => command.id === 'mac.view.cellFocus');
+    expect(button?.disabled).toBeFalsy();
     expect(menuItems('mac.view.cellFocus')).toEqual([
-      ['mac.view.cellFocus.focusCell', 'セルにフォーカス', true],
+      ['mac.view.cellFocus.focusCell', 'セルにフォーカス', false],
       ['mac.view.cellFocus.color', 'フォーカス セルの色', true],
-      ['mac.view.cellFocus.autoHighlight', '自動強調表示を表示する', true],
+      ['mac.view.cellFocus.autoHighlight', '自動強調表示を表示する', false],
     ]);
+    const menu = createMacRibbonMenuFactory('ja')('mac.view.cellFocus');
+    for (const id of ['mac.view.cellFocus.focusCell', 'mac.view.cellFocus.autoHighlight']) {
+      expect(menu?.querySelector(`[data-ribbon-command="${id}"]`)?.getAttribute('role'), id).toBe(
+        'menuitemcheckbox',
+      );
+    }
+  });
+
+  it('turns Focus Cell and Auto-Highlight on and off, checked as set, never in the workbook', async () => {
+    sheet = await mountStubSheet({
+      workbook: await WorkbookHandle.createDefault({ preferStub: true }),
+      locale: 'en',
+    });
+    const { instance } = sheet;
+    const host = document.createElement('div');
+    const menu = createMacRibbonMenuFactory('en')('mac.view.cellFocus');
+    if (menu) host.appendChild(menu);
+    const item = host.querySelector('[data-ribbon-command="mac.view.cellFocus.focusCell"]');
+    const deps = {
+      inst: instance,
+      runtime: { projectFormatToolbar: () => undefined, focusSheet: () => undefined },
+    } as unknown as ApplyRibbonCommandDeps;
+    expect(instance.store.getState().ui.focusCell).toBe(false);
+    expect(dispatchMacRibbonCommand('mac.view.cellFocus.focusCell', deps, () => false)).toBe(true);
+    expect(instance.store.getState().ui.focusCell).toBe(true);
+    projectMacRibbonState(host, instance);
+    expect(item?.getAttribute('aria-checked')).toBe('true');
+    dispatchMacRibbonCommand('mac.view.cellFocus.focusCell', deps, () => false);
+    expect(instance.store.getState().ui.focusCell).toBe(false);
+    projectMacRibbonState(host, instance);
+    expect(item?.getAttribute('aria-checked')).toBe('false');
+    const auto = host.querySelector('[data-ribbon-command="mac.view.cellFocus.autoHighlight"]');
+    expect(instance.store.getState().ui.autoHighlight).toBe(true);
+    expect(auto?.getAttribute('aria-checked')).toBe('true');
+    dispatchMacRibbonCommand('mac.view.cellFocus.autoHighlight', deps, () => false);
+    expect(instance.store.getState().ui.autoHighlight).toBe(false);
+    projectMacRibbonState(host, instance);
+    expect(auto?.getAttribute('aria-checked')).toBe('false');
+    expect(instance.history.canUndo()).toBe(false);
   });
 
   it('labels the Freeze Panes button and its menu entry as each is drawn', () => {

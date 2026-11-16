@@ -61,6 +61,10 @@ export const createSpreadsheetStore = () =>
       showFormulas: false,
       showOutlineSymbols: true,
       showAllNotes: false,
+      focusCell: false,
+      // Show Auto-Highlight is checked on a fresh desktop install.
+      autoHighlight: true,
+      findHighlight: null,
       formatStaleValues: true,
       errorChecking: {
         enabled: true,

@@ -7,6 +7,7 @@ import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js'
 import { en } from '../../../src/i18n/strings.js';
 import { attachFindReplace } from '../../../src/interact/find-replace.js';
 import { attachNavigationPolicy } from '../../../src/interact/navigation-policy.js';
+import { focusBandShown } from '../../../src/render/grid/focus-cell.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -294,6 +295,63 @@ describe('attachFindReplace', () => {
     expect(store.getState().selection.active).toEqual({ sheet: 0, row: 10, col: 0 });
     expect($<HTMLElement>(host, '.fc-find__pill').textContent).toBe('2 / 2');
     handle.detach();
+  });
+
+  describe('Show Auto-Highlight', () => {
+    const findApple = () => {
+      seed(store, wb, [
+        { row: 1, col: 0, value: 'apple' },
+        { row: 5, col: 0, value: 'banana' },
+      ]);
+      const handle = attachFindReplace({ host, store, wb });
+      handle.open();
+      return { handle, findInput: $<HTMLInputElement>(host, '.fc-find input[type="text"]') };
+    };
+
+    it('bands nothing while typing and bands the hit Enter lands on', () => {
+      const { handle, findInput } = findApple();
+      setInputValue(findInput, 'apple');
+      expect(focusBandShown(store.getState())).toBe(false);
+      fireKey(findInput, 'Enter');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
+      expect(focusBandShown(store.getState())).toBe(true);
+      mutators.setAutoHighlight(store, false);
+      expect(focusBandShown(store.getState())).toBe(false);
+      handle.detach();
+    });
+
+    it('drops the band when the user moves to another cell, the box staying open', () => {
+      const { handle, findInput } = findApple();
+      setInputValue(findInput, 'apple');
+      fireKey(findInput, 'Enter');
+      mutators.setActive(store, { sheet: 0, row: 3, col: 2 });
+      expect(focusBandShown(store.getState())).toBe(false);
+      expect($<HTMLElement>(host, '.fc-find').hidden).toBe(false);
+      expect(findInput.value).toBe('apple');
+      handle.detach();
+    });
+
+    it('drops the band when the Find box closes', () => {
+      const { handle, findInput } = findApple();
+      setInputValue(findInput, 'apple');
+      fireKey(findInput, 'Enter');
+      fireKey(findInput, 'Escape');
+      expect($<HTMLElement>(host, '.fc-find').hidden).toBe(true);
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
+      expect(focusBandShown(store.getState())).toBe(false);
+      handle.detach();
+    });
+
+    it('keeps the band where it was when a later search finds nothing', () => {
+      const { handle, findInput } = findApple();
+      setInputValue(findInput, 'apple');
+      fireKey(findInput, 'Enter');
+      setInputValue(findInput, 'cherry');
+      fireKey(findInput, 'Enter');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
+      expect(focusBandShown(store.getState())).toBe(true);
+      handle.detach();
+    });
   });
 
   it('Shift+Enter steps backward', () => {
