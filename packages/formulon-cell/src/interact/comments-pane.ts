@@ -3,7 +3,7 @@ import { formatA1Cell } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import { MAC_CONTEXT_LABELS } from '../toolbar/ribbon/mac/labels-data.js';
+import { macBundleText } from '../toolbar/ribbon/mac/bundle-text.js';
 import { toolbarLangForLocale } from '../toolbar/ribbon/mac/locale.js';
 import { focusSheet } from './dialog-focus.js';
 import { isNavigationAddrAllowed, subscribeNavigationPolicy } from './navigation-policy.js';
@@ -49,7 +49,7 @@ export function attachCommentsPane(deps: CommentsPaneDeps): CommentsPaneHandle {
     }
   };
   const draw = (): void => {
-    const heading = MAC_CONTEXT_LABELS.commentsTitle[toolbarLangForLocale(deps.getLocale())];
+    const heading = macBundleText('pane:comments', toolbarLangForLocale(deps.getLocale()));
     title.textContent = heading;
     root.setAttribute('aria-label', heading);
     closeBtn.setAttribute('aria-label', deps.getStrings().workbookObjects.close);

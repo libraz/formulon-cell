@@ -23,6 +23,7 @@ import type { MacPivotOptionsStrings } from './pivot-options.js';
 import type { MacPivotTableDialogStrings } from './pivot-table-dialog.js';
 import type { MacProtectSheetStrings } from './protect-sheet.js';
 import type { MacRemoveDuplicatesStrings } from './remove-duplicates.js';
+import type { MacRibbonReasonStrings } from './ribbon-reasons.js';
 import type { MacSheetTabMenuStrings } from './sheet-tab-menu.js';
 import type { MacSheetViewStrings } from './sheet-views.js';
 import type { MacSortDialogStrings } from './sort-dialog.js';
@@ -75,6 +76,8 @@ export interface MacStrings {
   /** The Mac accessibility checker task pane. */
   accessibilityPane: MacAccessibilityPaneStrings;
   commentsPane: MacCommentsPaneStrings;
+  /** Why a ribbon command or menu item is unavailable. */
+  ribbonReasons: MacRibbonReasonStrings;
   /** Overrides of `cfRulesDialog`, plus its Mac-only labels, that apply on the Mac host only. */
   cfRulesDialog: MacCfRulesDialogStrings;
   /** Overrides of `hyperlinkDialog`, plus its Mac-only labels, that apply on the Mac host only. */

@@ -12,7 +12,7 @@ import {
   localizedGroupLabel,
   localizedLabel,
   localizedMenuLabel,
-  MAC_DISABLED_TRANSLATIONS,
+  MAC_CONTEXT_LABELS,
   MAC_LOCALES,
 } from './labels-data.js';
 
@@ -21,21 +21,9 @@ export type { Label, LabelLike } from './labels-data.js';
 export const text = (lang: ToolbarLang, label: LabelLike): string =>
   lang in label ? (label as Label)[lang] : label.en;
 
-export const OFFICE_REQUIRED: Label = {
-  ja: 'クラウドサービスへの接続が必要です。',
-  en: 'Requires a cloud service connection.',
-  ...MAC_DISABLED_TRANSLATIONS.officeRequired,
-};
-export const NOT_IMPLEMENTED: Label = {
-  ja: 'この機能は未実装です。',
-  en: 'This feature is not implemented yet.',
-  ...MAC_DISABLED_TRANSLATIONS.notImplemented,
-};
-export const EMBEDDED_UNSUPPORTED: Label = {
-  ja: 'この埋め込み環境では未対応です。',
-  en: 'This feature is not available in the embedded workbook.',
-  ...MAC_DISABLED_TRANSLATIONS.embeddedUnsupported,
-};
+export const OFFICE_REQUIRED: Label = MAC_CONTEXT_LABELS.officeRequired;
+export const NOT_IMPLEMENTED: Label = MAC_CONTEXT_LABELS.notImplemented;
+export const EMBEDDED_UNSUPPORTED: Label = MAC_CONTEXT_LABELS.embeddedUnsupported;
 
 const labelSeeds: Record<string, LegacyLabel> = {
   home: { ja: 'ホーム', en: 'Home' },

@@ -27,6 +27,11 @@ const AUTOMATION_SOURCE = resolvePath(
   '../../../src/toolbar/ribbon/mac/automation-gallery.ts',
 );
 
+/** Task panes titled from the bundle, by `pane:` key. */
+const PANE_SOURCES: Readonly<Record<string, string>> = {
+  comments: resolvePath(HERE, '../../../src/interact/comments-pane.ts'),
+};
+
 /** A Mac menu row carrying `rowKey` (`dataset:value`), worded for the Mac in `locale`. */
 const menuRowText = (rowKey: string, locale: MacLocale): string => {
   const [attr = '', value = ''] = rowKey.split(':');
@@ -227,6 +232,13 @@ describe('generated Mac ribbon labels', () => {
       for (const locale of MAC_LOCALES) {
         expect(pivotColourWords(locale), `${key} (${locale})`).toContain(bundle[locale]);
       }
+      return;
+    }
+    if (namespace === 'pane') {
+      // Read by key when the pane draws; the pane tests cover the rendered title.
+      const source = PANE_SOURCES[name];
+      expect(source, key).toBeDefined();
+      expect(readFileSync(source ?? '', 'utf8')).toContain(`'${key}'`);
       return;
     }
     if (namespace === 'automation-ui') {

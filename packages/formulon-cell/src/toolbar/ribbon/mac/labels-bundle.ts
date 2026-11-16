@@ -5980,6 +5980,15 @@ export const MAC_BUNDLE_LABELS: Readonly<
     th: 'แถวผลรวม',
     zh: '汇总行',
   },
+  'pane:comments': {
+    en: 'Comments',
+    ja: 'コメント',
+    de: 'Kommentare',
+    fr: 'Commentaires',
+    ko: '메모',
+    th: 'ข้อคิดเห็น',
+    zh: '批注',
+  },
   'pivot-style:PivotStyleDark1': {
     en: 'Pivot Style Dark 1',
     ja: 'ピボット スタイル (濃色) 1',

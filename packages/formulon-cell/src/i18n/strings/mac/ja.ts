@@ -22,6 +22,7 @@ import { macPivotOptionsJa } from './pivot-options.js';
 import { macPivotTableDialogJa } from './pivot-table-dialog.js';
 import { macProtectSheetJa } from './protect-sheet.js';
 import { macRemoveDuplicatesJa } from './remove-duplicates.js';
+import { macRibbonReasonsJa } from './ribbon-reasons.js';
 import { macSheetTabMenuJa } from './sheet-tab-menu.js';
 import { macSheetViewsJa } from './sheet-views.js';
 import { macSortDialogJa } from './sort-dialog.js';
@@ -243,6 +244,7 @@ export const macJa: MacStrings = {
   watchWindow: macWatchWindowJa,
   accessibilityPane: macAccessibilityPaneJa,
   commentsPane: macCommentsPaneJa,
+  ribbonReasons: macRibbonReasonsJa,
   createTable: macCreateTableJa,
   tableStyleDialog: {
     newTitle: '新しいテーブル スタイル',

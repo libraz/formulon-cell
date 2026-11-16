@@ -5336,6 +5336,10 @@
       "tcid": 12209,
       "source": "tbbtn",
       "name": "UxGalPivotTableStyles"
+    },
+    "pane:comments": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1132180810"
     }
   },
   "held": {

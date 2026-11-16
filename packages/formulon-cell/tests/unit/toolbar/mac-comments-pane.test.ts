@@ -3,6 +3,8 @@ import { addThreadedComment } from '../../../src/commands/comment.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { Spreadsheet } from '../../../src/mount.js';
 import { mutators } from '../../../src/store/store.js';
+import { MAC_BUNDLE_LABELS } from '../../../src/toolbar/ribbon/mac/labels-bundle.js';
+import { MAC_LOCALES } from '../../../src/toolbar/ribbon/mac/labels-data.js';
 import { projectMacRibbonState } from '../../../src/toolbar/ribbon/mac/state-projection.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
 import { stubHelpers } from '../mount/toolbar/fixtures.js';
@@ -58,6 +60,15 @@ describe('Mac Show Comments toggle', () => {
     pane()?.querySelector<HTMLButtonElement>('.fc-commentspane__close')?.click();
     expect(instance.store.getState().ui.commentsPaneOpen).toBe(false);
     expect(pressed()).toBe('false');
+  });
+
+  it.each(MAC_LOCALES)('titles the pane with the bundle wording in %s', async (locale) => {
+    const title = MAC_BUNDLE_LABELS['pane:comments']?.[locale];
+    expect(title).toBeTruthy();
+    sheet = await mountStubSheet({ locale, ui: { platform: 'mac' } });
+    mutators.setCommentsPaneOpen(sheet.instance.store, true);
+    expect(pane()?.querySelector('.fc-commentspane__title')?.textContent).toBe(title);
+    expect(pane()?.getAttribute('aria-label')).toBe(title);
   });
 
   it('reads the bundle empty notice when the file has no comments', async () => {

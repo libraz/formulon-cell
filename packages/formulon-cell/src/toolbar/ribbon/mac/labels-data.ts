@@ -1,3 +1,7 @@
+import {
+  type MacRibbonReasonStrings,
+  macRibbonReasonsEn,
+} from '../../../i18n/strings/mac/ribbon-reasons.js';
 import type { Locale, Strings } from '../../../i18n/strings.js';
 import { dictionaries } from '../../../i18n/strings.js';
 import { MAC_BUNDLE_LABELS } from './labels-bundle.js';
@@ -738,176 +742,17 @@ export const MAC_GROUP_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>>
   },
 };
 
-export const MAC_DISABLED_TRANSLATIONS = {
-  officeRequired: {
-    de: 'Eine Verbindung mit einem Clouddienst ist erforderlich.',
-    fr: 'Une connexion à un service cloud est requise.',
-    zh: '需要连接云服务。',
-    ko: '클라우드 서비스에 연결해야 합니다.',
-    th: 'ต้องเชื่อมต่อบริการคลาวด์',
-  },
-  notImplemented: {
-    de: 'Diese Funktion ist noch nicht implementiert.',
-    fr: 'Cette fonctionnalité n’est pas encore implémentée.',
-    zh: '此功能尚未实现。',
-    ko: '이 기능은 아직 구현되지 않았습니다.',
-    th: 'ฟีเจอร์นี้ยังไม่ได้ใช้งาน',
-  },
-  embeddedUnsupported: {
-    de: 'Diese Funktion ist in der eingebetteten Arbeitsmappe nicht verfügbar.',
-    fr: 'Cette fonctionnalité n’est pas disponible dans le classeur incorporé.',
-    zh: '嵌入式工作簿不支持此功能。',
-    ko: '포함된 통합 문서에서는 이 기능을 사용할 수 없습니다.',
-    th: 'ฟีเจอร์นี้ไม่พร้อมใช้งานในเวิร์กบุ๊กแบบฝังตัว',
-  },
-} as const satisfies Readonly<Record<string, ExtraTranslations>>;
+type MacRibbonReason = keyof MacRibbonReasonStrings;
 
-export const MAC_CONTEXT_LABELS = {
-  themeEngineUnavailable: {
-    ja: 'このエンジンはブックのテーマを編集できません。',
-    en: 'This engine cannot edit workbook themes.',
-    de: 'Diese Engine kann keine Arbeitsmappendesigns bearbeiten.',
-    fr: 'Ce moteur ne peut pas modifier les thèmes du classeur.',
-    zh: '此引擎无法编辑工作簿主题。',
-    ko: '이 엔진에서는 통합 문서 테마를 편집할 수 없습니다.',
-    th: 'กลไกนี้ไม่สามารถแก้ไขธีมเวิร์กบุ๊กได้',
-  },
-  themeProtected: {
-    ja: '保護されたシートがあります。',
-    en: 'The workbook contains protected sheets.',
-    de: 'Die Arbeitsmappe enthält geschützte Blätter.',
-    fr: 'Le classeur contient des feuilles protégées.',
-    zh: '工作簿包含受保护的工作表。',
-    ko: '통합 문서에 보호된 시트가 있습니다.',
-    th: 'เวิร์กบุ๊กมีแผ่นงานที่ได้รับการป้องกัน',
-  },
-  themeUnreadable: {
-    ja: 'ブックのテーマを読み取れません。',
-    en: 'The workbook theme cannot be read.',
-    de: 'Das Arbeitsmappendesign kann nicht gelesen werden.',
-    fr: 'Le thème du classeur ne peut pas être lu.',
-    zh: '无法读取工作簿主题。',
-    ko: '통합 문서 테마를 읽을 수 없습니다.',
-    th: 'ไม่สามารถอ่านธีมเวิร์กบุ๊กได้',
-  },
-  threadedCommentsUnavailable: {
-    ja: 'このエンジンはスレッドコメントを編集できません。',
-    en: 'This engine cannot edit threaded comments.',
-    de: 'Diese Engine kann Threadkommentare nicht bearbeiten.',
-    fr: 'Ce moteur ne peut pas modifier les commentaires avec conversation.',
-    zh: '此引擎无法编辑线程批注。',
-    ko: '이 엔진에서는 스레드 댓글을 편집할 수 없습니다.',
-    th: 'กลไกนี้ไม่สามารถแก้ไขข้อคิดเห็นแบบเธรดได้',
-  },
-  filterRangeRequired: {
-    ja: '適用中のフィルター範囲はありません。',
-    en: 'There is no active filter range.',
-    de: 'Es gibt keinen Filter zum Löschen.',
-    fr: 'Il n’y a aucun filtre à effacer.',
-    zh: '没有可清除的筛选。',
-    ko: '지울 필터가 없습니다.',
-    th: 'ไม่มีตัวกรองให้ล้าง',
-  },
-  outlineRequired: {
-    ja: '選択範囲にアウトライン グループはありません。',
-    en: 'The selection is not in an outline group.',
-    de: 'Die Auswahl befindet sich in keiner Gliederungsgruppe.',
-    fr: 'La sélection ne se trouve dans aucun groupe du plan.',
-    zh: '所选内容不在任何分级显示组中。',
-    ko: '선택 영역에 윤곽 그룹이 없습니다.',
-    th: 'การเลือกไม่ได้อยู่ในกลุ่มเค้าร่าง',
-  },
-  slicerRequired: {
-    ja: 'テーブルまたはピボットテーブルを選択してください。',
-    en: 'Select a table or PivotTable first.',
-    de: 'Wählen Sie zuerst eine Tabelle oder PivotTable aus.',
-    fr: 'Sélectionnez d’abord un tableau ou un tableau croisé dynamique.',
-    zh: '请先选择表格或数据透视表。',
-    ko: '먼저 표 또는 피벗 테이블을 선택하세요.',
-    th: 'เลือกตารางหรือพีวอตเทเบิลก่อน',
-  },
-  symbolEditRequired: {
-    ja: 'セルを編集中にのみ使用できます。',
-    en: 'Available only while editing a cell.',
-    de: 'Nur beim Bearbeiten einer Zelle verfügbar.',
-    fr: 'Disponible uniquement pendant la modification d’une cellule.',
-    zh: '仅在编辑单元格时可用。',
-    ko: '셀을 편집하는 동안에만 사용할 수 있습니다.',
-    th: 'ใช้ได้เฉพาะขณะแก้ไขเซลล์',
-  },
-  externalLinksRequired: {
-    ja: 'このブックには外部リンクがありません。',
-    en: 'This workbook has no external links.',
-    de: 'Diese Arbeitsmappe enthält keine externen Verknüpfungen.',
-    fr: 'Ce classeur ne contient aucun lien externe.',
-    zh: '此工作簿没有外部链接。',
-    ko: '이 통합 문서에는 외부 링크가 없습니다.',
-    th: 'สมุดงานนี้ไม่มีการเชื่อมโยงภายนอก',
-  },
-  temporarySheetViewRequired: {
-    ja: '保持できる一時ビューはありません。',
-    en: 'There is no temporary view to keep.',
-    de: 'Es gibt keine temporäre Ansicht zum Beibehalten.',
-    fr: 'Aucun affichage temporaire à conserver.',
-    zh: '没有可保留的临时视图。',
-    ko: '유지할 임시 보기가 없습니다.',
-    th: 'ไม่มีมุมมองชั่วคราวให้เก็บไว้',
-  },
-  sheetViewRequired: {
-    ja: '既定のビューが表示されています。',
-    en: 'The Default view is shown.',
-    de: 'Die Standardansicht wird angezeigt.',
-    fr: 'L’affichage par défaut est affiché.',
-    zh: '正在显示默认视图。',
-    ko: '기본 보기가 표시되어 있습니다.',
-    th: 'กำลังแสดงมุมมองเริ่มต้น',
-  },
-  filterCriteriaRequired: {
-    ja: '再適用できるフィルター条件はありません。',
-    en: 'There are no filter criteria to reapply.',
-    de: 'Es gibt keine Filterkriterien zum erneuten Anwenden.',
-    fr: 'Aucun critère de filtre à réappliquer.',
-    zh: '没有可重新应用的筛选条件。',
-    ko: '다시 적용할 필터 조건이 없습니다.',
-    th: 'ไม่มีเกณฑ์ตัวกรองให้นำไปใช้ใหม่',
-  },
-  commentsTitle: {
-    ja: 'コメント',
-    en: 'Comments',
-    de: 'Kommentare',
-    fr: 'Commentaires',
-    zh: '批注',
-    ko: '댓글',
-    th: 'ข้อคิดเห็น',
-  },
-  inkUnavailable: {
-    ja: 'このスプレッドシートではインクを使用できません。',
-    en: 'Ink is unavailable for this spreadsheet.',
-    de: 'Freihand ist für diese Tabelle nicht verfügbar.',
-    fr: 'L’entrée manuscrite n’est pas disponible pour cette feuille de calcul.',
-    zh: '此电子表格无法使用墨迹。',
-    ko: '이 스프레드시트에서는 잉크를 사용할 수 없습니다.',
-    th: 'หมึกไม่พร้อมใช้งานสำหรับสเปรดชีตนี้',
-  },
-  unavailableCommand: {
-    ja: '使用できないリボン コマンド: {id}',
-    en: 'Unavailable ribbon command: {id}',
-    de: 'Nicht verfügbarer Menübandbefehl: {id}',
-    fr: 'Commande du ruban indisponible : {id}',
-    zh: '不可用的功能区命令：{id}',
-    ko: '사용할 수 없는 리본 명령: {id}',
-    th: 'คำสั่ง Ribbon ไม่พร้อมใช้งาน: {id}',
-  },
-  functionUnavailable: {
-    ja: 'この関数は現在の計算エンジンでは使用できません。',
-    en: 'This function is unavailable in the current calculation engine.',
-    de: 'Diese Funktion ist in der aktuellen Berechnungsengine nicht verfügbar.',
-    fr: 'Cette fonction n’est pas disponible dans le moteur de calcul actuel.',
-    zh: '此函数在当前计算引擎中不可用。',
-    ko: '현재 계산 엔진에서는 이 함수를 사용할 수 없습니다.',
-    th: 'ฟังก์ชันนี้ไม่พร้อมใช้งานในกลไกการคำนวณปัจจุบัน',
-  },
-} as const satisfies Readonly<Record<string, Label>>;
+/** Why a ribbon command or menu item is unavailable, in every locale, from the dictionaries. */
+export const MAC_CONTEXT_LABELS = Object.fromEntries(
+  (Object.keys(macRibbonReasonsEn) as MacRibbonReason[]).map((key) => [
+    key,
+    Object.fromEntries(
+      MAC_LOCALES.map((locale) => [locale, dictionaries[locale].mac.ribbonReasons[key]]),
+    ),
+  ]),
+) as Readonly<Record<MacRibbonReason, Label>>;
 
 export const MAC_MENU_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> = {
   'mac.page.theme.enableUpdates': {
