@@ -130,6 +130,8 @@ export const ribbonDe: RibbonStrings = {
     tableStyleOptions: 'Optionen für Tabellenformatvorlagen',
     tableStyles: 'Tabellenformatvorlagen',
     quickStyles: 'Schnellformatvorlagen',
+    quickStylesPrevious: 'Vorheriger Schnellformatvorlagen-Katalog',
+    quickStylesNext: 'Nächster Schnellformatvorlagen-Katalog',
     tableTools: 'Extras',
     summarizePivot: 'In einer PivotTable zusammenfassen',
     convertRange: 'In Bereich konvertieren',

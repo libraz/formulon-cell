@@ -129,6 +129,8 @@ export const ribbonKo: RibbonStrings = {
     tableStyleOptions: '표 스타일 옵션',
     tableStyles: '표 스타일',
     quickStyles: '빠른 스타일',
+    quickStylesPrevious: '이전 빠른 스타일 갤러리',
+    quickStylesNext: '다음 빠른 스타일 갤러리',
     tableTools: '도구',
     summarizePivot: '피벗 테이블을 사용하여 요약',
     convertRange: '범위로 변환',

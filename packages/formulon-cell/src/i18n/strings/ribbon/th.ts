@@ -128,6 +128,8 @@ export const ribbonTh: RibbonStrings = {
     tableStyleOptions: 'ตัวเลือกลักษณะตาราง',
     tableStyles: 'ลักษณะตาราง',
     quickStyles: 'สไตล์ด่วน',
+    quickStylesPrevious: 'แกลเลอรีสไตล์ด่วนก่อนหน้า',
+    quickStylesNext: 'แกลเลอรีสไตล์ด่วนถัดไป',
     tableTools: 'เครื่องมือ',
     summarizePivot: 'สรุปด้วย PivotTable',
     convertRange: 'แปลงเป็นช่วง',

@@ -130,6 +130,8 @@ export const ribbonJa: RibbonStrings = {
     tableStyleOptions: 'テーブル スタイルのオプション',
     tableStyles: 'テーブル スタイル',
     quickStyles: 'クイック スタイル',
+    quickStylesPrevious: '前のクイック スタイル ギャラリー',
+    quickStylesNext: '次のクイック スタイル ギャラリー',
     tableTools: 'ツール',
     summarizePivot: 'ピボットテーブルで集計',
     convertRange: '範囲に変換',

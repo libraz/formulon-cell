@@ -129,6 +129,8 @@ export const ribbonEn: RibbonStrings = {
     tableStyleOptions: 'Table Style Options',
     tableStyles: 'Table Styles',
     quickStyles: 'Quick Styles',
+    quickStylesPrevious: 'Previous Quick Styles gallery',
+    quickStylesNext: 'Next Quick Styles gallery',
     tableTools: 'Tools',
     summarizePivot: 'Summarize with PivotTable',
     convertRange: 'Convert to Range',

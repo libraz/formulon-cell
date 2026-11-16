@@ -7,7 +7,7 @@ import {
 } from '../../interact/chip-button.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { projectDisabledState } from '../menu-a11y.js';
-import type { ToolbarLang } from '../ribbon-model.js';
+import { type ToolbarLang, toolbarText } from '../ribbon-model.js';
 
 /** One style the strip offers. */
 export interface QuickStyleEntry {
@@ -99,11 +99,6 @@ export const blockedUnlessPermitted =
       : { reason: localizedDecisionReason(decision, inst.i18n.strings) };
   };
 
-const ARROW_LABELS = {
-  previous: { ja: '前のクイック スタイル ギャラリー', en: 'Previous Quick Styles gallery' },
-  next: { ja: '次のクイック スタイル ギャラリー', en: 'Next Quick Styles gallery' },
-} as const;
-
 /** An in-ribbon style gallery: a row of style chips, refreshed by an `fc-ribbon-control-refresh`
  *  event on the wrapper, holding as many chips as its width fits. Whenever the current style
  *  changes the row follows it: paging to its page between arrows, or on the Mac scrolling it to
@@ -113,8 +108,9 @@ export const createQuickStyleStrip = (opts: QuickStyleStripOptions): HTMLDivElem
   const geometry = quickStyleStripGeometry(opts.kind, opts.mac);
   // Chips the strip shows: its full count until a measured width says fewer fit.
   let fit = geometry.visible;
-  const arrowLabel = (key: keyof typeof ARROW_LABELS): string =>
-    opts.lang === 'ja' ? ARROW_LABELS[key].ja : ARROW_LABELS[key].en;
+  const text = toolbarText(opts.lang);
+  const arrowLabel = (key: 'previous' | 'next'): string =>
+    key === 'previous' ? text.quickStylesPrevious : text.quickStylesNext;
   const wrap = document.createElement('div');
   wrap.className = `${classPrefix}-gallery`;
   wrap.style.setProperty('--fc-strip-chip-w', `${geometry.chipWidth}px`);

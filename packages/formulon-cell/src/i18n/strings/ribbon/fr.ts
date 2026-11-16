@@ -130,6 +130,8 @@ export const ribbonFr: RibbonStrings = {
     tableStyleOptions: 'Options de style de tableau',
     tableStyles: 'Styles de tableau',
     quickStyles: 'Styles rapides',
+    quickStylesPrevious: 'Galerie de styles rapides précédente',
+    quickStylesNext: 'Galerie de styles rapides suivante',
     tableTools: 'Outils',
     summarizePivot: 'Synthétiser avec un tableau croisé dynamique',
     convertRange: 'Convertir en plage',

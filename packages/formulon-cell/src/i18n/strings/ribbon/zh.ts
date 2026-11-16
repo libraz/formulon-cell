@@ -128,6 +128,8 @@ export const ribbonZh: RibbonStrings = {
     tableStyleOptions: '表格样式选项',
     tableStyles: '表格样式',
     quickStyles: '快速样式',
+    quickStylesPrevious: '上一个快速样式库',
+    quickStylesNext: '下一个快速样式库',
     tableTools: '工具',
     summarizePivot: '通过数据透视表汇总',
     convertRange: '转换为区域',

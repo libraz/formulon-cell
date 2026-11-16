@@ -135,6 +135,9 @@ export interface RibbonStrings {
     tableStyles: string;
     /** The table style gallery button; on a wide ribbon it heads the in-ribbon strip. */
     quickStyles: string;
+    /** Aria labels of the quick style strip's page arrows. */
+    quickStylesPrevious: string;
+    quickStylesNext: string;
     /** Table Design Tools group and its commands. */
     tableTools: string;
     summarizePivot: string;
