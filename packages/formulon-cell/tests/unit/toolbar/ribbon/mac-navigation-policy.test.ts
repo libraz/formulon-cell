@@ -78,6 +78,25 @@ describe('Mac note navigation bounds', () => {
     expect(calls).toEqual(['1:note', '-1:note', '1:thread', '-1:thread']);
   });
 
+  it('routes Mac comment navigation through the shared review hook', () => {
+    const calls: string[] = [];
+    const deps = {
+      inst: {
+        store: createSpreadsheetStore(),
+        workbook: { capabilities: { threadedComments: true } },
+      } as unknown as SpreadsheetInstance,
+      runtime: { projectFormatToolbar: () => {} },
+      hooks: {
+        review: {
+          selectComment: (direction: 1 | -1, mode?: string) => calls.push(`${direction}:${mode}`),
+        },
+      },
+    } as unknown as ApplyRibbonCommandDeps;
+    expect(applyRibbonCommand('mac.review.nextComment', deps)).toBe(true);
+    expect(applyRibbonCommand('mac.review.previousComment', deps)).toBe(true);
+    expect(calls).toEqual(['1:thread', '-1:thread']);
+  });
+
   it('moves between notes from the default shared ribbon hook', async () => {
     const store = createSpreadsheetStore();
     const workbook = await WorkbookHandle.createDefault({ preferStub: true });

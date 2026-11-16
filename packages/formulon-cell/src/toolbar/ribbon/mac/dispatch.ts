@@ -540,6 +540,12 @@ export function dispatchMacRibbonCommand(
       }
       case 'mac.review.previousComment':
       case 'mac.review.nextComment':
+        if (deps.hooks?.review?.selectComment) {
+          return deps.hooks.review.selectComment(
+            id === 'mac.review.nextComment' ? 1 : -1,
+            'thread',
+          );
+        }
         return selectAdjacentComment(instance, id === 'mac.review.nextComment' ? 1 : -1, 'thread');
       case 'mac.review.previousNote':
       case 'mac.review.nextNote':
