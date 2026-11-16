@@ -10,7 +10,7 @@
  * folding; "Yu Gothic" is a different face from 游ゴシック on Mac and is kept apart.
  */
 
-import { normalizeFontName } from './mac-digit-metrics.js';
+import { canonicalMacFontName, normalizeFontName } from './mac-digit-metrics.js';
 
 /** Default row height in points by family, keyed by Normal font size in points. */
 const FAMILY_ROW_PT: ReadonlyArray<readonly [string, Readonly<Record<number, number>>]> = [
@@ -43,24 +43,10 @@ const ROW_PT_BY_FAMILY: ReadonlyMap<string, Readonly<Record<number, number>>> = 
   FAMILY_ROW_PT.map(([name, sizes]) => [normalizeFontName(name), sizes]),
 );
 
-/** Alternate spellings, keyed and valued by normalized name. */
-const FAMILY_ALIASES: ReadonlyMap<string, string> = new Map(
-  (
-    [
-      ['MS PGothic', 'ＭＳ Ｐゴシック'],
-      ['DengXian', '等线'],
-      ['Malgun Gothic', '맑은 고딕'],
-      ['PMingLiU', '新細明體'],
-      ['Microsoft JhengHei', '微軟正黑體'],
-    ] as const
-  ).map(([alias, name]) => [normalizeFontName(alias), normalizeFontName(name)]),
-);
-
 /** Mac Excel's default row height in points for a Normal font, or null when
  *  the family and size are not tabulated. */
 export function macDefaultRowPt(fontName: string, sizePt: number): number | null {
-  const key = normalizeFontName(fontName);
-  return ROW_PT_BY_FAMILY.get(FAMILY_ALIASES.get(key) ?? key)?.[sizePt] ?? null;
+  return ROW_PT_BY_FAMILY.get(canonicalMacFontName(fontName))?.[sizePt] ?? null;
 }
 
 /** Families whose wrapped lines advance by the default row itself; the rest

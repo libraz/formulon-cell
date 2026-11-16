@@ -39,23 +39,31 @@ const FAMILY_EM: ReadonlyMap<string, number> = new Map(
   ).map(([name, em]) => [normalizeFontName(name), em]),
 );
 
-/** Alternate spellings, keyed and valued by normalized name. */
+/** Alternate spellings, keyed and valued by normalized name. Shared with the
+ *  row model. "Yu Gothic" is deliberately absent: it is a different face from
+ *  游ゴシック on Mac. */
 const FAMILY_ALIASES: ReadonlyMap<string, string> = new Map(
   (
     [
-      ['Yu Gothic', '游ゴシック'],
       ['メイリオ', 'Meiryo'],
       ['MS PGothic', 'ＭＳ Ｐゴシック'],
       ['DengXian', '等线'],
       ['Malgun Gothic', '맑은 고딕'],
+      ['PMingLiU', '新細明體'],
+      ['Microsoft JhengHei', '微軟正黑體'],
     ] as const
   ).map(([alias, name]) => [normalizeFontName(alias), normalizeFontName(name)]),
 );
 
+/** Normalized family name with any alternate spelling resolved. */
+export const canonicalMacFontName = (name: string): string => {
+  const key = normalizeFontName(name);
+  return FAMILY_ALIASES.get(key) ?? key;
+};
+
 /** Digit advance in points, before Mac Excel rounds it to whole points. */
 export function macDigitAdvance(fontName: string, sizePt: number): number {
-  const key = normalizeFontName(fontName);
-  const em = FAMILY_EM.get(FAMILY_ALIASES.get(key) ?? key) ?? UNKNOWN_FAMILY_EM;
+  const em = FAMILY_EM.get(canonicalMacFontName(fontName)) ?? UNKNOWN_FAMILY_EM;
   return em * sizePt;
 }
 
