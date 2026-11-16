@@ -3,6 +3,7 @@ import { chartDataFromEngine, chartPreviewOverrides } from '../charts/engine-ada
 import { formatChartValue } from '../charts/format.js';
 import { chartTitleText, layoutChart, layoutUnsupportedChart } from '../charts/layout.js';
 import { accentsFromTheme } from '../charts/series-colors.js';
+import { DEFAULT_CHART_AREA_LINE } from '../charts/styles.js';
 import type { ChartData, ChartKind, ChartPrimitive, ChartScene } from '../charts/types.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
@@ -776,6 +777,8 @@ export function attachSessionCharts(deps: {
       panel.style.height = `${position.h}px`;
       panel.style.clipPath = drawingClipPath(store, chart.nativeAnchor, position);
       panel.style.zIndex = zIndex(chart.id);
+      panel.style.setProperty('--fc-chart-area-line', DEFAULT_CHART_AREA_LINE.color);
+      panel.style.setProperty('--fc-chart-area-line-width', `${DEFAULT_CHART_AREA_LINE.widthPt}pt`);
       panel.classList.toggle('fc-chart--selected', chart.id === selectedId);
       panel.classList.toggle('fc-chart--fixed', !placeable);
       panel.addEventListener('focus', () => {

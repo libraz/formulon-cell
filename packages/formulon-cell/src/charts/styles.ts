@@ -115,6 +115,9 @@ export const resolveChartStyle = (
   };
 };
 
+/** Excel's chart-area outline where the file states none. */
+export const DEFAULT_CHART_AREA_LINE = { color: '#898989', widthPt: 1 } as const;
+
 export const fillColor = (fill: ChartFillSpec | undefined, fallback: string): string =>
   fill?.color ?? fallback;
 

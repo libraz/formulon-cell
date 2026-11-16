@@ -2559,6 +2559,26 @@ describe('attachSessionCharts', () => {
     expect(source).not.toContain("document.createElement('button')");
   });
 
+  it('frames the chart area as Excel does where the file states no paint of its own', () => {
+    project({ kind: 'column' });
+    const handle = attach();
+
+    // Excel draws a 1 pt #898989 outline; the fill is the sheet's own, as an unfilled cell's is.
+    expect(panel().style.getPropertyValue('--fc-chart-area-line')).toBe('#898989');
+    expect(panel().style.getPropertyValue('--fc-chart-area-line-width')).toBe('1pt');
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/overlays/quick-analysis-and-charts.css'),
+      'utf8',
+    );
+    const area = css.slice(css.indexOf('.fc-chart {'));
+    const rule = area.slice(0, area.indexOf('}'));
+    expect(rule).toMatch(/background: var\(--fc-bg,/);
+    expect(rule).toContain(
+      'border: var(--fc-chart-area-line-width) solid var(--fc-chart-area-line);',
+    );
+    handle.detach();
+  });
+
   it('keeps session charts close to Excel 365 desktop object geometry', () => {
     const css = readFileSync(
       join(root, 'src/styles/core/app/overlays/quick-analysis-and-charts.css'),
