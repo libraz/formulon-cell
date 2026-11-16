@@ -503,7 +503,7 @@ export function insertDefinedNameFormula(
   let entry: DefinedNameEntry | null = null;
   let workbookScoped: DefinedNameEntry | null = null;
   for (const definedName of wb.definedNames()) {
-    if (definedName.name.toLowerCase() !== trimmed.toLowerCase()) continue;
+    if (!isSameDefinedName(definedName.name, trimmed)) continue;
     if (definedName.localSheetId === activeSheet) {
       entry = definedName;
       break;

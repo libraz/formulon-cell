@@ -406,6 +406,21 @@ describe('named range commands', () => {
     expect(formulas.get('0:4:2')).toBe('=TaxRate');
   });
 
+  it('matches a fullwidth spelling of a defined name when inserting formulas', () => {
+    const store = createSpreadsheetStore();
+    const { wb, formulas } = makeWb();
+    setRange(store, 4, 2, 4, 2);
+
+    const result = insertDefinedNameFormula(
+      store.getState(),
+      wb,
+      '\uFF34\uFF41\uFF58\uFF32\uFF41\uFF54\uFF45',
+    );
+
+    expect(result).toEqual({ addr: { sheet: 0, row: 4, col: 2 }, formula: '=TaxRate' });
+    expect(formulas.get('0:4:2')).toBe('=TaxRate');
+  });
+
   it('prefers sheet-scoped defined names over workbook-scoped names when inserting formulas', () => {
     const store = createSpreadsheetStore();
     const { wb, formulas } = makeWb();
