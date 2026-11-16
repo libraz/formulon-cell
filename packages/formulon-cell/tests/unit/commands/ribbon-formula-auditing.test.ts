@@ -6,7 +6,8 @@ import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const strings = { errorChecking: 'Error Checking' };
 
-const workbook = (): WorkbookHandle => ({}) as WorkbookHandle;
+const workbook = (): WorkbookHandle =>
+  ({ capabilities: { validationEvaluation: false } }) as unknown as WorkbookHandle;
 
 describe('executeRibbonFormulaAuditingAction', () => {
   it('delegates traceError to the host so visual tracing can use viewport state', () => {
