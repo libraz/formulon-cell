@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MAC_OBJECT_TAB_DISABLED_COMMAND_IDS } from '../../../src/toolbar/ribbon/mac/object-tab-ids.js';
 import {
   buildRibbonModel,
+  CHART_CONTEXTUAL_RIBBON_TABS,
   CONTEXTUAL_RIBBON_TABS,
   type RibbonCommand,
 } from '../../../src/toolbar/ribbon-model.js';
@@ -46,6 +47,26 @@ describe('Mac table and chart tabs', () => {
       ['行/列の切り替え', 'グラフ データの選択'],
       ['グラフの種類の変更'],
       ['グラフの移動'],
+    ]);
+  });
+
+  it('appends the two chart tabs after Automate for a selected chart', () => {
+    const strip = buildRibbonModel('ja', {
+      profile: 'excel365Mac',
+      contextualTabs: CHART_CONTEXTUAL_RIBBON_TABS,
+    }).map((tab) => tab.label);
+    expect(strip).toEqual([
+      'ホーム',
+      '挿入',
+      '描画',
+      'ページ レイアウト',
+      '数式',
+      'データ',
+      '校閲',
+      '表示',
+      '自動化',
+      'グラフのデザイン',
+      '書式',
     ]);
   });
 
