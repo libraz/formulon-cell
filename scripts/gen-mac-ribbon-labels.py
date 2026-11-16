@@ -6,15 +6,21 @@ Inputs (read-only; the app is never launched):
     `Label` redirects (`:rctcidstring(N)` takes TCID N's string).
   - <app>/Contents/Frameworks/mso40ui.framework: TCID -> string-key table embedded in the
     binary, and <loc>.lproj/{tbbtn,tbbtn2,tbfriendly}.strings.
-  - scripts/mac-ribbon-label-tcids.json: our key (`labels:<k>`, `groups:<k>`, `menu:<id>`)
-    -> TCID and the string source whose ja text equals the observed ja label.
+  - <app>/Contents/**/<loc>.lproj/*.strings: any other strings table, named by a map entry.
+  - scripts/mac-ribbon-label-tcids.json: our key -> its string source, either a TCID and the
+    command table (tbbtn|tbbtn2|tbfriendly) whose ja text equals the observed ja label, or a
+    strings file and key (see strings_path). Ribbon controls use the `labels:`, `groups:` and
+    `menu:` namespaces; other namespaces name the menus, galleries and names read elsewhere.
 
-Per entry and locale the label is the cleaned string of that source for the TCID's key; there
-is no fallback between sources. An entry with `identical_to: [tcid, source]` fails the run
+Per entry and locale the label is the cleaned string of its source; there is no fallback
+between sources. An entry with `identical_to: [tcid, source]` fails the run
 when that candidate's strings differ in any locale from the mapped ones. Entries flagged
 `strip_ellipsis` additionally lose a trailing
 ellipsis in every locale (see strip_trailing_ellipsis). Keys under `held` (unconfirmed source,
-pinned pending, suspect value, no match) are not generated and keep their current text.
+pinned pending, suspect value, no match) are not generated and keep their current text, unless
+the entry carries locale text: `text` ({locale: text}, the measured or current wording) and/or
+`provisional` (a strings file and key whose ja differs or is unconfirmed). A held locale takes
+`text`, else the provisional source, else `text.en`.
 
   gen-mac-ribbon-labels.py [OUT]        write the TS data file (default: the package's labels-bundle.ts)
   gen-mac-ribbon-labels.py --check PATH exit 1 if PATH differs from the generated output
@@ -31,6 +37,8 @@ SOURCES = ('tbbtn', 'tbbtn2', 'tbfriendly')
 KEY_TABLE_OFFSET = 7124152
 KEY_TABLE_COUNT = 49990
 NAMESPACES = ('labels', 'groups', 'menu')
+FRAMEWORK_SUFFIX = '.framework'
+BUNDLE_SUFFIX = '.bundle'
 REDIRECT = re.compile(r':rctcidstring\((\d+)\)')
 
 
@@ -99,6 +107,30 @@ def strip_trailing_ellipsis(v):
     return re.sub(r'\s*(\.\.\.|\u2026)(?=\u200b*$)', '', v)
 
 
+def strings_path(contents, file, lproj):
+    """Path of a strings table in one locale.
+
+    `file` is the table name, prefixed by the frameworks and bundles that hold it; a bare name
+    is in the app's own Resources.
+
+    >>> from pathlib import PurePosixPath as P
+    >>> str(strings_path(P('C'), 'strman_0066.strings', 'de'))
+    'C/Resources/de.lproj/strman_0066.strings'
+    >>> str(strings_path(P('C'), 'mso99.framework/mso_intl.bundle/strman_ac16.strings', 'zh_CN'))
+    'C/Frameworks/mso99.framework/Resources/mso_intl.bundle/Contents/Resources/zh_CN.lproj/strman_ac16.strings'
+    """
+    *holders, name = file.split('/')
+    res = contents / 'Resources'
+    for h in holders:
+        if h.endswith(FRAMEWORK_SUFFIX):
+            res = contents / 'Frameworks' / h / 'Resources'
+        elif h.endswith(BUNDLE_SUFFIX):
+            res = res / h / 'Contents' / 'Resources'
+        else:
+            raise ValueError(f'{file}: {h} is neither a framework nor a bundle')
+    return res / f'{lproj}.lproj' / name
+
+
 def decode_ribbon(path):
     d = plistlib.load(open(path, 'rb'))
     objs = d['$objects']
@@ -159,6 +191,35 @@ class Bundle:
             for loc, d in LOCS.items()
         }
         self.redirect, self.conflicts = collect_redirects(decode_ribbon(base / 'Resources/Excel.ribbonb'))
+        self.contents = base
+        self.tables = {}
+
+    def table(self, file, loc):
+        if (file, loc) not in self.tables:
+            path = strings_path(self.contents, file, LOCS[loc])
+            self.tables[(file, loc)] = plistlib.load(open(path, 'rb')) if path.exists() else None
+        return self.tables[(file, loc)]
+
+    def file_labels(self, file, key):
+        """Return ({loc: text}, None) or (None, reason) for a strings file and key."""
+        out = {}
+        for loc in LOCS:
+            t = self.table(file, loc)
+            if t is None:
+                return None, f'{file} has no {loc} table'
+            v = t.get(key)
+            if not isinstance(v, str):
+                return None, f'{file} has no {loc} string for key {key}'
+            out[loc] = clean(v)
+        return out, None
+
+    def source(self, spec):
+        """Labels of a map entry's source: a strings file and key, or a TCID and command table."""
+        if isinstance(spec, dict) and 'file' in spec:
+            return self.file_labels(spec['file'], spec['key'])
+        if isinstance(spec, dict):
+            return self.labels(spec['tcid'], spec['source'])
+        return self.labels(*spec)
 
     def labels(self, tcid, source):
         """Return ({loc: text}, None) or (None, reason)."""
@@ -182,10 +243,10 @@ class Bundle:
 
 
 def out_of_scope(ours):
-    """Menu ids whose label is the id itself (gallery tiles) or an engine-localized function name (mac.function.*, mac.autosum.*)."""
+    """Menu ids whose label is the id itself (gallery tiles) or an engine-localized function name (mac.function.*)."""
     gallery, function = set(), set()
     for mid, v in ours['menu'].items():
-        if mid.startswith(('mac.function.', 'mac.autosum.')):
+        if mid.startswith('mac.function.'):
             function.add(f'menu:{mid}')
         elif any(x == mid for x in v.values()):
             gallery.add(f'menu:{mid}')
@@ -223,7 +284,7 @@ def build(b, ours, mapfile):
     known = {f'{ns}:{k}' for ns in NAMESPACES for k in ours[ns]} if ours else None
     rows, problems = {}, []
     for key, e in m['map'].items():
-        if known is not None and key not in known:
+        if known is not None and key.partition(':')[0] in NAMESPACES and key not in known:
             problems.append((key, 'key not present in the current label set'))
             continue
         if key in m.get('held', {}):
@@ -243,12 +304,12 @@ def build(b, ours, mapfile):
         if e.get('disagrees'):
             problems.append((key, f'recorded disagreement with the drawn label: {e["disagrees"]}'))
             continue
-        labs, why = b.labels(e['tcid'], e['source'])
+        labs, why = b.source(e)
         if labs is None:
             problems.append((key, why))
             continue
         if e.get('identical_to'):
-            other, why = b.labels(*e['identical_to'])
+            other, why = b.source(e['identical_to'])
             if other is None:
                 problems.append((key, f'identical_to: {why}'))
                 continue
@@ -260,6 +321,19 @@ def build(b, ours, mapfile):
             labs = {loc: strip_trailing_ellipsis(v) for loc, v in labs.items()}
         rows[key] = labs
     held = {k: v for k, v in m.get('held', {}).items()}
+    for key, h in held.items():
+        if 'text' not in h and 'provisional' not in h:
+            continue
+        labs, text = None, h.get('text', {})
+        if 'provisional' in h:
+            labs, why = b.source(h['provisional'])
+            if labs is None:
+                problems.append((key, f'provisional: {why}'))
+                continue
+        elif 'en' not in text:
+            problems.append((key, 'held text without en or a provisional source'))
+            continue
+        rows[key] = {loc: text.get(loc, labs[loc] if labs else text['en']) for loc in LOCS}
     return rows, problems, held
 
 
@@ -268,6 +342,8 @@ def report(rows, problems, held, ours):
     diff = {loc: 0 for loc in LOCS}
     for key, labs in rows.items():
         ns, _, name = key.partition(':')
+        if ns not in NAMESPACES or key in held:
+            continue
         for loc in LOCS:
             if labs[loc] != clean(ours[ns][name][loc]):
                 diff[loc] += 1
@@ -285,6 +361,7 @@ def report(rows, problems, held, ours):
         w(f'ERROR {key}: {why}')
     for key, v in sorted(held.items()):
         w(f"held [{v['status']}] {key}" + (f" (TCID {v['tcid']} {v.get('name', '')})" if v.get('tcid') else '')
+          + (' (generated)' if key in rows else '')
           + f": {v['reason']}")
 
 
@@ -320,12 +397,13 @@ def main():
         doc = json.load(open(a.map, encoding='utf-8'))
         mapped = doc['map']
         consumers = set(doc.get('consumers', ()))
-        unresolved = sorted(k for k in rows if k not in consumers)
+        ribbon = [k for k in rows if k in mapped and k.partition(':')[0] in NAMESPACES]
+        unresolved = sorted(k for k in ribbon if k not in consumers)
         if unresolved:
             print(f'mapped keys that our label set never resolves (run verify-mac-ribbon-labels.py --write): '
                   f'{unresolved}', file=sys.stderr)
             return 1
-        unverified = {loc: sum(1 for k in rows if loc not in mapped[k].get('verified', {})) for loc in LOCS}
+        unverified = {loc: sum(1 for k in ribbon if loc not in mapped[k].get('verified', {})) for loc in LOCS}
         print(f'mapped rows without a drawn reading, per locale: {unverified}', file=sys.stderr)
         path = Path(a.check)
         if not path.exists() or path.read_text(encoding='utf-8') != text:

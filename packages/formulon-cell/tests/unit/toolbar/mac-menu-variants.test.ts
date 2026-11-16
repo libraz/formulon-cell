@@ -57,7 +57,7 @@ describe('Mac Home menu wording', () => {
     expect(itemsOf(wrap)[0]).toBe('折り返して全体を表示する');
   });
 
-  it('applies the Mac row set in every language and keeps the shared wording outside Japanese', () => {
+  it('applies the Mac row set and wording in every language', () => {
     const en = createHomeMenuFactories({
       ribbonLang: 'en',
       ribbonMenuText: dictionaries.en.ribbonMenu,
@@ -69,8 +69,34 @@ describe('Mac Home menu wording', () => {
     const shared = itemsOf(en.createSortMenu('sortFilterHome'));
     const mac = itemsOf(en.createSortMenu('sortFilterHome', MAC));
     expect(mac).toHaveLength(6);
-    expect(mac).toEqual(shared.filter((text) => mac.includes(text)));
-    expect(mac[0]).toBe(shared[0]);
+    expect(mac.slice(0, 2)).toEqual(['Ascending', 'Descending']);
+    expect(mac.slice(2)).toEqual(shared.filter((text) => mac.slice(2).includes(text)));
+  });
+
+  it('words a German Mac menu with the app strings, not English', () => {
+    const de = createHomeMenuFactories({
+      ribbonLang: 'de',
+      ribbonMenuText: dictionaries.de.ribbonMenu,
+      ribbonText: toolbarText('de'),
+      formatDialog: dictionaries.de.formatDialog,
+      sheetTabs: dictionaries.de.sheetTabs,
+      viewToolbar: dictionaries.de.viewToolbar,
+    });
+    expect(itemsOf(de.createSortMenu('sortFilterHome', MAC)).slice(0, 2)).toEqual([
+      'Aufsteigend',
+      'Absteigend',
+    ]);
+    expect(itemsOf(de.createInsertCellsMenu('insertRows', MAC))).toContain('Zellen einfügen...');
+    expect(itemsOf(de.createFindSelectMenu('findHome', MAC))).toContain('Notizen');
+  });
+
+  it('words the German Mac Paste menu, its heading and its text rows with the app strings', () => {
+    const menu = createPasteMenu(dictionaries.de, 'de', MAC);
+    expect(menu.firstElementChild?.textContent).toBe('Einfügeoptionen:');
+    const items = itemsOf(menu);
+    expect(items).toContain('Nur den Text übernehmen');
+    expect(items).toContain('Textimport-Assistenten verwenden...');
+    expect(items.at(-1)).toBe('Inhalte einfügen...');
   });
 
   it('builds the full shared menu when no variant is asked for', () => {

@@ -674,6 +674,12 @@ describe('Mac Excel ribbon profile', () => {
 
   it('keeps Home alignment actions labeled and wide on Mac without changing their ids', () => {
     const locales = ['en', 'ja', 'de', 'fr', 'zh', 'ko', 'th'] as const;
+    // The Mac app names Wrap Text differently from the shared model in these locales.
+    const MAC_WRAP_NAMES: Partial<Record<(typeof locales)[number], string>> = {
+      ja: '折り返して全体を表示する',
+      de: 'Textumbruch',
+      ko: '자동 줄 바꿈',
+    };
     for (const locale of locales) {
       const macModel = buildRibbonModel(locale, { profile: 'excel365Mac' });
       const genericModel = buildRibbonModel(locale);
@@ -693,10 +699,10 @@ describe('Mac Excel ribbon profile', () => {
       expect(macById.get('merge')?.label).toBe(dictionaries[locale].ribbon.mergeAndCenter);
       expect(macById.get('merge')?.title).toBe(dictionaries[locale].ribbon.mergeAndCenter);
       expect(macById.get('wrap')?.label).toBe(
-        locale === 'ja' ? '折り返して全体を表示する' : genericById.get('wrap')?.label,
+        MAC_WRAP_NAMES[locale] ?? genericById.get('wrap')?.label,
       );
       expect(macById.get('wrap')?.title).toBe(
-        locale === 'ja' ? '折り返して全体を表示する' : genericById.get('wrap')?.title,
+        MAC_WRAP_NAMES[locale] ?? genericById.get('wrap')?.title,
       );
       expect(macAlignment?.commands.map((command) => command.id)).toEqual(
         genericAlignment?.commands.map((command) => command.id),

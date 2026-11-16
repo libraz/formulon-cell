@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import type { Locale } from '../../../src/i18n/strings.js';
 import { MAC_RIBBON_DISABLED_COMMAND_IDS } from '../../../src/toolbar/ribbon/mac/model.js';
 import { buildRibbonModel } from '../../../src/toolbar/ribbon-model.js';
 
-const homeCommands = () =>
-  buildRibbonModel('ja', { profile: 'excel365Mac' })
+const homeCommands = (lang: Locale = 'ja') =>
+  buildRibbonModel(lang, { profile: 'excel365Mac' })
     .find((tab) => tab.id === 'home')
     ?.groups.flatMap((g) => g.commands) ?? [];
-const byId = (id: string) => homeCommands().find((c) => c.id === id);
+const byId = (id: string, lang: Locale = 'ja') => homeCommands(lang).find((c) => c.id === id);
 
 // Excel for Mac (ja) Home tab: control names and AX help strings.
 describe('Mac Home ribbon labels', () => {
@@ -23,6 +24,22 @@ describe('Mac Home ribbon labels', () => {
   ])('names %s %s', (id, name) => {
     expect(byId(id)?.label).toBe(name);
     expect(byId(id)?.title).toBe(name);
+  });
+});
+
+describe('Mac Home ribbon names in other languages', () => {
+  it.each([
+    ['textOrientation', 'Ausrichtung'],
+    ['fillColor', 'Schattierung'],
+    ['wrap', 'Textumbruch'],
+  ])('names %s %s in German', (id, name) => {
+    expect(byId(id, 'de')?.label).toBe(name);
+    expect(byId(id, 'de')?.title).toBe(name);
+  });
+
+  it('carries the help text of the Korean app', () => {
+    expect(byId('formatPainter', 'ko')?.title).toBe('특정 위치의 서식을 복사하여 다른 위치에 적용');
+    expect(byId('alignC', 'ko')?.title).toBe('텍스트 가운데 맞춤');
   });
 });
 

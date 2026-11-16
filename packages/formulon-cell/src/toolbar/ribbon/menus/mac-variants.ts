@@ -1,5 +1,6 @@
 import { projectDisabledState } from '../../menu-a11y.js';
 import type { ToolbarLang } from '../../ribbon-model.js';
+import { findMacBundleLabel, macBundleText } from '../mac/bundle-text.js';
 import { menuSectionHeader } from './general.js';
 
 /** Which command surface a menu is built for. */
@@ -24,35 +25,19 @@ const MAC_OMITTED_ROWS: Readonly<Record<string, readonly string[]>> = {
 /** Menus whose section captions are greyed rows on the Mac. */
 const MAC_DISABLED_HEADING_MENUS: ReadonlySet<string> = new Set(['menu-format-cells']);
 
-/** Greyed heading the Mac menu opens with, by menu id; Japanese is the measured wording. */
-const MAC_MENU_HEADINGS: Readonly<Record<string, { ja: string; en: string }>> = {
-  'menu-paste': { ja: '貼り付けのオプション:', en: 'Paste Options:' },
-};
-
-/** Japanese wording of the Mac menus, by `dataset:value` row key. */
-const MAC_JA_ROW_LABELS: Readonly<Record<string, string>> = {
-  'wrapAction:wrapText': '折り返して全体を表示する',
-  'cellInsert:cells': 'セルの挿入...',
-  'cellDelete:cells': 'セルの削除...',
-  'cellFormat:col-autofit': '列の幅に合わせて自動調整',
-  'clear:comments': 'コメントとメモをクリア',
-  'cellFormat:protect-sheet': 'シートの保護...',
-  'sort:asc': '昇順',
-  'sort:desc': '降順',
-  'pasteAction:all': 'ペースト',
-  'pasteAction:dialog': '形式を選択してペースト...',
-  'findSelect:go-to-special': '選択オプション...',
-  'findSelect:comments': 'メモ',
-  'findSelect:selection-pane': '選択ウインドウ...',
-};
+/** Menus that open with a greyed heading on the Mac; its wording is generated as `heading:<menu id>`. */
+const MAC_HEADING_MENUS: ReadonlySet<string> = new Set(['menu-paste']);
 
 const rowKeys = (row: HTMLElement): string[] =>
   Object.entries(row.dataset).map(([attr, value]) => `${attr}:${value}`);
 
+/** The Mac wording of a menu row, generated as `row:<dataset:value>`, in `lang`. */
+const macMenuRowText = (rowKey: string, lang: ToolbarLang): string | undefined =>
+  findMacBundleLabel(`row:${rowKey}`)?.[lang];
+
 /**
- * Give a built menu the Mac row set and wording. The row set is a property of the
- * platform and applies in every language; only the wording is per language, and
- * only Japanese is measured so far.
+ * Give a built menu the Mac row set and wording. Both are properties of the platform and apply
+ * in every language; the wording is the Mac app's own string for each row that has one.
  */
 export const applyMenuVariant = (
   menu: HTMLDivElement,
@@ -67,8 +52,7 @@ export const applyMenuVariant = (
       row.remove();
       continue;
     }
-    const label =
-      lang === 'ja' ? keys.map((key) => MAC_JA_ROW_LABELS[key]).find(Boolean) : undefined;
+    const label = keys.map((key) => macMenuRowText(key, lang)).find(Boolean);
     if (!label) continue;
     const text = row.querySelector<HTMLElement>('.fc-tb__menu-item__text') ?? row;
     const previous = (text.textContent ?? '').trim();
@@ -81,9 +65,8 @@ export const applyMenuVariant = (
       projectDisabledState(caption, true, null);
     }
   }
-  const heading = MAC_MENU_HEADINGS[menu.id];
-  if (heading) {
-    const row = menuSectionHeader(lang === 'ja' ? heading.ja : heading.en);
+  if (MAC_HEADING_MENUS.has(menu.id)) {
+    const row = menuSectionHeader(macBundleText(`heading:${menu.id}`, lang));
     projectDisabledState(row, true, null);
     menu.prepend(row);
   }

@@ -20,6 +20,7 @@ import {
 } from '../../../interact/dialog-shell.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
 import type { CellFormat } from '../../../store/types.js';
+import { macBundleLabel } from './bundle-text.js';
 import type { Label } from './labels-data.js';
 import { toolbarLangForLocale } from './locale.js';
 import { reportMacRibbonError } from './report-error.js';
@@ -36,253 +37,51 @@ export type MacAutomationScriptId =
 export interface MacAutomationScriptDescriptor {
   readonly id: MacAutomationScriptId;
   readonly commandId: `mac.automate.${string}`;
-  /** English/Japanese compatibility fields retained for existing consumers. */
+  /** English name and description. */
   readonly label: string;
   readonly detail: string;
-  readonly labelJa: string;
-  readonly detailJa: string;
   readonly labels: Label;
   readonly details: Label;
 }
 
-const automationLabel = (
-  ja: string,
-  en: string,
-  de: string,
-  fr: string,
-  zh: string,
-  ko: string,
-  th: string,
-): Label => ({ ja, en, de, fr, zh, ko, th });
-
-const automationScript = (
-  id: MacAutomationScriptId,
-  labels: Label,
-  details: Label,
-): MacAutomationScriptDescriptor => ({
-  id,
-  commandId: `mac.automate.${id}`,
-  label: labels.en,
-  detail: details.en,
-  labelJa: labels.ja,
-  detailJa: details.ja,
-  labels,
-  details,
-});
+const automationScript = (id: MacAutomationScriptId): MacAutomationScriptDescriptor => {
+  const labels = macBundleLabel(`automation:${id}`);
+  const details = macBundleLabel(`automation-detail:${id}`);
+  return {
+    id,
+    commandId: `mac.automate.${id}`,
+    label: labels.en,
+    detail: details.en,
+    labels,
+    details,
+  };
+};
 
 /** The sample gallery shipped with Excel for the web/mac parity surface.
  *  Each item is backed by a local workbook operation below; no item claims to
  *  call an Office service or an external script host. */
 export const MAC_AUTOMATION_GALLERY: readonly MacAutomationScriptDescriptor[] = [
-  automationScript(
-    'allRowsColumns',
-    automationLabel(
-      'すべての行と列を再表示',
-      'Unhide All Rows and Columns',
-      'Alle Zeilen und Spalten einblenden',
-      'Afficher toutes les lignes et colonnes',
-      '取消隐藏所有行和列',
-      '모든 행 및 열 숨기기 취소',
-      'ยกเลิกการซ่อนแถวและคอลัมน์ทั้งหมด',
-    ),
-    automationLabel(
-      '使用範囲の行と列の非表示を解除します。',
-      'Unhide rows and columns in the used area.',
-      'Zeilen und Spalten im verwendeten Bereich einblenden.',
-      'Afficher les lignes et colonnes de la zone utilisée.',
-      '取消隐藏已用区域中的行和列。',
-      '사용 영역의 행 및 열 숨기기 취소',
-      'ยกเลิกการซ่อนแถวและคอลัมน์ในพื้นที่ที่ใช้',
-    ),
-  ),
-  automationScript(
-    'freezeSelection',
-    automationLabel(
-      '選択範囲の固定',
-      'Freeze Selection',
-      'Auswahl fixieren',
-      'Figer la sélection',
-      '冻结所选内容',
-      '선택 영역 고정',
-      'ตรึงส่วนที่เลือก',
-    ),
-    automationLabel(
-      '選択範囲の上の行と左の列を固定します。',
-      'Freeze rows above and columns left of the active selection.',
-      'Zeilen oberhalb und Spalten links von der aktiven Auswahl fixieren.',
-      'Figer les lignes au-dessus et les colonnes à gauche de la sélection active.',
-      '冻结活动单元格上方的行和左侧的列。',
-      '활성 선택 영역 위의 행과 왼쪽 열 고정',
-      'ตรึงแถวด้านบนและคอลัมน์ด้านซ้ายของส่วนที่เลือก',
-    ),
-  ),
-  automationScript(
-    'makeSubtable',
-    automationLabel(
-      '選択範囲からサブテーブルを作成する',
-      'Make a Subtable from a Selection',
-      'Untertabelle aus einer Auswahl erstellen',
-      'Effectuer une sous-table à partir d’une sélection',
-      '从所选内容中创建子表',
-      '선택 영역에서 하위 테이블 만들기',
-      'สร้างตารางย่อยจากส่วนที่เลือก',
-    ),
-    automationLabel(
-      '現在の選択範囲から実際のテーブルを作成します。',
-      'Create a real table/overlay from the current selection.',
-      'Eine echte Tabelle oder Überlagerung aus der aktuellen Auswahl erstellen.',
-      'Créer un tableau ou une superposition réelle à partir de la sélection actuelle.',
-      '根据当前所选内容创建真实表格或叠加层。',
-      '현재 선택 영역에서 실제 표/오버레이 만들기',
-      'สร้างตารางหรือโอเวอร์เลย์จริงจากส่วนที่เลือกปัจจุบัน',
-    ),
-  ),
-  automationScript(
-    'removeHyperlinks',
-    automationLabel(
-      'シートからハイパーリンクを削除する',
-      'Remove Hyperlinks from Sheet',
-      'Links aus Blatt entfernen',
-      'Supprimer des liens hypertexte de la feuille',
-      '从工作表中删除超链接',
-      '시트에서 하이퍼링크 제거',
-      'นำไฮเปอร์ลิงก์ออกจากแผ่นงาน',
-    ),
-    automationLabel(
-      'アクティブなシートのハイパーリンクをすべて削除します。',
-      'Clear every hyperlink on the active sheet.',
-      'Alle Hyperlinks auf dem aktiven Blatt löschen.',
-      'Effacer tous les liens hypertexte de la feuille active.',
-      '清除活动工作表中的所有超链接。',
-      '활성 시트의 모든 하이퍼링크 지우기',
-      'ล้างไฮเปอร์ลิงก์ทั้งหมดในแผ่นงานที่ใช้งานอยู่',
-    ),
-  ),
-  automationScript(
-    'countEmptyRows',
-    automationLabel(
-      '空の行数をカウントする',
-      'Count Empty Rows',
-      'Leere Zeilen zählen',
-      'Compter les lignes vides',
-      '空行计数',
-      '빈 행 수',
-      'นับแถวที่ว่าง',
-    ),
-    automationLabel(
-      '使用範囲内の空白行を数えます。',
-      'Count blank rows inside the used area.',
-      'Leere Zeilen im verwendeten Bereich zählen.',
-      'Compter les lignes vides dans la zone utilisée.',
-      '统计已用区域中的空白行。',
-      '사용 영역의 빈 행 개수 세기',
-      'นับแถวว่างภายในพื้นที่ที่ใช้',
-    ),
-  ),
-  automationScript(
-    'tableToJson',
-    automationLabel(
-      'テーブルデータを JSON として取得',
-      'Return Table Data as JSON',
-      'Tabellendaten als JSON zurückgeben',
-      'Renvoyer les données de table au format JSON',
-      '将表数据返回为 JSON',
-      '테이블 데이터를 JSON으로 반환',
-      'ส่งกลับข้อมูลตารางเป็น JSON',
-    ),
-    automationLabel(
-      'アクティブなテーブルまたは選択範囲を JSON に変換して表示します。',
-      'Serialize the active table or selection and expose it to the host.',
-      'Die aktive Tabelle oder Auswahl serialisieren und der Host-App bereitstellen.',
-      'Sérialiser le tableau ou la sélection active et les transmettre à l’hôte.',
-      '将活动表格或所选内容序列化并提供给宿主。',
-      '활성 표 또는 선택 영역을 직렬화하여 호스트에 표시',
-      'ทำให้ตารางหรือส่วนที่เลือกปัจจุบันเป็นอนุกรมและแสดงต่อโฮสต์',
-    ),
-  ),
-  automationScript(
-    'newPivotTable',
-    automationLabel(
-      'テーブルから新しいピボットテーブルを作成する',
-      'Create a New PivotTable from a Table',
-      'Neue PivotTable aus einer Tabelle erstellen',
-      'Créer un tableau croisé dynamique à partir d’un tableau',
-      '根据表创建新的数据透视表',
-      '테이블에서 새 피벗 테이블 만들기',
-      'สร้าง PivotTable ใหม่จากตาราง',
-    ),
-    automationLabel(
-      '標準のピボットテーブル作成ダイアログを開きます。',
-      'Open the native PivotTable creation dialog.',
-      'Den systemeigenen Dialog zum Erstellen einer PivotTable öffnen.',
-      'Ouvrir la boîte de dialogue native de création de tableau croisé dynamique.',
-      '打开本机数据透视表创建对话框。',
-      '기본 피벗 테이블 만들기 대화 상자 열기',
-      'เปิดกล่องโต้ตอบการสร้าง PivotTable แบบเนทีฟ',
-    ),
-  ),
+  automationScript('allRowsColumns'),
+  automationScript('freezeSelection'),
+  automationScript('makeSubtable'),
+  automationScript('removeHyperlinks'),
+  automationScript('countEmptyRows'),
+  automationScript('tableToJson'),
+  automationScript('newPivotTable'),
 ];
 
 /** Gallery dialog title, shared with the ribbon command that opens it. */
-const MAC_AUTOMATION_GALLERY_TITLE: Label = automationLabel(
-  'スクリプト ギャラリー',
-  'Script Gallery',
-  'Skriptgalerie',
-  'Galerie de scripts',
-  '脚本库',
-  '스크립트 갤러리',
-  'แกลเลอรีสคริปต์',
-);
+const MAC_AUTOMATION_GALLERY_TITLE: Label = macBundleLabel('automation-ui:title');
 
 const AUTOMATION_UI_LABELS = {
-  countTitle: automationLabel(
-    '空白行を数える',
-    'Count blank rows',
-    'Leere Zeilen zählen',
-    'Compter les lignes vides',
-    '统计空白行',
-    '빈 행 개수 세기',
-    'นับแถวว่าง',
-  ),
-  countSummary: automationLabel(
-    '使用範囲内の空白行: {count} 行',
-    'Blank rows inside the used area: {count}',
-    'Leere Zeilen im verwendeten Bereich: {count}',
-    'Lignes vides dans la zone utilisée : {count}',
-    '已用区域中的空白行：{count}',
-    '사용 영역의 빈 행: {count}',
-    'แถวว่างภายในพื้นที่ที่ใช้: {count}',
-  ),
-  jsonTitle: automationLabel(
-    'テーブルデータを JSON として取得',
-    'Return table data as JSON',
-    'Tabellendaten als JSON zurückgeben',
-    'Retourner les données du tableau au format JSON',
-    '将表格数据作为 JSON 返回',
-    '표 데이터를 JSON으로 반환',
-    'ส่งคืนข้อมูลตารางเป็น JSON',
-  ),
-  jsonCopied: automationLabel(
-    'JSON をクリップボードにコピーしました。',
-    'The JSON was copied to the clipboard.',
-    'Das JSON wurde in die Zwischenablage kopiert.',
-    'Le JSON a été copié dans le Presse-papiers.',
-    'JSON 已复制到剪贴板。',
-    'JSON이 클립보드에 복사되었습니다.',
-    'คัดลอก JSON ไปยังคลิปบอร์ดแล้ว',
-  ),
-  jsonClipboardUnavailable: automationLabel(
-    'クリップボードにアクセスできないため、下の JSON をコピーしてください。',
-    'Clipboard access was unavailable; copy the JSON below.',
-    'Der Zugriff auf die Zwischenablage war nicht möglich. Kopieren Sie das JSON unten.',
-    'Le Presse-papiers est indisponible ; copiez le JSON ci-dessous.',
-    '无法访问剪贴板；请复制下面的 JSON。',
-    '클립보드를 사용할 수 없습니다. 아래 JSON을 복사하세요.',
-    'ไม่สามารถเข้าถึงคลิปบอร์ด ให้คัดลอก JSON ด้านล่าง',
-  ),
-  copy: automationLabel('コピー', 'Copy', 'Kopieren', 'Copier', '复制', '복사', 'คัดลอก'),
-  close: automationLabel('閉じる', 'Close', 'Schließen', 'Fermer', '关闭', '닫기', 'ปิด'),
-  cancel: automationLabel('キャンセル', 'Cancel', 'Abbrechen', 'Annuler', '取消', '취소', 'ยกเลิก'),
+  countTitle: macBundleLabel('automation-ui:countTitle'),
+  countSummary: macBundleLabel('automation-ui:countSummary'),
+  jsonTitle: macBundleLabel('automation-ui:jsonTitle'),
+  jsonCopied: macBundleLabel('automation-ui:jsonCopied'),
+  jsonClipboardUnavailable: macBundleLabel('automation-ui:jsonClipboardUnavailable'),
+  copy: macBundleLabel('automation-ui:copy'),
+  close: macBundleLabel('automation-ui:close'),
+  cancel: macBundleLabel('automation-ui:cancel'),
 } as const;
 
 const automationText = (instance: SpreadsheetInstance, label: Label): string =>

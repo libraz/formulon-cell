@@ -3690,6 +3690,639 @@
         "th": "มุมมอง: 0.1.0.4.2 > 0.1",
         "zh": "视图: 0.1.0.4.2 > 0.1"
       }
+    },
+    "row:wrapAction:wrapText": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4284566947"
+    },
+    "row:cellInsert:cells": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1555940015"
+    },
+    "row:cellDelete:cells": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2177380250"
+    },
+    "row:cellFormat:col-autofit": {
+      "file": "mso40ui.framework/tbbtn2.strings",
+      "key": "1193928148"
+    },
+    "row:clear:comments": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3904218729"
+    },
+    "row:cellFormat:protect-sheet": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2606449828"
+    },
+    "row:sort:asc": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3797378749"
+    },
+    "row:sort:desc": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3755271146"
+    },
+    "row:pasteAction:all": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1471127226"
+    },
+    "row:pasteAction:dialog": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1726585511"
+    },
+    "row:findSelect:go-to-special": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1664557583"
+    },
+    "row:findSelect:comments": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3458342130"
+    },
+    "row:findSelect:selection-pane": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3058570390"
+    },
+    "heading:menu-paste": {
+      "file": "mso99.framework/mso_intl.bundle/strman_5a95.strings",
+      "key": "71bac78c"
+    },
+    "row:pasteAction:text-only": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4172380566"
+    },
+    "row:pasteAction:text-wizard": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4103773146"
+    },
+    "home:textOrientation": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2663590074"
+    },
+    "home:indentDecrease": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "866854112"
+    },
+    "home:indentIncrease": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "644318533"
+    },
+    "home:borders": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "870931639"
+    },
+    "home:fillColor": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2986607320"
+    },
+    "home:decUp": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "841603462"
+    },
+    "home:decDown": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2710913210"
+    },
+    "home:insertRows": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "63631210"
+    },
+    "home:deleteRows": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4178864772"
+    },
+    "home:wrap": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4284566947"
+    },
+    "home-help:formatPainter": {
+      "file": "mso40ui.framework/tbtip.strings",
+      "key": "4162384555"
+    },
+    "home-help:alignC": {
+      "file": "mso40ui.framework/tbtip.strings",
+      "key": "3867188610"
+    },
+    "pivot-style:PivotStyleLight1": {
+      "file": "strman_0031.strings",
+      "key": "af"
+    },
+    "pivot-style:PivotStyleLight2": {
+      "file": "strman_0031.strings",
+      "key": "b1"
+    },
+    "pivot-style:PivotStyleLight3": {
+      "file": "strman_0031.strings",
+      "key": "b3"
+    },
+    "pivot-style:PivotStyleLight4": {
+      "file": "strman_0031.strings",
+      "key": "b5"
+    },
+    "pivot-style:PivotStyleLight5": {
+      "file": "strman_0031.strings",
+      "key": "b7"
+    },
+    "pivot-style:PivotStyleLight6": {
+      "file": "strman_0031.strings",
+      "key": "b9"
+    },
+    "pivot-style:PivotStyleLight7": {
+      "file": "strman_0031.strings",
+      "key": "bb"
+    },
+    "pivot-style:PivotStyleLight8": {
+      "file": "strman_0031.strings",
+      "key": "bd"
+    },
+    "pivot-style:PivotStyleLight9": {
+      "file": "strman_0031.strings",
+      "key": "bf"
+    },
+    "pivot-style:PivotStyleLight10": {
+      "file": "strman_0031.strings",
+      "key": "c1"
+    },
+    "pivot-style:PivotStyleLight11": {
+      "file": "strman_0031.strings",
+      "key": "c3"
+    },
+    "pivot-style:PivotStyleLight12": {
+      "file": "strman_0031.strings",
+      "key": "c5"
+    },
+    "pivot-style:PivotStyleLight13": {
+      "file": "strman_0031.strings",
+      "key": "c7"
+    },
+    "pivot-style:PivotStyleLight14": {
+      "file": "strman_0031.strings",
+      "key": "c9"
+    },
+    "pivot-style:PivotStyleLight15": {
+      "file": "strman_0031.strings",
+      "key": "cb"
+    },
+    "pivot-style:PivotStyleLight16": {
+      "file": "strman_0031.strings",
+      "key": "cd"
+    },
+    "pivot-style:PivotStyleLight17": {
+      "file": "strman_0031.strings",
+      "key": "cf"
+    },
+    "pivot-style:PivotStyleLight18": {
+      "file": "strman_0031.strings",
+      "key": "d1"
+    },
+    "pivot-style:PivotStyleLight19": {
+      "file": "strman_0031.strings",
+      "key": "d3"
+    },
+    "pivot-style:PivotStyleLight20": {
+      "file": "strman_0031.strings",
+      "key": "d5"
+    },
+    "pivot-style:PivotStyleLight21": {
+      "file": "strman_0031.strings",
+      "key": "d7"
+    },
+    "pivot-style:PivotStyleLight22": {
+      "file": "strman_0031.strings",
+      "key": "d9"
+    },
+    "pivot-style:PivotStyleLight23": {
+      "file": "strman_0031.strings",
+      "key": "db"
+    },
+    "pivot-style:PivotStyleLight24": {
+      "file": "strman_0031.strings",
+      "key": "dd"
+    },
+    "pivot-style:PivotStyleLight25": {
+      "file": "strman_0031.strings",
+      "key": "df"
+    },
+    "pivot-style:PivotStyleLight26": {
+      "file": "strman_0031.strings",
+      "key": "e1"
+    },
+    "pivot-style:PivotStyleLight27": {
+      "file": "strman_0031.strings",
+      "key": "e3"
+    },
+    "pivot-style:PivotStyleLight28": {
+      "file": "strman_0031.strings",
+      "key": "e5"
+    },
+    "pivot-style:PivotStyleMedium1": {
+      "file": "strman_0031.strings",
+      "key": "e7"
+    },
+    "pivot-style:PivotStyleMedium2": {
+      "file": "strman_0031.strings",
+      "key": "e9"
+    },
+    "pivot-style:PivotStyleMedium3": {
+      "file": "strman_0031.strings",
+      "key": "eb"
+    },
+    "pivot-style:PivotStyleMedium4": {
+      "file": "strman_0031.strings",
+      "key": "ed"
+    },
+    "pivot-style:PivotStyleMedium5": {
+      "file": "strman_0031.strings",
+      "key": "ef"
+    },
+    "pivot-style:PivotStyleMedium6": {
+      "file": "strman_0031.strings",
+      "key": "f1"
+    },
+    "pivot-style:PivotStyleMedium7": {
+      "file": "strman_0031.strings",
+      "key": "f3"
+    },
+    "pivot-style:PivotStyleMedium8": {
+      "file": "strman_0031.strings",
+      "key": "f5"
+    },
+    "pivot-style:PivotStyleMedium9": {
+      "file": "strman_0031.strings",
+      "key": "f7"
+    },
+    "pivot-style:PivotStyleMedium10": {
+      "file": "strman_0031.strings",
+      "key": "f9"
+    },
+    "pivot-style:PivotStyleMedium11": {
+      "file": "strman_0031.strings",
+      "key": "fb"
+    },
+    "pivot-style:PivotStyleMedium12": {
+      "file": "strman_0031.strings",
+      "key": "fd"
+    },
+    "pivot-style:PivotStyleMedium13": {
+      "file": "strman_0031.strings",
+      "key": "ff"
+    },
+    "pivot-style:PivotStyleMedium14": {
+      "file": "strman_0031.strings",
+      "key": "101"
+    },
+    "pivot-style:PivotStyleMedium15": {
+      "file": "strman_0031.strings",
+      "key": "103"
+    },
+    "pivot-style:PivotStyleMedium16": {
+      "file": "strman_0031.strings",
+      "key": "105"
+    },
+    "pivot-style:PivotStyleMedium17": {
+      "file": "strman_0031.strings",
+      "key": "107"
+    },
+    "pivot-style:PivotStyleMedium18": {
+      "file": "strman_0031.strings",
+      "key": "109"
+    },
+    "pivot-style:PivotStyleMedium19": {
+      "file": "strman_0031.strings",
+      "key": "10b"
+    },
+    "pivot-style:PivotStyleMedium20": {
+      "file": "strman_0031.strings",
+      "key": "10d"
+    },
+    "pivot-style:PivotStyleMedium21": {
+      "file": "strman_0031.strings",
+      "key": "10f"
+    },
+    "pivot-style:PivotStyleMedium22": {
+      "file": "strman_0031.strings",
+      "key": "111"
+    },
+    "pivot-style:PivotStyleMedium23": {
+      "file": "strman_0031.strings",
+      "key": "113"
+    },
+    "pivot-style:PivotStyleMedium24": {
+      "file": "strman_0031.strings",
+      "key": "115"
+    },
+    "pivot-style:PivotStyleMedium25": {
+      "file": "strman_0031.strings",
+      "key": "117"
+    },
+    "pivot-style:PivotStyleMedium26": {
+      "file": "strman_0031.strings",
+      "key": "119"
+    },
+    "pivot-style:PivotStyleMedium27": {
+      "file": "strman_0031.strings",
+      "key": "11b"
+    },
+    "pivot-style:PivotStyleMedium28": {
+      "file": "strman_0031.strings",
+      "key": "11d"
+    },
+    "pivot-style:PivotStyleDark1": {
+      "file": "strman_0031.strings",
+      "key": "11f"
+    },
+    "pivot-style:PivotStyleDark2": {
+      "file": "strman_0031.strings",
+      "key": "121"
+    },
+    "pivot-style:PivotStyleDark3": {
+      "file": "strman_0031.strings",
+      "key": "123"
+    },
+    "pivot-style:PivotStyleDark4": {
+      "file": "strman_0031.strings",
+      "key": "125"
+    },
+    "pivot-style:PivotStyleDark5": {
+      "file": "strman_0031.strings",
+      "key": "127"
+    },
+    "pivot-style:PivotStyleDark6": {
+      "file": "strman_0031.strings",
+      "key": "129"
+    },
+    "pivot-style:PivotStyleDark7": {
+      "file": "strman_0031.strings",
+      "key": "12b"
+    },
+    "pivot-style:PivotStyleDark8": {
+      "file": "strman_0031.strings",
+      "key": "12d"
+    },
+    "pivot-style:PivotStyleDark9": {
+      "file": "strman_0031.strings",
+      "key": "12f"
+    },
+    "pivot-style:PivotStyleDark10": {
+      "file": "strman_0031.strings",
+      "key": "131"
+    },
+    "pivot-style:PivotStyleDark11": {
+      "file": "strman_0031.strings",
+      "key": "133"
+    },
+    "pivot-style:PivotStyleDark12": {
+      "file": "strman_0031.strings",
+      "key": "135"
+    },
+    "pivot-style:PivotStyleDark13": {
+      "file": "strman_0031.strings",
+      "key": "137"
+    },
+    "pivot-style:PivotStyleDark14": {
+      "file": "strman_0031.strings",
+      "key": "139"
+    },
+    "pivot-style:PivotStyleDark15": {
+      "file": "strman_0031.strings",
+      "key": "13b"
+    },
+    "pivot-style:PivotStyleDark16": {
+      "file": "strman_0031.strings",
+      "key": "13d"
+    },
+    "pivot-style:PivotStyleDark17": {
+      "file": "strman_0031.strings",
+      "key": "13f"
+    },
+    "pivot-style:PivotStyleDark18": {
+      "file": "strman_0031.strings",
+      "key": "141"
+    },
+    "pivot-style:PivotStyleDark19": {
+      "file": "strman_0031.strings",
+      "key": "143"
+    },
+    "pivot-style:PivotStyleDark20": {
+      "file": "strman_0031.strings",
+      "key": "145"
+    },
+    "pivot-style:PivotStyleDark21": {
+      "file": "strman_0031.strings",
+      "key": "147"
+    },
+    "pivot-style:PivotStyleDark22": {
+      "file": "strman_0031.strings",
+      "key": "149"
+    },
+    "pivot-style:PivotStyleDark23": {
+      "file": "strman_0031.strings",
+      "key": "14b"
+    },
+    "pivot-style:PivotStyleDark24": {
+      "file": "strman_0031.strings",
+      "key": "14d"
+    },
+    "pivot-style:PivotStyleDark25": {
+      "file": "strman_0031.strings",
+      "key": "14f"
+    },
+    "pivot-style:PivotStyleDark26": {
+      "file": "strman_0031.strings",
+      "key": "151"
+    },
+    "pivot-style:PivotStyleDark27": {
+      "file": "strman_0031.strings",
+      "key": "153"
+    },
+    "pivot-style:PivotStyleDark28": {
+      "file": "strman_0031.strings",
+      "key": "155"
+    },
+    "pivot-style:none": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1668987864"
+    },
+    "colour:white": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "43cbb52a"
+    },
+    "colour:iceBlue": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "a6568d0e"
+    },
+    "colour:rose": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "17a2ae7"
+    },
+    "colour:lightGreen": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "765cc1ca"
+    },
+    "colour:lavender": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "97d0af89"
+    },
+    "colour:skyBlue": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "470baeec"
+    },
+    "colour:lightOrange": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "da70475c"
+    },
+    "colour:lightGray": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "6ebd0494"
+    },
+    "colour:lightBlue": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "721e630a"
+    },
+    "colour:darkBlue": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "6c7994f6"
+    },
+    "colour:darkRed": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "63722ac1"
+    },
+    "colour:darkGreen": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "600dfb56"
+    },
+    "colour:darkPurple": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "84e88a6c"
+    },
+    "colour:darkTeal": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "63f8c73f"
+    },
+    "colour:brown": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "6888c011"
+    },
+    "colour:darkGray": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "6de7dc54"
+    },
+    "colour:gray": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "6f889b15"
+    },
+    "colour:blue": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "41020067"
+    },
+    "colour:red": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "e022110e"
+    },
+    "colour:oliveGreen": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "2b3ec9cb"
+    },
+    "colour:aqua": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "5b2a7a94"
+    },
+    "colour:orange": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ac16.strings",
+      "key": "bd41f80c"
+    },
+    "menu:mac.page.theme.office": {
+      "file": "mso99.framework/mso_intl.bundle/strman_9703.strings",
+      "key": "ebc1dc0b"
+    },
+    "menu:mac.page.theme.gray": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3968501784"
+    },
+    "menu:mac.page.color.office": {
+      "file": "mso99.framework/mso_intl.bundle/strman_9703.strings",
+      "key": "ebc1dc0b"
+    },
+    "menu:mac.page.color.gray": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3968501784"
+    },
+    "menu:mac.page.font.office": {
+      "file": "mso99.framework/mso_intl.bundle/strman_9703.strings",
+      "key": "ebc1dc0b"
+    },
+    "menu:mac.page.font.gray": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3968501784"
+    },
+    "menu:mac.autosum.SUM": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2177504241",
+      "control": "menu-item"
+    },
+    "menu:mac.autosum.AVERAGE": {
+      "file": "strman_040a.strings",
+      "key": "df",
+      "evidence": "drawn label in all locales; the ja-keyed tbbtn row reads de Durchschnitt where the menu draws Mittelwert",
+      "ax_path": {
+        "en": "Formulas: 0.1.0.0.1 > 0.1",
+        "ja": "数式: 0.1.0.0.1 > 0.1"
+      },
+      "control": "menu-item"
+    },
+    "menu:mac.autosum.MIN": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1351996790",
+      "evidence": "drawn label in all locales; the ja-keyed strman_005b row reads de Minimum and fr Min.",
+      "ax_path": {
+        "en": "Formulas: 0.1.0.0.1 > 0.4",
+        "ja": "数式: 0.1.0.0.1 > 0.4"
+      },
+      "control": "menu-item"
+    },
+    "gallery:mac.insert.recommendedChart.none": {
+      "file": "strman_008a.strings",
+      "key": "391"
+    },
+    "gallery:mac.insert.recommendedChart.apply": {
+      "file": "mso40ui.framework/tbtip.strings",
+      "key": "3791498120"
+    },
+    "automation:allRowsColumns": {
+      "file": "strman_0050.strings",
+      "key": "22e"
+    },
+    "automation:freezeSelection": {
+      "file": "strman_0050.strings",
+      "key": "22f"
+    },
+    "automation:makeSubtable": {
+      "file": "strman_0050.strings",
+      "key": "22d"
+    },
+    "automation:removeHyperlinks": {
+      "file": "strman_0017.strings",
+      "key": "248"
+    },
+    "automation:countEmptyRows": {
+      "file": "strman_0017.strings",
+      "key": "247"
+    },
+    "automation:newPivotTable": {
+      "file": "strman_0050.strings",
+      "key": "23a"
+    },
+    "automation-ui:copy": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1570785191"
+    },
+    "automation-ui:close": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "653791522"
+    },
+    "automation-ui:cancel": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "746909326"
     }
   },
   "held": {
@@ -3779,7 +4412,11 @@
       "status": "no-consumer",
       "tcid": 12562,
       "name": "GalMaximumHeight",
-      "reason": "nothing in the label set resolves this key"
+      "reason": "nothing in the label set resolves this key",
+      "provisional": {
+        "file": "mso40ui.framework/tbbtn.strings",
+        "key": "3812860876"
+      }
     },
     "labels:macros": {
       "status": "drawn-disagrees",
@@ -3801,18 +4438,33 @@
       "status": "drawn-disagrees",
       "tcid": 1591,
       "name": "NextComment",
-      "reason": "tbfriendly of TCID 1591 disagrees with the drawn label: zh at AX 审阅: 0.1.0.4.3: drawn '下一条批注', bundle '下一条\\u200b\\u200b批注'"
+      "reason": "tbfriendly of TCID 1591 disagrees with the drawn label: zh at AX 审阅: 0.1.0.4.3: drawn '下一条批注', bundle '下一条\\u200b\\u200b批注'",
+      "provisional": {
+        "file": "mso40ui.framework/tbbtn.strings",
+        "key": "1020212086"
+      },
+      "text": {
+        "zh": "下一条批注"
+      }
     },
     "labels:pageBreakPreview": {
       "status": "pinned-pending",
       "tcid": null,
-      "reason": "runtime substitution with no ribbon string source; th draws \"แสดงตัวอย่างตัวแบ่งหน้า\""
+      "reason": "runtime substitution with no ribbon string source; th draws \"แสดงตัวอย่างตัวแบ่งหน้า\"",
+      "provisional": {
+        "file": "strman_004b.strings",
+        "key": "2b"
+      }
     },
     "labels:pageLayout": {
       "status": "split",
       "tcid": 11441,
       "name": "XLPageLayoutView",
-      "reason": "one key drawn differently on several controls (it needs one key per control): fr: 'Mise en page' at ['tab pageLayout @ Mise en page: 0.1.5'] | 'Mode Page' at ['mac.view.pageLayout @ Affichage: 0.1.0.1.2']"
+      "reason": "one key drawn differently on several controls (it needs one key per control): fr: 'Mise en page' at ['tab pageLayout @ Mise en page: 0.1.5'] | 'Mode Page' at ['mac.view.pageLayout @ Affichage: 0.1.0.1.2']",
+      "provisional": {
+        "file": "mso40ui.framework/tbbtn.strings",
+        "key": "1812408391"
+      }
     },
     "labels:pageSetup": {
       "status": "drawn-disagrees",
@@ -3846,12 +4498,26 @@
       "status": "drawn-disagrees",
       "tcid": 1590,
       "name": "PreviousComment",
-      "reason": "tbfriendly of TCID 1590 disagrees with the drawn label: zh at AX 审阅: 0.1.0.4.2: drawn '上一条批注', bundle '上一条\\u200b\\u200b批注'"
+      "reason": "tbfriendly of TCID 1590 disagrees with the drawn label: zh at AX 审阅: 0.1.0.4.2: drawn '上一条批注', bundle '上一条\\u200b\\u200b批注'",
+      "provisional": {
+        "file": "mso40ui.framework/tbbtn.strings",
+        "key": "3015357561"
+      },
+      "text": {
+        "zh": "上一条批注"
+      }
     },
     "labels:protectSheet": {
       "status": "unconfirmed",
       "tcid": 893,
-      "reason": "th Review button (AX 0.1.0.6.0) draws \"ป้องกันแผ่นงาน\"; tbbtn 893 gives \"การป้องกันแผ่นงาน\" and no bundle source gives the drawn text. The Home Format menu item draws \"ป้องกันแผ่นงาน...\"."
+      "reason": "th Review button (AX 0.1.0.6.0) draws \"ป้องกันแผ่นงาน\"; tbbtn 893 gives \"การป้องกันแผ่นงาน\" and no bundle source gives the drawn text. The Home Format menu item draws \"ป้องกันแผ่นงาน...\".",
+      "provisional": {
+        "file": "strman_0041.strings",
+        "key": "4"
+      },
+      "text": {
+        "th": "ป้องกันแผ่นงาน"
+      }
     },
     "labels:removeHyperlinks": {
       "status": "unresolved",
@@ -3914,12 +4580,20 @@
     "labels:sortAsc": {
       "status": "pinned-pending",
       "tcid": null,
-      "reason": "runtime substitution with no ribbon string source"
+      "reason": "runtime substitution with no ribbon string source",
+      "provisional": {
+        "file": "mso40ui.framework/tbbtn.strings",
+        "key": "3797378749"
+      }
     },
     "labels:sortDesc": {
       "status": "pinned-pending",
       "tcid": null,
-      "reason": "runtime substitution with no ribbon string source"
+      "reason": "runtime substitution with no ribbon string source",
+      "provisional": {
+        "file": "mso40ui.framework/tbbtn.strings",
+        "key": "3755271146"
+      }
     },
     "labels:tableToJson": {
       "status": "unresolved",
@@ -3941,13 +4615,26 @@
       "status": "pinned-pending",
       "tcid": 15653,
       "name": "FlyoutAnchorDataValidation",
-      "reason": "run-time label: the ribbon slot draws en \"Data Validation\" and ja 入力規則, while tbbtn reads データの入力規則"
+      "reason": "run-time label: the ribbon slot draws en \"Data Validation\" and ja 入力規則, while tbbtn reads データの入力規則",
+      "text": {
+        "en": "Data Validation",
+        "ja": "入力規則",
+        "de": "Datenüberprüfung",
+        "fr": "Validation des données",
+        "ko": "데이터 유효성 검사",
+        "th": "การตรวจสอบความถูกต้องของข้อมูล",
+        "zh": "数据验证"
+      }
     },
     "labels:width": {
       "status": "no-consumer",
       "tcid": 12561,
       "name": "GalMaximumWidth",
-      "reason": "nothing in the label set resolves this key"
+      "reason": "nothing in the label set resolves this key",
+      "provisional": {
+        "file": "mso40ui.framework/tbbtn.strings",
+        "key": "2782528510"
+      }
     },
     "menu:mac.automate.allRowsColumns": {
       "status": "unresolved",
@@ -4152,26 +4839,6 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "menu:mac.page.color.gray": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "menu:mac.page.color.office": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "menu:mac.page.font.gray": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "menu:mac.page.font.office": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
     "menu:mac.page.margins.narrow": {
       "status": "unresolved",
       "tcid": null,
@@ -4222,16 +4889,6 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "menu:mac.page.theme.gray": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "menu:mac.page.theme.office": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
     "menu:mac.view.formulaBar": {
       "status": "no-consumer",
       "tcid": 849,
@@ -4254,6 +4911,1015 @@
       "tcid": 15644,
       "name": "BooleanChoiceViewHeadings2",
       "reason": "nothing in the label set resolves this key"
+    },
+    "gallery:mac.insert.heading.column2d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "2-D Column",
+        "ja": "2-D 縦棒"
+      }
+    },
+    "gallery:mac.insert.heading.column3d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "3-D Column",
+        "ja": "3-D 縦棒"
+      }
+    },
+    "gallery:mac.insert.heading.bar2d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "2-D Bar",
+        "ja": "2-D 横棒"
+      }
+    },
+    "gallery:mac.insert.heading.bar3d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "3-D Bar",
+        "ja": "3-D 横棒"
+      }
+    },
+    "gallery:mac.insert.heading.line2d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "2-D Line",
+        "ja": "2-D 折れ線"
+      }
+    },
+    "gallery:mac.insert.heading.line3d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "3-D Line",
+        "ja": "3-D 折れ線"
+      }
+    },
+    "gallery:mac.insert.heading.area2d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "2-D Area",
+        "ja": "2-D 面"
+      }
+    },
+    "gallery:mac.insert.heading.area3d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "3-D Area",
+        "ja": "3-D 面"
+      }
+    },
+    "gallery:mac.insert.heading.pie2d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "2-D Pie",
+        "ja": "2-D 円"
+      }
+    },
+    "gallery:mac.insert.heading.pie3d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "3-D Pie",
+        "ja": "3-D 円"
+      }
+    },
+    "gallery:mac.insert.heading.doughnut": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "Doughnut",
+        "ja": "ドーナツ"
+      }
+    },
+    "gallery:mac.insert.heading.scatter": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "Scatter",
+        "ja": "散布図"
+      }
+    },
+    "gallery:mac.insert.heading.bubble": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "Bubble",
+        "ja": "バブル"
+      }
+    },
+    "gallery:mac.insert.heading.treemap": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "Treemap",
+        "ja": "ツリーマップ"
+      }
+    },
+    "gallery:mac.insert.heading.sunburst": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "Sunburst",
+        "ja": "サンバースト"
+      }
+    },
+    "gallery:mac.insert.heading.histogramGroup": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "Histogram",
+        "ja": "ヒストグラム"
+      }
+    },
+    "gallery:mac.insert.heading.boxWhisker": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "Box and Whisker",
+        "ja": "箱ひげ図"
+      }
+    },
+    "gallery:mac.insert.heading.waterfall": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "Waterfall",
+        "ja": "ウォーターフォール"
+      }
+    },
+    "gallery:mac.insert.heading.funnel": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "Funnel",
+        "ja": "じょうご"
+      }
+    },
+    "gallery:mac.insert.heading.stock": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "Stock",
+        "ja": "株価"
+      }
+    },
+    "gallery:mac.insert.heading.surface": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "Surface",
+        "ja": "等高線"
+      }
+    },
+    "gallery:mac.insert.heading.radar": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "Radar",
+        "ja": "レーダー"
+      }
+    },
+    "gallery:mac.insert.heading.combo": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "Combo",
+        "ja": "組み合わせ"
+      }
+    },
+    "gallery:mac.insert.heading.filledMap": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery caption; current en/ja text",
+      "text": {
+        "en": "Filled Map",
+        "ja": "塗り分けマップ"
+      }
+    },
+    "gallery:mac.insert.chartColumn": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Clustered Column",
+        "ja": "集合縦棒"
+      }
+    },
+    "gallery:mac.insert.chartColumnStacked": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Stacked Column",
+        "ja": "積み上げ縦棒"
+      }
+    },
+    "gallery:mac.insert.chartColumn100": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "100% Stacked Column",
+        "ja": "100% 積み上げ縦棒"
+      }
+    },
+    "gallery:mac.insert.chartColumn3d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "3-D Clustered Column",
+        "ja": "3-D 集合縦棒"
+      }
+    },
+    "gallery:mac.insert.chartColumnStacked3d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "3-D Stacked Column",
+        "ja": "3-D 積み上げ縦棒"
+      }
+    },
+    "gallery:mac.insert.chartColumn1003d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "3-D 100% Stacked Column",
+        "ja": "3-D 100% 積み上げ縦棒"
+      }
+    },
+    "gallery:mac.insert.chartColumnTrue3d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "3-D Column",
+        "ja": "3-D 縦棒グラフ"
+      }
+    },
+    "gallery:mac.insert.chartBar": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Clustered Bar",
+        "ja": "集合横棒"
+      }
+    },
+    "gallery:mac.insert.chartBarStacked": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Stacked Bar",
+        "ja": "積み上げ横棒"
+      }
+    },
+    "gallery:mac.insert.chartBar100": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "100% Stacked Bar",
+        "ja": "100% 積み上げ横棒"
+      }
+    },
+    "gallery:mac.insert.chartBar3d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "3-D Clustered Bar",
+        "ja": "3-D 集合横棒"
+      }
+    },
+    "gallery:mac.insert.chartBarStacked3d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "3-D Stacked Bar",
+        "ja": "3-D 積み上げ横棒"
+      }
+    },
+    "gallery:mac.insert.chartBar1003d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "3-D 100% Stacked Bar",
+        "ja": "3-D 100% 積み上げ横棒"
+      }
+    },
+    "gallery:mac.insert.chartLine": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Line",
+        "ja": "折れ線"
+      }
+    },
+    "gallery:mac.insert.chartLineStacked": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Stacked Line",
+        "ja": "積み上げ折れ線"
+      }
+    },
+    "gallery:mac.insert.chartLine100": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "100% Stacked Line",
+        "ja": "100% 積み上げ折れ線"
+      }
+    },
+    "gallery:mac.insert.chartLineMarkers": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Line with Markers",
+        "ja": "マーカー付き折れ線"
+      }
+    },
+    "gallery:mac.insert.chartLineStackedMarkers": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Stacked Line with Markers",
+        "ja": "マーカー付き積み上げ折れ線"
+      }
+    },
+    "gallery:mac.insert.chartLine100Markers": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "100% Stacked Line with Markers",
+        "ja": "マーカー付き 100% 積み上げ折れ線"
+      }
+    },
+    "gallery:mac.insert.chartLine3d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "3-D Line",
+        "ja": "3-D 折れ線"
+      }
+    },
+    "gallery:mac.insert.chartArea": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Area",
+        "ja": "面"
+      }
+    },
+    "gallery:mac.insert.chartAreaStacked": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Stacked Area",
+        "ja": "積み上げ面"
+      }
+    },
+    "gallery:mac.insert.chartArea100": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "100% Stacked Area",
+        "ja": "100% 積み上げ面"
+      }
+    },
+    "gallery:mac.insert.chartArea3d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "3-D Area",
+        "ja": "3-D 面"
+      }
+    },
+    "gallery:mac.insert.chartAreaStacked3d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "3-D Stacked Area",
+        "ja": "3-D 積み上げ面"
+      }
+    },
+    "gallery:mac.insert.chartArea1003d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "3-D 100% Stacked Area",
+        "ja": "3-D 100% 積み上げ面"
+      }
+    },
+    "gallery:mac.insert.chartPie": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Pie",
+        "ja": "円"
+      }
+    },
+    "gallery:mac.insert.chartPieOfPie": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Pie of Pie",
+        "ja": "補助円グラフ付き円"
+      }
+    },
+    "gallery:mac.insert.chartBarOfPie": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Bar of Pie",
+        "ja": "補助縦棒付き円"
+      }
+    },
+    "gallery:mac.insert.chartPie3d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "3-D Pie",
+        "ja": "3-D 円"
+      }
+    },
+    "gallery:mac.insert.chartDoughnut": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Doughnut",
+        "ja": "ドーナツ"
+      }
+    },
+    "gallery:mac.insert.chartScatter": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Scatter",
+        "ja": "散布図"
+      }
+    },
+    "gallery:mac.insert.chartScatterSmooth": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Scatter with Smooth Lines",
+        "ja": "散布図 (平滑線)"
+      }
+    },
+    "gallery:mac.insert.chartScatterLinesMarkers": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Scatter with Straight Lines and Markers",
+        "ja": "散布図 (直線とマーカー)"
+      }
+    },
+    "gallery:mac.insert.chartScatterLines": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Scatter with Straight Lines",
+        "ja": "散布図 (直線)"
+      }
+    },
+    "gallery:mac.insert.chartBubble": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Bubble",
+        "ja": "バブル"
+      }
+    },
+    "gallery:mac.insert.chartBubble3d": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "3-D Bubble",
+        "ja": "3-D 効果付きバブル"
+      }
+    },
+    "gallery:mac.insert.chartTreemap": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Treemap",
+        "ja": "ツリーマップ"
+      }
+    },
+    "gallery:mac.insert.chartSunburst": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Sunburst",
+        "ja": "サンバースト"
+      }
+    },
+    "gallery:mac.insert.chartHistogram": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Histogram",
+        "ja": "ヒストグラム"
+      }
+    },
+    "gallery:mac.insert.chartPareto": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Pareto",
+        "ja": "パレート図"
+      }
+    },
+    "gallery:mac.insert.chartBoxWhisker": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Box and Whisker",
+        "ja": "箱ひげ図"
+      }
+    },
+    "gallery:mac.insert.chartWaterfall.plot": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Waterfall",
+        "ja": "ウォーターフォール"
+      }
+    },
+    "gallery:mac.insert.chartFunnel": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Funnel",
+        "ja": "じょうご"
+      }
+    },
+    "gallery:mac.insert.chartStockHlc": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Stock: High-Low-Close",
+        "ja": "株価チャート (高値-安値-終値)"
+      }
+    },
+    "gallery:mac.insert.chartStockOhlc": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Stock: Open-High-Low-Close",
+        "ja": "株価チャート (始値-高値-安値-終値)"
+      }
+    },
+    "gallery:mac.insert.chartStockVhlc": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Stock: Volume-High-Low-Close",
+        "ja": "株価チャート (出来高-高値-安値-終値)"
+      }
+    },
+    "gallery:mac.insert.chartStockVohlc": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Stock: Volume-Open-High-Low-Close",
+        "ja": "株価チャート (出来高-始値-高値-安値-終値)"
+      }
+    },
+    "gallery:mac.insert.chartSurface": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "3-D Surface",
+        "ja": "3-D の表面"
+      }
+    },
+    "gallery:mac.insert.chartSurfaceWireframe": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Wireframe 3-D Surface",
+        "ja": "ワイヤーフレーム 3-D 等高線"
+      }
+    },
+    "gallery:mac.insert.chartContour": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Contour",
+        "ja": "等高線"
+      }
+    },
+    "gallery:mac.insert.chartContourWireframe": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Wireframe Contour",
+        "ja": "ワイヤーフレーム等高線"
+      }
+    },
+    "gallery:mac.insert.chartRadar": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Radar",
+        "ja": "レーダー チャート"
+      }
+    },
+    "gallery:mac.insert.chartRadarMarkers": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Radar with Markers",
+        "ja": "マーカー付きレーダー"
+      }
+    },
+    "gallery:mac.insert.chartRadarFilled": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Filled Radar",
+        "ja": "塗りつぶしレーダー"
+      }
+    },
+    "gallery:mac.insert.chartComboColumnLine": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Clustered Column - Line",
+        "ja": "集合縦棒 - 折れ線"
+      }
+    },
+    "gallery:mac.insert.chartComboColumnLineSecondary": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Clustered Column - Line on Secondary Axis",
+        "ja": "集合縦棒 - 第 2 軸の折れ線"
+      }
+    },
+    "gallery:mac.insert.chartComboAreaColumn": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Stacked Area - Clustered Column",
+        "ja": "積み上げ面 - 集合縦棒"
+      }
+    },
+    "gallery:mac.insert.chartFilledMap": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Filled Map",
+        "ja": "塗り分けマップ"
+      }
+    },
+    "gallery:mac.data.dataTypes.stocks": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Stocks (English)",
+        "ja": "株式 (English)"
+      }
+    },
+    "gallery:mac.data.dataTypes.currencies": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Currencies (English)",
+        "ja": "通貨 (English)"
+      }
+    },
+    "gallery:mac.data.dataTypes.geography": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "Geography (English)",
+        "ja": "地理 (English)"
+      }
+    },
+    "gallery:mac.data.pictureFromData.file": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "From File...",
+        "ja": "ファイルからの画像..."
+      }
+    },
+    "gallery:mac.data.pictureFromData.clipboard": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry looked up for this gallery entry; current en/ja text",
+      "text": {
+        "en": "From Clipboard",
+        "ja": "クリップボードからの画像"
+      }
+    },
+    "automation:tableToJson": {
+      "status": "provisional",
+      "tcid": null,
+      "reason": "no bundle entry with the current ja; en-keyed candidate for the other locales",
+      "provisional": {
+        "file": "strman_0017.strings",
+        "key": "242"
+      },
+      "text": {
+        "ja": "テーブルデータを JSON として取得"
+      }
+    },
+    "automation-detail:tableToJson": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry; current text",
+      "text": {
+        "en": "Serialize the active table or selection and expose it to the host.",
+        "ja": "アクティブなテーブルまたは選択範囲を JSON に変換して表示します。",
+        "de": "Die aktive Tabelle oder Auswahl serialisieren und der Host-App bereitstellen.",
+        "fr": "Sérialiser le tableau ou la sélection active et les transmettre à l’hôte.",
+        "ko": "활성 표 또는 선택 영역을 직렬화하여 호스트에 표시",
+        "th": "ทำให้ตารางหรือส่วนที่เลือกปัจจุบันเป็นอนุกรมและแสดงต่อโฮสต์",
+        "zh": "将活动表格或所选内容序列化并提供给宿主。"
+      }
+    },
+    "automation-detail:makeSubtable": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry; current text",
+      "text": {
+        "en": "Create a real table/overlay from the current selection.",
+        "ja": "現在の選択範囲から実際のテーブルを作成します。",
+        "de": "Eine echte Tabelle oder Überlagerung aus der aktuellen Auswahl erstellen.",
+        "fr": "Créer un tableau ou une superposition réelle à partir de la sélection actuelle.",
+        "ko": "현재 선택 영역에서 실제 표/오버레이 만들기",
+        "th": "สร้างตารางหรือโอเวอร์เลย์จริงจากส่วนที่เลือกปัจจุบัน",
+        "zh": "根据当前所选内容创建真实表格或叠加层。"
+      }
+    },
+    "automation-detail:freezeSelection": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry; current text",
+      "text": {
+        "en": "Freeze rows above and columns left of the active selection.",
+        "ja": "選択範囲の上の行と左の列を固定します。",
+        "de": "Zeilen oberhalb und Spalten links von der aktiven Auswahl fixieren.",
+        "fr": "Figer les lignes au-dessus et les colonnes à gauche de la sélection active.",
+        "ko": "활성 선택 영역 위의 행과 왼쪽 열 고정",
+        "th": "ตรึงแถวด้านบนและคอลัมน์ด้านซ้ายของส่วนที่เลือก",
+        "zh": "冻结活动单元格上方的行和左侧的列。"
+      }
+    },
+    "automation-detail:allRowsColumns": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry; current text",
+      "text": {
+        "en": "Unhide rows and columns in the used area.",
+        "ja": "使用範囲の行と列の非表示を解除します。",
+        "de": "Zeilen und Spalten im verwendeten Bereich einblenden.",
+        "fr": "Afficher les lignes et colonnes de la zone utilisée.",
+        "ko": "사용 영역의 행 및 열 숨기기 취소",
+        "th": "ยกเลิกการซ่อนแถวและคอลัมน์ในพื้นที่ที่ใช้",
+        "zh": "取消隐藏已用区域中的行和列。"
+      }
+    },
+    "automation-detail:countEmptyRows": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry; current text",
+      "text": {
+        "en": "Count blank rows inside the used area.",
+        "ja": "使用範囲内の空白行を数えます。",
+        "de": "Leere Zeilen im verwendeten Bereich zählen.",
+        "fr": "Compter les lignes vides dans la zone utilisée.",
+        "ko": "사용 영역의 빈 행 개수 세기",
+        "th": "นับแถวว่างภายในพื้นที่ที่ใช้",
+        "zh": "统计已用区域中的空白行。"
+      }
+    },
+    "automation-detail:newPivotTable": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry; current text",
+      "text": {
+        "en": "Open the native PivotTable creation dialog.",
+        "ja": "標準のピボットテーブル作成ダイアログを開きます。",
+        "de": "Den systemeigenen Dialog zum Erstellen einer PivotTable öffnen.",
+        "fr": "Ouvrir la boîte de dialogue native de création de tableau croisé dynamique.",
+        "ko": "기본 피벗 테이블 만들기 대화 상자 열기",
+        "th": "เปิดกล่องโต้ตอบการสร้าง PivotTable แบบเนทีฟ",
+        "zh": "打开本机数据透视表创建对话框。"
+      }
+    },
+    "automation-detail:removeHyperlinks": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry; current text",
+      "text": {
+        "en": "Clear every hyperlink on the active sheet.",
+        "ja": "アクティブなシートのハイパーリンクをすべて削除します。",
+        "de": "Alle Hyperlinks auf dem aktiven Blatt löschen.",
+        "fr": "Effacer tous les liens hypertexte de la feuille active.",
+        "ko": "활성 시트의 모든 하이퍼링크 지우기",
+        "th": "ล้างไฮเปอร์ลิงก์ทั้งหมดในแผ่นงานที่ใช้งานอยู่",
+        "zh": "清除活动工作表中的所有超链接。"
+      }
+    },
+    "automation-ui:title": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry; current text",
+      "text": {
+        "ja": "スクリプト ギャラリー",
+        "en": "Script Gallery",
+        "de": "Skriptgalerie",
+        "fr": "Galerie de scripts",
+        "zh": "脚本库",
+        "ko": "스크립트 갤러리",
+        "th": "แกลเลอรีสคริปต์"
+      }
+    },
+    "automation-ui:countTitle": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry; current text",
+      "text": {
+        "ja": "空白行を数える",
+        "en": "Count blank rows",
+        "de": "Leere Zeilen zählen",
+        "fr": "Compter les lignes vides",
+        "zh": "统计空白行",
+        "ko": "빈 행 개수 세기",
+        "th": "นับแถวว่าง"
+      }
+    },
+    "automation-ui:countSummary": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry; current text",
+      "text": {
+        "ja": "使用範囲内の空白行: {count} 行",
+        "en": "Blank rows inside the used area: {count}",
+        "de": "Leere Zeilen im verwendeten Bereich: {count}",
+        "fr": "Lignes vides dans la zone utilisée : {count}",
+        "zh": "已用区域中的空白行：{count}",
+        "ko": "사용 영역의 빈 행: {count}",
+        "th": "แถวว่างภายในพื้นที่ที่ใช้: {count}"
+      }
+    },
+    "automation-ui:jsonCopied": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry; current text",
+      "text": {
+        "ja": "JSON をクリップボードにコピーしました。",
+        "en": "The JSON was copied to the clipboard.",
+        "de": "Das JSON wurde in die Zwischenablage kopiert.",
+        "fr": "Le JSON a été copié dans le Presse-papiers.",
+        "zh": "JSON 已复制到剪贴板。",
+        "ko": "JSON이 클립보드에 복사되었습니다.",
+        "th": "คัดลอก JSON ไปยังคลิปบอร์ดแล้ว"
+      }
+    },
+    "automation-ui:jsonClipboardUnavailable": {
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no bundle entry; current text",
+      "text": {
+        "ja": "クリップボードにアクセスできないため、下の JSON をコピーしてください。",
+        "en": "Clipboard access was unavailable; copy the JSON below.",
+        "de": "Der Zugriff auf die Zwischenablage war nicht möglich. Kopieren Sie das JSON unten.",
+        "fr": "Le Presse-papiers est indisponible ; copiez le JSON ci-dessous.",
+        "zh": "无法访问剪贴板；请复制下面的 JSON。",
+        "ko": "클립보드를 사용할 수 없습니다. 아래 JSON을 복사하세요.",
+        "th": "ไม่สามารถเข้าถึงคลิปบอร์ด ให้คัดลอก JSON ด้านล่าง"
+      }
+    },
+    "automation-ui:jsonTitle": {
+      "status": "provisional",
+      "tcid": null,
+      "reason": "no bundle entry with the current ja; en-keyed candidate for the other locales",
+      "provisional": {
+        "file": "strman_0017.strings",
+        "key": "242"
+      },
+      "text": {
+        "ja": "テーブルデータを JSON として取得"
+      }
+    },
+    "menu:mac.autosum.COUNT": {
+      "status": "drawn-disagrees",
+      "tcid": null,
+      "reason": "no bundle source gives the drawn label in every locale: strman_040a e3 reads zh '数值计数' where the menu draws '计数'",
+      "provisional": {
+        "file": "strman_040a.strings",
+        "key": "e3"
+      },
+      "text": {
+        "zh": "计数"
+      }
+    },
+    "menu:mac.autosum.MAX": {
+      "status": "drawn-disagrees",
+      "tcid": null,
+      "reason": "no bundle source gives the drawn label in every locale: strman_005b 34 reads de 'Maximum' and fr 'Max.' where the menu draws 'Max'",
+      "provisional": {
+        "file": "strman_005b.strings",
+        "key": "34"
+      },
+      "text": {
+        "de": "Max",
+        "fr": "Max"
+      }
     }
   },
   "consumers": [
@@ -4504,6 +6170,9 @@
     "labels:zoom",
     "labels:zoom100",
     "labels:zoomSelection",
+    "menu:mac.autosum.AVERAGE",
+    "menu:mac.autosum.MIN",
+    "menu:mac.autosum.SUM",
     "menu:mac.data.dataTable",
     "menu:mac.data.goalSeek",
     "menu:mac.data.scenarioManager",
@@ -4528,9 +6197,15 @@
     "menu:mac.page.break.insert",
     "menu:mac.page.break.remove",
     "menu:mac.page.break.reset",
+    "menu:mac.page.color.gray",
+    "menu:mac.page.color.office",
+    "menu:mac.page.font.gray",
+    "menu:mac.page.font.office",
     "menu:mac.page.margins.custom",
     "menu:mac.page.printArea.clear",
     "menu:mac.page.printArea.set",
+    "menu:mac.page.theme.gray",
+    "menu:mac.page.theme.office",
     "menu:mac.review.convertNotes",
     "menu:mac.review.newNote",
     "menu:mac.review.nextNote",

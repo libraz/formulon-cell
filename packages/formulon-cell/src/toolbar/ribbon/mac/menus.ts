@@ -34,6 +34,7 @@ import {
   visualMenuGrid,
   visualMenuTile,
 } from '../menus/general.js';
+import { findMacBundleLabel } from './bundle-text.js';
 import { macFunctionCategoryLabel } from './labels.js';
 import { localizedFunctionName, MAC_CONTEXT_LABELS } from './labels-data.js';
 import {
@@ -270,6 +271,11 @@ const SHAPE_ICONS: Readonly<Record<string, VisualTileIconSlug>> = {
   shapeDiamond: 'shape-diamond',
 };
 
+/** The wording of a gallery's own row: its generated label, or the shape gallery's own pair. */
+const ownLabel = (item: MacRibbonMenuItem, lang: Locale): string =>
+  findMacBundleLabel(`gallery:${item.id}`)?.[lang] ??
+  (lang === 'ja' && item.labelJa ? item.labelJa : item.label);
+
 const menuItemButton = (
   item: MacRibbonMenuItem,
   lang: Locale,
@@ -282,12 +288,7 @@ const menuItemButton = (
     (functionName
       ? functionDisplayName(undefined, lang, functionName)
       : macRibbonLabelForCommand(item.id, lang));
-  const label =
-    item.own || localized === item.id
-      ? item.labelJa && lang === 'ja'
-        ? item.labelJa
-        : item.label
-      : localized;
+  const label = item.own || localized === item.id ? ownLabel(item, lang) : localized;
   const icon = CHART_ICONS[item.id] ?? SHAPE_ICONS[item.icon ?? ''];
   const button =
     visual && icon
@@ -421,9 +422,7 @@ export const createMacRibbonMenuFactory = (lang: Locale): MacRibbonMenuFactory =
       let grid: HTMLElement | null = null;
       for (const item of items) {
         if (item.heading) {
-          menu.appendChild(
-            menuSectionHeader(lang === 'ja' && item.labelJa ? item.labelJa : item.label),
-          );
+          menu.appendChild(menuSectionHeader(ownLabel(item, lang)));
           grid = null;
           continue;
         }

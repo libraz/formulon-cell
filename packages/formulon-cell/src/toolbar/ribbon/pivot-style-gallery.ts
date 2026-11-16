@@ -7,6 +7,7 @@ import { BUILTIN_PIVOT_STYLE, builtinPivotStyleElements } from '../../engine/piv
 import type { StyleElementFormat, StyleElementFormats } from '../../engine/table-style-elements.js';
 import { focusSheet } from '../../interact/dialog-focus.js';
 import type { ToolbarLang } from '../ribbon-model.js';
+import { findMacBundleLabel, macBundleText } from './mac/bundle-text.js';
 import {
   blockedUnlessPermitted,
   createQuickStyleStrip,
@@ -14,61 +15,38 @@ import {
   type RibbonStyleGalleryOptions,
 } from './quick-style-strip.js';
 
-const FAMILIES = [
-  { id: 'Light', ja: '淡色', en: 'Light' },
-  { id: 'Medium', ja: '中間', en: 'Medium' },
-  { id: 'Dark', ja: '濃色', en: 'Dark' },
-] as const;
+type PivotStyleFamily = 'Light' | 'Medium' | 'Dark';
 
-/** Colour names Excel (ja) prefixes to each built-in style's accessible name, by family. */
-const JA_COLOUR_NAMES: Readonly<Record<(typeof FAMILIES)[number]['id'], readonly string[]>> = {
+/** The colour each built-in style's accessible name opens with, by family and style number. */
+const COLOURS: Readonly<Record<PivotStyleFamily, readonly string[]>> = {
   Light: [
-    ...Array<string>(8).fill('白'),
-    ...[
-      'アイスブルー',
-      'ローズ',
-      '薄い緑',
-      'ラベンダー',
-      'スカイブルー',
-      '薄いオレンジ',
-      '薄い灰色',
-    ],
-    ...['アイスブルー', 'ローズ', '薄い緑', 'ラベンダー', 'スカイブルー', '薄いオレンジ'],
-    ...Array<string>(7).fill('白'),
+    ...Array<string>(8).fill('white'),
+    ...['iceBlue', 'rose', 'lightGreen', 'lavender', 'skyBlue', 'lightOrange', 'lightGray'],
+    ...['iceBlue', 'rose', 'lightGreen', 'lavender', 'skyBlue', 'lightOrange'],
+    ...Array<string>(7).fill('white'),
   ],
   Medium: [
-    ...['白', '薄い青', 'ローズ', '薄い緑', 'ラベンダー', 'スカイブルー', '薄いオレンジ'],
-    ...['白', 'アイスブルー', 'ローズ', '薄い緑', 'ラベンダー', 'スカイブルー', '薄いオレンジ'],
-    ...['白', 'アイスブルー', 'ローズ', '薄い緑', 'ラベンダー', 'スカイブルー', '薄いオレンジ'],
-    ...[
-      '薄い灰色',
-      'アイスブルー',
-      'ローズ',
-      '薄い緑',
-      'ラベンダー',
-      'スカイブルー',
-      '薄いオレンジ',
-    ],
+    ...['white', 'lightBlue', 'rose', 'lightGreen', 'lavender', 'skyBlue', 'lightOrange'],
+    ...['white', 'iceBlue', 'rose', 'lightGreen', 'lavender', 'skyBlue', 'lightOrange'],
+    ...['white', 'iceBlue', 'rose', 'lightGreen', 'lavender', 'skyBlue', 'lightOrange'],
+    ...['lightGray', 'iceBlue', 'rose', 'lightGreen', 'lavender', 'skyBlue', 'lightOrange'],
   ],
   Dark: [
-    ...['薄い灰色', '濃い青', '濃い赤', '濃い緑', '濃い紫', '濃い青緑', '茶'],
-    ...Array<string>(7).fill('濃い灰色'),
-    ...['灰色', '青', '赤', 'オリーブ', '濃い紫', 'アクア', 'オレンジ'],
-    ...['灰色', '青', '赤', 'オリーブ', '濃い紫', 'アクア', 'オレンジ'],
+    ...['lightGray', 'darkBlue', 'darkRed', 'darkGreen', 'darkPurple', 'darkTeal', 'brown'],
+    ...Array<string>(7).fill('darkGray'),
+    ...['gray', 'blue', 'red', 'oliveGreen', 'darkPurple', 'aqua', 'orange'],
+    ...['gray', 'blue', 'red', 'oliveGreen', 'darkPurple', 'aqua', 'orange'],
   ],
 };
 
-/** The accessible name of a built-in PivotTable style, or None for ''. */
+/** The accessible name of a built-in PivotTable style, "<colour>, <name>", or None for ''. */
 export const pivotStyleLabel = (name: string, lang: ToolbarLang): string => {
-  if (name === '') return lang === 'ja' ? 'なし' : 'None';
+  if (name === '') return macBundleText('pivot-style:none', lang);
   const match = BUILTIN_PIVOT_STYLE.exec(name);
-  const f = FAMILIES.find((family) => family.id === match?.[1]);
-  if (!match || !f) return name;
-  const index = Number(match[2]);
-  const family = lang === 'ja' ? f.ja : f.en;
-  const word = lang === 'ja' ? 'ピボット スタイル' : 'PivotTable Style';
-  const colour = lang === 'ja' ? JA_COLOUR_NAMES[f.id][index - 1] : undefined;
-  return `${colour ? `${colour}, ` : ''}${word} (${family}) ${index}`;
+  const style = findMacBundleLabel(`pivot-style:${name}`);
+  const colour = match && COLOURS[match[1] as PivotStyleFamily][Number(match[2]) - 1];
+  if (!style || !colour) return name;
+  return `${macBundleText(`colour:${colour}`, lang)}, ${style[lang]}`;
 };
 
 const edgeColor = (edge: unknown): string =>

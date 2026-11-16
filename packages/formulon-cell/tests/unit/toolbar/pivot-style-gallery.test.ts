@@ -8,7 +8,10 @@ import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { dictionaries } from '../../../src/i18n/strings.js';
 import type { SpreadsheetInstance } from '../../../src/mount/types.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
-import { createPivotStyleGallery } from '../../../src/toolbar/ribbon/pivot-style-gallery.js';
+import {
+  createPivotStyleGallery,
+  pivotStyleLabel,
+} from '../../../src/toolbar/ribbon/pivot-style-gallery.js';
 
 const setup = async () => {
   const wb = await WorkbookHandle.createDefault();
@@ -36,6 +39,70 @@ const setup = async () => {
   const inst = { host, store, history, workbook: wb } as unknown as SpreadsheetInstance;
   return { wb, store, history, inst };
 };
+
+// The accessible names the Japanese app gives the built-in styles: "<colour>, <name>".
+const JA_FAMILY = { Light: '淡色', Medium: '中間', Dark: '濃色' } as const;
+const JA_COLOURS: Record<keyof typeof JA_FAMILY, readonly string[]> = {
+  Light: [
+    ...Array<string>(8).fill('白'),
+    ...[
+      'アイスブルー',
+      'ローズ',
+      '薄い緑',
+      'ラベンダー',
+      'スカイブルー',
+      '薄いオレンジ',
+      '薄い灰色',
+    ],
+    ...['アイスブルー', 'ローズ', '薄い緑', 'ラベンダー', 'スカイブルー', '薄いオレンジ'],
+    ...Array<string>(7).fill('白'),
+  ],
+  Medium: [
+    ...['白', '薄い青', 'ローズ', '薄い緑', 'ラベンダー', 'スカイブルー', '薄いオレンジ'],
+    ...['白', 'アイスブルー', 'ローズ', '薄い緑', 'ラベンダー', 'スカイブルー', '薄いオレンジ'],
+    ...['白', 'アイスブルー', 'ローズ', '薄い緑', 'ラベンダー', 'スカイブルー', '薄いオレンジ'],
+    ...[
+      '薄い灰色',
+      'アイスブルー',
+      'ローズ',
+      '薄い緑',
+      'ラベンダー',
+      'スカイブルー',
+      '薄いオレンジ',
+    ],
+  ],
+  Dark: [
+    ...['薄い灰色', '濃い青', '濃い赤', '濃い緑', '濃い紫', '濃い青緑', '茶'],
+    ...Array<string>(7).fill('濃い灰色'),
+    ...['灰色', '青', '赤', 'オリーブ', '濃い紫', 'アクア', 'オレンジ'],
+    ...['灰色', '青', '赤', 'オリーブ', '濃い紫', 'アクア', 'オレンジ'],
+  ],
+};
+
+describe('PivotTable style names', () => {
+  it('keeps the Japanese accessible name of every built-in style', () => {
+    expect(pivotStyleLabel('', 'ja')).toBe('なし');
+    for (const family of ['Light', 'Medium', 'Dark'] as const) {
+      for (let n = 1; n <= 28; n += 1) {
+        expect(pivotStyleLabel(`PivotStyle${family}${n}`, 'ja')).toBe(
+          `${JA_COLOURS[family][n - 1]}, ピボット スタイル (${JA_FAMILY[family]}) ${n}`,
+        );
+      }
+    }
+  });
+
+  it('names the styles in German and English with the app strings and the same pattern', () => {
+    expect(pivotStyleLabel('', 'de')).toBe('Keine');
+    expect(pivotStyleLabel('PivotStyleLight1', 'de')).toBe('Weiß, Pivotformat - Hell 1');
+    expect(pivotStyleLabel('PivotStyleDark28', 'de')).toBe('Orange, Pivotformat - Dunkel 28');
+    expect(pivotStyleLabel('PivotStyleLight1', 'en')).toBe('White, Pivot Style Light 1');
+  });
+
+  it('leaves a name outside the built-in set as it is', () => {
+    expect(pivotStyleLabel('PivotStyleLight29', 'de')).toBe('PivotStyleLight29');
+    expect(pivotStyleLabel('Brand', 'de')).toBe('Brand');
+  });
+});
 
 describe('PivotTable style gallery', () => {
   afterEach(() => {

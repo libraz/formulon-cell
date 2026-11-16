@@ -158,9 +158,9 @@ describe('Mac automation gallery', () => {
     document.body.innerHTML = '';
   });
 
-  it('ships bilingual descriptors for every local sample', () => {
+  it('ships named descriptors for every local sample', () => {
     expect(
-      MAC_AUTOMATION_GALLERY.every((entry) => entry.label.length > 0 && entry.labelJa.length > 0),
+      MAC_AUTOMATION_GALLERY.every((entry) => entry.label.length > 0 && entry.labels.ja.length > 0),
     ).toBe(true);
     expect(MAC_AUTOMATION_GALLERY.map((entry) => entry.id)).toEqual([
       'allRowsColumns',

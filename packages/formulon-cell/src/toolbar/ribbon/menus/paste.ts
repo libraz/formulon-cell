@@ -5,6 +5,7 @@
 import type { Strings } from '../../../i18n/strings.js';
 
 import type { ToolbarLang } from '../../ribbon-model.js';
+import { macBundleText } from '../mac/bundle-text.js';
 import { createMenu, menuIconButton, menuSeparator } from './general.js';
 import { applyMenuVariant, type MenuVariant } from './mac-variants.js';
 
@@ -43,14 +44,14 @@ export const createPasteMenu = (
     textSeparator.dataset.pasteText = 'true';
     const textRows = [
       menuIconButton(
-        lang === 'ja' ? 'テキストのみ保持' : 'Keep Text Only',
+        macBundleText('row:pasteAction:text-only', lang),
         'pasteAction',
         'text-only',
         'paste-values',
       ),
       textSeparator,
       menuIconButton(
-        lang === 'ja' ? 'テキスト ファイル ウィザードを使用する...' : 'Use Text Import Wizard...',
+        macBundleText('row:pasteAction:text-wizard', lang),
         'pasteAction',
         'text-wizard',
         'paste-values',

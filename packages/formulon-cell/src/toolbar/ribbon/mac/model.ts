@@ -10,6 +10,7 @@ import type {
   RibbonTabModel,
   ToolbarLang,
 } from '../../ribbon-model.js';
+import { findMacBundleLabel } from './bundle-text.js';
 import {
   EMBEDDED_UNSUPPORTED,
   type LabelLike,
@@ -670,30 +671,14 @@ const MAC_HOME_LABEL_KEYS: Readonly<Record<string, keyof Strings['mac']['homeRib
   autosum: 'autoSum',
 };
 
-/** Control names the Japanese Mac Home tab uses where they differ from the shared model. */
-const MAC_HOME_JA_NAMES: Readonly<Record<string, string>> = {
-  textOrientation: '文字の向き',
-  indentDecrease: 'インデント解除',
-  indentIncrease: 'インデント',
-  borders: '線種/網かけ変更',
-  fillColor: '網かけ',
-  decUp: '小数点表示桁上げ',
-  decDown: '小数点表示桁下げ',
-  insertRows: '挿入',
-  deleteRows: '削除',
-};
-/** Tooltips that read differently from the control name. */
-const MAC_HOME_JA_HELP: Readonly<Record<string, string>> = {
-  formatPainter: '書式を別の場所にコピーして適用',
-  alignC: '文字列中央揃え',
-};
 /** Mac tooltips are the bare control name: no shortcut or symbol suffix. */
 const stripShortcutHint = (title: string): string =>
   title.replace(/\s*\((?:Cmd|Ctrl|⌘)[^)]*\)|\s*\(Σ\)/g, '');
 
 const macHomeCommand = (candidate: RibbonCommand, lang: ToolbarLang): RibbonCommand => {
-  const measuredName = lang === 'ja' ? MAC_HOME_JA_NAMES[candidate.id] : undefined;
-  const measuredHelp = lang === 'ja' ? MAC_HOME_JA_HELP[candidate.id] : undefined;
+  // The Mac app's own control name and help text, where they differ from the shared model.
+  const measuredName = findMacBundleLabel(`home:${candidate.id}`)?.[lang];
+  const measuredHelp = findMacBundleLabel(`home-help:${candidate.id}`)?.[lang];
   const commandWithMacTitle = {
     ...candidate,
     ...(measuredName ? { label: measuredName, title: measuredName } : {}),
@@ -703,11 +688,9 @@ const macHomeCommand = (candidate: RibbonCommand, lang: ToolbarLang): RibbonComm
   const homeLabel =
     candidate.id === 'merge'
       ? dictionaries[lang].ribbon.mergeAndCenter
-      : candidate.id === 'wrap' && lang === 'ja'
-        ? '折り返して全体を表示する'
-        : macLabelKey
-          ? dictionaries[lang].mac.homeRibbon[macLabelKey]
-          : undefined;
+      : macLabelKey
+        ? dictionaries[lang].mac.homeRibbon[macLabelKey]
+        : undefined;
   // Keep any title suffix such as AutoSum's "(Σ)" after the relabelled name.
   const macHomeTitle = (label: string): string =>
     commandWithMacTitle.title.startsWith(candidate.label)
@@ -717,18 +700,13 @@ const macHomeCommand = (candidate: RibbonCommand, lang: ToolbarLang): RibbonComm
     ? { ...commandWithMacTitle, title: macHomeTitle(homeLabel), label: homeLabel }
     : commandWithMacTitle;
   if (measuredHelp) commandWithMacHomeLabel.title = measuredHelp;
-  // The desktop font-size list starts at 6, and its percent row reads パーセンテージ.
+  // The desktop font-size list starts at 6.
   if (
     candidate.id === 'fontSize' &&
     candidate.options &&
     !candidate.options.some((o) => o.value === '6')
   ) {
     commandWithMacHomeLabel.options = [{ value: '6', label: '6' }, ...candidate.options];
-  }
-  if (candidate.id === 'numberFormat' && candidate.options && lang === 'ja') {
-    commandWithMacHomeLabel.options = candidate.options.map((option) =>
-      option.value === 'percent' ? { ...option, label: 'パーセンテージ' } : option,
-    );
   }
   if (MAC_HOME_WIDE_STACKED_COMMAND_IDS.has(candidate.id)) {
     return {

@@ -59,6 +59,16 @@ describe('Mac Insert chart galleries', () => {
     expect(menu?.querySelector('[data-ribbon-command="mac.insert.chartColumn"]')).toBeNull();
   });
 
+  it('words the German Recommended Charts menu with the app strings, not English', () => {
+    const menu = createMacRibbonMenuFactory('de')('mac.insert.recommendedChart');
+    const text = (id: string) =>
+      menu?.querySelector<HTMLElement>(`[data-ribbon-command="${id}"]`)?.textContent;
+    expect(text('mac.insert.recommendedChart.none')).toBe(
+      'Für die von Ihnen ausgewählten Daten sind keine empfohlenen Diagramme vorhanden.',
+    );
+    expect(text('mac.insert.recommendedChart.apply')).toBe('Empfohlene Diagramme');
+  });
+
   it('lists the Data Types and From Picture entries greyed out without host support', () => {
     const types = factory('mac.data.dataTypes');
     expect(rows(types as HTMLElement)).toEqual([

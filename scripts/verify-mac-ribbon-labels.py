@@ -353,6 +353,9 @@ def verify(gen, app, mapfile, probes):
     places = places_of(surface)
     result = {}
     for key, labs in rows.items():
+        # Held rows and the non-ribbon namespaces have no drawn control to compare with.
+        if key not in m['map'] or key.partition(':')[0] not in gen.NAMESPACES:
+            continue
         e = m['map'][key]
         exc = e.get('drawn_exceptions', {})
         ps = places.get(key, [])
@@ -466,11 +469,12 @@ def main():
                 f'{loc}: ' + ' | '.join(f'{t!r} at {w}' for t, w in texts.items()) for loc, texts in r['split'])
         elif r['disagree']:
             status = 'drawn-disagrees'
-            reason = f'{e["source"]} of TCID {e["tcid"]} disagrees with the drawn label: ' + '; '.join(
+            origin = (f'{e["file"]} key {e["key"]}' if 'file' in e else f'{e["source"]} of TCID {e["tcid"]}')
+            reason = f'{origin} disagrees with the drawn label: ' + '; '.join(
                 f'{loc} at AX {path}: drawn {d!r}, bundle {r["labs"][loc]!r}' for loc, (d, path) in r['disagree'].items())
         if status:
             del m['map'][key]
-            m['held'][key] = {'status': status, 'tcid': e['tcid'], 'name': e.get('name'), 'reason': reason}
+            m['held'][key] = {'status': status, 'tcid': e.get('tcid'), 'name': e.get('name'), 'reason': reason}
         elif r['agree']:
             e['verified'] = r['agree']
     m['consumers'] = consumers

@@ -910,48 +910,6 @@ export const MAC_CONTEXT_LABELS = {
 } as const satisfies Readonly<Record<string, Label>>;
 
 export const MAC_MENU_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> = {
-  'mac.page.theme.office': {
-    de: 'Office',
-    fr: 'Office',
-    zh: 'Office',
-    ko: 'Office',
-    th: 'Office',
-  },
-  'mac.page.theme.gray': {
-    de: 'Graustufen',
-    fr: 'Niveaux de gris',
-    zh: '灰度',
-    ko: '회색조',
-    th: 'ระดับสีเทา',
-  },
-  'mac.page.color.office': {
-    de: 'Office',
-    fr: 'Office',
-    zh: 'Office',
-    ko: 'Office',
-    th: 'Office',
-  },
-  'mac.page.color.gray': {
-    de: 'Graustufen',
-    fr: 'Niveaux de gris',
-    zh: '灰度',
-    ko: '회색조',
-    th: 'ระดับสีเทา',
-  },
-  'mac.page.font.office': {
-    de: 'Office',
-    fr: 'Office',
-    zh: 'Office',
-    ko: 'Office',
-    th: 'Office',
-  },
-  'mac.page.font.gray': {
-    de: 'Graustufen',
-    fr: 'Niveaux de gris',
-    zh: '灰度',
-    ko: '회색조',
-    th: 'ระดับสีเทา',
-  },
   'mac.page.theme.enableUpdates': {
     de: 'Inhaltsaktualisierungen aktivieren',
     fr: 'Activer les mises à jour de contenu',
@@ -1548,23 +1506,6 @@ export const MAC_MENU_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> 
     ko: '모든 페이지 나누기 재설정',
     th: 'รีเซ็ตตัวแบ่งหน้าทั้งหมด',
   },
-  'mac.autosum.SUM': { de: 'SUMME', fr: 'SOMME', zh: '求和', ko: '합계', th: 'ผลรวม' },
-  'mac.autosum.AVERAGE': {
-    de: 'MITTELWERT',
-    fr: 'MOYENNE',
-    zh: '平均值',
-    ko: '평균',
-    th: 'ค่าเฉลี่ย',
-  },
-  'mac.autosum.COUNT': {
-    de: 'Anzahl Zahlen',
-    fr: 'Nb de nombres',
-    zh: '计数',
-    ko: '숫자 개수',
-    th: 'นับตัวเลข',
-  },
-  'mac.autosum.MAX': { de: 'Max', fr: 'Max', zh: '最大值', ko: '최대값', th: 'ค่าสูงสุด' },
-  'mac.autosum.MIN': { de: 'Min', fr: 'Min', zh: '最小值', ko: '최소값', th: 'ค่าต่ำสุด' },
   'mac.formulas.category.all': {
     de: 'Weitere Funktionen …',
     fr: 'Autres fonctions…',
@@ -1793,59 +1734,12 @@ export const localizedFunctionName = (name: string, locale: Locale): string => {
   return translations?.[locale] ?? name;
 };
 
-/** Control names the Japanese Mac app uses where the shared dictionary words them differently. */
-export const MAC_JA_LABELS: Readonly<Record<string, string>> = {
-  powerQuery: 'データ ファイル指定 (Power Query)',
-  sortAsc: '昇順',
-  sortDesc: '降順',
-  flashFill: 'フラッシュ フィル',
-  removeDuplicates: '重複を削除',
-  validation: '入力規則',
-  showDetail: '詳細データの表示',
-  autoSum: 'オート SUM',
-  namesManager: 'ネーム マネージャー',
-  precedents: '参照元のトレース',
-  dependents: '参照先のトレース',
-  removeArrows: 'トレース矢印の削除',
-  watch: 'ウォッチ ウィンドウ',
-  recalc: '再計算実行',
-  errorCheck: 'エラー チェック',
-  spelling: 'スペル チェック',
-  stats: 'ブックの統計情報',
-  accessibility: 'アクセシビリティ チェック',
-  previousComment: '前のコメント',
-  nextComment: '次のコメント',
-  protectSheet: 'シートの保護',
-  protectWorkbook: 'ブックの保護',
-  pageBreakPreview: '改ページ プレビュー',
-  pageLayout: 'ページ レイアウト',
-  newWindow: '新しいウインドウを開く',
-  arrange: 'ウインドウの整列',
-  freeze: 'ウインドウ枠の固定',
-  hide: '表示しない',
-  resetWindow: 'ウインドウを元の位置に戻す',
-  switchWindow: 'ウインドウの切り替え',
-  width: '幅:',
-  height: '高さ:',
-  scaleWidth: '幅:',
-  scaleHeight: '高さ:',
-  symbol: '記号/文字',
-  dataCleanup: 'データのクリーニング',
-  dataAnalysis: 'データの分析',
-  zoomSelection: '選択範囲に合わせて拡大/縮小',
-};
-
-const withMacJa = (key: string, label: Label): Label => {
-  const ja = MAC_JA_LABELS[key];
-  return ja ? { ...label, ja } : label;
-};
-
 export const localizedLabel = (key: string, seed: LegacyLabel): Label => {
   const bundled = MAC_BUNDLE_LABELS[`labels:${key}`];
   if (bundled) return bundled;
   const source = MAC_LABEL_SOURCES[key];
-  if (source) return withMacJa(key, localizedFromCore(source));
+  if (source) return localizedFromCore(source);
   const translations = MAC_LABEL_TRANSLATIONS[key];
-  if (translations) return withMacJa(key, localizedFromTranslations(seed, translations));
+  if (translations) return localizedFromTranslations(seed, translations);
   throw new Error(`Missing Mac ribbon translations for label: ${key}`);
 };

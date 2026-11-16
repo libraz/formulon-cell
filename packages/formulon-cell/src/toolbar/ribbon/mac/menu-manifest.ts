@@ -4,6 +4,7 @@ import {
   type CatalogFunctionCategory,
   supportedFunctionNames,
 } from '../../../commands/function-categories.js';
+import { macBundleLabel } from './bundle-text.js';
 import {
   EMBEDDED_UNSUPPORTED,
   type Label,
@@ -18,6 +19,7 @@ import { MAC_SHAPE_GALLERY } from './shape-gallery.js';
 export interface MacRibbonMenuItem {
   id: string;
   label: string;
+  /** Japanese wording of a shape gallery row; every other row's wording is generated. */
   labelJa?: string;
   disabled?: boolean;
   disabledReason?: string;
@@ -120,7 +122,7 @@ export const MAC_RIBBON_MENU_COMMAND_SET: ReadonlySet<string> = new Set(MAC_RIBB
 const menu = (items: readonly MacRibbonMenuItem[]): readonly MacRibbonMenuItem[] =>
   items.map((item) => {
     const label = labelFor(item.id);
-    const localized = label ? { ...item, label: label.en, labelJa: label.ja } : item;
+    const localized = label ? { ...item, label: label.en } : item;
     return item.submenu ? { ...localized, submenu: menu(item.submenu) } : localized;
   });
 /** Disable a row and, recursively, every entry of its submenu. */
@@ -144,30 +146,25 @@ const leaf = (
 ): MacRibbonMenuItem => ({
   id,
   label: labels[key]?.en ?? key,
-  labelJa: labels[key]?.ja,
   disabled,
   disabledReason: disabledReason?.en,
 });
 
+/** English wording of a gallery's own row; every locale's is generated as `gallery:<id>`. */
+const galleryLabel = (id: string): string => macBundleLabel(`gallery:${id}`).en;
+
 /** A gallery section caption. */
-const section = (id: string, label: string, labelJa: string): MacRibbonMenuItem => ({
+const section = (id: string): MacRibbonMenuItem => ({
   id: `mac.insert.heading.${id}`,
-  label,
-  labelJa,
+  label: galleryLabel(`mac.insert.heading.${id}`),
   heading: true,
   own: true,
 });
 
 /** A gallery entry; `enabled` entries run their chart command, the rest stay greyed out. */
-const galleryItem = (
-  id: string,
-  label: string,
-  labelJa: string,
-  enabled = false,
-): MacRibbonMenuItem => ({
+const galleryItem = (id: string, enabled = false): MacRibbonMenuItem => ({
   id,
-  label,
-  labelJa,
+  label: galleryLabel(id),
   own: true,
   disabled: !enabled,
   disabledReason: enabled ? undefined : NOT_IMPLEMENTED.en,
@@ -175,146 +172,103 @@ const galleryItem = (
 
 const chartGallery = {
   column: [
-    section('column2d', '2-D Column', '2-D 縦棒'),
-    galleryItem('mac.insert.chartColumn', 'Clustered Column', '集合縦棒', true),
-    galleryItem('mac.insert.chartColumnStacked', 'Stacked Column', '積み上げ縦棒', true),
-    galleryItem('mac.insert.chartColumn100', '100% Stacked Column', '100% 積み上げ縦棒', true),
-    section('column3d', '3-D Column', '3-D 縦棒'),
-    galleryItem('mac.insert.chartColumn3d', '3-D Clustered Column', '3-D 集合縦棒'),
-    galleryItem('mac.insert.chartColumnStacked3d', '3-D Stacked Column', '3-D 積み上げ縦棒'),
-    galleryItem('mac.insert.chartColumn1003d', '3-D 100% Stacked Column', '3-D 100% 積み上げ縦棒'),
-    galleryItem('mac.insert.chartColumnTrue3d', '3-D Column', '3-D 縦棒グラフ'),
-    section('bar2d', '2-D Bar', '2-D 横棒'),
-    galleryItem('mac.insert.chartBar', 'Clustered Bar', '集合横棒', true),
-    galleryItem('mac.insert.chartBarStacked', 'Stacked Bar', '積み上げ横棒', true),
-    galleryItem('mac.insert.chartBar100', '100% Stacked Bar', '100% 積み上げ横棒', true),
-    section('bar3d', '3-D Bar', '3-D 横棒'),
-    galleryItem('mac.insert.chartBar3d', '3-D Clustered Bar', '3-D 集合横棒'),
-    galleryItem('mac.insert.chartBarStacked3d', '3-D Stacked Bar', '3-D 積み上げ横棒'),
-    galleryItem('mac.insert.chartBar1003d', '3-D 100% Stacked Bar', '3-D 100% 積み上げ横棒'),
+    section('column2d'),
+    galleryItem('mac.insert.chartColumn', true),
+    galleryItem('mac.insert.chartColumnStacked', true),
+    galleryItem('mac.insert.chartColumn100', true),
+    section('column3d'),
+    galleryItem('mac.insert.chartColumn3d'),
+    galleryItem('mac.insert.chartColumnStacked3d'),
+    galleryItem('mac.insert.chartColumn1003d'),
+    galleryItem('mac.insert.chartColumnTrue3d'),
+    section('bar2d'),
+    galleryItem('mac.insert.chartBar', true),
+    galleryItem('mac.insert.chartBarStacked', true),
+    galleryItem('mac.insert.chartBar100', true),
+    section('bar3d'),
+    galleryItem('mac.insert.chartBar3d'),
+    galleryItem('mac.insert.chartBarStacked3d'),
+    galleryItem('mac.insert.chartBar1003d'),
   ],
   line: [
-    section('line2d', '2-D Line', '2-D 折れ線'),
-    galleryItem('mac.insert.chartLine', 'Line', '折れ線', true),
-    galleryItem('mac.insert.chartLineStacked', 'Stacked Line', '積み上げ折れ線', true),
-    galleryItem('mac.insert.chartLine100', '100% Stacked Line', '100% 積み上げ折れ線', true),
-    galleryItem('mac.insert.chartLineMarkers', 'Line with Markers', 'マーカー付き折れ線'),
-    galleryItem(
-      'mac.insert.chartLineStackedMarkers',
-      'Stacked Line with Markers',
-      'マーカー付き積み上げ折れ線',
-    ),
-    galleryItem(
-      'mac.insert.chartLine100Markers',
-      '100% Stacked Line with Markers',
-      'マーカー付き 100% 積み上げ折れ線',
-    ),
-    section('line3d', '3-D Line', '3-D 折れ線'),
-    galleryItem('mac.insert.chartLine3d', '3-D Line', '3-D 折れ線'),
-    section('area2d', '2-D Area', '2-D 面'),
-    galleryItem('mac.insert.chartArea', 'Area', '面', true),
-    galleryItem('mac.insert.chartAreaStacked', 'Stacked Area', '積み上げ面', true),
-    galleryItem('mac.insert.chartArea100', '100% Stacked Area', '100% 積み上げ面', true),
-    section('area3d', '3-D Area', '3-D 面'),
-    galleryItem('mac.insert.chartArea3d', '3-D Area', '3-D 面'),
-    galleryItem('mac.insert.chartAreaStacked3d', '3-D Stacked Area', '3-D 積み上げ面'),
-    galleryItem('mac.insert.chartArea1003d', '3-D 100% Stacked Area', '3-D 100% 積み上げ面'),
+    section('line2d'),
+    galleryItem('mac.insert.chartLine', true),
+    galleryItem('mac.insert.chartLineStacked', true),
+    galleryItem('mac.insert.chartLine100', true),
+    galleryItem('mac.insert.chartLineMarkers'),
+    galleryItem('mac.insert.chartLineStackedMarkers'),
+    galleryItem('mac.insert.chartLine100Markers'),
+    section('line3d'),
+    galleryItem('mac.insert.chartLine3d'),
+    section('area2d'),
+    galleryItem('mac.insert.chartArea', true),
+    galleryItem('mac.insert.chartAreaStacked', true),
+    galleryItem('mac.insert.chartArea100', true),
+    section('area3d'),
+    galleryItem('mac.insert.chartArea3d'),
+    galleryItem('mac.insert.chartAreaStacked3d'),
+    galleryItem('mac.insert.chartArea1003d'),
   ],
   pie: [
-    section('pie2d', '2-D Pie', '2-D 円'),
-    galleryItem('mac.insert.chartPie', 'Pie', '円', true),
-    galleryItem('mac.insert.chartPieOfPie', 'Pie of Pie', '補助円グラフ付き円'),
-    galleryItem('mac.insert.chartBarOfPie', 'Bar of Pie', '補助縦棒付き円'),
-    section('pie3d', '3-D Pie', '3-D 円'),
-    galleryItem('mac.insert.chartPie3d', '3-D Pie', '3-D 円'),
-    section('doughnut', 'Doughnut', 'ドーナツ'),
-    galleryItem('mac.insert.chartDoughnut', 'Doughnut', 'ドーナツ', true),
+    section('pie2d'),
+    galleryItem('mac.insert.chartPie', true),
+    galleryItem('mac.insert.chartPieOfPie'),
+    galleryItem('mac.insert.chartBarOfPie'),
+    section('pie3d'),
+    galleryItem('mac.insert.chartPie3d'),
+    section('doughnut'),
+    galleryItem('mac.insert.chartDoughnut', true),
   ],
   scatter: [
-    section('scatter', 'Scatter', '散布図'),
-    galleryItem('mac.insert.chartScatter', 'Scatter', '散布図', true),
-    galleryItem('mac.insert.chartScatterSmooth', 'Scatter with Smooth Lines', '散布図 (平滑線)'),
-    galleryItem(
-      'mac.insert.chartScatterLinesMarkers',
-      'Scatter with Straight Lines and Markers',
-      '散布図 (直線とマーカー)',
-    ),
-    galleryItem('mac.insert.chartScatterLines', 'Scatter with Straight Lines', '散布図 (直線)'),
-    section('bubble', 'Bubble', 'バブル'),
-    galleryItem('mac.insert.chartBubble', 'Bubble', 'バブル'),
-    galleryItem('mac.insert.chartBubble3d', '3-D Bubble', '3-D 効果付きバブル'),
+    section('scatter'),
+    galleryItem('mac.insert.chartScatter', true),
+    galleryItem('mac.insert.chartScatterSmooth'),
+    galleryItem('mac.insert.chartScatterLinesMarkers'),
+    galleryItem('mac.insert.chartScatterLines'),
+    section('bubble'),
+    galleryItem('mac.insert.chartBubble'),
+    galleryItem('mac.insert.chartBubble3d'),
   ],
   hierarchy: [
-    section('treemap', 'Treemap', 'ツリーマップ'),
-    galleryItem('mac.insert.chartTreemap', 'Treemap', 'ツリーマップ'),
-    section('sunburst', 'Sunburst', 'サンバースト'),
-    galleryItem('mac.insert.chartSunburst', 'Sunburst', 'サンバースト'),
+    section('treemap'),
+    galleryItem('mac.insert.chartTreemap'),
+    section('sunburst'),
+    galleryItem('mac.insert.chartSunburst'),
   ],
   statistical: [
-    section('histogramGroup', 'Histogram', 'ヒストグラム'),
-    galleryItem('mac.insert.chartHistogram', 'Histogram', 'ヒストグラム'),
-    galleryItem('mac.insert.chartPareto', 'Pareto', 'パレート図'),
-    section('boxWhisker', 'Box and Whisker', '箱ひげ図'),
-    galleryItem('mac.insert.chartBoxWhisker', 'Box and Whisker', '箱ひげ図'),
+    section('histogramGroup'),
+    galleryItem('mac.insert.chartHistogram'),
+    galleryItem('mac.insert.chartPareto'),
+    section('boxWhisker'),
+    galleryItem('mac.insert.chartBoxWhisker'),
   ],
   waterfall: [
-    section('waterfall', 'Waterfall', 'ウォーターフォール'),
-    galleryItem('mac.insert.chartWaterfall.plot', 'Waterfall', 'ウォーターフォール'),
-    section('funnel', 'Funnel', 'じょうご'),
-    galleryItem('mac.insert.chartFunnel', 'Funnel', 'じょうご'),
-    section('stock', 'Stock', '株価'),
-    galleryItem(
-      'mac.insert.chartStockHlc',
-      'Stock: High-Low-Close',
-      '株価チャート (高値-安値-終値)',
-    ),
-    galleryItem(
-      'mac.insert.chartStockOhlc',
-      'Stock: Open-High-Low-Close',
-      '株価チャート (始値-高値-安値-終値)',
-    ),
-    galleryItem(
-      'mac.insert.chartStockVhlc',
-      'Stock: Volume-High-Low-Close',
-      '株価チャート (出来高-高値-安値-終値)',
-    ),
-    galleryItem(
-      'mac.insert.chartStockVohlc',
-      'Stock: Volume-Open-High-Low-Close',
-      '株価チャート (出来高-始値-高値-安値-終値)',
-    ),
-    section('surface', 'Surface', '等高線'),
-    galleryItem('mac.insert.chartSurface', '3-D Surface', '3-D の表面'),
-    galleryItem(
-      'mac.insert.chartSurfaceWireframe',
-      'Wireframe 3-D Surface',
-      'ワイヤーフレーム 3-D 等高線',
-    ),
-    galleryItem('mac.insert.chartContour', 'Contour', '等高線'),
-    galleryItem('mac.insert.chartContourWireframe', 'Wireframe Contour', 'ワイヤーフレーム等高線'),
-    section('radar', 'Radar', 'レーダー'),
-    galleryItem('mac.insert.chartRadar', 'Radar', 'レーダー チャート'),
-    galleryItem('mac.insert.chartRadarMarkers', 'Radar with Markers', 'マーカー付きレーダー'),
-    galleryItem('mac.insert.chartRadarFilled', 'Filled Radar', '塗りつぶしレーダー'),
+    section('waterfall'),
+    galleryItem('mac.insert.chartWaterfall.plot'),
+    section('funnel'),
+    galleryItem('mac.insert.chartFunnel'),
+    section('stock'),
+    galleryItem('mac.insert.chartStockHlc'),
+    galleryItem('mac.insert.chartStockOhlc'),
+    galleryItem('mac.insert.chartStockVhlc'),
+    galleryItem('mac.insert.chartStockVohlc'),
+    section('surface'),
+    galleryItem('mac.insert.chartSurface'),
+    galleryItem('mac.insert.chartSurfaceWireframe'),
+    galleryItem('mac.insert.chartContour'),
+    galleryItem('mac.insert.chartContourWireframe'),
+    section('radar'),
+    galleryItem('mac.insert.chartRadar'),
+    galleryItem('mac.insert.chartRadarMarkers'),
+    galleryItem('mac.insert.chartRadarFilled'),
   ],
   combo: [
-    section('combo', 'Combo', '組み合わせ'),
-    galleryItem('mac.insert.chartComboColumnLine', 'Clustered Column - Line', '集合縦棒 - 折れ線'),
-    galleryItem(
-      'mac.insert.chartComboColumnLineSecondary',
-      'Clustered Column - Line on Secondary Axis',
-      '集合縦棒 - 第 2 軸の折れ線',
-    ),
-    galleryItem(
-      'mac.insert.chartComboAreaColumn',
-      'Stacked Area - Clustered Column',
-      '積み上げ面 - 集合縦棒',
-    ),
+    section('combo'),
+    galleryItem('mac.insert.chartComboColumnLine'),
+    galleryItem('mac.insert.chartComboColumnLineSecondary'),
+    galleryItem('mac.insert.chartComboAreaColumn'),
   ],
-  map: [
-    section('filledMap', 'Filled Map', '塗り分けマップ'),
-    galleryItem('mac.insert.chartFilledMap', 'Filled Map', '塗り分けマップ'),
-  ],
+  map: [section('filledMap'), galleryItem('mac.insert.chartFilledMap')],
 } as const satisfies Record<string, readonly MacRibbonMenuItem[]>;
 
 const functionMenu = (category: CatalogFunctionCategory): readonly MacRibbonMenuItem[] =>
@@ -385,15 +339,13 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
   'mac.insert.recommendedChart': [
     {
       id: 'mac.insert.recommendedChart.none',
-      label: 'No charts are recommended for the selected data.',
-      labelJa: '選択したデータに対するおすすめグラフはありません。',
+      label: galleryLabel('mac.insert.recommendedChart.none'),
       own: true,
       disabled: true,
     },
     {
       id: 'mac.insert.recommendedChart.apply',
-      label: 'Recommended Charts',
-      labelJa: 'おすすめグラフ',
+      label: galleryLabel('mac.insert.recommendedChart.apply'),
       own: true,
     },
   ],
@@ -461,8 +413,8 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
   // Office and Grayscale are the themes the host can apply; the commands below them
   // are the desktop's online-gallery, browse and save-to-file entries, which it has no backing for.
   'mac.page.theme': menu([
-    { id: 'mac.page.theme.office', label: 'Office', labelJa: 'Office' },
-    { id: 'mac.page.theme.gray', label: 'Grayscale', labelJa: 'グレースケール' },
+    { id: 'mac.page.theme.office', label: 'Office' },
+    { id: 'mac.page.theme.gray', label: 'Grayscale' },
     {
       id: 'mac.page.theme.enableUpdates',
       label: 'Enable Content Updates',
@@ -483,12 +435,12 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     },
   ]),
   'mac.page.color': menu([
-    { id: 'mac.page.color.office', label: 'Office', labelJa: 'Office' },
-    { id: 'mac.page.color.gray', label: 'Grayscale', labelJa: 'グレースケール' },
+    { id: 'mac.page.color.office', label: 'Office' },
+    { id: 'mac.page.color.gray', label: 'Grayscale' },
   ]),
   'mac.page.font': menu([
-    { id: 'mac.page.font.office', label: 'Office', labelJa: 'Office' },
-    { id: 'mac.page.font.gray', label: 'Grayscale', labelJa: 'グレースケール' },
+    { id: 'mac.page.font.office', label: 'Office' },
+    { id: 'mac.page.font.gray', label: 'Grayscale' },
   ]),
   'mac.page.margins': menu([
     { id: 'mac.page.margins.normal', label: 'Normal' },
@@ -512,25 +464,22 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     { id: 'mac.page.printArea.clear', label: 'Clear Print Area' },
   ]),
   'mac.page.pageBreaks': menu([
-    { id: 'mac.page.break.insert', label: 'Insert Page Break', labelJa: '改ページを挿入' },
-    { id: 'mac.page.break.remove', label: 'Remove Page Break', labelJa: '改ページを削除' },
+    { id: 'mac.page.break.insert', label: 'Insert Page Break' },
+    { id: 'mac.page.break.remove', label: 'Remove Page Break' },
     {
       id: 'mac.page.break.reset',
       label: 'Reset All Page Breaks',
-      labelJa: 'すべての改ページをリセット',
     },
   ]),
   'mac.formulas.autoSum': menu([
-    { id: 'mac.autosum.SUM', label: 'Sum', labelJa: '合計' },
-    { id: 'mac.autosum.AVERAGE', label: 'Average', labelJa: '平均' },
-    { id: 'mac.autosum.COUNT', label: 'Count Numbers', labelJa: '数値の個数' },
-    { id: 'mac.autosum.MAX', label: 'Max', labelJa: '最大値' },
-    { id: 'mac.autosum.MIN', label: 'Min', labelJa: '最小値' },
-    { id: 'mac.formulas.category.all', label: 'More Functions...', labelJa: 'その他の関数...' },
+    { id: 'mac.autosum.SUM', label: 'Sum' },
+    { id: 'mac.autosum.AVERAGE', label: 'Average' },
+    { id: 'mac.autosum.COUNT', label: 'Count Numbers' },
+    { id: 'mac.autosum.MAX', label: 'Max' },
+    { id: 'mac.autosum.MIN', label: 'Min' },
+    { id: 'mac.formulas.category.all', label: 'More Functions...' },
   ]),
-  'mac.formulas.recent': menu([
-    { id: 'mac.formulas.category.recent', label: 'More Functions...', labelJa: 'その他の関数...' },
-  ]),
+  'mac.formulas.recent': menu([{ id: 'mac.formulas.category.recent', label: 'More Functions...' }]),
   'mac.formulas.financial': functionMenu('financial'),
   'mac.formulas.logical': functionMenu('logical'),
   'mac.formulas.text': functionMenu('text'),
@@ -570,13 +519,12 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     { id: 'mac.formulas.useInFormula.paste', label: 'Paste Names...' },
   ]),
   'mac.formulas.calcOptions': menu([
-    { id: 'mac.formulas.calc.auto', label: 'Automatic', labelJa: '自動' },
+    { id: 'mac.formulas.calc.auto', label: 'Automatic' },
     {
       id: 'mac.formulas.calc.autoNoTable',
       label: 'Partial',
-      labelJa: '一部',
     },
-    { id: 'mac.formulas.calc.manual', label: 'Manual', labelJa: '手動' },
+    { id: 'mac.formulas.calc.manual', label: 'Manual' },
     separator,
     { id: 'mac.formulas.calc.formatStale', label: 'Format Stale Values', check: 'checkbox' },
     separator,
@@ -603,13 +551,13 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
   ]),
   // The host has no linked data types, so the gallery lists Excel's entries greyed out.
   'mac.data.dataTypes': [
-    galleryItem('mac.data.dataTypes.stocks', 'Stocks (English)', '株式 (English)'),
-    galleryItem('mac.data.dataTypes.currencies', 'Currencies (English)', '通貨 (English)'),
-    galleryItem('mac.data.dataTypes.geography', 'Geography (English)', '地理 (English)'),
+    galleryItem('mac.data.dataTypes.stocks'),
+    galleryItem('mac.data.dataTypes.currencies'),
+    galleryItem('mac.data.dataTypes.geography'),
   ],
   'mac.data.pictureFromData': [
-    galleryItem('mac.data.pictureFromData.file', 'From File...', 'ファイルからの画像...'),
-    galleryItem('mac.data.pictureFromData.clipboard', 'From Clipboard', 'クリップボードからの画像'),
+    galleryItem('mac.data.pictureFromData.file'),
+    galleryItem('mac.data.pictureFromData.clipboard'),
   ],
   'mac.data.sortFilter': menu([
     leaf('mac.data.sortAsc', 'sortAsc'),

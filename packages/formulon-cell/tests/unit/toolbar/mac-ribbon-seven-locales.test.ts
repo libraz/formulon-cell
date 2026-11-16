@@ -6,6 +6,7 @@ import {
   labels,
   macRibbonLabelForCommand,
 } from '../../../src/toolbar/ribbon/mac/labels.js';
+import { MAC_BUNDLE_LABELS } from '../../../src/toolbar/ribbon/mac/labels-bundle.js';
 import { MAC_LOCALES, type MacLocale } from '../../../src/toolbar/ribbon/mac/labels-data.js';
 import {
   createMacRibbonMenuFactory,
@@ -112,12 +113,19 @@ describe('Mac ribbon seven-language localization', () => {
       createMacRibbonMenuFactory('de')('mac.formulas.autoSum')?.querySelector(
         '[data-ribbon-command="mac.autosum.SUM"]',
       )?.textContent,
-    ).toBe('SUMME');
+    ).toBe('Summe');
     expect(
       createMacRibbonMenuFactory('fr')('mac.formulas.autoSum')?.querySelector(
         '[data-ribbon-command="mac.autosum.SUM"]',
       )?.textContent,
-    ).toBe('SOMME');
+    ).toBe('Somme');
+  });
+
+  it('names the controls the shared dictionary words differently with the app strings', () => {
+    expect(labels.previousComment?.de).toBe('Vorheriger Kommentar');
+    expect(labels.nextComment?.ko).toBe('다음 메모');
+    expect(labels.pageBreakPreview?.de).toBe('Umbruchvorschau');
+    expect(labels.sortAsc?.de).toBe('Aufsteigend');
   });
 
   it('uses German and French native function metadata while retaining canonical command ids', () => {
@@ -228,6 +236,12 @@ describe('Mac ribbon seven-language localization', () => {
         locale === 'ja' ? 1 : locale === 'de' ? 2 : locale === 'fr' ? 3 : 0,
       ),
     );
+  });
+
+  it('takes the automation script names from the app strings', () => {
+    const freeze = MAC_AUTOMATION_GALLERY.find((script) => script.id === 'freezeSelection');
+    expect(freeze?.labels).toBe(MAC_BUNDLE_LABELS['automation:freezeSelection']);
+    expect(freeze?.labels.de).toBe('Auswahl fixieren');
   });
 
   it('ships visible automation copy for every locale', () => {
