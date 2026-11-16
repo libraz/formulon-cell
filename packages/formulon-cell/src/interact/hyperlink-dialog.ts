@@ -405,7 +405,6 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
     },
     close(): void {
       shell.close();
-      host.focus();
     },
     detach(): void {
       shell.dispose();

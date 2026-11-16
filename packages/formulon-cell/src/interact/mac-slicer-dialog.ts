@@ -177,7 +177,6 @@ export function attachMacSlicerDialog(deps: MacSlicerDialogDeps): MacSlicerDialo
     },
     close(): void {
       shell.close();
-      host.focus();
     },
     refresh(): void {
       refreshLabels();

@@ -109,7 +109,6 @@ function attachPivotMoveDialog(instance: SpreadsheetInstance): PivotMoveDialogHa
   const close = (): void => {
     target = null;
     shell.close();
-    instance.host.focus();
   };
 
   const run = (): void => {

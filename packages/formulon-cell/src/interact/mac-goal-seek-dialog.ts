@@ -176,7 +176,6 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
     pending = null;
     setBusy(false);
     shell.close();
-    instance.host.focus();
   };
 
   const currentDefaults = (): void => {

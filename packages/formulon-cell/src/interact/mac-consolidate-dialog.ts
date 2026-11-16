@@ -224,7 +224,6 @@ function attachConsolidateDialog(instance: SpreadsheetInstance): ConsolidateDial
 
   const close = (): void => {
     shell.close();
-    instance.host.focus();
   };
 
   const defaults = (): void => {

@@ -553,7 +553,6 @@ export function attachMacChartSelectDataDialog(
     chartId = null;
     rows = [];
     shell.close();
-    host.focus();
   };
   const cancel = (): void => {
     if (chartId !== null) finish(false);

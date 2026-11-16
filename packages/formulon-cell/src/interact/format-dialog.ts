@@ -932,7 +932,6 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     close(): void {
       closePaletteFlyouts();
       shell.close();
-      host.focus();
     },
     detach(): void {
       shell.dispose();

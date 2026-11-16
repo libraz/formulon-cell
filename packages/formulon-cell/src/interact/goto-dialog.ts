@@ -541,7 +541,6 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
     },
     close(): void {
       shell.close();
-      host.focus();
     },
     detach(): void {
       detachTargetRows();

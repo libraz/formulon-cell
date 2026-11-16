@@ -486,7 +486,6 @@ export function openSpellingDialog(instance: SpreadsheetInstance): void {
     openDialogs.delete(instance);
     shell.close();
     shell.dispose();
-    instance.host.focus();
   }
   openDialogs.set(instance, close);
 

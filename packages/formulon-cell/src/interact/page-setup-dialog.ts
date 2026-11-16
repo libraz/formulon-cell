@@ -337,7 +337,6 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
     },
     close(): void {
       shell.close();
-      host.focus();
     },
     detach(): void {
       shell.dispose();

@@ -682,7 +682,6 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     editorShell.close();
     syncManagerPassthrough();
     clearError();
-    if (!shell.isOpen()) host.focus();
   }
 
   const openEditor = (mode: 'new' | 'edit'): void => {
@@ -882,7 +881,6 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   };
   const closeDefine = (): void => {
     defineShell.close();
-    host.focus();
   };
   defineShell.on(defineAddBtn, 'click', () => {
     defineCommit();
@@ -1031,8 +1029,8 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     commentInput.value = '';
     editorShell.close();
     renderList();
-    if (!shell.isOpen()) host.focus();
-    else if (editorMode === 'new') newBtn.focus();
+    if (!shell.isOpen()) return;
+    if (editorMode === 'new') newBtn.focus();
     else focusNameRow(selectedNameIndex);
   };
 
@@ -1139,7 +1137,6 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       closeEditor();
       closeDeleteConfirm();
       shell.close();
-      host.focus();
     },
     bindWorkbook(next: WorkbookHandle): void {
       wb = next;

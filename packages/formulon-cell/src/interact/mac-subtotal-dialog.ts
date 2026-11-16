@@ -149,7 +149,6 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
 
   const close = (): void => {
     shell.close();
-    instance.host.focus();
   };
 
   /** The header row's text names each column; a blank header falls back to its letter. */

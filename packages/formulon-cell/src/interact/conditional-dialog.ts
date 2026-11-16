@@ -1154,7 +1154,6 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     },
     close(): void {
       shell.close();
-      host.focus();
     },
     detach(): void {
       dxfFormatDialog?.detach();

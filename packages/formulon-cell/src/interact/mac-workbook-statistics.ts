@@ -231,7 +231,6 @@ export function attachMacWorkbookStatistics(
     },
     close(): void {
       shell.close();
-      host.focus();
     },
     refresh(): void {
       refreshLabels();

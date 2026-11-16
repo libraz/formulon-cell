@@ -103,7 +103,6 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     },
     close(): void {
       shell.close();
-      host.focus();
     },
     detach(): void {
       shell.dispose();

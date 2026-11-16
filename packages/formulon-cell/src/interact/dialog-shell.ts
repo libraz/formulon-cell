@@ -211,10 +211,13 @@ const keyWasHandled = (event: KeyboardEvent): boolean =>
  *  4. `on()` registers listeners that `dispose()` removes in one sweep, together with the
  *     built-in Escape and backdrop listeners.
  */
+/** A ribbon command hands its result to the sheet, as the desktop ribbon keeps no focus. */
+const RIBBON_CONTROL = '.fc-tb, [data-ribbon-command], [data-ribbon-tab]';
+
 /**
  * Hands focus back after `surface` closes: to `opener`, the element focused when it opened, while
- * that element is still attached, outside the surface and takes focus; otherwise to the sheet
- * `host`. Focus never falls to the page.
+ * that element is still attached, outside the surface, takes focus and is not a ribbon control;
+ * otherwise to the sheet `host`. Focus never falls to the page.
  */
 export function returnFocus(
   opener: HTMLElement | null,
@@ -222,7 +225,9 @@ export function returnFocus(
   host: HTMLElement,
 ): void {
   const target =
-    opener?.isConnected && !surface.contains(opener) ? visibleFocusReturn(opener) : null;
+    opener?.isConnected && !surface.contains(opener) && !opener.closest(RIBBON_CONTROL)
+      ? visibleFocusReturn(opener)
+      : null;
   target?.focus({ preventScroll: true });
   if (target && host.ownerDocument.activeElement === target) return;
   focusSheetAfterDialog(host);
@@ -385,10 +390,7 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
       enhanceSelects(panel);
       syncCustomSelects(panel);
       activateDialogLayer(overlay);
-      if (!overlay.contains(document.activeElement)) {
-        restoreFocusEl =
-          document.activeElement instanceof OwnerHTMLElement ? document.activeElement : host;
-      }
+      if (!overlay.contains(document.activeElement)) restoreFocusEl = openerOf(document);
       overlay.hidden = false;
       placeDialogPanel(overlay, panel, currentDialogAnchor());
       if (!overlay.contains(document.activeElement)) {

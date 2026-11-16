@@ -8,19 +8,22 @@ import {
   type DialogAnchor,
   placeDialogPanel,
 } from '../../interact/dialog-placement.js';
-import { markSurface } from '../../interact/dialog-shell.js';
+import { markSurface, returnFocus } from '../../interact/dialog-shell.js';
 import { isSubmitEnter } from '../../interact/mac-dialog-keys.js';
 import { overlayPortalFor } from '../../interact/overlay-portal.js';
 
-const restoreDialogFocus = (overlay: HTMLElement, opener: HTMLElement | null): void => {
-  if (!opener) return;
+/** Focus the user left in the dialog, or nowhere, goes back to the opener, else to the sheet. */
+const restoreDialogFocus = (shell: DialogShell): void => {
+  const { overlay, opener, sheet } = shell;
   const ownerDocument = overlay.ownerDocument;
   if (
-    overlay.contains(ownerDocument.activeElement) ||
-    ownerDocument.activeElement === ownerDocument.body
+    !overlay.contains(ownerDocument.activeElement) &&
+    ownerDocument.activeElement !== ownerDocument.body
   ) {
-    opener.focus({ preventScroll: true });
+    return;
   }
+  if (sheet) returnFocus(opener, overlay, sheet);
+  else opener?.focus({ preventScroll: true });
 };
 
 export interface DialogShellOptions {
@@ -45,6 +48,8 @@ export interface DialogShell {
   body: HTMLDivElement;
   footer: HTMLDivElement;
   opener: HTMLElement | null;
+  /** The sheet the dialog is for, which takes focus when the opener is gone. */
+  sheet: HTMLElement | null;
   /** The point a context-menu dispatch asked the dialog to centre on, captured when the shell is built. */
   anchor: DialogAnchor | null;
 }
@@ -82,9 +87,9 @@ export const createDialogShell = (opts: DialogShellOptions): DialogShell => {
   footer.className = 'fc-fmtdlg__footer';
   panel.appendChild(footer);
 
-  const overlayHost = opts.host ?? opener?.closest<HTMLElement>('.fc-host') ?? opener;
-  overlayPortalFor(overlayHost).appendChild(overlay);
-  return { overlay, panel, header, body, footer, opener, anchor: currentDialogAnchor() };
+  const sheet = opts.host ?? opener?.closest<HTMLElement>('.fc-host') ?? null;
+  overlayPortalFor(sheet ?? opener).appendChild(overlay);
+  return { overlay, panel, header, body, footer, opener, sheet, anchor: currentDialogAnchor() };
 };
 
 export interface DialogButtonOptions {
@@ -174,7 +179,7 @@ export const installDialogLifecycle = <T>(
     done = true;
     activeDialogCancellers.delete(cancel);
     shell.overlay.removeEventListener('keydown', onKey);
-    restoreDialogFocus(shell.overlay, shell.opener);
+    restoreDialogFocus(shell);
     shell.overlay.remove();
     resolve(value);
   };

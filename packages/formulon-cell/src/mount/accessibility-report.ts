@@ -13,5 +13,4 @@ export async function showAccessibilityReport(instance: SpreadsheetInstance): Pr
     items: analyzeAccessibilityCells(cells, toolbarLangForLocale(instance.i18n.locale)),
     ...reportDialogLabels(strings),
   });
-  instance.host.focus();
 }

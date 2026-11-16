@@ -348,7 +348,6 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
     },
     close(): void {
       shell.close();
-      host.focus();
       deps.onClosed?.();
     },
     refresh(): void {

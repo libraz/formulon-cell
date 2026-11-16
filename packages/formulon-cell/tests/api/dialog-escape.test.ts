@@ -376,4 +376,64 @@ describe('dialogs', () => {
     },
     120_000,
   );
+  it.each(['default', 'mac'] as const)(
+    'return focus from a modal dialog to a control outside the sheet that opened it on the %s profile',
+    async (platform) => {
+      const { sheet } = await mountWithContent(platform);
+      const opener = document.createElement('button');
+      opener.textContent = 'Open';
+      document.body.appendChild(opener);
+      const failures: string[] = [];
+      let walked = 0;
+      for (const id of Object.keys(DIALOGS) as DialogId[]) {
+        if (NOT_ON_PLATFORM[platform].includes(id)) continue;
+        if (PANES[platform].includes(id) || FLOATING[platform].includes(id)) continue;
+        sheet.selection.set(ACTIVE_CELL[id] ?? 'A1');
+        if (id === 'pasteSpecial') sheet.commands.execute('copy');
+        for (const how of ['Escape', 'Cancel'] as const) {
+          opener.focus();
+          const before = new Set(shownSurfaces());
+          sheet.dialogs.open(id);
+          await Promise.resolve();
+          const surface = shownSurfaces().find((el) => !before.has(el));
+          if (!surface) break;
+          if (how === 'Escape') walked += 1;
+          // The dialog's own Cancel or Close is the last one; a sub-editor's comes earlier.
+          const cancel = Array.from(surface.querySelectorAll<HTMLButtonElement>('button'))
+            .reverse()
+            .find((b) =>
+              /^(Cancel|Close)$/.test(b.textContent?.trim() || b.getAttribute('aria-label') || ''),
+            );
+          // Cell Styles closes on picking a style; it has no Cancel or Close button.
+          if (how === 'Cancel' && id === 'cellStylesGallery') {
+            sheet.dialogs.close(id);
+            continue;
+          }
+          if (how === 'Cancel' && !cancel) {
+            failures.push(`${id}: no Cancel or Close button`);
+            sheet.dialogs.close(id);
+            continue;
+          }
+          const first = surface.querySelector<HTMLElement>(FOCUSABLE) ?? surface;
+          first.focus();
+          if (how === 'Escape') pressEscape(first);
+          else cancel?.click();
+          // A dialog that resolves a promise on close may move focus a task later.
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          if (shownSurfaces().includes(surface)) {
+            failures.push(`${id} ${how}: stayed open`);
+            sheet.dialogs.close(id);
+          } else if (document.activeElement !== opener) {
+            const active = document.activeElement;
+            failures.push(
+              `${id} ${how}: focus on ${active === document.body ? 'body' : active?.className}`,
+            );
+          }
+        }
+      }
+      expect(failures).toEqual([]);
+      expect(walked).toBeGreaterThanOrEqual(20);
+    },
+    120_000,
+  );
 });

@@ -188,7 +188,6 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   const close = (): void => {
     openSnapshot = null;
     shell.close();
-    host.focus();
   };
 
   const open = (openOpts?: PasteSpecialOpenOptions, from?: DialogEntry): void => {

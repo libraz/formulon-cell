@@ -19,7 +19,6 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { focusSheetAfterDialog } from './dialog-focus.js';
 import {
   appendDialogActions,
   appendDialogButton,
@@ -756,12 +755,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       else argInputs[0]?.focus();
     },
     close(): void {
-      const wasOpen = shell.isOpen();
-      // Focus the user moved outside the dialog stays where it is.
-      const focusInDialog =
-        overlay.contains(document.activeElement) || document.activeElement === document.body;
       shell.close();
-      if (wasOpen && focusInDialog) focusSheetAfterDialog(host);
     },
     refresh(): void {
       // Re-snapshot strings from the original deps reference. The caller

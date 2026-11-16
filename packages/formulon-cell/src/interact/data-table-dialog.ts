@@ -96,7 +96,6 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
 
   const close = (): void => {
     shell.close();
-    instance.host.focus();
   };
 
   /** A blank field is "no input"; anything else must name one cell. */
