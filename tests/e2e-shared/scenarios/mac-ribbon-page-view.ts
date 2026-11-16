@@ -82,7 +82,7 @@ export async function runMacScaleAndSheetViewScenario(page: Page): Promise<void>
   await expect(options.locator('[role="option"]')).toHaveCount(1);
   await options.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(options).toBeHidden();
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   await expect.poll(async () => (await read()).views.length).toBe(1);
   await sp.expectNoConsoleErrors();

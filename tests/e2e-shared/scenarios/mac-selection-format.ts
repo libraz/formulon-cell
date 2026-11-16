@@ -45,7 +45,7 @@ async function selectWithHole(sp: UserJourneyPage, page: Page): Promise<void> {
 }
 
 async function historyKey(page: Page, key: string): Promise<void> {
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press(key);
 }
 

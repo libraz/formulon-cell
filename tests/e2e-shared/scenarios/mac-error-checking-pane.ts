@@ -184,7 +184,7 @@ export async function runMacErrorCheckingPaneScenario(
   await pane.locator('[data-prefs-action="reset"]').click();
   await closePrefs();
   await expect.poll(triangleB3).not.toBeNull();
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   await expect.poll(triangleB3).toBeNull();
   await sp.expectNoConsoleErrors();

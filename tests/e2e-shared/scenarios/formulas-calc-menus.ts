@@ -175,7 +175,7 @@ export async function runCalcOptionsMenusScenario(page: Page, platform: Platform
   await item('1').click();
   await expect.poll(version).toBe(1);
   await expect.poll(() => sp.readValue('A3')).toEqual({ kind: 'number', value: 2 });
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await sp.shortcut('z');
   await expect.poll(version).toBe(2);
   await expect.poll(() => sp.readValue('A3')).toEqual({ kind: 'number', value: 1 });

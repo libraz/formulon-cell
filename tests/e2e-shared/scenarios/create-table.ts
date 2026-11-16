@@ -141,7 +141,7 @@ export async function runMacAccessibilityMenuScenario(page: Page): Promise<void>
   await sheet.clickRibbon('mac.review.accessibility');
   await item('unmerge').click();
   await expect.poll(() => sheet.readMerge('D2')).toBeNull();
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await sheet.shortcut('z');
   await expect.poll(() => sheet.readMerge('D2')).toEqual({ sheet: 0, r0: 1, c0: 3, r1: 2, c1: 4 });
   await sheet.expectNoConsoleErrors();

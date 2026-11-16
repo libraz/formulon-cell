@@ -23,7 +23,7 @@ export async function runMacOutlineDetailScenario(page: Page): Promise<void> {
   await expect.poll(hidden).toEqual({ rows: [0, 1, 2], cols: [] });
   await sp.clickRibbon('mac.data.showDetail');
   await expect.poll(hidden).toEqual({ rows: [], cols: [] });
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   await expect.poll(hidden).toEqual({ rows: [0, 1, 2], cols: [] });
   await page.keyboard.press('Meta+Shift+z');
@@ -60,7 +60,7 @@ export async function runMacGoalSeekScenario(page: Page): Promise<void> {
   await expect(dialog).toBeHidden();
   await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 5 });
   await expect.poll(() => sp.readValue('B1')).toEqual({ kind: 'number', value: 10 });
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 3 });
   await page.keyboard.press('Meta+Shift+z');
@@ -101,7 +101,7 @@ export async function runMacConsolidateScenario(page: Page): Promise<void> {
   await expect(dialog).toBeHidden();
   await expect.poll(() => sp.readValue('E1')).toEqual({ kind: 'number', value: 4 });
   await expect.poll(() => sp.readValue('E2')).toEqual({ kind: 'number', value: 6 });
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   await expect.poll(() => sp.readValue('E1')).toEqual({ kind: 'blank' });
   await expect.poll(() => sp.readValue('E2')).toEqual({ kind: 'blank' });
@@ -136,7 +136,7 @@ export async function runMacSubtotalScenario(page: Page): Promise<void> {
   await expect(dialog).toBeHidden();
   await expect.poll(() => sp.readValue('B4')).toEqual({ kind: 'number', value: 5 });
   await expect.poll(() => sp.readValue('B6')).toEqual({ kind: 'number', value: 4 });
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   await expect.poll(() => sp.readValue('B4')).toEqual({ kind: 'number', value: 4 });
   await expect.poll(() => sp.readValue('B6')).toEqual({ kind: 'blank' });
@@ -172,7 +172,7 @@ export async function runMacDirectDataControlsScenario(page: Page): Promise<void
   await sp.clickRibbon('mac.data.sortDesc');
   await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 3 });
   await expect.poll(() => sp.readValue('A3')).toEqual({ kind: 'number', value: 1 });
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 1 });
   await sp.clickRibbon('mac.data.filter');
@@ -242,7 +242,7 @@ export async function runMacValidationMenuScenario(page: Page): Promise<void> {
       return store.getState().format.formats.get('0:0:0')?.validation ?? null;
     });
   await expect.poll(validation).toBeNull();
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   await expect.poll(validation).not.toBeNull();
   await sp.expectNoConsoleErrors();

@@ -28,7 +28,7 @@ const applyViewport = async (
           : viewport;
       await inst.update({ viewport: next });
       inst.selection.set(start);
-      inst.host.focus();
+      inst.focus();
     },
     { viewport, start },
   );
@@ -45,9 +45,18 @@ const walk = async (page: Page, key: string, expected: readonly string[]): Promi
   expect(seen, `${key} x${expected.length}`).toEqual(expected);
 };
 
-/** Whether keyboard focus is on the grid itself (the host element). */
+/** Whether keyboard focus is on the grid, the sheet's focus target. */
 const gridFocused = (page: Page) =>
-  page.evaluate(() => document.activeElement === (window as unknown as DemoWindow).__fcInst.host);
+  page.evaluate(() => !!document.activeElement?.closest('.fc-host__grid'));
+
+/** Whether keyboard focus sits on an element that follows the grid in document order. */
+const focusFollowsGrid = (page: Page) =>
+  page.evaluate(() => {
+    const grid = document.querySelector('.fc-host__grid');
+    const active = document.activeElement;
+    if (!grid || !active || active === document.body || grid.contains(active)) return false;
+    return !!(grid.compareDocumentPosition(active) & Node.DOCUMENT_POSITION_FOLLOWING);
+  });
 
 /** The viewport's `selectable` keeps the cursor on the listed cells, or on the cells its
  *  predicate allows, in either mode, and refuses a move onto any other. Tab walks the fixed range
@@ -80,7 +89,7 @@ export async function runViewportNavigationScenario(page: Page): Promise<void> {
   await walk(page, 'Tab', ['C2', 'B3', 'C3', 'C3']);
 
   // tabBoundary: 'stop' keeps focus on the grid at the last stop; 'leave' lets the browser move
-  // it to the next tab stop (here the name box).
+  // it to the next tab stop after the grid.
   await applyViewport(page, { mode: 'fixed', range: 'A1:B1' }, 'A1');
   await page.keyboard.press('Tab');
   await expect.poll(() => active(page)).toBe('B1');
@@ -92,7 +101,7 @@ export async function runViewportNavigationScenario(page: Page): Promise<void> {
   await expect.poll(() => active(page)).toBe('B1');
   await page.keyboard.press('Tab');
   await expect.poll(() => gridFocused(page)).toBe(false);
-  await expect(page.locator('.fc-host__formulabar-tag')).toBeFocused();
+  expect(await focusFollowsGrid(page), 'Tab leaves to the stop after the grid').toBe(true);
 
   // Cleared, the cursor moves freely again.
   await applyViewport(page, null, 'A1');
@@ -100,14 +109,6 @@ export async function runViewportNavigationScenario(page: Page): Promise<void> {
   await walk(page, 'Tab', ['B2']);
   await sp.expectNoConsoleErrors();
 }
-
-/** Whether keyboard focus is on the sheet: the host itself or inside the grid. */
-const sheetFocused = (page: Page) =>
-  page.evaluate(() => {
-    const el = document.activeElement;
-    const host = (window as unknown as DemoWindow).__fcInst.host;
-    return el === host || !!el?.closest('.fc-host__grid');
-  });
 
 /** Shift+Tab mirrors Tab. With no viewport it walks left and stops at column A. With
  *  `tabNavigation: 'editable'` both keys move only between the cells the policy lets the user
@@ -121,7 +122,7 @@ export async function runTabWalkScenario(page: Page): Promise<void> {
 
   await applyViewport(page, null, 'C3');
   await walk(page, 'Shift+Tab', ['B3', 'A3', 'A3']);
-  expect(await sheetFocused(page), 'Shift+Tab at column A keeps focus on the sheet').toBe(true);
+  expect(await gridFocused(page), 'Shift+Tab at column A keeps focus on the sheet').toBe(true);
 
   await page.evaluate(() =>
     (window as unknown as DemoWindow).__fcInst.update({
@@ -134,9 +135,9 @@ export async function runTabWalkScenario(page: Page): Promise<void> {
     'A1',
   );
   await walk(page, 'Tab', ['C1', 'B3', 'B3']);
-  expect(await sheetFocused(page), 'Tab at the last editable cell keeps focus').toBe(true);
+  expect(await gridFocused(page), 'Tab at the last editable cell keeps focus').toBe(true);
   await walk(page, 'Shift+Tab', ['C1', 'A1', 'A1']);
-  expect(await sheetFocused(page), 'Shift+Tab at the first editable cell keeps focus').toBe(true);
+  expect(await gridFocused(page), 'Shift+Tab at the first editable cell keeps focus').toBe(true);
 
   await applyViewport(
     page,
@@ -145,7 +146,7 @@ export async function runTabWalkScenario(page: Page): Promise<void> {
   );
   await walk(page, 'Shift+Tab', ['A1']);
   await page.keyboard.press('Shift+Tab');
-  await expect.poll(() => sheetFocused(page), 'Shift+Tab leaves the sheet').toBe(false);
+  await expect.poll(() => gridFocused(page), 'Shift+Tab leaves the sheet').toBe(false);
   expect(await active(page)).toBe('A1');
   await sp.expectNoConsoleErrors();
 }

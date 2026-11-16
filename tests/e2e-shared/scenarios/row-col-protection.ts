@@ -32,7 +32,7 @@ const item = (menu: Locator, kind: Kind, choice: 'cells' | 'rows' | 'cols') =>
 
 /** Asserts the cell context menu greys Insert…/Delete…, then closes the menu. */
 const expectCellMenuItemGreyed = async (page: Page, kind: Kind) => {
-  await expect(page.locator('.fc-host').first()).toBeFocused();
+  await expect(page.locator('.fc-host__grid').first()).toBeFocused();
   await page.keyboard.press('Shift+F10');
   const menu = page.locator('.fc-ctxmenu:not(.fc-ctxmenu__sub)');
   await expect(menu).toBeVisible();

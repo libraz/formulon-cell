@@ -3,7 +3,7 @@ import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { gridCellCenter, SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
-const host = (page: Page): Locator => page.locator('.fc-host').first();
+const sheetGrid = (page: Page): Locator => page.locator('.fc-host__grid').first();
 
 async function openCellMenu(page: Page): Promise<Locator> {
   await page.keyboard.press('Shift+F10');
@@ -30,7 +30,7 @@ export async function runContextDialogReturnScenario(page: Page): Promise<void> 
     await expect(menu).toBeHidden();
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
-    await expect(host(page)).toBeFocused();
+    await expect(sheetGrid(page)).toBeFocused();
   }
 
   const cell = await gridCellCenter(page, 0, 0);
@@ -46,7 +46,7 @@ export async function runContextDialogReturnScenario(page: Page): Promise<void> 
   await prompt.getByRole('button', { name: 'Cancel', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(prompt).toBeHidden();
-  await expect(host(page)).toBeFocused();
+  await expect(sheetGrid(page)).toBeFocused();
   expect(await rowHeight(page)).toBe(before);
 }
 
@@ -103,14 +103,14 @@ export async function runPasteSpecialCancelScenario(page: Page): Promise<void> {
   await page.keyboard.press('Enter');
   await expect(dialog).toBeHidden();
   await expect.poll(() => readValue(page, 1)).toEqual(99);
-  await expect(host(page)).toBeFocused();
+  await expect(sheetGrid(page)).toBeFocused();
 
   await openPasteSpecial(page);
   await dialog.getByRole('button', { name: 'OK', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(dialog).toBeHidden();
   await expect.poll(() => readValue(page, 1)).toEqual(17);
-  await expect(host(page)).toBeFocused();
+  await expect(sheetGrid(page)).toBeFocused();
   await sp.shortcut('z');
   await expect.poll(() => readValue(page, 1)).toEqual(99);
 }
@@ -151,7 +151,7 @@ export async function runHyperlinkCancelScenario(page: Page): Promise<void> {
   await expect(dialog).toBeHidden();
   expect(await readLinks(page)).toEqual([]);
   expect(await readValue(page, 0)).toEqual(before);
-  await expect(host(page)).toBeFocused();
+  await expect(sheetGrid(page)).toBeFocused();
 
   await openHyperlink(page);
   await input.fill(url);
@@ -163,14 +163,14 @@ export async function runHyperlinkCancelScenario(page: Page): Promise<void> {
   await page.keyboard.press('Enter');
   await expect(dialog).toBeHidden();
   expect(await readLinks(page)).toEqual([url]);
-  await expect(host(page)).toBeFocused();
+  await expect(sheetGrid(page)).toBeFocused();
 
   await openHyperlink(page);
   await dialog.getByRole('button', { name: 'Remove link', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(dialog).toBeHidden();
   expect(await readLinks(page)).toEqual([]);
-  await expect(host(page)).toBeFocused();
+  await expect(sheetGrid(page)).toBeFocused();
   await sp.shortcut('z');
   expect(await readLinks(page)).toEqual([url]);
 }

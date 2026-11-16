@@ -125,7 +125,7 @@ export async function runNameDeleteFocus(page: Page): Promise<void> {
 
   await page.keyboard.press('Escape');
   await expect(manager).toBeHidden();
-  await expect(page.locator('.fc-host')).toBeFocused();
+  await expect(page.locator('.fc-host__grid')).toBeFocused();
 
   await page.keyboard.press('Control+z');
   await page.keyboard.press('Control+F3');

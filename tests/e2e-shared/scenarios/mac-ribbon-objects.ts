@@ -38,7 +38,7 @@ export async function runMacSparklineScenario(page: Page): Promise<void> {
   await expect
     .poll(read)
     .toEqual({ type: 0, source: { firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 2 } });
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   await expect.poll(read).toBeNull();
   await page.keyboard.press('Meta+Shift+z');
@@ -89,7 +89,7 @@ export async function runMacInkScenario(page: Page): Promise<void> {
       '[data-ribbon-panel="draw"] .fc-tb__ribbon-tools > [data-ribbon-command="mac.draw.toggle"]',
     ),
   ).toHaveAttribute('aria-pressed', 'false');
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   await expect(stroke).toHaveCount(0);
   await page.keyboard.press('Meta+Shift+z');
@@ -101,7 +101,7 @@ export async function runMacInkScenario(page: Page): Promise<void> {
   await page.mouse.click(start.x + 40, start.y + 20);
   await expect(stroke).toHaveCount(0);
   await page.keyboard.press('Escape');
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   await expect(stroke).toHaveCount(1);
   // Escape exits trackpad drawing; the next click must reactivate it immediately.
@@ -158,7 +158,7 @@ export async function runMacChartKindScenario(page: Page): Promise<void> {
     .locator('[role=menu]:not([hidden]) [data-ribbon-command="mac.insert.chartPie"]')
     .click();
   await expect.poll(kinds).toEqual(['area', 'pie']);
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   await expect.poll(kinds).toEqual(['area']);
   await sp.expectNoConsoleErrors();
@@ -195,7 +195,7 @@ export async function runMacInsertGalleryScenario(page: Page): Promise<void> {
   await expect
     .poll(shapes)
     .toEqual(['line', 'rectangle', 'rounded-rectangle', 'oval', 'triangle', 'diamond']);
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   await expect.poll(shapes).toEqual(['line', 'rectangle', 'rounded-rectangle', 'oval', 'triangle']);
   await sp.expectNoConsoleErrors();

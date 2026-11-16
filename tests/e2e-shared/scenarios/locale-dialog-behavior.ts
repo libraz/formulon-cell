@@ -105,7 +105,7 @@ const goTo = async (page: Page, ref: string): Promise<void> => {
   const nameBox = page.locator('.fc-host__formulabar-tag').first();
   await nameBox.fill(ref);
   await nameBox.press('Enter');
-  await expect(page.locator('.fc-host').first()).toBeFocused();
+  await expect(page.locator('.fc-host__grid').first()).toBeFocused();
   await expect.poll(() => nameBox.inputValue()).toBe(ref);
 };
 

@@ -123,7 +123,7 @@ export async function runMacSelectionInputWithHole(page: Page): Promise<void> {
     for (const ref of ['A1', 'B1', 'C1', 'A2', 'C2', 'A3', 'B3', 'C3'])
       await expect.poll(() => sp.readValue(ref)).toEqual({ kind: 'number', value: 7 });
     await expect.poll(() => sp.readValue('B2')).toEqual({ kind: 'text', value: 'keep' });
-    await page.locator('.fc-host').focus();
+    await page.locator('.fc-host__grid').focus();
     await page.keyboard.press('Meta+z');
     for (const ref of ['A1', 'B1', 'C1', 'A2', 'C2', 'A3', 'B3', 'C3'])
       await expect.poll(() => sp.readValue(ref)).toEqual({ kind: 'blank' });
@@ -234,7 +234,7 @@ export async function runMacSelectionClearWithHole(page: Page): Promise<void> {
       await expect.poll(() => sp.readValue(ref)).toEqual({ kind: 'blank' });
     await expect.poll(() => sp.readValue('B2')).toEqual({ kind: 'text', value: 'keep' });
     await expect.poll(() => sp.readValue('D4')).toEqual({ kind: 'number', value: 99 });
-    await page.locator('.fc-host').focus();
+    await page.locator('.fc-host__grid').focus();
     await page.keyboard.press('Meta+z');
     for (const ref of targets)
       await expect

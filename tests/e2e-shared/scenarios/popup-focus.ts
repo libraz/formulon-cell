@@ -60,7 +60,7 @@ export async function runKeyboardMenuLayoutScenario(
     await page.setViewportSize({ width: 900, height: 600 });
     await expect(menu).toBeHidden();
     await expect(submenu).toBeHidden();
-    await expect(page.locator('.fc-host').first()).toBeFocused();
+    await expect(page.locator('.fc-host__grid').first()).toBeFocused();
     expect(
       await page.evaluate(() =>
         (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.selection.get(),
@@ -259,9 +259,9 @@ export async function runPopupViewportScenario(page: Page): Promise<void> {
       // Keep the pointer out so keyboard scrolling cannot open a hover submenu.
       await page.mouse.move(389, 0);
       await page
-        .locator('.fc-host')
+        .locator('.fc-host__grid')
         .first()
-        .evaluate((host) => (host as HTMLElement).focus({ preventScroll: true }));
+        .evaluate((grid) => (grid as HTMLElement).focus({ preventScroll: true }));
       await page.keyboard.press('Shift+F10');
       menu = page.locator('.fc-ctxmenu:not(.fc-ctxmenu__sub)');
     } else {
@@ -399,7 +399,10 @@ export async function runSubmenuHighlightScenario(page: Page): Promise<void> {
             },
           },
         ],
-        { label: 'Object actions', restoreFocusTo: host },
+        {
+          label: 'Object actions',
+          restoreFocusTo: host.querySelector<HTMLElement>('.fc-host__grid') ?? host,
+        },
       );
     });
     const objectMenu = page.locator('.fc-ctxmenu--object');
@@ -426,7 +429,7 @@ export async function runSubmenuHighlightScenario(page: Page): Promise<void> {
     await page.keyboard.press('Enter');
     await expect(objectMenu).toHaveCount(0);
     await expect(page.locator('.fc-host').first()).toHaveAttribute('data-object-action', 'second');
-    await expect(page.locator('.fc-host').first()).toBeFocused();
+    await expect(page.locator('.fc-host__grid').first()).toBeFocused();
   }
 }
 
@@ -438,7 +441,7 @@ export async function runMacSubmenuLayoutScenario(page: Page): Promise<void> {
       await sp.mount({ locale, platform: 'mac' });
       await sp.expectNoStub();
       await page.mouse.move(width - 1, 0);
-      await page.locator('.fc-host').first().focus();
+      await page.locator('.fc-host__grid').first().focus();
       await page.keyboard.press('Shift+F10');
       const menu = page.locator('.fc-ctxmenu:not(.fc-ctxmenu__sub)');
       const submenu = page.locator('.fc-ctxmenu__sub');

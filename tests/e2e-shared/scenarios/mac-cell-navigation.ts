@@ -52,7 +52,7 @@ export async function runMacSelectionTraversal(page: Page): Promise<void> {
     ],
   ] as const) {
     await sp.goTo('A1:B2');
-    await page.locator('.fc-host').focus();
+    await page.locator('.fc-host__grid').focus();
     for (const [row, col] of path) {
       await page.keyboard.press(key);
       await expect.poll(() => selection(page)).toMatchObject({ active: { row, col }, range });
@@ -66,7 +66,7 @@ export async function runMacSelectionEntry(page: Page): Promise<void> {
   await sp.mount({ platform: 'mac' });
   await sp.expectNoStub();
   await sp.goTo('A1:B2');
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.type('10');
   await page.keyboard.press('Enter');
   await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 10 });
@@ -93,7 +93,7 @@ export async function runMacCommandReturnFill(page: Page): Promise<void> {
   await sp.mount({ platform: 'mac' });
   await sp.expectNoStub();
   await sp.goTo('A1:B2');
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.type('42');
   await page.keyboard.press('Meta+Enter');
   await expect(page.locator('.fc-host__editor')).toHaveCount(0);
@@ -105,7 +105,7 @@ export async function runMacCommandReturnFill(page: Page): Promise<void> {
       active: { row: 0, col: 0 },
       range: { firstRow: 0, firstCol: 0, lastRow: 1, lastCol: 1 },
     });
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   for (const ref of ['A1', 'A2', 'B1', 'B2'])
     await expect.poll(() => sp.readValue(ref)).toEqual({ kind: 'blank' });
@@ -124,7 +124,7 @@ export async function runMacCollapseSelection(page: Page): Promise<void> {
   await sp.expectNoStub();
   await sp.enter('A1', 'keep');
   await sp.goTo('A1:B2');
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Shift+Backspace');
   await expect(page.locator('.fc-host__editor')).toHaveCount(0);
   await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'text', value: 'keep' });
@@ -171,7 +171,7 @@ export async function runMacFormulaBarSelection(page: Page): Promise<void> {
     ['D2', '=B2'],
   ])
     await expect.poll(() => sp.readFormula(ref as string)).toBe(formula);
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   for (const ref of ['C1', 'C2', 'D1', 'D2'])
     await expect.poll(() => sp.readValue(ref)).toEqual({ kind: 'blank' });
@@ -215,7 +215,7 @@ export async function runMacOptionSheetSwitch(page: Page): Promise<void> {
   await page.locator('.fc-host__sheetbar-add').click();
   await expect(tabs).toHaveCount(2);
   await tabs.first().click();
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Alt+ArrowRight');
   await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('Alt+ArrowLeft');

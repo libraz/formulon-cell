@@ -24,7 +24,7 @@ async function expectModalFocusContract(page: Page, dialog: Locator) {
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expectActive(
-    page.locator('.fc-host').first(),
+    page.locator('.fc-host__grid').first(),
     'the dialog should return focus to the grid',
   );
 }

@@ -88,7 +88,7 @@ export async function runMacHomeMenusScenario(page: Page): Promise<void> {
         .format.formats.get('0:0:0')?.underline;
     });
   await expect.poll(read).toBe('double');
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   await expect.poll(read).not.toBe('double');
   await page.locator('.fc-tb__rb[data-ribbon-command="merge"] .fc-tb__rb-split-chevron').click();

@@ -47,7 +47,7 @@ export async function runCellShiftModalScenario(page: Page, kind: Kind): Promise
     { kind: 'blank' },
   ];
   await expect.poll(() => values(page)).toEqual(initial);
-  const host = page.locator('.fc-host').first();
+  const grid = page.locator('.fc-host__grid').first();
   const primary = kind === 'insert' ? 'down' : 'up';
   const alternate = kind === 'insert' ? 'right' : 'left';
   const dialog = await openShift(page, kind);
@@ -67,21 +67,21 @@ export async function runCellShiftModalScenario(page: Page, kind: Kind): Promise
   await expect(cancel).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(dialog).toHaveCount(0);
-  await expect(host).toBeFocused();
+  await expect(grid).toBeFocused();
   expect(await values(page)).toEqual(initial);
 
   await openShift(page, kind);
   await expect(checked).toBeChecked();
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
-  await expect(host).toBeFocused();
+  await expect(grid).toBeFocused();
   expect(await values(page)).toEqual(initial);
 
   await openShift(page, kind);
   await checked.focus();
   await page.keyboard.press('Enter');
   await expect(dialog).toHaveCount(0);
-  await expect(host).toBeFocused();
+  await expect(grid).toBeFocused();
   const shifted =
     kind === 'insert'
       ? [{ kind: 'blank' }, ...initial.slice(0, 3)]
@@ -103,7 +103,7 @@ export async function runCellShiftModalScenario(page: Page, kind: Kind): Promise
   await ok.focus();
   await page.keyboard.press('Enter');
   await expect(dialog).toHaveCount(0);
-  await expect(host).toBeFocused();
+  await expect(grid).toBeFocused();
   const horizontal =
     kind === 'insert'
       ? [{ kind: 'blank' }, { kind: 'number', value: 11 }, { kind: 'number', value: 44 }]

@@ -11,7 +11,7 @@ async function setTheme(page: Page, theme: (typeof themes)[number]): Promise<voi
 }
 
 async function openMenu(page: Page): Promise<Locator> {
-  await page.locator('.fc-host').first().focus();
+  await page.locator('.fc-host__grid').first().focus();
   await page.keyboard.press('Shift+F10');
   const menu = page.locator('.fc-ctxmenu:not(.fc-ctxmenu__sub)');
   await expect(menu).toBeVisible();
@@ -49,7 +49,7 @@ export async function runDirectionFocusFeedbackScenario(page: Page): Promise<voi
       await expect(dialog.locator('.fc-cellshift__button--secondary')).toBeFocused();
       await page.keyboard.press('Enter');
       await expect(dialog).toHaveCount(0);
-      await expect(page.locator('.fc-host').first()).toBeFocused();
+      await expect(page.locator('.fc-host__grid').first()).toBeFocused();
     }
   }
 }

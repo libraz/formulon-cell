@@ -111,7 +111,7 @@ export async function runProtectedSheetMenuScenario(page: Page): Promise<void> {
     await page.evaluate(() => (window as unknown as InstanceWindow).__fcInst.history.canUndo),
   ).toBe(true);
   // A pick hands focus back to the grid, so Cmd+Z undoes it at once.
-  await expect(page.locator('.fc-host').first()).toBeFocused();
+  await expect(page.locator('.fc-host__grid').first()).toBeFocused();
   await sheet.shortcut('z');
   await expect.poll(() => sheet.readValue('B5')).toEqual({ kind: 'blank' });
   await sheet.expectNoConsoleErrors();

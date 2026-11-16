@@ -39,13 +39,14 @@ export async function runUndoSubsystemSmokeScenario(page: Page): Promise<void> {
 }
 
 /** D03 — Shift+F3 and the formula bar fx button open Function Arguments, and
- *  closing it by Escape or Cancel hands focus back to the sheet. */
+ *  closing it by Escape or Cancel hands focus back to where it was opened: the sheet for Shift+F3,
+ *  the fx button for fx. */
 export async function runFunctionDialogShortcutScenario(page: Page): Promise<void> {
   const sp = new SpreadsheetPage(page);
   const consoleErrors = sp.collectConsoleErrors();
   await sp.mount();
   await sp.expectNoStub();
-  const host = page.locator('.fc-host').first();
+  const grid = page.locator('.fc-host__grid').first();
   const dialog = page.getByRole('dialog', { name: 'Function Arguments', exact: true });
 
   await sp.focusHost();
@@ -54,7 +55,7 @@ export async function runFunctionDialogShortcutScenario(page: Page): Promise<voi
   await expect(dialog.getByRole('combobox', { name: 'Search functions…' })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
-  await expect(host).toBeFocused();
+  await expect(grid).toBeFocused();
 
   const fx = page.locator('.fc-host__formulabar-fx').first();
   for (const close of ['Escape', 'Cancel'] as const) {
@@ -63,7 +64,7 @@ export async function runFunctionDialogShortcutScenario(page: Page): Promise<voi
     if (close === 'Escape') await page.keyboard.press('Escape');
     else await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(dialog, `closed by ${close}`).toHaveCount(0);
-    await expect(host, `focus after ${close}`).toBeFocused();
+    await expect(fx, `focus after ${close}`).toBeFocused();
   }
   expect(consoleErrors.read()).toEqual([]);
 }
@@ -80,7 +81,7 @@ export async function runMacFormulaBuilderKeyboardScenario(page: Page): Promise<
   const consoleErrors = sp.collectConsoleErrors();
   await sp.mount({ platform: 'mac' });
   await sp.expectNoStub();
-  const host = page.locator('.fc-host').first();
+  const grid = page.locator('.fc-host__grid').first();
   const pane = page.locator('.fc-mac-formula-palette');
   const search = pane.locator('.fc-mac-formula-palette__search');
   const close = pane.locator('.fc-mac-formula-palette__header [data-action="close"]');
@@ -149,6 +150,6 @@ export async function runMacFormulaBuilderKeyboardScenario(page: Page): Promise<
 
   await close.click();
   await expect(pane).toBeHidden();
-  await expect(host).toBeFocused();
+  await expect(grid).toBeFocused();
   expect(consoleErrors.read()).toEqual([]);
 }

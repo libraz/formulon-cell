@@ -65,7 +65,7 @@ export class UserJourneyPage extends SpreadsheetPage {
     const nameBox = this.page.locator('.fc-host__formulabar-tag').first();
     await nameBox.fill(ref);
     await nameBox.press('Enter');
-    await expect(this.page.locator('.fc-host').first()).toBeFocused();
+    await expect(this.page.locator('.fc-host__grid').first()).toBeFocused();
     // A plain cell range shows only its active cell (top-left) in the name box.
     const range = /^([A-Z]+\d+):[A-Z]+\d+$/i.exec(ref);
     const displayedRef = range?.[1] ? range[1].toUpperCase() : ref;

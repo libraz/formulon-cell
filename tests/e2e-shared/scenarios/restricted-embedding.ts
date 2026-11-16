@@ -36,7 +36,7 @@ export async function runRestrictedEmbeddingScenario(page: Page): Promise<void> 
     dialog.append(instance.host);
     dialog.showModal();
     instance.update({ overlays: { root: dialog } });
-    instance.host.focus();
+    instance.focus();
   });
   // Actual keyboard input passes through the restricted editor and real WASM.
   await page.keyboard.type('7');
@@ -70,7 +70,7 @@ export async function runRestrictedEmbeddingScenario(page: Page): Promise<void> 
     const instance = (window as DemoWindow).__fcInst;
     if (!instance) throw new Error('Spreadsheet instance is unavailable');
     instance.update({ policy: { readOnly: true } });
-    instance.host.focus();
+    instance.focus();
   });
   await page.keyboard.type('99');
   await page.keyboard.press('Enter');
@@ -113,7 +113,7 @@ export async function runRestrictedEmbeddingScenario(page: Page): Promise<void> 
   await expect
     .poll(() => page.evaluate(() => document.fullscreenElement?.id))
     .toBe('embedded-fullscreen');
-  await page.evaluate(() => (window as DemoWindow).__fcInst?.host.focus());
+  await page.evaluate(() => (window as DemoWindow).__fcInst?.focus());
   await page.keyboard.press('Shift+F10');
   await expect(
     page.locator('#embedded-fullscreen .fc-ctxmenu:not(.fc-ctxmenu__sub)'),

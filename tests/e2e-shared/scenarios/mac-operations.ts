@@ -45,7 +45,7 @@ export async function runMacEditShortcutScenario(page: Page): Promise<void> {
         inst.update({ locale: 'ja' });
       }
     }, rebind);
-    await page.locator('.fc-host').focus();
+    await page.locator('.fc-host__grid').focus();
     await page.keyboard.press('Control+u');
     await expect(editor).toHaveValue('committed');
     await page.keyboard.press('Escape');

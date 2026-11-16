@@ -65,7 +65,7 @@ export async function runMacEditingPaletteScenario(
     await expect.poll(() => sp.readFormula('A1')).toBe('=1+SUM(5,3)*4');
     await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 33 });
     await palette.locator('[data-action="close"]').click();
-    await page.locator('.fc-host').focus();
+    await page.locator('.fc-host__grid').focus();
     await page.keyboard.press('Meta+z');
     await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 9 });
     await expect.poll(() => sp.readFormula('A1')).toBeNull();
@@ -201,9 +201,8 @@ export async function runMacFormulaPaletteScenario(page: Page): Promise<void> {
   await expect
     .poll(async () => (await grid.boundingBox())?.width)
     .toBeCloseTo(originalGrid.width, 0);
-  // The new draft came from More Functions; Close restores its visible trigger.
-  await expect(page.locator('[data-ribbon-command="mac.formulas.more"]')).toBeFocused();
-  await page.locator('.fc-host').focus();
+  // The new draft came from a ribbon command, which is not an opener; Close returns to the sheet.
+  await expect(page.locator('.fc-host__grid').first()).toBeFocused();
   await page.keyboard.press('Meta+z');
   await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 1 });
   await expect.poll(() => sp.readFormula('A1')).toBeNull();
@@ -265,7 +264,7 @@ export async function runMacFunctionCatalogScenario(page: Page): Promise<void> {
   await expect(dialog.locator('.fc-mac-formula-palette__argument input')).toHaveCount(2);
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.locator('[data-ribbon-command="mac.formulas.more"]')).toBeFocused();
+  await expect(page.locator('.fc-host__grid').first()).toBeFocused();
   await sp.clickRibbon('mac.formulas.more');
   await moreMenu.locator('[data-function-category-submenu="statistical"]').focus();
   await page.keyboard.press('ArrowRight');
@@ -404,17 +403,14 @@ export async function runMacFunctionCatalogScenario(page: Page): Promise<void> {
   expect(lastLeafBox.y).toBeGreaterThanOrEqual(-1);
   expect(lastLeafBox.y + lastLeafBox.height).toBeLessThanOrEqual(narrowViewport.height + 1);
 
-  // A leaf command closes the folded popup, so Close restores its nearest visible trigger.
-  const functionLibraryCollapse = page.locator(
-    '.fc-tb__ribbon-group--function-library > .fc-tb__ribbon-group-collapse',
-  );
+  // A ribbon command is not an opener, so Close returns to the sheet.
   const narrowCountIf = statisticalPanel.locator('[data-ribbon-command="mac.function.COUNTIF"]');
   await narrowCountIf.click();
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.fc-mac-formula-palette__args-name')).toHaveText('COUNTIF');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(dialog).toBeHidden();
-  await expect(functionLibraryCollapse).toBeFocused();
+  await expect(page.locator('.fc-host__grid').first()).toBeFocused();
 
   await sp.clickRibbon('mac.formulas.more');
   await statisticalTrigger.focus();
@@ -426,7 +422,7 @@ export async function runMacFunctionCatalogScenario(page: Page): Promise<void> {
   await expect(dialog.locator('.fc-mac-formula-palette__args-name')).toHaveText('COUNTIF');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(dialog).toBeHidden();
-  await expect(functionLibraryCollapse).toBeFocused();
+  await expect(page.locator('.fc-host__grid').first()).toBeFocused();
 
   await sp.clickRibbon('mac.formulas.more');
   await statisticalTrigger.focus();
@@ -568,7 +564,7 @@ export async function runMacAutoSumMenuScenario(page: Page): Promise<void> {
     page.locator('#menu-mac-formulas-recent [data-ribbon-command="mac.function.AVERAGE"]'),
   ).toBeVisible();
   await page.keyboard.press('Escape');
-  await page.locator('.fc-host').focus();
+  await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
   await expect.poll(() => sp.readFormula('A3')).toBeNull();
   await sp.expectNoConsoleErrors();
