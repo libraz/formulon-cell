@@ -643,6 +643,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       padsNumberRows(liveWb),
       defaultPatternFor,
       canonicalizeDialogFormula,
+      liveWb?.sheetName(range.sheet),
     );
     let actionPatch: Partial<CellFormat> = touchedPatch;
     let borderAction: SelectionFormatAction['border'];

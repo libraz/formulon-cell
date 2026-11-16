@@ -47,6 +47,7 @@ export const mergeWorkbook = (): WorkbookHandle =>
     setText: () => undefined,
     getValue: () => ({ kind: 'blank' }),
     getTheme: () => null,
+    sheetName: () => 'Sheet1',
     withBatchedRecalc: <T>(fn: () => T): T => fn(),
     withEngineSyncMuted: <T>(fn: () => T): T => fn(),
     subscribe: () => () => {},

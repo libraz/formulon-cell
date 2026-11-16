@@ -466,6 +466,7 @@ describe('format dialog Number category padding by workbook locale', () => {
       getTheme: () => null,
       getValue: () => ({ kind: 'blank' }),
       spreadsheetProfileId: () => profile,
+      sheetName: () => 'Sheet1',
       withEngineSyncMuted: <T>(fn: () => T): T => fn(),
       subscribe: () => () => {},
     } as unknown as never;

@@ -56,6 +56,16 @@ describe('parseRangeRef', () => {
   it('strips a leading equals sign', () => {
     expect(parseRangeRef('=Sheet1!A1')).not.toBeNull();
   });
+  it('tolerates spaces around the reference', () => {
+    expect(parseRangeRef('  $A$5:$A$9')).toEqual({
+      sheetName: null,
+      r0: 4,
+      c0: 0,
+      r1: 8,
+      c1: 0,
+    });
+    expect(parseRangeRef(' $A$5:$A$9 ')).not.toBeNull();
+  });
   it('returns null for non-ref strings', () => {
     expect(parseRangeRef('"Yes,No"')).toBeNull();
     expect(parseRangeRef('not-a-ref')).toBeNull();

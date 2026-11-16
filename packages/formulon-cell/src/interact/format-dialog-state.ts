@@ -362,6 +362,7 @@ export function buildTouchedDialogPatch(
   padNumber: boolean,
   defaultPattern: (category: NumberCategory) => string,
   canonicalizeFormula?: FormulaTransform,
+  sheetName?: string,
 ): Partial<CellFormat> {
   const patch: Partial<CellFormat> = {};
   const set = <K extends keyof CellFormat>(key: K, value: CellFormat[K]): void => {
@@ -406,7 +407,7 @@ export function buildTouchedDialogPatch(
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
-    patch.validation = computeDialogValidation(draft, lines, canonicalizeFormula);
+    patch.validation = computeDialogValidation(draft, lines, canonicalizeFormula, sheetName);
   }
   const border: CellBorders = {};
   const sides: SideKey[] = ['top', 'right', 'bottom', 'left', 'diagonalDown', 'diagonalUp'];
@@ -714,10 +715,24 @@ export function computeDialogNumFmt(
   }
 }
 
+/** A list source as Excel stores it: `=` dropped, trailing spaces dropped,
+ *  spaces after `=` kept, and a prefix naming the current sheet removed. */
+function normalizeListSourceText(text: string, sheetName: string | undefined): string {
+  const body = text.replace(/^\s*=/, '').trimEnd();
+  const quoted = body.match(/^(\s*)'((?:[^']|'')+)'!/);
+  const plain = quoted ? null : body.match(/^(\s*)([^'!\s:]+)!/);
+  const hit = quoted ?? plain;
+  if (!hit || sheetName === undefined) return body;
+  const name = quoted ? (hit[2] ?? '').replace(/''/g, "'") : (hit[2] ?? '');
+  if (name.toLowerCase() !== sheetName.toLowerCase()) return body;
+  return (hit[1] ?? '') + body.slice(hit[0].length);
+}
+
 export function computeDialogValidation(
   draft: DraftState,
   lines: string[],
   canonicalizeFormula?: FormulaTransform,
+  sheetName?: string,
 ): CellValidation | undefined {
   const k = draft.validationKind;
   if (k === 'none') return undefined;
@@ -741,8 +756,8 @@ export function computeDialogValidation(
   switch (k) {
     case 'list':
       if (draft.validationListSourceKind === 'range') {
-        const ref = draft.validationListRange.trim().replace(/^=/, '');
-        if (!ref) return undefined;
+        const ref = normalizeListSourceText(draft.validationListRange, sheetName);
+        if (!ref.trim()) return undefined;
         return { kind: 'list', source: { ref }, ...meta };
       }
       if (lines.length === 0) return undefined;

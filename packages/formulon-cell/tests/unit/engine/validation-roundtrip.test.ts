@@ -123,6 +123,28 @@ describe.skipIf(!canLoadWasm())('data validation round-trip', () => {
     }
   });
 
+  it('keeps spaces in a list range source across save and reload', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      wb.addValidationEntry(
+        0,
+        entry([[0, 0, 0, 0]], { type: ValidationType.List, formula1: '  $A$5:$A$9' }),
+      );
+      const { restored, store, before, after } = await roundTrip(wb);
+      try {
+        expect(before[0]?.formula1).toBe('=  $A$5:$A$9');
+        expect(validationAt(store.getState().format, { sheet: 0, row: 0, col: 0 })).toMatchObject({
+          source: { ref: '  $A$5:$A$9' },
+        });
+        expect(shape(after)).toEqual(shape(before));
+      } finally {
+        restored.dispose();
+      }
+    } finally {
+      wb.dispose();
+    }
+  });
+
   it('keeps whole-column rules as one range without per-cell entries', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {

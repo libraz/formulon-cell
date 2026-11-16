@@ -355,6 +355,57 @@ describe('syncValidationsToEngine', () => {
     expect(adds[0]?.input.formula1).toBe('Sheet1!$A$1:$A$10');
   });
 
+  it('keeps whitespace in a range source on write and on hydrate', () => {
+    const adds: string[] = [];
+    const wb = makeFake({
+      onClear: () => true,
+      onAdd: (_sheet, input) => {
+        adds.push((input as { formula1: string }).formula1);
+        return true;
+      },
+      entries: [
+        partial({
+          ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }],
+          type: DV_TYPE_LIST,
+          formula1: '  $A$5:$A$9',
+        }),
+      ],
+    });
+    const store = createSpreadsheetStore();
+    hydrateValidationsFromEngine(wb, store, 0);
+    const v = store
+      .getState()
+      .format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.validation;
+    expect(v).toEqual({ kind: 'list', source: { ref: '  $A$5:$A$9' } });
+    syncValidationsToEngine(wb, store, 0);
+    expect(adds).toEqual(['  $A$5:$A$9']);
+  });
+
+  it('writes a comma list literal quoted and trimmed per item', () => {
+    const adds: string[] = [];
+    const wb = makeFake({
+      onClear: () => true,
+      onAdd: (_sheet, input) => {
+        adds.push((input as { formula1: string }).formula1);
+        return true;
+      },
+    });
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      format: {
+        formats: new Map([
+          [
+            addrKey({ sheet: 0, row: 0, col: 0 }),
+            { validation: { kind: 'list' as const, source: ['Yes', 'No'] } },
+          ],
+        ]),
+      },
+    }));
+    syncValidationsToEngine(wb, store, 0);
+    expect(adds).toEqual(['"Yes,No"']);
+  });
+
   it('encodes custom rules without a leading = on formula1', () => {
     type AddCall = { input: { formula1?: string } };
     const adds: AddCall[] = [];

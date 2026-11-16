@@ -613,6 +613,52 @@ describe('interact/format-dialog-state', () => {
       expect(out).toEqual({ kind: 'list', source: { ref: 'Sheet1!$A$1:$A$10' } });
     });
 
+    describe('list range source text', () => {
+      const rangeSource = (text: string, sheetName?: string) => {
+        const draft = makeEmptyDraft('en');
+        draft.validationKind = 'list';
+        draft.validationListSourceKind = 'range';
+        draft.validationListRange = text;
+        return computeDialogValidation(draft, [], undefined, sheetName);
+      };
+      const refOf = (text: string, sheetName?: string) => {
+        const v = rangeSource(text, sheetName);
+        return v && v.kind === 'list' && !Array.isArray(v.source) ? v.source.ref : undefined;
+      };
+
+      it('drops the same-sheet prefix and trailing spaces, keeps spaces after =', () => {
+        expect(refOf('= Sheet1!$A$5:$A$9 ', 'Sheet1')).toBe(' $A$5:$A$9');
+      });
+
+      it('keeps spaces after = when there is no prefix', () => {
+        expect(refOf('=  $A$5:$A$9', 'Sheet1')).toBe('  $A$5:$A$9');
+      });
+
+      it('keeps a prefix naming another sheet', () => {
+        expect(refOf('=Sheet2!$A$5:$A$9', 'Sheet1')).toBe('Sheet2!$A$5:$A$9');
+      });
+
+      it('drops a quoted same-sheet prefix', () => {
+        expect(refOf("='My Sheet'!$A$5:$A$9", 'My Sheet')).toBe('$A$5:$A$9');
+        expect(refOf("='It''s'!$A$5", "It's")).toBe('$A$5');
+        expect(refOf("='Other'!$A$5", 'My Sheet')).toBe("'Other'!$A$5");
+      });
+
+      it('is undefined for a blank source', () => {
+        expect(rangeSource('=  ')).toBeUndefined();
+      });
+    });
+
+    it('keeps a literal list as trimmed items', () => {
+      const draft = makeEmptyDraft('en');
+      draft.validationKind = 'list';
+      draft.validationListSourceKind = 'literal';
+      expect(computeDialogValidation(draft, ['a', 'b,c'], undefined, 'Sheet1')).toEqual({
+        kind: 'list',
+        source: ['a', 'b,c'],
+      });
+    });
+
     it('builds a bounded numeric rule with between/notBetween a..b', () => {
       const draft = makeEmptyDraft('en');
       draft.validationKind = 'whole';

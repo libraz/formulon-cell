@@ -390,8 +390,8 @@ function parseInlineList(formula: string): string[] | null {
 /** List source that is not a literal: an A1 range, a defined name or a formula
  *  such as `INDIRECT(...)`, returned without the leading `=`. */
 function parseListFormulaSource(formula: string): string | null {
-  const trimmed = stripEquals(formula);
-  return trimmed || null;
+  const source = formula.replace(/^\s*=/, '').trimEnd();
+  return source.trim() ? source : null;
 }
 
 export function stripEquals(formula: string): string {
@@ -411,6 +411,5 @@ function parseNumberFormula(formula: string): number | null {
  *  OOXML contract and expects range refs without the optional leading `=`. */
 function encodeListSource(source: string[] | { ref: string }): string {
   if (Array.isArray(source)) return `"${source.join(',')}"`;
-  const ref = source.ref.trim().replace(/^=/, '');
-  return ref;
+  return source.ref.replace(/^\s*=/, '').trimEnd();
 }
