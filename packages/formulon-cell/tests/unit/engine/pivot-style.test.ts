@@ -168,6 +168,45 @@ describe('buildPivotStyleLayer', () => {
   });
 });
 
+describe('report options in the style layer', () => {
+  const twoRowFieldReport = async (): Promise<WorkbookHandle> => {
+    const wb = await WorkbookHandle.createDefault();
+    const rows: (string | number)[][] = [
+      ['Region', 'Product', 'Amt'],
+      ['East', 'A', 500],
+      ['North', 'A', 100],
+      ['North', 'B', 200],
+    ];
+    for (const [r, row] of rows.entries()) {
+      for (const [c, v] of row.entries()) {
+        const addr = { sheet: 0, row: r, col: c };
+        if (typeof v === 'number') wb.setNumber(addr, v);
+        else wb.setText(addr, v);
+      }
+    }
+    createPivotTableFromRange(wb, {
+      source: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 },
+      destination: { sheet: 0, row: 6, col: 0 },
+      rowField: 'Product',
+      valueField: 'Amt',
+      aggregation: PivotAggregation.Sum,
+    });
+    wb.addPivotField(0, 0, { sourceName: 'Region', axis: PivotAxis.Row });
+    return wb;
+  };
+
+  it('draws no collapse buttons with +/- Buttons off, moving the labels left by the button', async () => {
+    const wb = await twoRowFieldReport();
+    expect(buildPivotStyleLayer(wb, 0, {}).outlineAt(7, 0)).toEqual({ steps: 1, collapse: true });
+    expect(wb.updatePivotOptions(0, 0, { showDrill: false })).toBe(true);
+    const layer = buildPivotStyleLayer(wb, 0, {});
+    expect(layer.outlineAt(7, 0)).toEqual({ steps: 0, collapse: false });
+    expect(layer.outlineAt(8, 0)).toEqual({ steps: 1, collapse: false });
+    expect([...layer.buttons]).toEqual(['0:6:0']);
+    wb.dispose();
+  });
+});
+
 describe('empty report placeholder', () => {
   it('reserves 3 columns x 18 rows from the anchor and drops the style', async () => {
     const wb = await WorkbookHandle.createDefault();

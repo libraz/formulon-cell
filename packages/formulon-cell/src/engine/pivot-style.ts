@@ -113,6 +113,7 @@ type PivotStyleReader = Pick<
   | 'pivotTableName'
   | 'pivotSpills'
   | 'getPivotDefinition'
+  | 'pivotOptions'
 >;
 
 /** Whether a field hides any item or carries a label / value filter. */
@@ -238,10 +239,12 @@ const leafDepthOf = (cells: readonly PivotLayoutCell[]): number =>
 const closesGroup = (cell: PivotLayoutCell, next: PivotLayoutCell | undefined): boolean =>
   cell.kind === PIVOT_CELL_KIND.RowSubtotal && (!next || next.depth <= cell.depth);
 
-/** Outline placement of the row labels in a report's first column. */
+/** Outline placement of the row labels in a report's first column; with `drill` off (+/- Buttons)
+ *  no label carries a button and none is pushed in for one. */
 export function pivotRowOutline(
   range: Range,
   cells: readonly PivotLayoutCell[],
+  drill = true,
 ): { row: number; col: number; outline: PivotRowOutline }[] {
   const lead = leadCells(cells);
   const leafDepth = leafDepthOf(cells);
@@ -251,7 +254,7 @@ export function pivotRowOutline(
       (c.kind === PIVOT_CELL_KIND.RowLabel || c.kind === PIVOT_CELL_KIND.RowSubtotal),
   );
   const heads = (c: PivotLayoutCell): boolean =>
-    c.depth < leafDepth && !closesGroup(c, lead.get(c.row + 1));
+    drill && c.depth < leafDepth && !closesGroup(c, lead.get(c.row + 1));
   const gutter = labels.some(heads) ? 1 : 0;
   return labels.map((c) => ({
     row: c.row,
@@ -423,7 +426,8 @@ export function buildPivotStyleLayer(
       continue;
     }
     reports.push({ pivotIndex, range, cells });
-    for (const label of pivotRowOutline(range, cellsByPivot.get(pivotIndex) ?? [])) {
+    const drill = wb.pivotOptions(sheet, pivotIndex)?.showDrill !== false;
+    for (const label of pivotRowOutline(range, cellsByPivot.get(pivotIndex) ?? [], drill)) {
       outlines.set(addrKey({ sheet, row: label.row, col: label.col }), label.outline);
     }
     const info = wb.getPivotStyleInfo(sheet, pivotIndex);

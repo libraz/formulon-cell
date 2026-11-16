@@ -55,6 +55,15 @@ const REPORT_EDIT_COMMAND: Readonly<Record<string, string>> = {
   'clear-filters': 'pivotClear',
 };
 
+/** Re-reads the reports after a pivot edit and points out a report that no longer fits. */
+export function refreshAfterPivotEdit(instance: SpreadsheetInstance): void {
+  const { spilled } = refreshPivotReportsAfterEdit(instance.store, instance.workbook, {
+    theme: resolveTheme(instance.host),
+  });
+  const spill = spilled[0];
+  if (spill) showPivotSpillCallout(instance.host, instance.store, instance.i18n.strings, spill);
+}
+
 export function createPivotDropdownDefaults(instance: SpreadsheetInstance): PivotDropdownDefaults {
   const activePivot = (): PivotRef | null => {
     const pivot = findPivotTableAtCell(
@@ -64,13 +73,7 @@ export function createPivotDropdownDefaults(instance: SpreadsheetInstance): Pivo
     return pivot ? { sheetIndex: pivot.sheetIndex, pivotIndex: pivot.pivotIndex } : null;
   };
 
-  const onChanged = (): void => {
-    const { spilled } = refreshPivotReportsAfterEdit(instance.store, instance.workbook, {
-      theme: resolveTheme(instance.host),
-    });
-    const spill = spilled[0];
-    if (spill) showPivotSpillCallout(instance.host, instance.store, instance.i18n.strings, spill);
-  };
+  const onChanged = (): void => refreshAfterPivotEdit(instance);
 
   return {
     applyPivotLayoutAction(action) {

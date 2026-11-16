@@ -729,6 +729,25 @@ function readPivotOptions(
   };
 }
 
+/** The report options the PivotTable Analyze Show group turns on and off. */
+export type PivotShowOption = 'showDrill' | 'showHeaders';
+
+/** Turns one Show option of a report over as one undo step; false when the report cannot be read
+ *  or the write is refused. */
+export function togglePivotShowOption(
+  ctx: PivotCommitContext,
+  sheetIndex: number,
+  pivotIndex: number,
+  option: PivotShowOption,
+): boolean {
+  const previous = readPivotOptions(ctx, sheetIndex, pivotIndex);
+  if (!previous) return false;
+  return applyPivotOptions(ctx, sheetIndex, pivotIndex, previous, {
+    ...previous,
+    options: { ...previous.options, [option]: !previous.options[option] },
+  });
+}
+
 /** Opens the dialog on a report and applies the result; false when the report cannot be read. */
 export function openPivotOptions(
   ctx: PivotCommitContext & { host: HTMLElement; strings: Strings },

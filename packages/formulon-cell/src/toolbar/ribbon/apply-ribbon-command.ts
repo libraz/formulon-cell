@@ -69,6 +69,8 @@ import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import type { FeatureFlags } from '../../extensions/index.js';
 import { openPivotTableDialogFrom } from '../../interact/dialog-entry.js';
 import { openMacPivotMoveDialog } from '../../interact/mac-pivot-move-dialog.js';
+import { togglePivotShowOption } from '../../interact/pivot-options-dialog.js';
+import { refreshAfterPivotEdit } from '../../mount/dynamic-dropdown-defaults/pivot.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { outlineSummaryFor } from '../../store/outline-summary.js';
 import { getPageSetup } from '../../store/store.js';
@@ -452,6 +454,28 @@ const applyGenericRibbonCommand = (
     case 'tableRefresh':
       refreshAllConnections(i.workbook);
       return true;
+    case 'pivotButtons':
+    case 'pivotHeaders': {
+      const pivot = findPivotTableAtCell(i.workbook, i.store.getState().selection.active);
+      if (pivot) {
+        togglePivotShowOption(
+          {
+            wb: i.workbook,
+            history: i.history,
+            store: i.store,
+            origin: 'ribbon',
+            commandId: id,
+            onChanged: () => refreshAfterPivotEdit(i),
+          },
+          pivot.sheetIndex,
+          pivot.pivotIndex,
+          id === 'pivotButtons' ? 'showDrill' : 'showHeaders',
+        );
+      }
+      runtime.projectFormatToolbar();
+      runtime.focusSheet();
+      return true;
+    }
     case 'pivotRowHeaders':
     case 'pivotColHeaders':
     case 'pivotRowStripes':

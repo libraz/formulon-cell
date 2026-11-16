@@ -122,6 +122,40 @@ describe('PivotTable tabs of the ribbon', () => {
     tb.dispose();
   });
 
+  it('toggles +/- Buttons and Field Headers on the report, pressed as set, one undo step each', () => {
+    const store = sheet.instance.store;
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
+    createPivotTableAtPlacement(
+      {
+        origin: 'ribbon' as const,
+        commandId: 'test',
+        store,
+        workbook: sheet.workbook,
+        history: sheet.instance.history,
+      },
+      { source: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 }, rowField: 'Region', valueField: 'Sales' },
+      { row: 8, col: 4 },
+    );
+    mutators.setActive(store, { sheet: 0, row: 9, col: 4 });
+    tb.setActiveTab('pivotAnalyze');
+    const options = () => sheet.workbook.pivotOptions(0, 0);
+    for (const [command, key] of [
+      ['pivotButtons', 'showDrill'],
+      ['pivotHeaders', 'showHeaders'],
+    ] as const) {
+      const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
+      if (!button) throw new Error(`missing ${command}`);
+      expect(button.disabled, command).toBe(false);
+      expect(button.getAttribute('aria-pressed'), command).toBe('true');
+      button.click();
+      expect(options()?.[key], command).toBe(false);
+      expect(button.getAttribute('aria-pressed'), command).toBe('false');
+      expect(sheet.instance.history.undo()).toBe(true);
+      expect(options()?.[key], command).toBe(true);
+    }
+    tb.dispose();
+  });
+
   it('refreshes the report from its source through the Analyze tab', () => {
     const store = sheet.instance.store;
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {

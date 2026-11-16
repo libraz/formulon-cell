@@ -135,7 +135,8 @@ export const projectTableDesign = (host: HTMLElement, instance: SpreadsheetInsta
     ?.dispatchEvent(new Event('fc-ribbon-control-refresh'));
 };
 
-/** Sync the PivotTable Design controls under `host` with the report under the active cell. */
+/** Sync the PivotTable toggles under `host` (the Design options and the Analyze Show group) with
+ *  the report under the active cell. */
 export const projectPivotDesign = (host: HTMLElement, instance: SpreadsheetInstance): void => {
   const pivot = findPivotTableAtCell(instance.workbook, instance.store.getState().selection.active);
   const info = pivot
@@ -146,6 +147,14 @@ export const projectPivotDesign = (host: HTMLElement, instance: SpreadsheetInsta
     if (!button) continue;
     const pressed = info ? info[key] : DEFAULT_PIVOT_TOGGLES[key];
     projectPressedState(button, pressed);
+  }
+  const options = pivot ? instance.workbook.pivotOptions(pivot.sheetIndex, pivot.pivotIndex) : null;
+  for (const [command, key] of [
+    ['pivotButtons', 'showDrill'],
+    ['pivotHeaders', 'showHeaders'],
+  ] as const) {
+    const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
+    if (button) projectPressedState(button, options?.[key] ?? true);
   }
   host
     .querySelector('[data-ribbon-gallery="pivotQuickStyles"]')
