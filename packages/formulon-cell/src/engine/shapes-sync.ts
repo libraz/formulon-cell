@@ -501,6 +501,7 @@ export class ShapeMirror {
         input.presetGeometry = PRST_OF_KIND[item.shape as SessionShapeKind];
       }
       if (item.text !== old.text) input.text = item.text ?? '';
+      if (item.rotationDeg !== old.rotationDeg) input.rotationDeg = item.rotationDeg ?? 0;
     }
     if (Object.keys(input).length === 0) return null;
     if (this.handle.updateShape(item.sheet, objectId, input)) {

@@ -7,9 +7,11 @@ import {
 } from '../../../src/commands/session-illustration.js';
 import {
   applySessionShapeFill,
+  applySessionShapeKind,
   applySessionShapeOutline,
   applySessionShapeOutlineDash,
   applySessionShapeOutlineWeight,
+  applySessionShapeRotation,
   DEFAULT_SHAPE_COLOR,
   DEFAULT_SHAPE_LINE_WIDTH,
   DEFAULT_SHAPE_OUTLINE_COLOR,
@@ -148,5 +150,64 @@ describe('shape format commands', () => {
 
     applySessionShapeOutline(store, line, '#7030a0', history);
     expect(shapeOutlineColor(current(line.id))).toBe('#7030a0');
+  });
+
+  it('turns a shape a quarter turn each way, one undo step each', () => {
+    const item = shape();
+    applySessionShapeRotation(store, item, 90, history);
+    expect(current(item.id).rotationDeg).toBe(90);
+    applySessionShapeRotation(store, current(item.id), -90, history);
+    applySessionShapeRotation(store, current(item.id), -90, history);
+    expect(current(item.id).rotationDeg).toBe(270);
+
+    history.undo();
+    expect(current(item.id).rotationDeg).toBe(0);
+    history.undo();
+    history.undo();
+    expect(current(item.id)).toEqual(item);
+  });
+
+  it('turns a rotation the file stored past a full turn into the range drawn', () => {
+    const item = shape();
+    mutators.updateIllustration(store, item.id, { rotationDeg: 400 });
+    applySessionShapeRotation(store, current(item.id), 90, history);
+    expect(current(item.id).rotationDeg).toBe(130);
+  });
+
+  it('changes the kind of a shape, keeping its paint, text and frame', () => {
+    const created = createSessionShape(store, range, {
+      id: 'box',
+      shape: 'rectangle',
+      x: 40,
+      y: 30,
+      w: 120,
+      h: 60,
+      color: '#ff0000',
+      lineWidth: 3,
+      extra: { text: 'Note', textBox: true, lineColor: '#00ff00', rotationDeg: 30 },
+    });
+    if (!created) throw new Error('shape was not created');
+
+    applySessionShapeKind(store, created, 'oval', history);
+    expect(current(created.id)).toEqual({ ...created, shape: 'oval' });
+    history.undo();
+    expect(current(created.id)).toEqual(created);
+  });
+
+  it('changes no line, and makes nothing into one', () => {
+    const line = shape('line');
+    expect(applySessionShapeKind(store, line, 'oval', history)).toBeNull();
+    const box = shape();
+    expect(applySessionShapeKind(store, box, 'line', history)).toBeNull();
+    expect(applySessionShapeKind(store, box, 'arrow', history)).toBeNull();
+    expect(history.canUndo()).toBe(false);
+  });
+
+  it('leaves a shape drawn only as its bounding box as it is', () => {
+    const box = shape();
+    mutators.updateIllustration(store, box.id, { nativeLocked: true });
+    expect(applySessionShapeKind(store, current(box.id), 'oval', history)).toBeNull();
+    expect(applySessionShapeRotation(store, current(box.id), 90, history)).toBeNull();
+    expect(history.canUndo()).toBe(false);
   });
 });

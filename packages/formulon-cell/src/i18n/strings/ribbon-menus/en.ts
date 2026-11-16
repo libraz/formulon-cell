@@ -235,6 +235,8 @@ export const ribbonMenusEn: RibbonMenusStrings = {
     chartColorsBlue: 'Blue',
     chartColorsMonochrome: 'Monochromatic',
     shapeNoFill: 'No Fill',
+    shapeRotateRight: 'Rotate Right 90°',
+    shapeRotateLeft: 'Rotate Left 90°',
     shapeNoOutline: 'No Outline',
     shapeOutlineWeight: 'Weight',
     shapeOutlineDashes: 'Dashes',

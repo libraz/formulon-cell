@@ -637,6 +637,7 @@ export const dataObjectsKo: DataObjectsStrings = {
     diamondName: '다이아몬드 {n}',
     lineName: '직선 연결선 {n}',
     arrowName: '직선 화살표 연결선 {n}',
+    textBoxName: 'TextBox {n}',
     bringToFront: '맨 앞으로 가져오기',
     sendToBack: '맨 뒤로 보내기',
   },

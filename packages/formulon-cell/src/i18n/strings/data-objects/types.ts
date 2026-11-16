@@ -618,6 +618,7 @@ export interface DataObjectsStrings {
     diamondName: string;
     lineName: string;
     arrowName: string;
+    textBoxName: string;
     /** Right-click menu of a picture or shape. */
     bringToFront: string;
     sendToBack: string;

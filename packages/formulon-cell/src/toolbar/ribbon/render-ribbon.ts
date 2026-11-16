@@ -154,6 +154,8 @@ export interface RibbonMenus {
   chartColors?: RibbonMenuFactory;
   shapeFill?: RibbonMenuFactory;
   shapeOutline?: RibbonMenuFactory;
+  shapeRotate?: RibbonMenuFactory;
+  shapeChangeShape?: RibbonMenuFactory;
   pivotLayout?: RibbonMenuFactory;
   tableRefresh?: RibbonMenuFactory;
   sparklineEditData?: RibbonMenuFactory;

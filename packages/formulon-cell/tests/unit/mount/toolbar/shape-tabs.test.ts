@@ -145,6 +145,71 @@ describe('shape and picture tabs of the ribbon', () => {
     tb.dispose();
   });
 
+  it('turns the selected shape a quarter turn from the Rotate menu', () => {
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    const shape = insertShape();
+
+    command('shapeRotate').click();
+    pick(tb, '[data-shape-rotate="right"]');
+    expect(current(shape.id).rotationDeg).toBe(90);
+    command('shapeRotate').click();
+    pick(tb, '[data-shape-rotate="left"]');
+    command('shapeRotate').click();
+    pick(tb, '[data-shape-rotate="left"]');
+    expect(current(shape.id).rotationDeg).toBe(270);
+
+    expect(sheet.instance.store.getState().ui.selectedObject?.id).toBe(shape.id);
+    sheet.instance.history.undo();
+    expect(current(shape.id).rotationDeg).toBe(0);
+    tb.dispose();
+  });
+
+  it('changes the selected shape to another from the shapes gallery', () => {
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    const shape = insertShape();
+
+    command('shapeChangeShape').click();
+    const kinds = Array.from(
+      host.querySelectorAll<HTMLElement>('[data-shape-change]'),
+      (tile) => tile.dataset.shapeChange,
+    );
+    expect(kinds).toEqual(['rectangle', 'rounded-rectangle', 'oval', 'triangle', 'diamond']);
+    expect(host.querySelector('[data-shape-change="oval"]')?.getAttribute('aria-label')).toBe(
+      host.querySelector('[data-shape-insert="oval"]')?.getAttribute('aria-label') ?? 'Oval',
+    );
+    pick(tb, '[data-shape-change="oval"]');
+    expect(current(shape.id)).toEqual({ ...shape, shape: 'oval' });
+
+    expect(sheet.instance.store.getState().ui.selectedObject?.id).toBe(shape.id);
+    sheet.instance.history.undo();
+    expect(current(shape.id).shape).toBe('rectangle');
+    tb.dispose();
+  });
+
+  it('greys Change Shape for a line, which still turns', () => {
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    createIllustrationDropdownDefaults(sheet.instance).insertShapeFromRibbon('line');
+
+    command('shapeChangeShape').click();
+    const tiles = host.querySelectorAll<HTMLButtonElement>('[data-shape-change]');
+    expect(tiles.length).toBeGreaterThan(0);
+    for (const tile of tiles) expect(tile.disabled, tile.dataset.shapeChange).toBe(true);
+    command('shapeRotate').click();
+    expect(host.querySelector<HTMLButtonElement>('[data-shape-rotate="right"]')?.disabled).toBe(
+      false,
+    );
+    tb.dispose();
+  });
+
   it('brings the selected shape forward and sends it backward', () => {
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
       dynamicDropdowns: true,

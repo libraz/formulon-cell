@@ -15,9 +15,11 @@ import {
 } from '../../../src/commands/session-illustration.js';
 import {
   applySessionShapeFill,
+  applySessionShapeKind,
   applySessionShapeOutline,
   applySessionShapeOutlineDash,
   applySessionShapeOutlineWeight,
+  applySessionShapeRotation,
   SHAPE_LINE_DASHES,
   shapeDashEditable,
 } from '../../../src/commands/shape-format.js';
@@ -349,6 +351,34 @@ describe('shapes saved with the workbook', () => {
     expect(listShapes(wb, 0)[0]?.text).toBe('Total\nQ3');
     const reopened = await saved(wb);
     expect(only(reopened.store).text).toBe('Total\nQ3');
+  });
+
+  it('turns a shape a quarter turn in the file, and back on undo', async () => {
+    const { wb, store, history } = await session();
+    oval(store);
+
+    applySessionShapeRotation(store, only(store), -90, history, wb);
+    expect(listShapes(wb, 0)[0]?.rotation).toBe(270);
+    expect(only((await saved(wb)).store).rotationDeg).toBe(270);
+    applySessionShapeRotation(store, only(store), 90, history, wb);
+    expect(listShapes(wb, 0)[0]?.rotation).toBe(0);
+
+    history.undo();
+    expect(listShapes(wb, 0)[0]?.rotation).toBe(270);
+  });
+
+  it('changes the kind of a shape in the file, keeping its paint, text and anchor', async () => {
+    const { wb, store, history } = await session();
+    oval(store);
+    updateSessionIllustration(store, 's1', { text: 'Total' }, history, wb);
+    const before = listShapes(wb, 0)[0];
+
+    applySessionShapeKind(store, only(store), 'diamond', history, wb);
+    expect(listShapes(wb, 0)[0]).toEqual({ ...before, prst: 'diamond' });
+    expect(only((await saved(wb)).store)).toMatchObject({ shape: 'diamond', text: 'Total' });
+
+    history.undo();
+    expect(listShapes(wb, 0)[0]).toEqual(before);
   });
 
   it('deletes a shape from the file', async () => {

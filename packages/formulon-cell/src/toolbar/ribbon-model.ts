@@ -845,11 +845,12 @@ export function buildRibbonModel(
     ]),
   ];
   // The Arrange group every object format tab shares; it acts on the selected object.
-  const objectArrange = (): RibbonGroupModel =>
+  const objectArrange = (extra: RibbonCommand[] = []): RibbonGroupModel =>
     group(tr.arrange, [
       cmd('objectBringForward', tr.bringForward, tr.bringForward, 'bringForward', 'wide'),
       cmd('objectSendBackward', tr.sendBackward, tr.sendBackward, 'sendBackward', 'wide'),
       cmd('objectSelectionPane', tr.selectionPane, tr.selectionPane, 'selectionPane', 'wide'),
+      ...extra,
     ]);
   const contextualTabs: RibbonTabModel[] = [
     {
@@ -893,11 +894,14 @@ export function buildRibbonModel(
     },
     {
       ...tab('shapeFormat', [
+        group(tr.insertShapes, [
+          cmd('shapeChangeShape', tr.changeShape, tr.changeShape, 'changeShape', 'wide'),
+        ]),
         group(tr.shapeStyles, [
           cmd('shapeFill', tr.shapeFill, tr.shapeFill, 'shapeFill', 'wide'),
           cmd('shapeOutline', tr.shapeOutline, tr.shapeOutline, 'shapeOutline', 'wide'),
         ]),
-        objectArrange(),
+        objectArrange([cmd('shapeRotate', tr.rotate, tr.rotate, 'rotateRight', 'wide')]),
       ]),
       contextual: true,
     },

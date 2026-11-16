@@ -30,6 +30,40 @@ export interface InsertMenuFactories {
   createPdfMenu: () => HTMLDivElement;
 }
 
+/** The shapes gallery's section headings and tile grids, each tile writing its kind to `attr`;
+ *  `lines: false` leaves out the Lines section. */
+export const shapeGallery = (
+  t: ToolbarMenuText,
+  attr: string,
+  { lines = true }: { lines?: boolean } = {},
+): HTMLElement[] => [
+  ...(lines
+    ? [
+        menuSectionHeader(t.shapeLines),
+        visualMenuTileGrid('fc-tb__visual-grid--shapes', [
+          { label: t.shapeLine, attr, value: 'line', icon: 'shape-line' },
+          { label: t.shapeArrow, attr, value: 'arrow', icon: 'shape-arrow' },
+        ]),
+      ]
+    : []),
+  menuSectionHeader(t.shapeRectangles),
+  visualMenuTileGrid('fc-tb__visual-grid--shapes', [
+    { label: t.shapeRectangle, attr, value: 'rectangle', icon: 'shape-rectangle' },
+    {
+      label: t.shapeRoundedRectangle,
+      attr,
+      value: 'rounded-rectangle',
+      icon: 'shape-rounded-rectangle',
+    },
+  ]),
+  menuSectionHeader(t.shapeBasicShapes),
+  visualMenuTileGrid('fc-tb__visual-grid--shapes', [
+    { label: t.shapeOval, attr, value: 'oval', icon: 'shape-oval' },
+    { label: t.shapeTriangle, attr, value: 'triangle', icon: 'shape-triangle' },
+    { label: t.shapeDiamond, attr, value: 'diamond', icon: 'shape-diamond' },
+  ]),
+];
+
 export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): InsertMenuFactories => {
   const t = ribbonMenuText;
 
@@ -212,62 +246,7 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
   const createShapesInsertMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-shapes-insert');
     menu.classList.add('fc-tb__menu--visual', 'fc-tb__menu--shapes');
-    const lines = visualMenuTileGrid('fc-tb__visual-grid--shapes', [
-      {
-        label: t.shapeLine,
-        attr: 'shapeInsert',
-        value: 'line',
-        icon: 'shape-line',
-      },
-      {
-        label: t.shapeArrow,
-        attr: 'shapeInsert',
-        value: 'arrow',
-        icon: 'shape-arrow',
-      },
-    ]);
-    const rectangles = visualMenuTileGrid('fc-tb__visual-grid--shapes', [
-      {
-        label: t.shapeRectangle,
-        attr: 'shapeInsert',
-        value: 'rectangle',
-        icon: 'shape-rectangle',
-      },
-      {
-        label: t.shapeRoundedRectangle,
-        attr: 'shapeInsert',
-        value: 'rounded-rectangle',
-        icon: 'shape-rounded-rectangle',
-      },
-    ]);
-    const basic = visualMenuTileGrid('fc-tb__visual-grid--shapes', [
-      {
-        label: t.shapeOval,
-        attr: 'shapeInsert',
-        value: 'oval',
-        icon: 'shape-oval',
-      },
-      {
-        label: t.shapeTriangle,
-        attr: 'shapeInsert',
-        value: 'triangle',
-        icon: 'shape-triangle',
-      },
-      {
-        label: t.shapeDiamond,
-        attr: 'shapeInsert',
-        value: 'diamond',
-        icon: 'shape-diamond',
-      },
-    ]);
-    menu.append(
-      menuSectionHeader(t.shapeLines),
-      lines,
-      menuSectionHeader(t.shapeRectangles),
-      rectangles,
-      menuSectionHeader(t.shapeBasicShapes),
-      basic,
-    );
+    menu.append(...shapeGallery(t, 'shapeInsert'));
     return menu;
   };
 

@@ -624,6 +624,7 @@ export const dataObjectsTh: DataObjectsStrings = {
     diamondName: 'สี่เหลี่ยมขนมเปียกปูน {n}',
     lineName: 'ตัวเชื่อมต่อตรง {n}',
     arrowName: 'ตัวเชื่อมต่อลูกศรตรง {n}',
+    textBoxName: 'กล่องข้อความ {n}',
     bringToFront: 'นำไปไว้ด้านหน้า',
     sendToBack: 'ส่งไปไว้ด้านหลัง',
   },

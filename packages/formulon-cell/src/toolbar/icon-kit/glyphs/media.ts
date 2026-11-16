@@ -1,9 +1,39 @@
 /** Picture, screenshot and drawing-shape icons. */
 
 import { circle, ellipse, poly, rect, roundRect } from '../path.js';
-import { arrow, badge, filled, monitor, outlined, stroked } from '../primitives.js';
+import { arcArrow, arrow, badge, filled, monitor, outlined, stroked } from '../primitives.js';
 import { PALETTE } from '../tokens.js';
-import type { IconDefinition } from '../types.js';
+import type { IconDefinition, IconSegment } from '../types.js';
+
+/** A right triangle under a quarter-turn arrow; `left` mirrors it for Rotate Left. */
+const rotateMark = (left: boolean): IconSegment[] => {
+  const x = (value: number): number => (left ? 24 - value : value);
+  return [
+    outlined(
+      poly(
+        [
+          [x(3.4), 20.6],
+          [x(14.2), 20.6],
+          [x(3.4), 9.8],
+        ],
+        true,
+      ),
+      PALETTE.paper,
+      PALETTE.accent,
+      'bold',
+    ),
+    ...arcArrow({
+      from: [x(9.8), 3.6],
+      to: [x(20.4), 12.4],
+      radius: 9,
+      sweep: left ? 0 : 1,
+      headDir: [0, 1],
+      color: PALETTE.info,
+      weight: 'bold',
+      head: 'solid',
+    }),
+  ];
+};
 
 /** The photo: frame, sun and hills, sized to whatever box it is given. */
 const photo = (box: { x: number; y: number; w: number; h: number }, framed = true) => {
@@ -125,5 +155,22 @@ export const MEDIA_ICONS = {
       PALETTE.info,
       'heavy',
     ),
+  ],
+  rotateRight: rotateMark(false),
+  rotateLeft: rotateMark(true),
+  // One shape turning into another.
+  changeShape: [
+    outlined(rect(2.6, 2.6, 9.4, 9.4), PALETTE.paper, PALETTE.info, 'bold'),
+    outlined(circle(16.4, 16.4, 5), PALETTE.paper, PALETTE.warnDeep, 'bold'),
+    ...arcArrow({
+      from: [14.6, 3.8],
+      to: [20.2, 9.2],
+      radius: 6.4,
+      sweep: 1,
+      headDir: [0, 1],
+      color: PALETTE.ink,
+      weight: 'regular',
+      head: 'solid',
+    }),
   ],
 } satisfies Record<string, IconDefinition>;

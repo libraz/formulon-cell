@@ -687,7 +687,10 @@ describe('attachSessionIllustrations', () => {
     });
 
     describe('default text layout', () => {
-      const withTheme = async (options?: Parameters<typeof WorkbookHandle.createDefault>[0]) => {
+      const withTheme = async (
+        options?: Parameters<typeof WorkbookHandle.createDefault>[0],
+        extra: { textBox?: boolean } = {},
+      ) => {
         const wb = await WorkbookHandle.createDefault(options);
         const theme = wb.getWorkbookTheme();
         if (!theme) throw new Error('missing theme');
@@ -704,6 +707,7 @@ describe('attachSessionIllustrations', () => {
           w: 200,
           h: 80,
           text: 'hello',
+          ...extra,
         });
         const handle = attachSessionIllustrations({
           host,
@@ -734,6 +738,22 @@ describe('attachSessionIllustrations', () => {
         const face = theme.minorScripts.find((s) => s.script === 'Jpan')?.typeface;
         expect(face).toBeTruthy();
         expect(panel.querySelector('svg text')?.getAttribute('font-family')).toBe(face);
+        handle.detach();
+        wb.dispose();
+      });
+
+      it('writes a text box in the theme dark colour, and names it a text box', async () => {
+        const { wb, theme, host, handle, panel } = await withTheme(undefined, { textBox: true });
+        const dark = cssColorFromArgb(theme.colors[0] as number);
+        expect(panel.querySelector('svg text')?.getAttribute('fill')).toBe(dark);
+        firePointer(panel, 'pointerdown');
+        expect(panel.getAttribute('aria-label')).toBe('TextBox 1');
+        panel.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+        const editor = host.querySelector<HTMLTextAreaElement>('.fc-illustration textarea');
+        expect(editor?.getAttribute('aria-label')).toBe('TextBox 1');
+        const probe = document.createElement('span');
+        probe.style.color = dark;
+        expect(editor?.style.color).toBe(probe.style.color);
         handle.detach();
         wb.dispose();
       });

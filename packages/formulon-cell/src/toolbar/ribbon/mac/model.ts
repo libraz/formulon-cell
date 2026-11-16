@@ -250,7 +250,7 @@ const insertTab = (): RibbonTabModel =>
       command('mac.insert.newComment', t('newComment'), 'commentAdd'),
     ]),
     group({ ja: 'テキスト', en: 'Text' }, [
-      disabledCommand('mac.insert.textBox', t('textBox'), 'textBox', EMBEDDED_UNSUPPORTED),
+      menuCommand('mac.insert.textBox', t('textBox'), 'textBox'),
       menuCommand('mac.insert.headerFooter', t('headerFooter'), 'headerFooter'),
       disabledCommand('mac.insert.wordArt', t('wordArt'), 'wordArt', NOT_IMPLEMENTED),
       disabledCommand('mac.insert.object', t('object'), 'object', NOT_IMPLEMENTED),

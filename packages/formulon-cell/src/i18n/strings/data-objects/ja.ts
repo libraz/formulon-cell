@@ -639,6 +639,7 @@ export const dataObjectsJa: DataObjectsStrings = {
     diamondName: 'ひし形 {n}',
     lineName: '直線コネクタ {n}',
     arrowName: '直線矢印コネクタ {n}',
+    textBoxName: 'テキスト ボックス {n}',
     bringToFront: '最前面へ移動',
     sendToBack: '最背面へ移動',
   },

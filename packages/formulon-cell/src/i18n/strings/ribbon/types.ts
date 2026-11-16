@@ -128,6 +128,9 @@ export interface RibbonStrings {
     shapeStyles: string;
     shapeFill: string;
     shapeOutline: string;
+    insertShapes: string;
+    changeShape: string;
+    rotate: string;
     tableProperties: string;
     tableName: string;
     tableStyleOptions: string;

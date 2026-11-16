@@ -8,6 +8,7 @@ import { createShapeFormatDropdownDefaults } from '../../../../src/mount/dynamic
 import type { SpreadsheetInstance } from '../../../../src/mount.js';
 import { createSpreadsheetStore, mutators } from '../../../../src/store/store.js';
 import { projectMacRibbonState } from '../../../../src/toolbar/ribbon/mac/model.js';
+import { zipEntries } from '../../engine/zip-entries.js';
 
 const open: WorkbookHandle[] = [];
 afterEach(() => {
@@ -106,5 +107,21 @@ describe('shape controls against an engine that saves shapes', () => {
 
     createIllustrationDropdownDefaults(sheet).insertShapeFromRibbon('oval');
     expect(sheet.workbook.listShapes(0)).toHaveLength(1);
+  });
+
+  it('saves a text box with the white fill and grey outline of a new one', async () => {
+    const sheet = await instance();
+
+    createIllustrationDropdownDefaults(sheet).insertTextBoxFromRibbon();
+
+    const [shape] = sheet.workbook.listShapes(0);
+    expect(shape).toMatchObject({ presetGeometry: 'rect', textBox: true });
+    const xml = new TextDecoder().decode(
+      zipEntries(sheet.workbook.save()).get('xl/drawings/drawing1.xml'),
+    );
+    expect(xml).toContain('txBox="1"');
+    // The fill follows the theme's light colour (bg1 maps to lt1); the outline is the grey Excel renders.
+    expect(xml).toMatch(/<\/a:prstGeom><a:solidFill><a:schemeClr val="bg1"\/><\/a:solidFill>/);
+    expect(xml).toMatch(/<a:ln w="9525"[^>]*><a:solidFill><a:srgbClr val="BCBCBC"\/>/);
   });
 });

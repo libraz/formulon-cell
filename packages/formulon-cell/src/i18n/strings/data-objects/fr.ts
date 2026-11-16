@@ -652,6 +652,7 @@ export const dataObjectsFr: DataObjectsStrings = {
     diamondName: 'Losange {n}',
     lineName: 'Connecteur droit {n}',
     arrowName: 'Connecteur droit avec flèche {n}',
+    textBoxName: 'ZoneTexte {n}',
     bringToFront: 'Mettre au premier plan',
     sendToBack: 'Mettre à l’arrière-plan',
   },

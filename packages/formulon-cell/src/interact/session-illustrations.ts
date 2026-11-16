@@ -75,6 +75,7 @@ export interface SessionIllustrationLabels {
   diamondName: string;
   lineName: string;
   arrowName: string;
+  textBoxName: string;
   /** The object's right-click menu. */
   bringToFront: string;
   sendToBack: string;
@@ -91,6 +92,7 @@ const DEFAULT_LABELS: SessionIllustrationLabels = {
   diamondName: 'Diamond {n}',
   lineName: 'Straight Connector {n}',
   arrowName: 'Straight Arrow Connector {n}',
+  textBoxName: 'TextBox {n}',
   bringToFront: 'Bring to Front',
   sendToBack: 'Send to Back',
 };
@@ -112,12 +114,17 @@ const objectName = (
   labels: SessionIllustrationLabels,
 ): string => {
   const sameKind = (entry: SessionIllustration): boolean =>
-    entry.sheet === item.sheet && entry.kind === item.kind && entry.shape === item.shape;
+    entry.sheet === item.sheet &&
+    entry.kind === item.kind &&
+    entry.shape === item.shape &&
+    !entry.textBox === !item.textBox;
   const index = state.illustrations.illustrations.filter(sameKind).indexOf(item);
   const template =
     item.kind === 'image'
       ? labels.pictureName
-      : labels[SHAPE_NAME_LABEL[item.shape ?? 'rectangle']];
+      : item.textBox
+        ? labels.textBoxName
+        : labels[SHAPE_NAME_LABEL[item.shape ?? 'rectangle']];
   return template.replace('{n}', String(index + 1));
 };
 
@@ -234,19 +241,19 @@ const SHAPE_TEXT_INSET_Y = 4;
 const SHAPE_TEXT_LINE_HEIGHT = 1.2;
 
 /** The text face and colour a shape takes from the workbook theme: its minor
- *  font and the light-1 colour. Unset where the theme is not reachable. */
+ *  font, and the light-1 colour (dark-1 in a text box). Unset where the theme is not reachable. */
 interface ShapeTextTheme {
   family?: string;
   color?: string;
 }
 
-const shapeTextTheme = (wb: WorkbookHandle | null): ShapeTextTheme => {
+const shapeTextTheme = (wb: WorkbookHandle | null, item: SessionIllustration): ShapeTextTheme => {
   const theme = wb?.getWorkbookTheme();
-  const light1 = theme?.colors[1];
+  const color = theme?.colors[item.textBox ? 0 : 1];
   const family = wb ? themeFontFace(wb, false) : undefined;
   return {
     ...(family ? { family } : {}),
-    ...(light1 !== undefined ? { color: cssColorFromArgb(light1) } : {}),
+    ...(color !== undefined ? { color: cssColorFromArgb(color) } : {}),
   };
 };
 
@@ -425,7 +432,7 @@ export function attachSessionIllustrations(deps: {
     editor.className = 'fc-illustration__text';
     editor.setAttribute('aria-label', objectName(store.getState(), item, labels));
     editor.value = item.text ?? '';
-    const textTheme = shapeTextTheme(getWb());
+    const textTheme = shapeTextTheme(getWb(), item);
     editor.style.cssText =
       'position:absolute;inset:0;box-sizing:border-box;margin:0;border:0;' +
       'outline:0;resize:none;overflow:hidden;background:transparent;font:inherit;' +
@@ -700,7 +707,13 @@ export function attachSessionIllustrations(deps: {
         svg.setAttribute('preserveAspectRatio', 'none');
         svg.style.cssText = 'display:block;width:100%;height:100%;overflow:visible;';
         const scale = item.nativeAnchor ? viewportZoom(store) : 1;
-        renderShape(svg, item, placement.w / scale, placement.h / scale, shapeTextTheme(getWb()));
+        renderShape(
+          svg,
+          item,
+          placement.w / scale,
+          placement.h / scale,
+          shapeTextTheme(getWb(), item),
+        );
         panel.appendChild(svg);
       }
 

@@ -263,6 +263,8 @@ export function createDefaultRibbonMenus(
     // Shape Format tab
     shapeFill: shapeFormatFactories.createShapeFillMenu,
     shapeOutline: shapeFormatFactories.createShapeOutlineMenu,
+    shapeRotate: shapeFormatFactories.createShapeRotateMenu,
+    shapeChangeShape: shapeFormatFactories.createShapeChangeMenu,
 
     // Formulas tab
     autoSum: formulaFactories.createAutoSumMenu,

@@ -364,12 +364,12 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     { id: 'mac.insert.sparkline.column', label: 'Column' },
     { id: 'mac.insert.sparkline.winLoss', label: 'Win/Loss' },
   ]),
-  'mac.insert.textBox': unavailable(
-    [
-      { id: 'mac.insert.textBox.horizontal', label: 'Horizontal Text Box' },
-      { id: 'mac.insert.textBox.vertical', label: 'Vertical Text Box' },
-    ],
-    EMBEDDED_UNSUPPORTED,
+  // The file the engine writes holds no vertical text.
+  'mac.insert.textBox': menu([
+    { id: 'mac.insert.textBox.horizontal', label: 'Horizontal Text Box' },
+    { id: 'mac.insert.textBox.vertical', label: 'Vertical Text Box' },
+  ]).map((item) =>
+    item.id === 'mac.insert.textBox.vertical' ? greyOutItem(item, EMBEDDED_UNSUPPORTED) : item,
   ),
   // The WordArt gallery carries styles, not named entries.
   'mac.insert.wordArt': [],

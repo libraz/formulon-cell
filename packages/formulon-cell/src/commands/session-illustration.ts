@@ -1,4 +1,4 @@
-import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
+import { AnchorEditAs, AnchorKind, type Color, ColorKind } from '@libraz/formulon';
 import {
   cellOrigin,
   DUPLICATE_OFFSET_PX,
@@ -11,6 +11,7 @@ import {
   persistentImageFromState,
 } from '../engine/images-sync.js';
 import { captureShapeInput } from '../engine/shapes-sync.js';
+import { cssColorFromArgb } from '../engine/theme-color.js';
 import type { EngineDrawingAnchor, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { EngineShapeInput } from '../engine/workbook-handle-drawing-objects.js';
@@ -46,6 +47,8 @@ export interface CreateSessionShapeOptions {
   /** Outline weight in points; 0 is No Outline. */
   lineWidth?: number;
   opacity?: number;
+  /** Further fields carried on the shape. */
+  extra?: Partial<SessionIllustration>;
   authorization?: IllustrationMutationAuthorization;
 }
 
@@ -199,6 +202,7 @@ export function createSessionShape(
     null,
     () => {
       const item: SessionIllustration = {
+        ...options.extra,
         id: options.id ?? defaultShapeId(range, options.shape),
         kind: 'shape',
         shape: options.shape,
@@ -437,6 +441,52 @@ export function createRibbonShapeFromSelection(
       y: 88 + (count % 3) * 24,
       w: shape === 'line' || shape === 'arrow' ? 180 : 160,
       h: shape === 'line' || shape === 'arrow' ? 80 : 96,
+      authorization,
+    },
+    history,
+  );
+  return selectInserted(store, item);
+}
+
+/** A new text box's fill: theme light 1. */
+const TEXT_BOX_FILL: Color = {
+  kind: ColorKind.Theme,
+  argb: 0,
+  theme: 0,
+  tint: 0,
+  indexed: 0,
+};
+/** A new text box's outline, light 1 shaded 50% as Excel draws it; the
+ *  engine stores no shade, so it is written as RGB. */
+const TEXT_BOX_LINE = '#bcbcbc';
+
+export function createRibbonTextBoxFromSelection(
+  store: SpreadsheetStore,
+  range: Range,
+  history: History | null = null,
+  authorization?: IllustrationMutationAuthorization,
+  wb?: WorkbookHandle,
+): SessionIllustration | null {
+  const count = store.getState().illustrations.illustrations.length;
+  const argb = wb?.resolveColorArgb(TEXT_BOX_FILL) ?? null;
+  const fill = argb === null ? '#ffffff' : cssColorFromArgb(argb);
+  const item = createSessionShape(
+    store,
+    range,
+    {
+      id: `ribbon-text-box-${range.sheet}-${range.r0}-${range.c0}-${count}`,
+      shape: 'rectangle',
+      x: 300 + (count % 3) * 24,
+      y: 88 + (count % 3) * 24,
+      w: 160,
+      h: 96,
+      color: fill,
+      lineWidth: 0.75,
+      extra: {
+        textBox: true,
+        nativeFill: { spec: TEXT_BOX_FILL, css: fill },
+        lineColor: TEXT_BOX_LINE,
+      },
       authorization,
     },
     history,

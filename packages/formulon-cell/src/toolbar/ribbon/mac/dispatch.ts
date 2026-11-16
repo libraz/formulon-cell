@@ -202,6 +202,8 @@ const operations = [
   'mac.insert.photo.file',
   'mac.insert.screenshot',
   'mac.insert.screenshot.clipping',
+  'mac.insert.textBox',
+  'mac.insert.textBox.horizontal',
   'mac.insert.headerFooter',
   'mac.insert.symbol',
   'mac.formulas.autoSum',
@@ -443,6 +445,9 @@ export function dispatchMacRibbonCommand(
       case 'mac.insert.screenshot':
       case 'mac.insert.screenshot.clipping':
         return ctx().insertScreenshotFromRibbon();
+      case 'mac.insert.textBox':
+      case 'mac.insert.textBox.horizontal':
+        return ctx().insertTextBoxFromRibbon();
       case 'mac.insert.headerFooter':
         return openPageSetupDialogFrom(instance.store, 'headerFooter', {
           origin: 'ribbon',

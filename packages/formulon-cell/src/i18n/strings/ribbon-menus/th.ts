@@ -233,6 +233,8 @@ export const ribbonMenusTh: RibbonMenusStrings = {
     chartColorsBlue: 'น้ำเงิน',
     chartColorsMonochrome: 'สีเดียว',
     shapeNoFill: 'ไม่มีการเติม',
+    shapeRotateRight: 'หมุนขวา 90°',
+    shapeRotateLeft: 'หมุนซ้าย 90°',
     shapeNoOutline: 'ไม่มีเส้นกรอบ',
     shapeOutlineWeight: 'น้ำหนัก',
     shapeOutlineDashes: 'เส้นประ',

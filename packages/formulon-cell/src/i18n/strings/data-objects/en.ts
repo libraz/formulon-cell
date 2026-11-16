@@ -641,6 +641,7 @@ export const dataObjectsEn: DataObjectsStrings = {
     diamondName: 'Diamond {n}',
     lineName: 'Straight Connector {n}',
     arrowName: 'Straight Arrow Connector {n}',
+    textBoxName: 'TextBox {n}',
     bringToFront: 'Bring to Front',
     sendToBack: 'Send to Back',
   },

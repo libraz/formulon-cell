@@ -121,6 +121,35 @@ describe('Mac ribbon command dispatch', () => {
     expect(formulaWrites).toEqual([]);
   });
 
+  it('routes Text Box to a text box shape, painted as Excel paints a new one', () => {
+    const store = createSpreadsheetStore();
+    const instance = {
+      store,
+      history: new History(),
+      host: document.createElement('div'),
+      workbook: {
+        capabilities: {},
+        resolveColorArgb: () => 0xffffffff,
+      } as unknown as WorkbookHandle,
+    } as unknown as SpreadsheetInstance;
+    const deps = {
+      inst: instance,
+      runtime: { projectFormatToolbar: () => undefined },
+    } as unknown as ApplyRibbonCommandDeps;
+
+    expect(dispatchMacRibbonCommand('mac.insert.textBox.horizontal', deps, () => false)).toBe(true);
+    const [box] = store.getState().illustrations.illustrations;
+    expect(box).toMatchObject({
+      kind: 'shape',
+      shape: 'rectangle',
+      textBox: true,
+      color: '#ffffff',
+      lineColor: '#bcbcbc',
+      lineWidth: 0.75,
+    });
+    expect(store.getState().ui.selectedObject?.id).toBe(box?.id);
+  });
+
   it('routes Mac Recommended Chart to the session chart command', async () => {
     const store = createSpreadsheetStore();
     const history = new History();

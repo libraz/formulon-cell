@@ -5,6 +5,10 @@ import {
   clearSessionIllustration,
   updateSessionIllustration,
 } from '../../../src/commands/session-illustration.js';
+import {
+  applySessionShapeKind,
+  applySessionShapeRotation,
+} from '../../../src/commands/shape-format.js';
 import { hydrateImagesFromEngine } from '../../../src/engine/images-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
@@ -219,3 +223,18 @@ describe.each(['picture', 'shape'] as const)(
     });
   },
 );
+
+describe('a shape placed at a fixed position on the sheet', () => {
+  it('changes kind and turns in place, since neither moves its anchor', async () => {
+    const { wb, store, history, item } = await fixedDrawing('shape');
+
+    expect(applySessionShapeKind(store, item, 'oval', history, wb)).not.toBeNull();
+    const kinded = store.getState().illustrations.illustrations[0];
+    if (!kinded) throw new Error('shape is gone');
+    expect(applySessionShapeRotation(store, kinded, 90, history, wb)).not.toBeNull();
+
+    const [shape] = wb.listShapes(0);
+    expect(shape).toMatchObject({ presetGeometry: 'ellipse', rotationDeg: 90 });
+    expect(anchors(wb)).toEqual([FIXED]);
+  });
+});

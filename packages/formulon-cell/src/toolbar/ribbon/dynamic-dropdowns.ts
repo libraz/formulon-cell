@@ -71,6 +71,8 @@ export interface DynamicDropdownsCtx {
   updateChartColorsMenu: (menu: HTMLElement) => void;
   updateShapeFillMenu: (menu: HTMLElement) => void;
   updateShapeOutlineMenu: (menu: HTMLElement) => void;
+  updateShapeRotateMenu: (menu: HTMLElement) => void;
+  updateShapeChangeMenu: (menu: HTMLElement) => void;
   /** Optional so hosts built before it keep working; the menu then stays as built. */
   updateShapesInsertMenu?: (menu: HTMLElement) => void;
   updatePageBreaksMenu: (menu: HTMLElement) => void;
@@ -136,6 +138,10 @@ export interface DynamicDropdownsCtx {
   applyShapeOutlineWeightAction: (weight: string) => void;
   /** A Shape Outline > Dashes entry. */
   applyShapeOutlineDashAction: (dash: string) => void;
+  /** A Rotate entry: `right` or `left`, a quarter turn. */
+  applyShapeRotateAction: (direction: string) => void;
+  /** A Change Shape tile: the shape kind. */
+  applyShapeChangeAction: (kind: string) => void;
   applyUiTheme: (theme: UiTheme) => void;
   applyWorkbookTheme: (presetId: WorkbookThemePresetId) => void;
   focusSheet: () => void;
@@ -156,6 +162,7 @@ export interface DynamicDropdownsCtx {
   chartKindFromAction: (action: string) => SessionChartKind;
   insertPictureFromRibbon: (action: string) => void | Promise<void>;
   insertShapeFromRibbon: (shape: SessionShapeKind) => void;
+  insertTextBoxFromRibbon: () => void;
   insertScreenshotFromRibbon: (action?: string) => void | Promise<void>;
   applyScriptAction: (action: string) => void | Promise<void>;
   applyPdfAction: (action: string) => void | Promise<void>;
@@ -228,6 +235,8 @@ export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS = [
   'shape-outline',
   'shape-outline-weight',
   'shape-outline-dash',
+  'shape-rotate',
+  'shape-change',
   'page-theme-action',
   'workbook-theme-action',
   'sort',
@@ -353,6 +362,8 @@ export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
   'menu-chart-colors': 'updateChartColorsMenu',
   'menu-shape-fill': 'updateShapeFillMenu',
   'menu-shape-outline': 'updateShapeOutlineMenu',
+  'menu-shape-rotate': 'updateShapeRotateMenu',
+  'menu-shape-change': 'updateShapeChangeMenu',
   'menu-shapes-insert': 'updateShapesInsertMenu',
   'menu-pivot-subtotals': 'updatePivotLayoutMenu',
   'menu-pivot-grand-totals': 'updatePivotLayoutMenu',
@@ -771,6 +782,8 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     { attr: 'shape-outline', handler: (v) => ctx.applyShapeOutlineAction(v) },
     { attr: 'shape-outline-weight', handler: (v) => ctx.applyShapeOutlineWeightAction(v) },
     { attr: 'shape-outline-dash', handler: (v) => ctx.applyShapeOutlineDashAction(v) },
+    { attr: 'shape-rotate', handler: (v) => ctx.applyShapeRotateAction(v) },
+    { attr: 'shape-change', handler: (v) => ctx.applyShapeChangeAction(v) },
     {
       attr: 'page-theme-action',
       handler: (v) => {

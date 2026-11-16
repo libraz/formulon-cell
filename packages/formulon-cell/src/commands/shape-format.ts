@@ -1,7 +1,9 @@
 import { ChartLineDash } from '@libraz/formulon';
+import { displayRotation } from '../engine/drawing-geometry.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type {
   SessionIllustration,
+  SessionShapeKind,
   SessionShapeLineDash,
   SpreadsheetStore,
 } from '../store/store.js';
@@ -160,6 +162,10 @@ export const shapeDashEditable = (item: SessionIllustration, dash: SessionShapeL
   shapeOutlineEditable(item) &&
   (item.nativeObjectId === undefined || SAVED_LINE_DASH[dash] !== undefined);
 
+/** Whether Change Shape can make `item` a `kind`: lines and arrows are left out either way. */
+export const shapeKindChangeable = (item: SessionIllustration, kind: SessionShapeKind): boolean =>
+  shapeStyleEditable(item) && shapeHasFill(item) && kind !== 'line' && kind !== 'arrow';
+
 const applyShapePatch = (
   store: SpreadsheetStore,
   item: SessionIllustration,
@@ -223,4 +229,28 @@ export function applySessionShapeOutlineDash(
   if (!shapeDashEditable(item, dash)) return null;
   const patch = shapeOutlineDashPatch(item, dash);
   return applyShapePatch(store, item, patch, 'shapeOutline', history, wb);
+}
+
+/** Rotate Right 90° (90) or Rotate Left 90° (-90): one undo step. */
+export function applySessionShapeRotation(
+  store: SpreadsheetStore,
+  item: SessionIllustration,
+  stepDeg: number,
+  history: History | null = null,
+  wb?: WorkbookHandle,
+): SessionIllustration | null {
+  const rotationDeg = displayRotation((item.rotationDeg ?? 0) + stepDeg);
+  return applyShapePatch(store, item, { rotationDeg }, 'shapeRotate', history, wb);
+}
+
+/** Change Shape: a new kind with the same paint, text and frame; one undo step. */
+export function applySessionShapeKind(
+  store: SpreadsheetStore,
+  item: SessionIllustration,
+  kind: SessionShapeKind,
+  history: History | null = null,
+  wb?: WorkbookHandle,
+): SessionIllustration | null {
+  if (!shapeKindChangeable(item, kind)) return null;
+  return applyShapePatch(store, item, { shape: kind }, 'shapeChangeShape', history, wb);
 }

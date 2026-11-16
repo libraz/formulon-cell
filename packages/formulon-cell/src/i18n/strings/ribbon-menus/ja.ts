@@ -235,6 +235,8 @@ export const ribbonMenusJa: RibbonMenusStrings = {
     chartColorsBlue: '青',
     chartColorsMonochrome: 'モノクロ',
     shapeNoFill: '塗りつぶしなし',
+    shapeRotateRight: '右へ 90 度回転',
+    shapeRotateLeft: '左へ 90 度回転',
     shapeNoOutline: '枠線なし',
     shapeOutlineWeight: '太さ',
     shapeOutlineDashes: '実線/点線',

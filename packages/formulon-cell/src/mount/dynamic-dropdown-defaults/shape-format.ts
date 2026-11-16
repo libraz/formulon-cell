@@ -1,17 +1,21 @@
 import { selectedSessionIllustration } from '../../commands/session-illustration.js';
 import {
   applySessionShapeFill,
+  applySessionShapeKind,
   applySessionShapeOutline,
   applySessionShapeOutlineDash,
   applySessionShapeOutlineWeight,
+  applySessionShapeRotation,
   SHAPE_LINE_DASHES,
   shapeDashEditable,
   shapeFillColor,
   shapeFillEditable,
+  shapeKindChangeable,
   shapeOutlineColor,
   shapeOutlineDash,
   shapeOutlineEditable,
   shapeOutlineWeight,
+  shapeStyleEditable,
 } from '../../commands/shape-format.js';
 import {
   normalizeHex,
@@ -19,7 +23,11 @@ import {
   themeColorColumns,
 } from '../../components/color-palette.js';
 import type { SpreadsheetInstance } from '../../mount.js';
-import type { SessionIllustration, SessionShapeLineDash } from '../../store/store.js';
+import type {
+  SessionIllustration,
+  SessionShapeKind,
+  SessionShapeLineDash,
+} from '../../store/store.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { setMenuControlDisabled } from './menu-feedback.js';
 
@@ -31,6 +39,10 @@ type ShapeFormatDropdownDefaults = Pick<
   | 'applyShapeOutlineWeightAction'
   | 'applyShapeOutlineDashAction'
   | 'updateShapeOutlineMenu'
+  | 'applyShapeRotateAction'
+  | 'updateShapeRotateMenu'
+  | 'applyShapeChangeAction'
+  | 'updateShapeChangeMenu'
 >;
 
 /** A menu value: a colour, or `none` for No Fill / No Outline. */
@@ -82,6 +94,9 @@ const projectRadioPanel = (
 
 const isLineDash = (value: string): value is SessionShapeLineDash =>
   (SHAPE_LINE_DASHES as readonly string[]).includes(value);
+
+/** Quarter turn of each Rotate entry, in degrees clockwise. */
+const ROTATE_STEP: Readonly<Record<string, number>> = { right: 90, left: -90 };
 
 export function createShapeFormatDropdownDefaults(
   instance: SpreadsheetInstance,
@@ -169,6 +184,37 @@ export function createShapeFormatDropdownDefaults(
             setMenuControlDisabled(button, true);
           }
         }
+      }
+    },
+    applyShapeRotateAction(value) {
+      const item = selectedShape();
+      const step = ROTATE_STEP[value];
+      if (!item || step === undefined) return;
+      applySessionShapeRotation(instance.store, item, step, instance.history, instance.workbook);
+    },
+    updateShapeRotateMenu(menu) {
+      const item = selectedShape();
+      const editable = item !== null && shapeStyleEditable(item);
+      for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-shape-rotate]')) {
+        setMenuControlDisabled(button, !editable);
+      }
+    },
+    applyShapeChangeAction(value) {
+      const item = selectedShape();
+      if (!item) return;
+      applySessionShapeKind(
+        instance.store,
+        item,
+        value as SessionShapeKind,
+        instance.history,
+        instance.workbook,
+      );
+    },
+    updateShapeChangeMenu(menu) {
+      const item = selectedShape();
+      for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-shape-change]')) {
+        const kind = button.dataset.shapeChange as SessionShapeKind;
+        setMenuControlDisabled(button, item === null || !shapeKindChangeable(item, kind));
       }
     },
   };

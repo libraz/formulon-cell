@@ -1,5 +1,5 @@
-// Shape Format tab menus: Shape Fill and Shape Outline. The parent checks the
-// selected shape's colour, weight and dash just before the menu opens.
+// Shape Format tab menus: Change Shape, Shape Fill, Shape Outline and Rotate. The
+// parent checks the selected shape's colour, weight and dash just before the menu opens.
 
 import {
   SHAPE_LINE_DASHES,
@@ -15,14 +15,18 @@ import {
   createMenu,
   formatSubmenu,
   menuCheckable,
+  menuIconButton,
   menuIconSpacer,
   menuPresetButton,
   menuSeparator,
 } from './general.js';
+import { shapeGallery } from './insert.js';
 
 export interface ShapeFormatMenuFactories {
   createShapeFillMenu: () => HTMLDivElement;
   createShapeOutlineMenu: () => HTMLDivElement;
+  createShapeRotateMenu: () => HTMLDivElement;
+  createShapeChangeMenu: () => HTMLDivElement;
 }
 
 const SAMPLE_W = 64;
@@ -153,9 +157,28 @@ export const createShapeFormatMenuFactories = (
     return menu;
   };
 
+  const createShapeRotateMenu = (): HTMLDivElement => {
+    const menu = createMenu('menu-shape-rotate');
+    menu.append(
+      menuIconButton(t.shapeRotateRight, 'shapeRotate', 'right', 'rotate-right'),
+      menuIconButton(t.shapeRotateLeft, 'shapeRotate', 'left', 'rotate-left'),
+    );
+    return menu;
+  };
+
+  /** The shapes gallery without its lines, which Change Shape does not offer. */
+  const createShapeChangeMenu = (): HTMLDivElement => {
+    const menu = createMenu('menu-shape-change');
+    menu.classList.add('fc-tb__menu--visual', 'fc-tb__menu--shapes');
+    menu.append(...shapeGallery(t, 'shapeChange', { lines: false }));
+    return menu;
+  };
+
   return {
     createShapeFillMenu: () =>
       colorMenu('menu-shape-fill', 'shapeFill', ribbonText.shapeFill, t.shapeNoFill),
     createShapeOutlineMenu,
+    createShapeRotateMenu,
+    createShapeChangeMenu,
   };
 };

@@ -1374,7 +1374,8 @@ describe('Mac Excel ribbon profile', () => {
         ['mac.insert.sparkline.winLoss', 'Win/Loss', false],
       ]);
       expect(items('mac.insert.textBox')).toEqual([
-        ['mac.insert.textBox.horizontal', 'Horizontal Text Box', true],
+        ['mac.insert.textBox.horizontal', 'Horizontal Text Box', false],
+        // The file the engine writes holds no vertical text.
         ['mac.insert.textBox.vertical', 'Vertical Text Box', true],
       ]);
       expect(items('mac.insert.wordArt')).toEqual([]);
@@ -1403,6 +1404,7 @@ describe('Mac Excel ribbon profile', () => {
         'mac.insert.photo.file',
         'mac.insert.screenshot.clipping',
         'mac.insert.sparkline.line',
+        'mac.insert.textBox.horizontal',
       ]) {
         expect(isMacRibbonCommandSupported(id), id).toBe(true);
       }
@@ -1417,7 +1419,6 @@ describe('Mac Excel ribbon profile', () => {
         'mac.insert.smartArt',
         'mac.insert.checkBox',
         'mac.insert.pivotChart',
-        'mac.insert.textBox',
         'mac.insert.wordArt',
         'mac.insert.object',
         'mac.insert.equation',
@@ -1425,6 +1426,7 @@ describe('Mac Excel ribbon profile', () => {
         expect(findCommand('insert', id)?.disabled, id).toBe(true);
       }
       expect(findCommand('insert', 'mac.insert.symbol')?.disabled).toBeUndefined();
+      expect(findCommand('insert', 'mac.insert.textBox')?.disabled).toBeFalsy();
       expect(MAC_RIBBON_MENU_COMMAND_SET.has('mac.insert.pivotTable')).toBe(false);
       expect(MAC_RIBBON_MENU_ITEMS['mac.insert.pivotTable']).toBeUndefined();
       expect(macRibbonMenuIdForCommand('mac.insert.pivotTable')).toBeNull();

@@ -141,6 +141,8 @@ export const MENU_ICON_GLYPHS = {
   replace: 'replaceFind',
   reset: 'clear',
   'remove-duplicates': 'removeDuplicates',
+  'rotate-left': 'rotateLeft',
+  'rotate-right': 'rotateRight',
   wrap: 'wrap',
   'script-clear': 'script',
   'script-custom': 'script',

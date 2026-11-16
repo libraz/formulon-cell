@@ -235,6 +235,8 @@ export const ribbonMenusKo: RibbonMenusStrings = {
     chartColorsBlue: '파랑',
     chartColorsMonochrome: '단색',
     shapeNoFill: '채우기 없음',
+    shapeRotateRight: '오른쪽으로 90도 회전',
+    shapeRotateLeft: '왼쪽으로 90도 회전',
     shapeNoOutline: '윤곽선 없음',
     shapeOutlineWeight: '두께',
     shapeOutlineDashes: '대시',

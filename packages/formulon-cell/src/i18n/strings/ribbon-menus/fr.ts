@@ -237,6 +237,8 @@ export const ribbonMenusFr: RibbonMenusStrings = {
     chartColorsBlue: 'Bleu',
     chartColorsMonochrome: 'Monochrome',
     shapeNoFill: 'Aucun remplissage',
+    shapeRotateRight: 'Faire pivoter à droite de 90°',
+    shapeRotateLeft: 'Faire pivoter à gauche de 90°',
     shapeNoOutline: 'Sans contour',
     shapeOutlineWeight: 'Épaisseur',
     shapeOutlineDashes: 'Tirets',

@@ -112,6 +112,7 @@ describe('default dynamic dropdown AutoSum', () => {
       'applyArrangeAction',
       'insertPictureFromRibbon',
       'insertShapeFromRibbon',
+      'insertTextBoxFromRibbon',
       'updateShapesInsertMenu',
       'insertScreenshotFromRibbon',
     ] as const;

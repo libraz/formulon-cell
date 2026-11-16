@@ -5,6 +5,7 @@ import {
   arrangeStackPosition,
   createRibbonImageFromSelection,
   createRibbonShapeFromSelection,
+  createRibbonTextBoxFromSelection,
   sheetDrawingStack,
 } from '../../commands/session-illustration.js';
 import { focusSheet } from '../../interact/dialog-focus.js';
@@ -30,6 +31,7 @@ type IllustrationDropdownDefaults = Pick<
   | 'updateArrangeMenu'
   | 'insertPictureFromRibbon'
   | 'insertShapeFromRibbon'
+  | 'insertTextBoxFromRibbon'
   | 'updateShapesInsertMenu'
   | 'insertScreenshotFromRibbon'
 >;
@@ -105,6 +107,19 @@ export function createIllustrationDropdownDefaults(
         shape,
         instance.history as unknown as Parameters<typeof createRibbonShapeFromSelection>[3],
         { origin: 'ribbon', commandId: 'shapesInsert' },
+      );
+    };
+
+  const buildTextBoxAction =
+    (instance: SpreadsheetInstance): DynamicDropdownsCtx['insertTextBoxFromRibbon'] =>
+    () => {
+      focusSheet(instance.host);
+      createRibbonTextBoxFromSelection(
+        instance.store as unknown as Parameters<typeof createRibbonTextBoxFromSelection>[0],
+        normalizedSelectionRange(instance),
+        instance.history as unknown as Parameters<typeof createRibbonTextBoxFromSelection>[2],
+        { origin: 'ribbon', commandId: 'shapesInsert' },
+        instance.workbook,
       );
     };
 
@@ -286,6 +301,7 @@ export function createIllustrationDropdownDefaults(
     applyArrangeAction: buildArrangeAction(instance),
     insertPictureFromRibbon: buildPictureAction(instance),
     insertShapeFromRibbon: buildShapeAction(instance),
+    insertTextBoxFromRibbon: buildTextBoxAction(instance),
     updateShapesInsertMenu: updateShapesInsertMenu(instance),
     insertScreenshotFromRibbon: buildScreenshotAction(instance),
   };

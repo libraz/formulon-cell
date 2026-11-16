@@ -235,6 +235,8 @@ export interface RibbonMenusStrings {
     chartColorsBlue: string;
     chartColorsMonochrome: string;
     shapeNoFill: string;
+    shapeRotateRight: string;
+    shapeRotateLeft: string;
     shapeNoOutline: string;
     shapeOutlineWeight: string;
     shapeOutlineDashes: string;

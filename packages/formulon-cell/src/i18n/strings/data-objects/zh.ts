@@ -617,6 +617,7 @@ export const dataObjectsZh: DataObjectsStrings = {
     diamondName: '菱形 {n}',
     lineName: '直接连接符 {n}',
     arrowName: '直接箭头连接符 {n}',
+    textBoxName: '文本框 {n}',
     bringToFront: '置于顶层',
     sendToBack: '置于底层',
   },

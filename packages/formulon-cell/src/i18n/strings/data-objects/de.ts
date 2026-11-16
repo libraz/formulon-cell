@@ -654,6 +654,7 @@ export const dataObjectsDe: DataObjectsStrings = {
     diamondName: 'Raute {n}',
     lineName: 'Gerader Verbinder {n}',
     arrowName: 'Gerade Verbindung mit Pfeil {n}',
+    textBoxName: 'Textfeld {n}',
     bringToFront: 'Ganz nach vorne',
     sendToBack: 'Ganz nach hinten',
   },

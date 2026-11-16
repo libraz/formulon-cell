@@ -240,6 +240,8 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     chartColorsBlue: 'Blau',
     chartColorsMonochrome: 'Monochrom',
     shapeNoFill: 'Keine Füllung',
+    shapeRotateRight: 'Rechtsdrehung 90°',
+    shapeRotateLeft: 'Linksdrehung 90°',
     shapeNoOutline: 'Keine Kontur',
     shapeOutlineWeight: 'Stärke',
     shapeOutlineDashes: 'Striche',
