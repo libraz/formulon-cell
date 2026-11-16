@@ -1,13 +1,15 @@
-import type { History } from '../commands/history.js';
+import { type History, recordingHistory } from '../commands/history.js';
+import { pivotReportRange } from '../commands/pivot-actions.js';
 import {
   clearPivotFieldFilter,
   pivotFieldFilterModel,
   setPivotFieldItemsChecked,
 } from '../commands/pivot-filter.js';
 import { deletePivotTables } from '../commands/pivot-table.js';
-import { PIVOT_CELL_KIND } from '../engine/pivot-cell-kind.js';
+import { PIVOT_CELL_KIND, pivotItemText } from '../engine/pivot-cell-kind.js';
 import { type Addr, PivotAxis, PivotSortOrder } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type { PivotCellInfo } from '../engine/workbook-handle-pivot.js';
 import type { Strings } from '../i18n/strings.js';
 import { selectionRangeList } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
@@ -18,6 +20,7 @@ import {
   type PivotMenuCell,
   type PivotMenuTarget,
 } from './context-menu-spec.js';
+import { pivotCellValueAt, pivotFieldOfCell } from './pivot-cell-at.js';
 import type { PivotNumberFormatPicker } from './pivot-field-settings-dialog.js';
 import {
   commitPivotChange,
@@ -26,11 +29,9 @@ import {
   updatePivotDataField,
 } from './pivot-field-settings-dialog-apply.js';
 import { openPivotFieldFilter } from './pivot-filter-panel.js';
-import { pivotGroupTargetAt } from './pivot-group.js';
+import { pivotGroupTargetAt, pivotGroupTargetOf } from './pivot-group.js';
 import { openPivotGroupDialog } from './pivot-group-dialog.js';
 import { openPivotOptions } from './pivot-options-dialog.js';
-
-type PivotCellInfo = NonNullable<ReturnType<WorkbookHandle['pivotCellInfo']>>;
 
 /** The report cell a pivot menu was opened on. */
 export interface PivotMenuCellRef {
@@ -67,20 +68,12 @@ export function pivotMenuTarget(
     info,
     dataFields.map((spec) => spec.name ?? ''),
   );
-  const field = definition?.fields.find((f) => f.cacheFieldIndex === info.fieldIndex);
+  const field = pivotFieldOfCell(definition, info);
   const dataField =
     dataFields.find((spec) => spec.name === info.fieldName) ??
     (cell === 'item' ? undefined : dataFields[0]);
   // The report's own cells carry the item text; the sheet value may not have it yet.
-  let value = wb.getValue(addr);
-  for (const entry of wb.pivotCells(addr.sheet)) {
-    if (entry.addr.row === addr.row && entry.addr.col === addr.col) {
-      value = entry.value;
-      break;
-    }
-  }
-  const itemName =
-    value.kind === 'text' ? value.value : value.kind === 'number' ? String(value.value) : '';
+  const itemName = pivotItemText(pivotCellValueAt(wb, addr));
   const model = field ? pivotFieldFilterModel(wb, addr.sheet, info.pivotIndex, field.index) : null;
   const axisOrder =
     field?.axis === PivotAxis.Col
@@ -103,12 +96,40 @@ export function pivotMenuTarget(
     fieldPosition: axisOrder.indexOf(field?.index ?? -1),
     fieldCount: axisOrder.length,
     grouped: !!(field?.dateGroup || field?.numericGroup),
-    groupable: (pivotGroupTargetAt(wb, addr)?.values ?? 'other') !== 'other',
+    groupable: (pivotGroupTargetOf(wb, addr, info, definition)?.values ?? 'other') !== 'other',
     dateField: model?.dateField ?? false,
     ...(fieldListHidden === undefined ? {} : { fieldListHidden }),
     canRefresh: info.cacheId >= 0,
     canOpenFieldList,
   };
+}
+
+type MoveMode = 'first' | 'earlier' | 'later' | 'last';
+
+const MOVE_MODE: Readonly<Record<string, MoveMode>> = {
+  pivotMoveItemFirst: 'first',
+  pivotMoveItemUp: 'earlier',
+  pivotMoveItemDown: 'later',
+  pivotMoveItemLast: 'last',
+  pivotMoveFieldFirst: 'first',
+  pivotMoveFieldLeft: 'earlier',
+  pivotMoveFieldRight: 'later',
+  pivotMoveFieldLast: 'last',
+};
+
+/** `list` with the entry at `from` moved to the start or end, or one place earlier or later. */
+function moveWithin<T>(list: readonly T[], from: number, mode: MoveMode): T[] {
+  const out = [...list];
+  const [moved] = out.splice(from, 1) as [T];
+  const clamp = (to: number): number => Math.max(0, Math.min(out.length, to));
+  const to =
+    mode === 'first'
+      ? 0
+      : mode === 'last'
+        ? out.length
+        : clamp(from + (mode === 'earlier' ? -1 : 1));
+  out.splice(to, 0, moved);
+  return out;
 }
 
 /** The items of the clicked cell's field that the selection covers. */
@@ -126,10 +147,9 @@ function selectedItemsOf(ctx: PivotMenuContext, ref: PivotMenuCellRef): Set<stri
     if (entry.pivotIndex !== ref.info.pivotIndex) continue;
     const { row, col } = entry.addr;
     if (!ranges.some((r) => row >= r.r0 && row <= r.r1 && col >= r.c0 && col <= r.c1)) continue;
-    const info = wb.pivotCellInfo(entry.addr);
-    if (info?.fieldIndex !== ref.info.fieldIndex || info.isValue) continue;
+    // Value cells (data cells and numeric labels) are not items.
+    if (entry.fieldName !== ref.info.fieldName || entry.kind === PIVOT_CELL_KIND.Data) continue;
     if (entry.value.kind === 'text') out.add(entry.value.value);
-    else if (entry.value.kind === 'number') out.add(String(entry.value.value));
   }
   return out;
 }
@@ -174,7 +194,7 @@ export function runContextMenuPivotItem(
     const byName = list.findIndex((spec) => spec.name === info.fieldName);
     return byName >= 0 ? byName : list.length > 0 ? 0 : -1;
   };
-  const pivotField = definition?.fields.find((f) => f.cacheFieldIndex === info.fieldIndex);
+  const pivotField = pivotFieldOfCell(definition, info);
   const openFieldDialog = (): void => {
     const opened = openPivotFieldSettingsAt(
       { ...commit, host: ctx.host, strings: ctx.strings, pickNumberFormat: ctx.pickNumberFormat },
@@ -201,10 +221,7 @@ export function runContextMenuPivotItem(
       const current = definition?.dataFields[index]?.numberFormat ?? '';
       if (index < 0) return true;
       // The sample is the clicked cell's value, which a right-click need not make active.
-      let sample = wb.getValue(addr);
-      for (const entry of wb.pivotCells(sheet)) {
-        if (entry.addr.row === addr.row && entry.addr.col === addr.col) sample = entry.value;
-      }
+      const sample = pivotCellValueAt(wb, addr);
       ctx.pickNumberFormat(
         current,
         (code) => {
@@ -215,7 +232,7 @@ export function runContextMenuPivotItem(
       return true;
     }
     case 'pivotDelete': {
-      const range = wb.pivotBounds(sheet).find((b) => b.pivotIndex === info.pivotIndex)?.range;
+      const range = pivotReportRange(wb, sheet, info.pivotIndex);
       if (!range) return true;
       deletePivotTables(
         {
@@ -255,19 +272,10 @@ export function runContextMenuPivotItem(
       const index = pivotField?.index;
       const model =
         index === undefined ? null : pivotFieldFilterModel(wb, sheet, info.pivotIndex, index);
-      const label = pivotMenuTarget(wb, ref, false).itemName;
+      const label = pivotItemText(pivotCellValueAt(wb, addr));
       const from = model ? model.items.findIndex((entry) => entry.value === label) : -1;
       if (index === undefined || !model || from < 0) return true;
-      const order = [...model.items];
-      const [moved] = order.splice(from, 1);
-      if (!moved) return true;
-      const to =
-        id === 'pivotMoveItemFirst'
-          ? 0
-          : id === 'pivotMoveItemLast'
-            ? order.length
-            : Math.max(0, Math.min(order.length, from + (id === 'pivotMoveItemUp' ? -1 : 1)));
-      order.splice(to, 0, moved);
+      const order = moveWithin(model.items, from, MOVE_MODE[id] as MoveMode);
       // The items show in list order once the field is in manual order.
       commitPivotChange(commit, sheet, info.pivotIndex, () => {
         const field = wb.getPivotField(sheet, info.pivotIndex, index);
@@ -285,17 +293,10 @@ export function runContextMenuPivotItem(
       const index = pivotField?.index;
       if (index === undefined || !definition) return true;
       const onColumns = pivotField?.axis === PivotAxis.Col;
-      const order = [...(onColumns ? definition.colFieldOrder : definition.rowFieldOrder)];
-      const from = order.indexOf(index);
+      const current = onColumns ? definition.colFieldOrder : definition.rowFieldOrder;
+      const from = current.indexOf(index);
       if (from < 0) return true;
-      order.splice(from, 1);
-      const to =
-        id === 'pivotMoveFieldFirst'
-          ? 0
-          : id === 'pivotMoveFieldLast'
-            ? order.length
-            : Math.max(0, Math.min(order.length, from + (id === 'pivotMoveFieldLeft' ? -1 : 1)));
-      order.splice(to, 0, index);
+      const order = moveWithin(current, from, MOVE_MODE[id] as MoveMode);
       commitPivotChange(commit, sheet, info.pivotIndex, () =>
         onColumns
           ? wb.setPivotColFieldOrder(sheet, info.pivotIndex, order)
@@ -322,7 +323,7 @@ export function runContextMenuPivotItem(
       return true;
     }
     case 'pivotSelectTable': {
-      const range = wb.pivotBounds(sheet).find((b) => b.pivotIndex === info.pivotIndex)?.range;
+      const range = pivotReportRange(wb, sheet, info.pivotIndex);
       if (range) mutators.setRange(ctx.store, range);
       return true;
     }
@@ -355,8 +356,10 @@ export function runContextMenuPivotItem(
         ctx.refresh(sheet);
       };
       write(false);
-      const history = ctx.history && !ctx.history.isReplaying() ? ctx.history : null;
-      history?.push({ undo: () => write(totals.cols), redo: () => write(false) });
+      recordingHistory(ctx.history)?.push({
+        undo: () => write(totals.cols),
+        redo: () => write(false),
+      });
       return true;
     }
     case 'pivotFieldSettings':

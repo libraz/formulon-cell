@@ -1,4 +1,5 @@
 import type { PivotCacheOptions, PivotOptions } from '@libraz/formulon';
+import { recordingHistory } from '../commands/history.js';
 import { pivotReportEffects, pivotWrite } from '../commands/pivot-actions.js';
 import type { Strings } from '../i18n/strings.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
@@ -669,7 +670,7 @@ const writePivotOptions = (
     );
   };
   if (!move(previous, next)) return false;
-  const history = ctx.history && !ctx.history.isReplaying() ? ctx.history : null;
+  const history = recordingHistory(ctx.history);
   history?.push({
     undo: () => {
       move(next, previous);

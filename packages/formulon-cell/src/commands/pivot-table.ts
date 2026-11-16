@@ -6,13 +6,20 @@ import type { CellValue, PivotFilterSpec, Range } from '../engine/types.js';
 import { PivotAggregation, PivotAxis, PivotShowValuesAs, PivotSortOrder } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { PivotDefinition, PivotSpill } from '../engine/workbook-handle-pivot.js';
+import { sameRange } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { AutofitOptions } from './autofit-measurement.js';
 import { currentRegion } from './current-region.js';
 import { defaultObjectNames } from './format-as-table.js';
-import type { History } from './history.js';
+import { type History, recordingHistory } from './history.js';
 import type { InteractionOrigin, OperationEffect } from './interaction-policy.js';
-import { type PivotAuthorization, pivotReportEffects, pivotWrite } from './pivot-actions.js';
+import {
+  type PivotAuthorization,
+  pivotFilterBlockRows,
+  pivotReportEffects,
+  pivotReportRange,
+  pivotWrite,
+} from './pivot-actions.js';
 import { reflowPivotFormats } from './pivot-format-reflow.js';
 import { autofitColsWidthForRanges } from './row-col-layout.js';
 import { addSheet, moveSheet, removeSheet } from './sheet-mutate.js';
@@ -503,8 +510,6 @@ export function refreshPivotTable(
   return refreshPivotCacheFromRange(wb, { cacheId, source });
 }
 
-/** Where a new report lands: a fresh sheet inserted before the source sheet
- *  (report at A3), or a cell of the source sheet. */
 /** Fit the columns of the PivotTables on the sheet on show to their content,
  *  as the desktop does after a report update; a column can shrink, and columns
  *  outside the reports keep their width. A report whose "autofit column widths
@@ -535,6 +540,8 @@ export function finishPivotReportUpdate(
   autofitPivotTableColumns(store, wb, opts);
 }
 
+/** Where a new report lands: a fresh sheet inserted before the source sheet
+ *  (report at A3), or a cell of the source sheet. */
 export type PivotPlacement = 'new-sheet' | { row: number; col: number };
 
 export const PIVOT_NEW_SHEET_ANCHOR = { row: 2, col: 0 } as const;
@@ -616,7 +623,7 @@ function createPlacedReport(
   placement: PivotPlacement,
 ): CreatePlacedPivotResult {
   const { store, workbook: wb } = deps;
-  const history = deps.history && !deps.history.isReplaying() ? deps.history : null;
+  const history = recordingHistory(deps.history);
   const txn = history?.begin();
   let source = opts.source;
   let destination = {
@@ -766,12 +773,12 @@ export function recreatePivotTable(
  *  block pushes a report with no room above it down; the report then stays
  *  there when the filter goes, as on the desktop. */
 export function settlePivotAnchor(wb: WorkbookHandle, sheet: number, pivotIndex: number): void {
-  const bounds = wb.pivotBounds(sheet).find((b) => b.pivotIndex === pivotIndex)?.range;
+  const bounds = pivotReportRange(wb, sheet, pivotIndex);
   const definition = bounds ? wb.getPivotDefinition(sheet, pivotIndex) : null;
   if (!bounds || !definition) return;
-  const filterRows = definition.fields.filter((f) => f.axis === PivotAxis.Page).length;
-  if (filterRows === 0) return;
-  const row = bounds.r0 + filterRows + 1;
+  const filterBlock = pivotFilterBlockRows(definition);
+  if (filterBlock === 0) return;
+  const row = bounds.r0 + filterBlock;
   // A report held at #SPILL! shows only its anchor; leave it where it is.
   if (row > bounds.r1) return;
   wb.setPivotTableAnchor(sheet, pivotIndex, {
@@ -811,6 +818,15 @@ function clearVacatedReportCells(
   wb.recalc();
 }
 
+/** Reload the projected cells of `sheet` when it is the shown sheet. */
+export function reloadSheetIfShown(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  sheet: number,
+): void {
+  if (store.getState().data.sheetIndex === sheet) mutators.replaceCells(store, wb.cells(sheet));
+}
+
 /** Bring the active sheet's reports up to date after a report edit, an undo
  *  or a redo: settle their anchors, reload the projected cells, move direct
  *  formats with the items they belong to and refit the report columns.
@@ -833,15 +849,7 @@ export function refreshPivotReportsAfterEdit(
 /** The report whose whole extent is exactly `range`, or null. */
 export function pivotTableAtRange(wb: WorkbookHandle, range: Range): number | null {
   if (!wb.capabilities.pivotTables) return null;
-  const hit = wb
-    .pivotBounds(range.sheet)
-    .find(
-      (b) =>
-        b.range.r0 === range.r0 &&
-        b.range.c0 === range.c0 &&
-        b.range.r1 === range.r1 &&
-        b.range.c1 === range.c1,
-    );
+  const hit = wb.pivotBounds(range.sheet).find((b) => sameRange(b.range, range));
   return hit ? hit.pivotIndex : null;
 }
 
@@ -868,20 +876,15 @@ function pasteReportCopy(
   at: { sheet: number; row: number; col: number },
 ): Range | null {
   const { store, workbook: wb } = deps;
-  const history = deps.history && !deps.history.isReplaying() ? deps.history : null;
+  const history = recordingHistory(deps.history);
   const definition = wb.getPivotDefinition(source.sheet, source.pivotIndex);
   if (!definition) return null;
   // The extent starts at the filter block, one blank row above the anchor.
-  const filterRows = definition.fields.filter((f) => f.axis === PivotAxis.Page).length;
-  const anchor = { row: at.row + (filterRows > 0 ? filterRows + 1 : 0), col: at.col };
+  const anchor = { row: at.row + pivotFilterBlockRows(definition), col: at.col };
   const copy = { ...definition, name: nextPivotTableName(wb) };
   let pivotIndex = recreatePivotTable(wb, at.sheet, anchor, copy);
   if (pivotIndex < 0) return null;
-  const refresh = (): void => {
-    if (store.getState().data.sheetIndex === at.sheet) {
-      mutators.replaceCells(store, wb.cells(at.sheet));
-    }
-  };
+  const refresh = (): void => reloadSheetIfShown(store, wb, at.sheet);
   history?.push({
     undo: () => {
       wb.removePivotTable(at.sheet, pivotIndex);
@@ -892,7 +895,7 @@ function pasteReportCopy(
       refresh();
     },
   });
-  return wb.pivotBounds(at.sheet).find((b) => b.pivotIndex === pivotIndex)?.range ?? null;
+  return pivotReportRange(wb, at.sheet, pivotIndex);
 }
 
 export interface DeletePivotTablesDeps extends PivotAuthorization {
@@ -925,7 +928,7 @@ function removeReports(
   pivots: readonly { pivotIndex: number; range: Range }[],
 ): boolean {
   const { store, workbook: wb } = deps;
-  const history = deps.history && !deps.history.isReplaying() ? deps.history : null;
+  const history = recordingHistory(deps.history);
   const ascending = [...pivots].sort((a, b) => a.pivotIndex - b.pivotIndex);
   const captured: { definition: PivotDefinition; anchor: { row: number; col: number } }[] = [];
   for (const { pivotIndex, range } of ascending) {
@@ -933,17 +936,12 @@ function removeReports(
     if (!definition) return false;
     // The extent starts at the filter block, which sits above the anchor with
     // one blank row between them.
-    const filterRows = definition.fields.filter((f) => f.axis === PivotAxis.Page).length;
     captured.push({
       definition,
-      anchor: { row: range.r0 + (filterRows > 0 ? filterRows + 1 : 0), col: range.c0 },
+      anchor: { row: range.r0 + pivotFilterBlockRows(definition), col: range.c0 },
     });
   }
-  const refresh = (): void => {
-    if (store.getState().data.sheetIndex === sheet) {
-      mutators.replaceCells(store, wb.cells(sheet));
-    }
-  };
+  const refresh = (): void => reloadSheetIfShown(store, wb, sheet);
   // Highest index first so the lower ones stay valid while removing.
   const removeAll = (indices: readonly number[]): void => {
     for (const index of [...indices].sort((a, b) => b - a)) wb.removePivotTable(sheet, index);
@@ -1015,18 +1013,34 @@ export interface ExecuteRibbonPivotTableActionDeps {
   history?: History | null;
 }
 
+/** A one-line report dialog result titled `title`. */
+const pivotReport = (
+  strings: RibbonPivotTableActionStrings,
+  title: string,
+  severity: RibbonPivotTableReportItem['severity'],
+  detail: string,
+): RibbonPivotTableActionResult => ({
+  kind: 'report',
+  report: { title, items: [{ severity, label: strings.pivotTable, detail }] },
+});
+
+/** Show the report's new sheet, settle its reports and select its first cell. */
+function createdResult(
+  store: SpreadsheetStore,
+  workbook: WorkbookHandle,
+  destination: { sheet: number; row: number; col: number },
+): RibbonPivotTableActionResult {
+  mutators.setSheetIndex(store, destination.sheet);
+  refreshPivotReportsAfterEdit(store, workbook);
+  mutators.setActive(store, destination);
+  return { kind: 'created', destinationSheet: destination.sheet, destination };
+}
+
 /** An existing cache whose worksheet source is exactly `source`. */
 const cacheForSource = (wb: WorkbookHandle, source: Range): number | undefined =>
   wb.pivotCacheIds().find((id) => {
     const range = pivotCacheWorksheetSourceRange(wb, id);
-    return (
-      range !== null &&
-      range.sheet === source.sheet &&
-      range.r0 === source.r0 &&
-      range.c0 === source.c0 &&
-      range.r1 === source.r1 &&
-      range.c1 === source.c1
-    );
+    return range !== null && sameRange(range, source);
   });
 
 /**
@@ -1044,15 +1058,12 @@ function insertRecommendedPivotTable(
   const rowField = fields.find((field) => !field.numeric);
   const columnField = fields.find((field) => field.numeric);
   if (!workbook.capabilities.pivotTableMutate || !rowField || !columnField) {
-    return {
-      kind: 'report',
-      report: {
-        title: strings.recommendedPivotTables,
-        items: [
-          { severity: 'warning', label: strings.pivotTable, detail: strings.pivotAuthoringDetail },
-        ],
-      },
-    };
+    return pivotReport(
+      strings,
+      strings.recommendedPivotTables,
+      'warning',
+      strings.pivotAuthoringDetail,
+    );
   }
   const cacheId = cacheForSource(workbook, source);
   const result = createPivotTableAtPlacement(
@@ -1068,28 +1079,16 @@ function insertRecommendedPivotTable(
     'new-sheet',
   );
   if (!result.ok) {
-    return {
-      kind: 'report',
-      report: {
-        title: strings.recommendedPivotTables,
-        items: [
-          {
-            severity: 'warning',
-            label: strings.pivotTable,
-            detail:
-              result.reason === 'sheet-failed'
-                ? strings.workbookStructureProtectedBlocked
-                : strings.pivotAuthoringDetail,
-          },
-        ],
-      },
-    };
+    return pivotReport(
+      strings,
+      strings.recommendedPivotTables,
+      'warning',
+      result.reason === 'sheet-failed'
+        ? strings.workbookStructureProtectedBlocked
+        : strings.pivotAuthoringDetail,
+    );
   }
-  const { destination } = result;
-  mutators.setSheetIndex(store, destination.sheet);
-  refreshPivotReportsAfterEdit(store, workbook);
-  mutators.setActive(store, destination);
-  return { kind: 'created', destinationSheet: destination.sheet, destination };
+  return createdResult(store, workbook, result.destination);
 }
 
 /** Implements the cross-host "PivotTable" ribbon split-button. Returns one of:
@@ -1110,42 +1109,23 @@ export const executeRibbonPivotTableAction = (
   if (action === 'refresh') {
     const active = store.getState().selection.active;
     const pivot = findPivotTableAtCell(workbook, active);
-    if (!pivot) {
-      return {
-        kind: 'report',
-        report: {
-          title: strings.pivotTableRefreshData,
-          items: [
-            {
-              severity: 'warning',
-              label: strings.pivotTable,
-              detail: strings.pivotTableRefreshUnavailable,
-            },
-          ],
-        },
-      };
-    }
-    const result = pivotWrite(
-      deps,
-      history,
-      pivotReportEffects(workbook, pivot.sheetIndex, pivot.pivotIndex),
-      { ok: false } as ReturnType<typeof refreshPivotTable>,
-      () => refreshPivotTable(workbook, { sheet: pivot.sheetIndex, pivotIndex: pivot.pivotIndex }),
-    );
-    if (!result.ok) {
-      return {
-        kind: 'report',
-        report: {
-          title: strings.pivotTableRefreshData,
-          items: [
-            {
-              severity: 'warning',
-              label: strings.pivotTable,
-              detail: strings.pivotTableRefreshUnavailable,
-            },
-          ],
-        },
-      };
+    const refreshed = pivot
+      ? pivotWrite(
+          deps,
+          history,
+          pivotReportEffects(workbook, pivot.sheetIndex, pivot.pivotIndex),
+          { ok: false } as ReturnType<typeof refreshPivotTable>,
+          () =>
+            refreshPivotTable(workbook, { sheet: pivot.sheetIndex, pivotIndex: pivot.pivotIndex }),
+        ).ok
+      : false;
+    if (!pivot || !refreshed) {
+      return pivotReport(
+        strings,
+        strings.pivotTableRefreshData,
+        'warning',
+        strings.pivotTableRefreshUnavailable,
+      );
     }
     mutators.replaceCells(store, workbook.cells(pivot.sheetIndex));
     return { kind: 'refreshed', sheet: pivot.sheetIndex };
@@ -1155,41 +1135,22 @@ export const executeRibbonPivotTableAction = (
   }
   if (action === 'recommended-insert') return insertRecommendedPivotTable(deps);
   if (action === 'recommended') {
-    return {
-      kind: 'report',
-      report: {
-        title: strings.recommendedPivotTables,
-        items: [
-          { severity: 'info', label: strings.pivotTable, detail: strings.pivotAuthoringDetail },
-        ],
-      },
-    };
+    return pivotReport(
+      strings,
+      strings.recommendedPivotTables,
+      'info',
+      strings.pivotAuthoringDetail,
+    );
   }
   if (!workbook.capabilities.pivotTableMutate) {
-    return {
-      kind: 'report',
-      report: {
-        title: strings.pivotTableNewSheet,
-        items: [
-          { severity: 'info', label: strings.pivotTable, detail: strings.pivotAuthoringDetail },
-        ],
-      },
-    };
+    return pivotReport(strings, strings.pivotTableNewSheet, 'info', strings.pivotAuthoringDetail);
   }
   const source = pivotSourceForSelection(store, workbook);
   const fields = readPivotSource(workbook, source)?.fields ?? [];
   const valueField = fields.find((field) => field.numeric) ?? fields.at(-1);
   const rowField = fields.find((field) => field.name !== valueField?.name) ?? fields[0];
   if (!rowField || !valueField || rowField.name === valueField.name) {
-    return {
-      kind: 'report',
-      report: {
-        title: strings.pivotTable,
-        items: [
-          { severity: 'warning', label: strings.pivotTable, detail: strings.pivotAuthoringDetail },
-        ],
-      },
-    };
+    return pivotReport(strings, strings.pivotTable, 'warning', strings.pivotAuthoringDetail);
   }
   const result = createPivotTableAtPlacement(
     { store, workbook, history, origin: deps.origin, commandId: deps.commandId },
@@ -1202,35 +1163,14 @@ export const executeRibbonPivotTableAction = (
     },
     'new-sheet',
   );
-  if (result.ok) {
-    const { destination } = result;
-    mutators.setSheetIndex(store, destination.sheet);
-    refreshPivotReportsAfterEdit(store, workbook);
-    mutators.setActive(store, destination);
-    return { kind: 'created', destinationSheet: destination.sheet, destination };
-  }
+  if (result.ok) return createdResult(store, workbook, result.destination);
   if (result.reason === 'sheet-failed') {
-    return {
-      kind: 'report',
-      report: {
-        title: strings.pivotTableNewSheet,
-        items: [
-          {
-            severity: 'warning',
-            label: strings.pivotTable,
-            detail: strings.workbookStructureProtectedBlocked,
-          },
-        ],
-      },
-    };
+    return pivotReport(
+      strings,
+      strings.pivotTableNewSheet,
+      'warning',
+      strings.workbookStructureProtectedBlocked,
+    );
   }
-  return {
-    kind: 'report',
-    report: {
-      title: strings.pivotTableNewSheet,
-      items: [
-        { severity: 'info', label: strings.pivotTable, detail: strings.pivotAuthoringDetail },
-      ],
-    },
-  };
+  return pivotReport(strings, strings.pivotTableNewSheet, 'info', strings.pivotAuthoringDetail);
 };

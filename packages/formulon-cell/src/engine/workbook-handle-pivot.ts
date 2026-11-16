@@ -223,6 +223,17 @@ interface LayoutCell {
   expansion: PivotCellExpansion | null;
 }
 
+/** A report layout cell as `pivotCellInfo` reports it. */
+export interface PivotCellInfo {
+  pivotIndex: number;
+  kind: number;
+  fieldName: string;
+  fieldIndex: number;
+  /** Cache bound to the report, -1 when the engine cannot say. */
+  cacheId: number;
+  isValue: boolean;
+}
+
 /** A report's layout as an anchor and extent; an extent of 0 spans no cell. */
 interface RawPivotLayout {
   top: number;
@@ -392,15 +403,7 @@ export abstract class WorkbookHandlePivotMethods {
   /** The PivotTable layout cell at `addr`, or null outside every report.
    *  `fieldIndex` is the cache index of the cell's source field, -1 when the
    *  cell belongs to no source field (captions, data-field names). */
-  pivotCellInfo(addr: Addr): {
-    pivotIndex: number;
-    kind: number;
-    fieldName: string;
-    fieldIndex: number;
-    /** Cache bound to the report, -1 when the engine cannot say. */
-    cacheId: number;
-    isValue: boolean;
-  } | null {
+  pivotCellInfo(addr: Addr): PivotCellInfo | null {
     assertAlive(this);
     if (!this.capabilities.pivotTables) return null;
     rawWb(this);

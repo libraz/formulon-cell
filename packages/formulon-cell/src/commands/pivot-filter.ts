@@ -1,7 +1,9 @@
 import { pivotFieldFiltered } from '../engine/pivot-style.js';
 import type { PivotAxis, PivotFilterSpec, PivotSortOrder } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { writePivotFieldItems } from './pivot-edit.js';
+import { setPivotFieldItemsChecked } from './pivot-edit.js';
+
+export { setPivotFieldItemsChecked };
 
 /** One item of a field's checklist. */
 export interface PivotFilterItem {
@@ -100,17 +102,6 @@ export function pivotFieldFilterModel(
     dataFields: definition.dataFields.map((d) => d.name ?? '').filter((name) => name !== ''),
     dateField: cacheFieldHoldsOnlyDates(wb, definition.cacheId, field.cacheFieldIndex),
   };
-}
-
-/** Show the checked items of a field and hide the rest. */
-export function setPivotFieldItemsChecked(
-  wb: WorkbookHandle,
-  sheet: number,
-  pivotIndex: number,
-  fieldIndex: number,
-  items: readonly PivotFilterItem[],
-): boolean {
-  return writePivotFieldItems(wb, sheet, pivotIndex, fieldIndex, items);
 }
 
 /** Replace the label / value filter of a field; null removes it. Filters on

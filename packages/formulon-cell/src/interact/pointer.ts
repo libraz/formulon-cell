@@ -290,7 +290,6 @@ function pivotButtonAt(
   const view = layoutForView(s);
   return pivotCellButtonAt(
     pivotStyleLayer(wb, s),
-    s.data.sheetIndex,
     row,
     col,
     cellRect(view, s.viewport, row, col),

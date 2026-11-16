@@ -1,7 +1,8 @@
-import type { History } from '../commands/history.js';
+import { type History, recordingHistory } from '../commands/history.js';
 import type { OperationEffect } from '../commands/interaction-policy.js';
 import {
   type PivotAuthorization,
+  pivotFilterBlockRows,
   pivotReportRange,
   pivotWrite,
 } from '../commands/pivot-actions.js';
@@ -9,10 +10,11 @@ import {
   PIVOT_NEW_SHEET_ANCHOR,
   recreatePivotTable,
   refreshPivotReportsAfterEdit,
+  reloadSheetIfShown,
 } from '../commands/pivot-table.js';
 import { addSheet, moveSheet } from '../commands/sheet-mutate.js';
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
-import { PivotAxis, type Range } from '../engine/types.js';
+import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { commitPivotChange } from './pivot-field-settings-dialog-apply.js';
@@ -51,25 +53,29 @@ export function movePivotTable(
       },
     });
   }
-  return pivotWrite(deps, deps.history, effects, null, () => moveReport(deps, source, target), {
-    addsSheet: target === 'new-sheet',
-  });
+  return pivotWrite(
+    deps,
+    deps.history,
+    effects,
+    null,
+    () => moveReport(deps, source, target, bounds),
+    {
+      addsSheet: target === 'new-sheet',
+    },
+  );
 }
 
 function moveReport(
   deps: MovePivotDeps,
   source: { sheet: number; pivotIndex: number },
   target: PivotMoveTarget,
+  bounds: Range,
 ): Range | null {
   const { store, workbook: wb } = deps;
-  const history = deps.history && !deps.history.isReplaying() ? deps.history : null;
+  const history = recordingHistory(deps.history);
   const definition = wb.getPivotDefinition(source.sheet, source.pivotIndex);
-  const bounds = wb
-    .pivotBounds(source.sheet)
-    .find((b) => b.pivotIndex === source.pivotIndex)?.range;
-  if (!definition || !bounds) return null;
-  const filterRows = definition.fields.filter((f) => f.axis === PivotAxis.Page).length;
-  const anchorOffset = filterRows > 0 ? filterRows + 1 : 0;
+  if (!definition) return null;
+  const anchorOffset = pivotFilterBlockRows(definition);
   const rows = bounds.r1 - bounds.r0 + 1;
   const cols = bounds.c1 - bounds.c0 + 1;
 
@@ -115,11 +121,7 @@ function moveReport(
   }
   const anchor = { row: at.row + anchorOffset, col: at.col };
   const refresh = (...sheets: number[]): void => {
-    for (const s of sheets) {
-      if (store.getState().data.sheetIndex === s) {
-        mutators.replaceCells(store, wb.cells(s));
-      }
-    }
+    for (const s of sheets) reloadSheetIfShown(store, wb, s);
   };
   const oldAnchor = { row: bounds.r0 + anchorOffset, col: bounds.c0 };
   wb.removePivotTable(source.sheet, source.pivotIndex);
@@ -152,7 +154,7 @@ function moveReport(
 /** Select the report's whole extent with its top-left active. */
 function selectExtent(deps: MovePivotDeps, sheet: number, pivotIndex: number): Range | null {
   const { store, workbook: wb } = deps;
-  const range = wb.pivotBounds(sheet).find((b) => b.pivotIndex === pivotIndex)?.range;
+  const range = pivotReportRange(wb, sheet, pivotIndex);
   if (!range) return null;
   if (store.getState().data.sheetIndex !== sheet) mutators.setSheetIndex(store, sheet);
   mutators.setActive(store, { sheet, row: range.r0, col: range.c0 });

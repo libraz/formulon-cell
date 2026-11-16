@@ -1,3 +1,4 @@
+import { pivotReportRange } from '../../commands/pivot-actions.js';
 import {
   applyPivotGrandTotals,
   applyPivotReportLayout,
@@ -25,34 +26,48 @@ export interface PivotDropdownDefaults {
   updatePivotLayoutMenu: (menu: HTMLElement) => void;
 }
 
-/** Edits that rewrite the report: each is one undo step and re-lays out once. */
-const REPORT_EDITS: Readonly<Record<string, (wb: WorkbookHandle, ref: PivotRef) => boolean>> = {
-  'totals-off': (wb, ref) => applyPivotGrandTotals(wb, ref, { rows: false, cols: false }),
-  'totals-on': (wb, ref) => applyPivotGrandTotals(wb, ref, { rows: true, cols: true }),
-  'totals-rows': (wb, ref) => applyPivotGrandTotals(wb, ref, { rows: true, cols: false }),
-  'totals-cols': (wb, ref) => applyPivotGrandTotals(wb, ref, { rows: false, cols: true }),
-  'layout-compact': (wb, ref) => applyPivotReportLayout(wb, ref, PivotReportLayout.Compact),
-  'layout-outline': (wb, ref) => applyPivotReportLayout(wb, ref, PivotReportLayout.Outline),
-  'layout-tabular': (wb, ref) => applyPivotReportLayout(wb, ref, PivotReportLayout.Tabular),
-  'subtotals-bottom': (wb, ref) => applyPivotSubtotalPosition(wb, ref, false),
-  'subtotals-top': (wb, ref) => applyPivotSubtotalPosition(wb, ref, true),
-  'clear-all': clearPivotFields,
-  'clear-filters': clearPivotFilters,
-};
-
-/** The Design / Analyze command each report edit runs under. */
-const REPORT_EDIT_COMMAND: Readonly<Record<string, string>> = {
-  'totals-off': 'pivotGrandTotals',
-  'totals-on': 'pivotGrandTotals',
-  'totals-rows': 'pivotGrandTotals',
-  'totals-cols': 'pivotGrandTotals',
-  'layout-compact': 'pivotReportLayout',
-  'layout-outline': 'pivotReportLayout',
-  'layout-tabular': 'pivotReportLayout',
-  'subtotals-bottom': 'pivotSubtotals',
-  'subtotals-top': 'pivotSubtotals',
-  'clear-all': 'pivotClear',
-  'clear-filters': 'pivotClear',
+/** Edits that rewrite the report: each is one undo step under its ribbon command and re-lays out once. */
+const REPORT_EDITS: Readonly<
+  Record<string, { run: (wb: WorkbookHandle, ref: PivotRef) => boolean; command: string }>
+> = {
+  'totals-off': {
+    run: (wb, ref) => applyPivotGrandTotals(wb, ref, { rows: false, cols: false }),
+    command: 'pivotGrandTotals',
+  },
+  'totals-on': {
+    run: (wb, ref) => applyPivotGrandTotals(wb, ref, { rows: true, cols: true }),
+    command: 'pivotGrandTotals',
+  },
+  'totals-rows': {
+    run: (wb, ref) => applyPivotGrandTotals(wb, ref, { rows: true, cols: false }),
+    command: 'pivotGrandTotals',
+  },
+  'totals-cols': {
+    run: (wb, ref) => applyPivotGrandTotals(wb, ref, { rows: false, cols: true }),
+    command: 'pivotGrandTotals',
+  },
+  'layout-compact': {
+    run: (wb, ref) => applyPivotReportLayout(wb, ref, PivotReportLayout.Compact),
+    command: 'pivotReportLayout',
+  },
+  'layout-outline': {
+    run: (wb, ref) => applyPivotReportLayout(wb, ref, PivotReportLayout.Outline),
+    command: 'pivotReportLayout',
+  },
+  'layout-tabular': {
+    run: (wb, ref) => applyPivotReportLayout(wb, ref, PivotReportLayout.Tabular),
+    command: 'pivotReportLayout',
+  },
+  'subtotals-bottom': {
+    run: (wb, ref) => applyPivotSubtotalPosition(wb, ref, false),
+    command: 'pivotSubtotals',
+  },
+  'subtotals-top': {
+    run: (wb, ref) => applyPivotSubtotalPosition(wb, ref, true),
+    command: 'pivotSubtotals',
+  },
+  'clear-all': { run: clearPivotFields, command: 'pivotClear' },
+  'clear-filters': { run: clearPivotFilters, command: 'pivotClear' },
 };
 
 /** Re-reads the reports after a pivot edit and points out a report that no longer fits. */
@@ -67,7 +82,7 @@ export function refreshAfterPivotEdit(instance: SpreadsheetInstance): void {
 export function createPivotDropdownDefaults(instance: SpreadsheetInstance): PivotDropdownDefaults {
   const activePivot = (): PivotRef | null => {
     const pivot = findPivotTableAtCell(
-      instance.workbook as unknown as Parameters<typeof findPivotTableAtCell>[0],
+      instance.workbook,
       instance.store.getState().selection.active,
     );
     return pivot ? { sheetIndex: pivot.sheetIndex, pivotIndex: pivot.pivotIndex } : null;
@@ -81,9 +96,7 @@ export function createPivotDropdownDefaults(instance: SpreadsheetInstance): Pivo
       if (!ref) return;
       const wb = instance.workbook;
       if (action === 'select-table') {
-        const range = wb
-          .pivotBounds(ref.sheetIndex)
-          .find((b) => b.pivotIndex === ref.pivotIndex)?.range;
+        const range = pivotReportRange(wb, ref.sheetIndex, ref.pivotIndex);
         if (range) mutators.setRange(instance.store, range);
         return;
       }
@@ -95,12 +108,12 @@ export function createPivotDropdownDefaults(instance: SpreadsheetInstance): Pivo
           history: instance.history,
           store: instance.store,
           origin: 'ribbon',
-          commandId: REPORT_EDIT_COMMAND[action] ?? 'pivotReportLayout',
+          commandId: edit.command,
           onChanged,
         },
         ref.sheetIndex,
         ref.pivotIndex,
-        () => edit(wb, ref),
+        () => edit.run(wb, ref),
       );
     },
     updatePivotLayoutMenu(menu) {

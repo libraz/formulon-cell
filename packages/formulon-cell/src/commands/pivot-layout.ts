@@ -1,6 +1,8 @@
+import { pivotFieldFiltered } from '../engine/pivot-style.js';
 import { PivotAxis, type PivotReportLayout } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { clearPivotFieldFilter, pivotFieldFilterModel } from './pivot-filter.js';
+import type { PivotDefinition } from '../engine/workbook-handle-pivot.js';
+import { clearPivotFieldFilter } from './pivot-filter.js';
 
 /**
  * Report-wide PivotTable layout edits behind the Design and Analyze tabs.
@@ -27,15 +29,18 @@ export interface PivotLayoutState {
   hasFilter: boolean;
 }
 
-const axisFields = (wb: WorkbookHandle, ref: PivotRef) =>
-  (wb.getPivotDefinition(ref.sheetIndex, ref.pivotIndex)?.fields ?? []).filter(
+const axisFieldsOf = (definition: PivotDefinition | null) =>
+  (definition?.fields ?? []).filter(
     (field) => field.axis === PivotAxis.Row || field.axis === PivotAxis.Col,
   );
+
+const axisFields = (wb: WorkbookHandle, ref: PivotRef) =>
+  axisFieldsOf(wb.getPivotDefinition(ref.sheetIndex, ref.pivotIndex));
 
 export function pivotLayoutState(wb: WorkbookHandle, ref: PivotRef): PivotLayoutState | null {
   const definition = wb.getPivotDefinition(ref.sheetIndex, ref.pivotIndex);
   if (!definition) return null;
-  const onAxes = axisFields(wb, ref);
+  const onAxes = axisFieldsOf(definition);
   const tops = new Set(onAxes.map((field) => field.subtotalTop));
   return {
     grandTotals: { ...definition.grandTotals },
@@ -43,10 +48,7 @@ export function pivotLayoutState(wb: WorkbookHandle, ref: PivotRef): PivotLayout
     subtotalTop: tops.size === 1 ? [...tops][0] === true : null,
     hasFields:
       definition.dataFields.length > 0 || definition.fields.some((field) => field.axis !== null),
-    hasFilter: definition.fields.some(
-      (field) =>
-        pivotFieldFilterModel(wb, ref.sheetIndex, ref.pivotIndex, field.index)?.filtered === true,
-    ),
+    hasFilter: definition.fields.some((field) => pivotFieldFiltered(definition, field.index)),
   };
 }
 
@@ -93,7 +95,7 @@ export function clearPivotFilters(wb: WorkbookHandle, ref: PivotRef): boolean {
   if (!definition) return false;
   return definition.fields.every(
     (field) =>
-      pivotFieldFilterModel(wb, sheetIndex, pivotIndex, field.index)?.filtered !== true ||
+      !pivotFieldFiltered(definition, field.index) ||
       clearPivotFieldFilter(wb, sheetIndex, pivotIndex, field.index),
   );
 }

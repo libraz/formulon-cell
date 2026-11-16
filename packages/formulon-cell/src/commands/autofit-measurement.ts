@@ -116,7 +116,13 @@ export function computeAutofitColWidth(
     const font = cellFont(format, theme, formulaDisplay);
     const width =
       maxExplicitLineWidth(text, textMeasure(ctx, font, state.layout)) +
-      headerButtonWidth(state, parsed.sheet, parsed.row, parsed.col, pivots.buttons.has(key)) +
+      headerButtonWidth(
+        state,
+        parsed.sheet,
+        parsed.row,
+        parsed.col,
+        pivots.hasButton(parsed.row, parsed.col),
+      ) +
       pivotOutlineIndent(
         pivots.outlineAt(parsed.row, parsed.col)?.steps ?? 0,
         fontPointsToCssPx(1),

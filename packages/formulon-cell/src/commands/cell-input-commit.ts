@@ -25,7 +25,7 @@ import { dataTableGuardAlert, dataTableOccupies, tableFunctionAlert } from './da
 import { interactionControllerFor, nativeAxisFontFormatFor } from './interaction-controller.js';
 import { mergeAnchorFor, mergeCellsFor } from './interaction-effects.js';
 import type { RefusalLike } from './permission-reasons.js';
-import { pivotGuardAlert, pivotOccupies } from './pivot-guard.js';
+import { pivotGuardAlert } from './pivot-guard.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
 export type CellInputOperation = 'valueEdit' | 'formulaEdit';
@@ -124,7 +124,7 @@ export function commitCellInput({
           return Object.keys(inherited).length > 0 ? inherited : undefined;
         })();
     if (
-      pivotOccupies(wb, {
+      wb.pivotOverlapsRange({
         sheet: anchor.sheet,
         r0: anchor.row,
         c0: anchor.col,

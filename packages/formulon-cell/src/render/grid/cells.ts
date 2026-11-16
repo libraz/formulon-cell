@@ -522,7 +522,7 @@ export function paintCells(
       const engineFmt = effectiveFormatAt(r, c);
       const table = tableForCell(tables.tables, data.sheetIndex, r, c);
       const styleFmt = styleFormatAt(r, c);
-      const pivotButton = pivots.buttons.has(key);
+      const pivotButton = pivots.hasButton(r, c);
       const outline = pivots.outlineAt(r, c);
       const isMergeAnchor = merges.byAnchor.has(key);
       // Use the union of contiguous visible rectangles for content bounds,
@@ -793,7 +793,7 @@ export function paintCells(
       // Most cells carry no report button; skip the lookup for them.
       const pivotButtons =
         pivotButton || outline?.collapse
-          ? pivotCellButtons(pivots, data.sheetIndex, r, c, bounds, pivotButtonMetrics)
+          ? pivotCellButtons(pivots, r, c, bounds, pivotButtonMetrics)
           : NO_PIVOT_BUTTONS;
       for (const button of pivotButtons) {
         if (button.kind === 'outline') {

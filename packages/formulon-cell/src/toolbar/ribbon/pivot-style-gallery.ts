@@ -3,7 +3,7 @@ import {
   pivotStyleGallerySections,
 } from '../../commands/format-as-table.js';
 import { ribbonStyleTarget } from '../../commands/table-style-actions.js';
-import { builtinPivotStyleElements } from '../../engine/pivot-style.js';
+import { BUILTIN_PIVOT_STYLE, builtinPivotStyleElements } from '../../engine/pivot-style.js';
 import type { StyleElementFormat, StyleElementFormats } from '../../engine/table-style-elements.js';
 import { focusSheet } from '../../interact/dialog-focus.js';
 import type { ToolbarLang } from '../ribbon-model.js';
@@ -61,7 +61,7 @@ const JA_COLOUR_NAMES: Readonly<Record<(typeof FAMILIES)[number]['id'], readonly
 /** The accessible name of a built-in PivotTable style, or None for ''. */
 export const pivotStyleLabel = (name: string, lang: ToolbarLang): string => {
   if (name === '') return lang === 'ja' ? 'なし' : 'None';
-  const match = /^PivotStyle(Light|Medium|Dark)(\d+)$/.exec(name);
+  const match = BUILTIN_PIVOT_STYLE.exec(name);
   const f = FAMILIES.find((family) => family.id === match?.[1]);
   if (!match || !f) return name;
   const index = Number(match[2]);
@@ -107,12 +107,6 @@ export const pivotStyleThumbnail = (elements: StyleElementFormats | null): HTMLD
   return thumb;
 };
 
-/** The elements of a built-in PivotTable style, or null for None. */
-export const builtinPivotThumbnailElements = (
-  name: string,
-  themeColors: readonly number[] | undefined,
-): StyleElementFormats | null => (name ? builtinPivotStyleElements(name, themeColors) : null);
-
 /** The PivotTable Design Quick Styles: custom styles, None and the built-in styles, a page at a
  *  time, with the Quick Styles button as the more arrow. */
 export const createPivotStyleGallery = (opts: RibbonStyleGalleryOptions): HTMLDivElement => {
@@ -143,7 +137,7 @@ export const createPivotStyleGallery = (opts: RibbonStyleGalleryOptions): HTMLDi
           : section.names.map((name) => ({
               id: name,
               label: pivotStyleLabel(name, lang),
-              thumbnail: () => pivotStyleThumbnail(builtinPivotThumbnailElements(name, theme)),
+              thumbnail: () => pivotStyleThumbnail(builtinPivotStyleElements(name, theme)),
             })),
       );
     },

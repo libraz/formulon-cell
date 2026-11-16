@@ -1,3 +1,5 @@
+import type { CellValue } from './types.js';
+
 /** `PivotCell.kind` ordinals reported by `pivotLayout()`. */
 export const PIVOT_CELL_KIND = {
   Header: 0,
@@ -28,3 +30,7 @@ export function isEmptyPivotLayout(cells: readonly { kind: number }[]): boolean 
 /** An empty report reserves this many columns and rows from its anchor. */
 export const PIVOT_PLACEHOLDER_COLS = 3;
 export const PIVOT_PLACEHOLDER_ROWS = 18;
+
+/** The text of a report item label as the report shows it; empty for anything but text or a number. */
+export const pivotItemText = (value: CellValue): string =>
+  value.kind === 'text' || value.kind === 'number' ? String(value.value) : '';

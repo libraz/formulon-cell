@@ -1,12 +1,15 @@
-import type { History } from '../commands/history.js';
+import { type History, recordingHistory } from '../commands/history.js';
 import {
   type PivotAuthorization,
+  pivotFilterBlockRows,
   pivotReportEffects,
+  pivotReportRange,
   pivotWrite,
 } from '../commands/pivot-actions.js';
 import {
   applyPivotEdit,
   type PivotEditField,
+  replacePivotDataFields,
   restorePivotFieldLayout,
 } from '../commands/pivot-edit.js';
 import type { Addr } from '../engine/types.js';
@@ -19,8 +22,9 @@ import {
   type PivotShowValuesAs as PivotShowValuesAsValue,
 } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { PivotDefinition } from '../engine/workbook-handle-pivot.js';
+import type { PivotCellInfo, PivotDefinition } from '../engine/workbook-handle-pivot.js';
 import type { Strings } from '../i18n/strings.js';
+import { pivotFieldOfCell } from './pivot-cell-at.js';
 import { pivotShowAsNeedsBaseField, pivotShowAsNeedsBaseItem } from './pivot-field-settings.js';
 import {
   type PivotFieldSettingsResult,
@@ -51,10 +55,9 @@ function pivotAnchorOf(
   pivotIndex: number,
   definition: PivotDefinition,
 ): PivotAnchor | null {
-  const range = wb.pivotBounds(sheetIndex).find((b) => b.pivotIndex === pivotIndex)?.range;
+  const range = pivotReportRange(wb, sheetIndex, pivotIndex);
   if (!range) return null;
-  const filterRows = definition.fields.filter((f) => f.axis === PivotAxis.Page).length;
-  const row = range.r0 + (filterRows > 0 ? filterRows + 1 : 0);
+  const row = range.r0 + pivotFilterBlockRows(definition);
   return { row, col: range.c0, rows: range.r1 - row + 1, cols: range.c1 - range.c0 + 1 };
 }
 
@@ -95,7 +98,7 @@ function commitAuthorizedPivotChange(
   const ok = apply();
   ctx.onChanged();
   const after = before ? capture() : null;
-  const history = ctx.history && !ctx.history.isReplaying() ? ctx.history : null;
+  const history = recordingHistory(ctx.history);
   if (history && before && after) {
     const restore = (target: NonNullable<typeof before>) => (): void => {
       restorePivotFieldLayout(wb, sheetIndex, pivotIndex, target.definition);
@@ -311,10 +314,7 @@ export function applyPivotFieldSettings(
     const list = definition.dataFields.map((spec, index) =>
       index === which.dataFieldIndex ? next : spec,
     );
-    return (
-      wb.clearPivotDataFields(sheetIndex, pivotIndex) &&
-      list.every((spec) => wb.addPivotDataField(sheetIndex, pivotIndex, spec) >= 0)
-    );
+    return replacePivotDataFields(wb, sheetIndex, pivotIndex, list);
   });
 }
 
@@ -324,8 +324,6 @@ export interface PivotFieldSettingsOpenContext extends PivotCommitContext {
   strings: Strings;
   pickNumberFormat?: PivotNumberFormatPicker;
 }
-
-type PivotCellInfo = NonNullable<ReturnType<WorkbookHandle['pivotCellInfo']>>;
 
 /** The field a report cell belongs to: a value cell's data field, or the row,
  *  column or filter field of a label. Null for a cell that names no field. */
@@ -344,7 +342,7 @@ function pivotFieldForCell(
       ? { kind: 'value', dataFieldIndex: Math.max(dataFieldIndex, 0) }
       : null;
   }
-  const field = definition.fields.find((f) => f.cacheFieldIndex === info.fieldIndex);
+  const field = pivotFieldOfCell(definition, info);
   return field ? { kind: 'field', fieldIndex: field.index } : null;
 }
 
@@ -434,9 +432,6 @@ export function updatePivotDataField(
     const list = definition.dataFields.map((spec, index) =>
       index === dataFieldIndex ? next : spec,
     );
-    return (
-      wb.clearPivotDataFields(sheetIndex, pivotIndex) &&
-      list.every((spec) => wb.addPivotDataField(sheetIndex, pivotIndex, spec) >= 0)
-    );
+    return replacePivotDataFields(wb, sheetIndex, pivotIndex, list);
   });
 }

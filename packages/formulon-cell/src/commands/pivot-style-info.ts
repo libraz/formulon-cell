@@ -2,7 +2,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { PivotStyleDefinition } from '../engine/workbook-handle-pivot.js';
 import type { PivotStyleInfo } from '../engine/workbook-handle-table-styles.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import type { History } from './history.js';
+import { type History, recordingHistory } from './history.js';
 
 /** What a report with no style element is shown with. */
 const DEFAULT_PIVOT_STYLE: PivotStyleDefinition = {
@@ -59,8 +59,6 @@ export function updatePivotStyleInfo(
   const apply = (info: PivotStyleDefinition): void => {
     if (wb.setPivotStyleInfo(pivot.sheetIndex, pivot.pivotIndex, info)) repaint();
   };
-  if (history && !history.isReplaying()) {
-    history.push({ undo: () => apply(before), redo: () => apply(after) });
-  }
+  recordingHistory(history)?.push({ undo: () => apply(before), redo: () => apply(after) });
   return true;
 }

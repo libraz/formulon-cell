@@ -21,6 +21,7 @@ import {
   tableStyleGallerySections,
 } from '../../../commands/format-as-table.js';
 import { builtinTableStyleElements } from '../../../engine/builtin-table-styles.js';
+import { builtinPivotStyleElements } from '../../../engine/pivot-style.js';
 import {
   composeStyleElements,
   type StyleElementFormats,
@@ -32,11 +33,7 @@ import { dictionaries } from '../../../i18n/strings.js';
 import type { CellBorderSide, CellFormat } from '../../../store/types.js';
 import type { ToolbarMenuText } from '../../menu-text.js';
 import type { ToolbarLang, ToolbarText } from '../../ribbon-model.js';
-import {
-  builtinPivotThumbnailElements,
-  pivotStyleLabel,
-  pivotStyleThumbnail,
-} from '../pivot-style-gallery.js';
+import { pivotStyleLabel, pivotStyleThumbnail } from '../pivot-style-gallery.js';
 
 import {
   createMenu,
@@ -361,7 +358,7 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
                   swatch(
                     name,
                     pivotStyleLabel(name, ribbonLang),
-                    pivotStyleThumbnail(builtinPivotThumbnailElements(name, themeColors)),
+                    pivotStyleThumbnail(builtinPivotStyleElements(name, themeColors)),
                   ),
                 ),
         }),

@@ -1,4 +1,4 @@
-import type { Range } from '../engine/types.js';
+import { PivotAxis, type Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { authorizedWriteOr } from './authorized-write.js';
@@ -20,6 +20,14 @@ export function pivotReportRange(
 ): Range | null {
   const bounds = wb.pivotBounds(sheet).find((entry) => entry.pivotIndex === pivotIndex)?.range;
   return bounds ? { ...bounds } : null;
+}
+
+/** Rows a report's filter block takes above it: each report filter plus a blank row, or none. */
+export function pivotFilterBlockRows(definition: {
+  readonly fields: readonly { readonly axis: number | null }[];
+}): number {
+  const filters = definition.fields.filter((field) => field.axis === PivotAxis.Page).length;
+  return filters > 0 ? filters + 1 : 0;
 }
 
 /**

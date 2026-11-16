@@ -71,7 +71,8 @@ describe('report filter area', () => {
     const wb = await setup({ row: 2, col: 0 });
     wb.setPivotFieldAxis(0, 0, PRODUCT, PivotAxis.Page);
     const layer = buildPivotStyleLayer(wb, 0, {});
-    expect([...layer.buttons]).toEqual(expect.arrayContaining(['0:0:1', '0:2:0']));
+    expect(layer.hasButton(0, 1)).toBe(true);
+    expect(layer.hasButton(2, 0)).toBe(true);
     expect(layer.formatAt(0, 0)).toBeUndefined();
     expect(layer.formatAt(0, 1)).toBeUndefined();
     expect(layer.formatAt(2, 0)?.bold).toBe(true);
@@ -101,7 +102,7 @@ describe('report filter area', () => {
     autofitPivotTableColumns(store, wb);
     const fitted = store.getState().layout.colWidths.get(1) ?? 0;
     expect(fitted).toBeGreaterThan(20);
-    expect(pivotStyleLayer(wb, store.getState()).buttons.has('0:0:1')).toBe(true);
+    expect(pivotStyleLayer(wb, store.getState()).hasButton(0, 1)).toBe(true);
     wb.dispose();
   });
 });

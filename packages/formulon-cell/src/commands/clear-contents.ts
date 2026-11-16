@@ -10,7 +10,7 @@ import {
   planDataTableSelection,
 } from './data-table-guard.js';
 import { rowHiddenByFilter } from './filter-visible.js';
-import { History } from './history.js';
+import { History, recordingHistory } from './history.js';
 import { InteractionController, interactionControllerFor } from './interaction-controller.js';
 import {
   appliedBatch,
@@ -130,7 +130,7 @@ export const clearSelectedContents = (options: ClearSelectedContentsOptions): Ch
   const removesObjects = pivotPlan.whole.length > 0 || dataTablePlan.whole.length > 0;
   // Deleting a whole report or data table and clearing the rest of the
   // selection undo together.
-  const history = options.history && !options.history.isReplaying() ? options.history : null;
+  const history = recordingHistory(options.history);
   const txn = removesObjects ? history?.begin() : undefined;
   if (pivotPlan.whole.length > 0) {
     const removed = deletePivotTables(

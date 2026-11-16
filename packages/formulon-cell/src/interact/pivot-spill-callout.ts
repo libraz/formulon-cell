@@ -9,6 +9,10 @@ import { placePanel } from './overlay-position.js';
 
 const open = new WeakMap<HTMLElement, () => void>();
 
+/** Callout size used to place it before it has been measured. */
+const CALLOUT_W = 384;
+const CALLOUT_H = 241;
+
 /** Tell the user a report edit left a report at #SPILL!: a callout hanging
  *  from the report's anchor cell, dismissed with OK, a click elsewhere or
  *  Escape. No callout for an anchor on another sheet. */
@@ -60,14 +64,14 @@ export function showPivotSpillCallout(
   // Cell rectangles are relative to the grid, not to the whole host.
   const grid = host.querySelector<HTMLElement>('.fc-host__grid') ?? host;
   const hostRect = grid.getBoundingClientRect();
-  const height = callout.getBoundingClientRect().height || 241;
+  const height = callout.getBoundingClientRect().height || CALLOUT_H;
   // Above the cell when there is room, else below it, so the cell stays in view.
   const above = hostRect.top + cell.y - height - 8;
   placePanel(
     callout,
-    hostRect.left + cell.x + cell.w / 2 - 192,
+    hostRect.left + cell.x + cell.w / 2 - CALLOUT_W / 2,
     above >= 4 ? above : hostRect.top + cell.y + cell.h + 8,
-    { fallbackWidth: 384, fallbackHeight: 241 },
+    { fallbackWidth: CALLOUT_W, fallbackHeight: CALLOUT_H },
   );
   ok.focus({ preventScroll: true });
   const detachOutside = onOutsidePress(

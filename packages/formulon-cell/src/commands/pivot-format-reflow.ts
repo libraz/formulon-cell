@@ -4,7 +4,6 @@ import {
   lastPivotStyleLayer,
   type PivotLayoutCell,
   type PivotReportCells,
-  pivotReportTop,
   pivotStyleLayer,
 } from '../engine/pivot-style.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -41,17 +40,21 @@ const isLabelKind = (kind: number): boolean =>
 const isColumnKind = (kind: number): boolean =>
   kind === PIVOT_CELL_KIND.ColLabel || kind === PIVOT_CELL_KIND.ColSubtotal;
 
-/** The identity of every position of a report below its filter block, keyed `row:col`. */
+/** The identity of every position of a report below its filter block, keyed by `addrKey`. */
 function reportIdentities(report: PivotReportCells): Map<string, Identity> {
-  const { range } = report;
-  const top = pivotReportTop(range, report.cells);
+  const { range, top } = report;
+  const { sheet } = range;
   const cells = report.cells.filter((c) => c.row >= top);
   const dataFields = new Set(
     cells.filter((c) => c.kind === PIVOT_CELL_KIND.Data).map((c) => c.fieldName ?? ''),
   );
   const isData = (c: PivotLayoutCell): boolean => dataFields.has(c.fieldName ?? '');
   const byRow = new Map<number, PivotLayoutCell[]>();
-  for (const c of cells) byRow.set(c.row, [...(byRow.get(c.row) ?? []), c]);
+  for (const c of cells) {
+    const rowCells = byRow.get(c.row);
+    if (rowCells) rowCells.push(c);
+    else byRow.set(c.row, [c]);
+  }
   let bodyTop = range.r1 + 1;
   for (let row = top; row <= range.r1; row += 1) {
     const lead = (byRow.get(row) ?? []).reduce<PivotLayoutCell | null>(
@@ -100,9 +103,15 @@ function reportIdentities(report: PivotReportCells): Map<string, Identity> {
   const out = new Map<string, Identity>();
   for (const c of cells) {
     if (c.row < bodyTop) {
-      out.set(`${c.row}:${c.col}`, { role: 'caption', tokens: new Map([['h', c.text ?? '']]) });
+      out.set(addrKey({ sheet, row: c.row, col: c.col }), {
+        role: 'caption',
+        tokens: new Map([['h', c.text ?? '']]),
+      });
     } else if (!isData(c)) {
-      out.set(`${c.row}:${c.col}`, { role: 'label', tokens: rowPath.get(c.row) ?? new Map() });
+      out.set(addrKey({ sheet, row: c.row, col: c.col }), {
+        role: 'label',
+        tokens: rowPath.get(c.row) ?? new Map(),
+      });
     }
   }
   for (let row = bodyTop; row <= range.r1; row += 1) {
@@ -112,7 +121,7 @@ function reportIdentities(report: PivotReportCells): Map<string, Identity> {
         ...(colPath.get(col) ?? []),
         ['d', field] as [string, string],
       ]);
-      out.set(`${row}:${col}`, { role: 'data', tokens });
+      out.set(addrKey({ sheet, row, col }), { role: 'data', tokens });
     }
   }
   return out;
@@ -135,11 +144,6 @@ function ruleFit(rule: Identity, cell: Identity, present: ReadonlySet<string>): 
   return score;
 }
 
-const position = (key: string): { row: number; col: number } => {
-  const [row, col] = key.split(':').map(Number);
-  return { row: row ?? 0, col: col ?? 0 };
-};
-
 /** Move the direct formats of the active sheet's reports from the layout last
  *  painted to the current one. Call after the report edit, once the store's
  *  cells hold the new layout. */
@@ -155,8 +159,7 @@ export function reflowPivotFormats(store: SpreadsheetStore, wb: WorkbookHandle):
     const previous = before.reports.find((r) => r.pivotIndex === next.pivotIndex);
     if (!previous) continue;
     const rules: Rule[] = [];
-    for (const [at, identity] of reportIdentities(previous)) {
-      const key = addrKey({ sheet, ...position(at) });
+    for (const [key, identity] of reportIdentities(previous)) {
       const format = formats.get(key);
       if (!format || Object.keys(format).length === 0) continue;
       rules.push({ ...identity, format });
@@ -169,13 +172,12 @@ export function reflowPivotFormats(store: SpreadsheetStore, wb: WorkbookHandle):
     for (const identity of identities.values()) {
       for (const dim of identity.tokens.keys()) present.add(dim);
     }
-    for (const [at, identity] of identities) {
+    for (const [key, identity] of identities) {
       const matched = rules
         .map((rule) => ({ rule, score: ruleFit(rule, identity, present) }))
         .filter((m): m is { rule: Rule; score: number } => m.score !== null)
         .sort((a, b) => a.score - b.score);
       if (matched.length === 0) continue;
-      const key = addrKey({ sheet, ...position(at) });
       let format: CellFormat = { ...formats.get(key) };
       for (const { rule } of matched) format = { ...format, ...rule.format };
       formats.set(key, format);

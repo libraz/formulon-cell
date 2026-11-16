@@ -1,4 +1,5 @@
 import { formatMacRangeAddress, parseMacRange } from '../commands/mac-data-tools.js';
+import { pivotReportRange } from '../commands/pivot-actions.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -169,9 +170,7 @@ function attachPivotMoveDialog(instance: SpreadsheetInstance): PivotMoveDialogHa
       target = { sheet: pivot.sheetIndex, pivotIndex: pivot.pivotIndex };
       pickFormat.begin();
       applyLabels();
-      const bounds = instance.workbook
-        .pivotBounds(pivot.sheetIndex)
-        .find((b) => b.pivotIndex === pivot.pivotIndex)?.range;
+      const bounds = pivotReportRange(instance.workbook, pivot.sheetIndex, pivot.pivotIndex);
       // The field starts on the report's current top-left, relative form.
       location.value = bounds
         ? formatMacRangeAddress(instance.workbook, { ...bounds, r1: bounds.r0, c1: bounds.c0 })

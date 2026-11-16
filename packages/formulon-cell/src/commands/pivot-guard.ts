@@ -49,11 +49,6 @@ export function pivotGuardAlert(wb: WorkbookHandle, kind: PivotEditKind = 'edit'
   return { severity: 'stop', message: (guards.get(wb)?.messages ?? ENGLISH_MESSAGES)[kind] };
 }
 
-/** Whether a PivotTable report occupies any cell of `range`. */
-export function pivotOccupies(wb: WorkbookHandle, range: Range): boolean {
-  return wb.pivotOverlapsRange(range);
-}
-
 /** Tell the user a write would touch part of a PivotTable report. */
 export function alertPivotEdit(wb: WorkbookHandle, kind: PivotEditKind = 'edit'): void {
   guards.get(wb)?.sink(pivotGuardAlert(wb, kind));
@@ -66,7 +61,7 @@ export function blockPivotEdit(
   range: Range,
   kind: PivotEditKind = 'edit',
 ): boolean {
-  if (!pivotOccupies(wb, range)) return false;
+  if (!wb.pivotOverlapsRange(range)) return false;
   alertPivotEdit(wb, kind);
   return true;
 }

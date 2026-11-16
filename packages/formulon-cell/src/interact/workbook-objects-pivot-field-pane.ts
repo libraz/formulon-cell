@@ -1,6 +1,6 @@
 import type { History } from '../commands/history.js';
 import type { PivotAuthorization } from '../commands/pivot-actions.js';
-import { applyPivotEdit } from '../commands/pivot-edit.js';
+import { applyPivotEdit, replacePivotDataFields } from '../commands/pivot-edit.js';
 import { PivotAxis, PivotReportLayout } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
@@ -186,10 +186,7 @@ export function renderPivotFieldListPane(
           )
           .map(({ spec }) => spec);
         if (sorted.some((spec, position) => spec !== written.dataFields[position])) {
-          ok =
-            wb.clearPivotDataFields(sheetIndex, pivotIndex) &&
-            sorted.every((spec) => wb.addPivotDataField(sheetIndex, pivotIndex, spec) >= 0) &&
-            ok;
+          ok = replacePivotDataFields(wb, sheetIndex, pivotIndex, sorted) && ok;
         }
       }
       state.layout = before ? null : next;

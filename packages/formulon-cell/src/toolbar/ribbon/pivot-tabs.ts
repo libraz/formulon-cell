@@ -60,7 +60,7 @@ export const buildPivotContextualTabs = (
   profile: RibbonProfile = 'default',
 ): RibbonTabModel[] => {
   const mac = profile === 'excel365Mac';
-  const text = (key: keyof typeof LABELS): string => LABELS[key][lang] ?? LABELS[key].en;
+  const text = (key: keyof typeof LABELS): string => LABELS[key][lang];
   const command = (
     id: string,
     key: keyof typeof LABELS,

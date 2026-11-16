@@ -2,7 +2,12 @@ import { PivotDatePeriod } from '@libraz/formulon';
 import { PIVOT_CELL_KIND } from '../engine/pivot-cell-kind.js';
 import { type Addr, PivotCalendar } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { dateGroupingOf } from '../engine/workbook-handle-pivot.js';
+import {
+  dateGroupingOf,
+  type PivotCellInfo,
+  type PivotDefinition,
+} from '../engine/workbook-handle-pivot.js';
+import { pivotFieldOfCell } from './pivot-cell-at.js';
 import { commitPivotChange, type PivotCommitContext } from './pivot-field-settings-dialog-apply.js';
 
 /** The By list of a date field, finest first. */
@@ -26,26 +31,39 @@ export interface PivotGroupTarget {
   values: 'date' | 'number' | 'other';
 }
 
+type CacheFieldInfo = ReturnType<WorkbookHandle['pivotCacheFields']>[number];
+
+function groupValuesOf(cache: CacheFieldInfo | undefined): PivotGroupTarget['values'] {
+  if (!cache || cache.containsBlank || cache.containsString) return 'other';
+  if (cache.containsDate && !cache.containsNonDate) return 'date';
+  if (cache.containsNumber && !cache.containsDate) return 'number';
+  return 'other';
+}
+
+const isGroupableLabel = (info: PivotCellInfo): boolean =>
+  info.fieldIndex >= 0 &&
+  (info.kind === PIVOT_CELL_KIND.RowLabel || info.kind === PIVOT_CELL_KIND.ColLabel);
+
 /** The field the row or column item label at `addr` groups; null for any other cell. */
 export function pivotGroupTargetAt(wb: WorkbookHandle, addr: Addr): PivotGroupTarget | null {
   const info = wb.pivotCellInfo(addr);
-  if (!info || info.fieldIndex < 0) return null;
-  if (info.kind !== PIVOT_CELL_KIND.RowLabel && info.kind !== PIVOT_CELL_KIND.ColLabel) {
-    return null;
-  }
-  const definition = wb.getPivotDefinition(addr.sheet, info.pivotIndex);
-  const label = definition?.fields.find((f) => f.cacheFieldIndex === info.fieldIndex);
+  if (!info || !isGroupableLabel(info)) return null;
+  return pivotGroupTargetOf(wb, addr, info, wb.getPivotDefinition(addr.sheet, info.pivotIndex));
+}
+
+/** `pivotGroupTargetAt` for a caller that already read the cell's info and its report's definition. */
+export function pivotGroupTargetOf(
+  wb: WorkbookHandle,
+  addr: Addr,
+  info: PivotCellInfo,
+  definition: PivotDefinition | null,
+): PivotGroupTarget | null {
+  if (!isGroupableLabel(info)) return null;
+  const label = pivotFieldOfCell(definition, info);
   if (!definition || !label) return null;
   const field = definition.fields[label.groupBaseIndex ?? label.index] ?? label;
   const cache = wb.pivotCacheFields(definition.cacheId)[field.cacheFieldIndex];
-  const values =
-    !cache || cache.containsBlank || cache.containsString
-      ? 'other'
-      : cache.containsDate && !cache.containsNonDate
-        ? 'date'
-        : cache.containsNumber && !cache.containsDate
-          ? 'number'
-          : 'other';
+  const values = groupValuesOf(cache);
   return { sheet: addr.sheet, pivotIndex: info.pivotIndex, fieldIdx: field.index, values };
 }
 

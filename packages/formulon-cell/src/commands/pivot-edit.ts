@@ -90,7 +90,7 @@ function editedDataFields(
 /** Rewrite a field's item list with each item's visibility: the one path the
  *  pane, the field dialogs and the filter panel hide and show items through.
  *  True only when every write succeeds. */
-export function writePivotFieldItems(
+export function setPivotFieldItemsChecked(
   wb: WorkbookHandle,
   sheetIndex: number,
   pivotIndex: number,
@@ -216,10 +216,7 @@ export function applyPivotEdit(
   const replaceDataFields = (current: readonly PivotDataFieldSpec[]): boolean => {
     const next = editedDataFields(current, edit.fields);
     if (canonicalSpecs(next) === canonicalSpecs(current)) return true;
-    return (
-      wb.clearPivotDataFields(sheetIndex, pivotIndex) &&
-      next.every((spec) => wb.addPivotDataField(sheetIndex, pivotIndex, spec) >= 0)
-    );
+    return replacePivotDataFields(wb, sheetIndex, pivotIndex, next);
   };
   const valueFieldsUpdated = edit.dataFields
     ? replaceDataFields(edit.dataFields)
@@ -240,7 +237,7 @@ export function applyPivotEdit(
   const filterItemsUpdated = edit.fields.every((field) => {
     if (field.axis !== PivotAxis.Page) return true;
     if (field.filterChecklist) {
-      return writePivotFieldItems(
+      return setPivotFieldItemsChecked(
         wb,
         sheetIndex,
         pivotIndex,
@@ -268,6 +265,19 @@ export function applyPivotEdit(
     valueFieldsUpdated &&
     filterItemsUpdated &&
     pivotFiltersUpdated
+  );
+}
+
+/** Replace a report's value fields with `specs`, in order. False when a write fails. */
+export function replacePivotDataFields(
+  wb: WorkbookHandle,
+  sheetIndex: number,
+  pivotIndex: number,
+  specs: readonly PivotDataFieldSpec[],
+): boolean {
+  return (
+    wb.clearPivotDataFields(sheetIndex, pivotIndex) &&
+    specs.every((spec) => wb.addPivotDataField(sheetIndex, pivotIndex, spec) >= 0)
   );
 }
 
@@ -402,12 +412,7 @@ export function restorePivotFieldLayout(
     !afterAxes ||
     canonicalSpecs(afterAxes.dataFields) !== canonicalSpecs(definition.dataFields)
   ) {
-    ok =
-      wb.clearPivotDataFields(sheetIndex, pivotIndex) &&
-      definition.dataFields.every(
-        (spec) => wb.addPivotDataField(sheetIndex, pivotIndex, spec) >= 0,
-      ) &&
-      ok;
+    ok = replacePivotDataFields(wb, sheetIndex, pivotIndex, definition.dataFields) && ok;
   }
   if (!afterAxes || !same(afterAxes.filters, definition.filters)) {
     ok =

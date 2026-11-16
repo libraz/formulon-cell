@@ -117,11 +117,6 @@ export interface PivotFilterInputContext {
   date1904?: boolean;
 }
 
-/** True when `condition` sets no filter: no kind, or a kind that takes an operand with none typed. */
-export const isEmptyPivotFilterCondition = (condition: PivotFilterConditionState): boolean =>
-  condition.kind === null ||
-  (pivotFilterOperand(condition.kind) !== 'none' && condition.value.trim() === '');
-
 /** The operand reading of `wb`. */
 export const pivotFilterInputFor = (wb: WorkbookHandle): PivotFilterInputContext => ({
   locale: inputLocaleForWorkbook(wb),

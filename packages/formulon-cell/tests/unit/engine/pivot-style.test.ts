@@ -193,7 +193,7 @@ describe('buildPivotStyleLayer', () => {
     expect(layer.formatAt(8, 0)).toBeUndefined();
     expect(layer.formatAt(10, 0)).toEqual(accent?.firstRowSubheading);
     expect(layer.formatAt(12, 1)).toEqual(accent?.totalRow);
-    expect([...layer.buttons]).toEqual(['0:6:0']);
+    expect(layer.hasButton(6, 0)).toBe(true);
     wb.dispose();
   });
 });
@@ -236,7 +236,7 @@ describe('report options in the style layer', () => {
     const layer = buildPivotStyleLayer(wb, 0, {});
     expect(layer.outlineAt(7, 0)).toEqual({ steps: 0, collapse: false, collapsed: false });
     expect(layer.outlineAt(8, 0)).toEqual({ steps: 1, collapse: false, collapsed: false });
-    expect([...layer.buttons]).toEqual(['0:6:0']);
+    expect(layer.hasButton(6, 0)).toBe(true);
     wb.dispose();
   });
 });
@@ -261,7 +261,7 @@ describe('empty report placeholder', () => {
     ]);
     expect(layer.ranges).toEqual([{ sheet: 0, r0: 4, c0: 0, r1: 21, c1: 2 }]);
     expect(layer.formatAt(4, 0)).toBeUndefined();
-    expect(layer.buttons.size).toBe(0);
+    expect(layer.hasButton(4, 0)).toBe(false);
     wb.dispose();
   });
 

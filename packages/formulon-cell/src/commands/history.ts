@@ -298,6 +298,11 @@ export class History {
 
 /* ---------- Public undo/redo API ---------- */
 
+/** The history a change should record into: none while an undo or redo replays. */
+export function recordingHistory(history: History | null | undefined): History | null {
+  return history && !history.isReplaying() ? history : null;
+}
+
 /** Pull one entry off the undo stack and apply it. */
 export function undo(history: History): boolean {
   return history.undo();

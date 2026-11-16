@@ -1,8 +1,10 @@
 import type { History } from '../commands/history.js';
+import { pivotFilterBlockRows } from '../commands/pivot-actions.js';
 import { keepingCollapsedItems } from '../commands/pivot-edit.js';
 import { refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
 import { addrKey } from '../engine/address.js';
-import { PivotAxis, PivotSortOrder } from '../engine/types.js';
+import { pivotItemText } from '../engine/pivot-cell-kind.js';
+import { PivotSortOrder } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { commitPivotChange } from './pivot-field-settings-dialog-apply.js';
@@ -36,18 +38,17 @@ export function pivotItemSlotsAt(
   col: number,
 ): PivotItemSlots | null {
   if (!wb.capabilities.pivotTables) return null;
+  if (state.data.sheetIndex !== sheet) return null;
   for (const { pivotIndex, range } of wb.pivotBounds(sheet)) {
     if (col !== range.c0) continue;
     const definition = wb.getPivotDefinition(sheet, pivotIndex);
     const fieldIdx = definition?.rowFieldOrder[0];
     if (!definition || fieldIdx === undefined) continue;
     if (definition.rowFieldOrder.length !== 1 || definition.colFieldOrder.length > 0) continue;
-    const filterRows = definition.fields.filter((f) => f.axis === PivotAxis.Page).length;
-    const firstRow = range.r0 + (filterRows > 0 ? filterRows + 1 : 0) + 1;
+    const firstRow = range.r0 + pivotFilterBlockRows(definition) + 1;
     const lastRow = range.r1 - (definition.grandTotals.cols ? 1 : 0);
     if (row < firstRow || row > lastRow) continue;
     if (definition.fields[fieldIdx]?.items.some((item) => !item.visible)) return null;
-    if (state.data.sheetIndex !== sheet) return null;
     return { sheet, pivotIndex, fieldIdx, col, c1: range.c1, firstRow, lastRow };
   }
   return null;
@@ -76,9 +77,9 @@ export function movePivotItem(
   const labels: string[] = [];
   for (let row = slots.firstRow; row <= slots.lastRow; row += 1) {
     const value = cells.get(addrKey({ sheet: slots.sheet, row, col: slots.col }))?.value;
-    if (value?.kind === 'text' && value.value !== '') labels.push(value.value);
-    else if (value?.kind === 'number') labels.push(String(value.value));
-    else return false;
+    const label = value ? pivotItemText(value) : '';
+    if (label === '') return false;
+    labels.push(label);
   }
   const [moved] = labels.splice(fromRow - slots.firstRow, 1);
   if (moved === undefined) return false;

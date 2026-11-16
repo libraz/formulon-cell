@@ -1,4 +1,3 @@
-import { addrKey } from '../../engine/address.js';
 import type { PivotStyleLayer } from '../../engine/pivot-style.js';
 import type { Rect } from '../geometry.js';
 import { ruleWidth } from '../grid/chrome-context.js';
@@ -25,7 +24,6 @@ export type PivotCellButton =
  *  hit-testing both read this, so a button is hit exactly where it is drawn. */
 export function pivotCellButtons(
   layer: PivotStyleLayer,
-  sheet: number,
   row: number,
   col: number,
   cell: Rect,
@@ -40,7 +38,7 @@ export function pivotCellButtons(
       collapsed: outline.collapsed,
     });
   }
-  if (layer.buttons.has(addrKey({ sheet, row, col }))) {
+  if (layer.hasButton(row, col)) {
     buttons.push({
       kind: 'field',
       rect: pivotFieldButtonRect(
@@ -58,7 +56,6 @@ export function pivotCellButtons(
 /** The button of the report cell at (row, col) under (x, y), or null. */
 export function pivotCellButtonAt(
   layer: PivotStyleLayer,
-  sheet: number,
   row: number,
   col: number,
   cell: Rect,
@@ -67,7 +64,7 @@ export function pivotCellButtonAt(
   y: number,
 ): PivotCellButton | null {
   return (
-    pivotCellButtons(layer, sheet, row, col, cell, m).find(
+    pivotCellButtons(layer, row, col, cell, m).find(
       ({ rect }) => x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h,
     ) ?? null
   );

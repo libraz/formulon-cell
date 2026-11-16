@@ -42,8 +42,8 @@ import type { PivotDefinition, PivotSpill, PivotStyleDefinition } from './workbo
 export interface PivotStyleLayer {
   /** Each report's rectangle; gridlines inside one are not drawn. */
   readonly ranges: readonly Range[];
-  /** Field caption cells ("Row Labels", "Column Labels") carrying a drop-down button. */
-  readonly buttons: ReadonlySet<string>;
+  /** Whether a field caption cell ("Row Labels", "Column Labels") carries a drop-down button. */
+  hasButton(row: number, col: number): boolean;
   /** The field a drop-down button at a cell filters, and whether it is filtered. */
   buttonAt(row: number, col: number): PivotFieldButton | undefined;
   /** The style format of a report cell; undefined outside every report. */
@@ -63,6 +63,8 @@ export interface PivotStyleLayer {
 export interface PivotReportCells {
   readonly pivotIndex: number;
   readonly range: Range;
+  /** First row of the report proper, below any report filter block. */
+  readonly top: number;
   readonly cells: readonly PivotLayoutCell[];
 }
 
@@ -98,7 +100,7 @@ export interface PivotRowOutline {
 
 const EMPTY_LAYER: PivotStyleLayer = {
   ranges: [],
-  buttons: new Set(),
+  hasButton: () => false,
   buttonAt: () => undefined,
   formatAt: () => undefined,
   outlineAt: () => undefined,
@@ -154,7 +156,8 @@ function fieldButton(
   };
 }
 
-const BUILTIN_PIVOT_STYLE = /^PivotStyle(Light|Medium|Dark)(\d+)$/;
+/** A built-in PivotTable style name: its family and 1-based index. */
+export const BUILTIN_PIVOT_STYLE = /^PivotStyle(Light|Medium|Dark)(\d+)$/;
 
 /** The elements of a built-in PivotTable style; null for any other name. */
 export function builtinPivotStyleElements(
@@ -287,7 +290,7 @@ export function pivotStyleRegions(
 } {
   const { r1, c0, c1 } = range;
   const pages = pivotPageRows(range, cells);
-  const r0 = pivotReportTop(range, cells);
+  const r0 = range.r0 + (pages > 0 ? pages + 1 : 0);
   const lead = leadCells(cells.filter((c) => c.row >= r0));
   let bodyTop = r1 + 1;
   for (let row = r0; row <= r1; row += 1) {
@@ -409,7 +412,6 @@ export function buildPivotStyleLayer(
   }
   const themeColors = wb.getTheme()?.colors;
   const formats = new Map<string, CellFormat>();
-  const buttons = new Set<string>();
   const buttonFields = new Map<string, PivotFieldButton>();
   const outlines = new Map<string, PivotRowOutline>();
   const placeholders: PivotPlaceholder[] = [];
@@ -433,20 +435,19 @@ export function buildPivotStyleLayer(
       });
       continue;
     }
-    reports.push({ pivotIndex, range, cells });
+    reports.push({ pivotIndex, range, top: pivotReportTop(range, cells), cells });
     const drill = wb.pivotOptions(sheet, pivotIndex)?.showDrill !== false;
-    for (const label of pivotRowOutline(range, cellsByPivot.get(pivotIndex) ?? [], drill)) {
+    for (const label of pivotRowOutline(range, cells, drill)) {
       outlines.set(addrKey({ sheet, row: label.row, col: label.col }), label.outline);
     }
     const info = wb.getPivotStyleInfo(sheet, pivotIndex);
     if (!info) continue;
-    const layout = pivotStyleRegions(range, cellsByPivot.get(pivotIndex) ?? [], info);
+    const layout = pivotStyleRegions(range, cells, info);
     const definition = wb.capabilities.pivotDefinitionRead
       ? wb.getPivotDefinition(sheet, pivotIndex)
       : null;
     for (const b of layout.buttons) {
       const key = addrKey({ sheet, row: b.row, col: b.col });
-      buttons.add(key);
       buttonFields.set(key, fieldButton(definition, pivotIndex, b.slot));
     }
     const elements = reportStyleElements(tables, sheet, pivotIndex, info.name, themeColors);
@@ -466,13 +467,13 @@ export function buildPivotStyleLayer(
   }
   return {
     ranges: [
-      ...reports.map((r) => ({ ...r.range, r0: pivotReportTop(r.range, r.cells) })),
+      ...reports.map((r) => ({ ...r.range, r0: r.top })),
       ...placeholders.map((p) => p.range),
     ],
     placeholders,
     spills,
     reports,
-    buttons,
+    hasButton: (row, col) => buttonFields.has(addrKey({ sheet, row, col })),
     buttonAt: (row, col) => buttonFields.get(addrKey({ sheet, row, col })),
     formatAt: (row, col) => formats.get(addrKey({ sheet, row, col })),
     outlineAt: (row, col) => outlines.get(addrKey({ sheet, row, col })),
