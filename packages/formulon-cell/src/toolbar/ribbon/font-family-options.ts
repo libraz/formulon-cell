@@ -1,4 +1,4 @@
-import { dictionaries, type Locale, type Strings } from '../../i18n/strings.js';
+import { dictionaries, type Locale } from '../../i18n/strings.js';
 import { shouldShowFontOption } from './font-availability.js';
 
 /**
@@ -71,19 +71,6 @@ const labelForValue = (value: string): string =>
   value === JAPANESE_BODY_VALUE ? JAPANESE_BODY_DISPLAY_VALUE : value;
 
 const normalizedValue = (value: string): string => value.trim().normalize('NFC');
-
-/** The locale whose bundled dictionary is exactly `strings`, if any. */
-export const dictionaryLocaleOf = (strings: Strings): Locale | undefined => {
-  for (const [locale, dictionary] of Object.entries(dictionaries) as [Locale, Strings][]) {
-    if (dictionary === strings) return locale;
-  }
-  return undefined;
-};
-
-/** Locale for `strings`: its dictionary, else `ja` when the font list holds CJK names, else `en`. */
-export const localeForStrings = (strings: Strings): Locale =>
-  dictionaryLocaleOf(strings) ??
-  (strings.ribbon.fontFamilies.some((family) => /[\u3000-\u9fff]/.test(family)) ? 'ja' : 'en');
 
 const makeCatalog = (
   locale: Locale,

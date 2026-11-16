@@ -9,7 +9,7 @@ import { marginPresetOf, pageSetupForSheet } from '../commands/page-setup.js';
 import { hiddenExtentInSelection } from '../commands/row-col-layout.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import { fontCssPxToDisplayPoints, fontPointsToCssPx } from '../engine/font-units.js';
-import { dictionaries, type Locale, type Strings } from '../i18n/strings.js';
+import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetInstance } from '../mount.js';
 import { outlineSummaryFor } from '../store/outline-summary.js';
 import { rangesIntersect } from '../store/selection-geometry.js';
@@ -177,29 +177,11 @@ export const indexRibbonButtons = (host: HTMLElement): Map<string, HTMLButtonEle
   return index;
 };
 
-/**
- * Labels resolved by the toolbar owner.  The optional form keeps the
- * projection usable by existing embedders while allowing a toolbar with an
- * explicit `lang`/`text`/menu-text override to provide the exact strings it
- * rendered.  In the absence of these values, the current button metadata is
- * used before falling back to the instance dictionary.
- */
+/** Labels the toolbar owner rendered; the projection never infers a locale of its own. */
 export interface RibbonActiveStateText {
   background?: string;
   sheetBackgroundClear?: string;
 }
-
-const builtInLocaleForBackground = (label: string): Locale | undefined => {
-  for (const [locale, strings] of Object.entries(dictionaries) as [Locale, Strings][]) {
-    if (strings.ribbon.background === label) return locale;
-  }
-  return undefined;
-};
-
-const localeFromHostLang = (host: HTMLElement): Locale | undefined => {
-  const language = host.lang.trim().toLowerCase().split('-', 1)[0] ?? '';
-  return Object.hasOwn(dictionaries, language) ? (language as Locale) : undefined;
-};
 
 export const RIBBON_ACTIVE_COMMANDS: ReadonlyMap<string, keyof ActiveState> = new Map([
   ['bold', 'bold'],
@@ -481,7 +463,7 @@ export const projectDrawingCommands = (host: HTMLElement, available: boolean): v
 export const projectRibbonActiveState = (
   host: HTMLElement,
   instance: SpreadsheetInstance | null,
-  text: RibbonActiveStateText = {},
+  text: Required<RibbonActiveStateText>,
 ): void => {
   if (!instance) return;
   const active = projectActiveState(instance);
@@ -534,24 +516,12 @@ export const projectRibbonActiveState = (
   if (sheetBackground) {
     const state = instance.store.getState();
     const hasBackground = state.ui.sheetBackgroundImages.has(state.data.sheetIndex);
-    // Use the resolved toolbar text first. This keeps an explicit toolbar
-    // language/text override intact even when the instance locale differs.
-    // Otherwise use the label produced by the current ribbon render.
     const renderedLabel =
       sheetBackground.querySelector('span')?.textContent?.trim() ||
       sheetBackground.getAttribute('aria-label')?.trim() ||
       sheetBackground.title.trim();
-    const baseLabel =
-      text.background?.trim() ||
-      (!hasBackground ? renderedLabel : '') ||
-      instance.i18n.strings.ribbon.background;
-    const inferredLocale = builtInLocaleForBackground(baseLabel);
-    const hostLocale = localeFromHostLang(host);
-    const resolvedClearLabel =
-      text.sheetBackgroundClear?.trim() ||
-      (inferredLocale ? dictionaries[inferredLocale].ribbonMenu.sheetBackgroundClear : '') ||
-      (hostLocale ? dictionaries[hostLocale].ribbonMenu.sheetBackgroundClear : '') ||
-      instance.i18n.strings.ribbonMenu.sheetBackgroundClear;
+    const baseLabel = text.background || renderedLabel;
+    const resolvedClearLabel = text.sheetBackgroundClear;
     const label = hasBackground ? resolvedClearLabel : baseLabel;
     sheetBackground.title = label;
     sheetBackground.setAttribute('aria-label', label);

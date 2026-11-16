@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { dictionaries } from '../../../src/i18n/strings.js';
 import { attachRibbonInteractionPolicy } from '../../../src/mount/toolbar-interaction-policy.js';
 import { mutators } from '../../../src/store/store.js';
 import { projectRibbonActiveState } from '../../../src/toolbar/ribbon-active-state.js';
@@ -8,6 +9,11 @@ import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js
 
 // Bold and Clear Formats follow the one built-in decision on every profile: a locked active cell
 // of a protected sheet greys them unless the sheet allows formatting cells.
+const textFor = (locale: keyof typeof dictionaries) => ({
+  background: dictionaries[locale].ribbon.background,
+  sheetBackgroundClear: dictionaries[locale].ribbonMenu.sheetBackgroundClear,
+});
+
 describe('Bold and Clear on a protected Mac sheet', () => {
   let sheet: MountedStubSheet | undefined;
 
@@ -32,7 +38,7 @@ describe('Bold and Clear on a protected Mac sheet', () => {
       closeDynamicDropdowns: () => undefined,
     });
     const project = (): void => {
-      projectRibbonActiveState(host, instance);
+      projectRibbonActiveState(host, instance, textFor('ja'));
       projection.project();
     };
     try {

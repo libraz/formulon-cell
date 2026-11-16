@@ -156,7 +156,7 @@ describe('toolbar/ribbon/font-family-options', () => {
   it('preserves custom command candidates instead of replacing them with dictionary entries', () => {
     const custom = structuredClone(dictionaries.ja);
     custom.ribbon.fontFamilies = ['Custom Corporate Font'];
-    const command = buildRibbonModel(custom)
+    const command = buildRibbonModel('ja', { strings: custom })
       .find((tab) => tab.id === 'home')
       ?.groups.flatMap((group) => group.commands)
       .find((candidate) => candidate.id === 'fontFamily');

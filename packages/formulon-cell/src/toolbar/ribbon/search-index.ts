@@ -1,4 +1,3 @@
-import type { Strings } from '../../i18n/strings.js';
 import {
   type BuildRibbonModelOptions,
   buildRibbonModel,
@@ -207,14 +206,16 @@ const searchCommandDisabled = (command: RibbonCommand): boolean =>
  * The ribbon's tabs and commands as search entries, in the ribbon's own labels and
  * availability: what a host's window search box ("Tell me") lists, so it finds what the
  * ribbon shows. Disabled commands are left out unless `includeDisabled`.
+ *
+ * `lang` picks the locale; `opts.strings` replaces the bundled dictionary for that locale.
  */
 export function buildRibbonSearchIndex(
-  input: Strings | ToolbarLang,
+  lang: ToolbarLang,
   opts: BuildRibbonSearchIndexOptions = {},
 ): RibbonSearchItem[] {
   const items: RibbonSearchItem[] = [];
-  const tr = toolbarText(input);
-  const tabs = buildRibbonModel(input, opts);
+  const tr = toolbarText(opts.strings ?? lang);
+  const tabs = buildRibbonModel(lang, opts);
   for (const tab of tabs) {
     items.push({
       id: `tab:${tab.id}`,

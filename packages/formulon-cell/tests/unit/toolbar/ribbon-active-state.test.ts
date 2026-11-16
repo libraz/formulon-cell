@@ -34,6 +34,11 @@ import {
 } from '../../../src/toolbar/ribbon-active-state.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
 
+const textFor = (locale: keyof typeof dictionaries) => ({
+  background: dictionaries[locale].ribbon.background,
+  sheetBackgroundClear: dictionaries[locale].ribbonMenu.sheetBackgroundClear,
+});
+
 describe('toolbar/ribbon-active-state', () => {
   let sheet: MountedStubSheet;
 
@@ -105,7 +110,7 @@ describe('toolbar/ribbon-active-state', () => {
     control.appendChild(button);
     host.appendChild(control);
 
-    projectRibbonActiveState(host, sheet.instance);
+    projectRibbonActiveState(host, sheet.instance, textFor('ja'));
 
     expect(button.title).toBe('フォント: 游ゴシック Regular (本文)');
     expect(button.getAttribute('aria-label')).toBe('フォント: 游ゴシック Regular (本文)');

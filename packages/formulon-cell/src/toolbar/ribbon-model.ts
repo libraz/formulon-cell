@@ -6,11 +6,7 @@ import {
   toolbarMenuText,
   viewToggleMenuText,
 } from './menu-text.js';
-import {
-  dictionaryLocaleOf,
-  fontFamilyCatalog,
-  localeForStrings,
-} from './ribbon/font-family-options.js';
+import { fontFamilyCatalog } from './ribbon/font-family-options.js';
 import { buildMacRibbonModel } from './ribbon/mac/model.js';
 import { buildMacObjectTabs } from './ribbon/mac/object-tabs.js';
 import { buildPivotContextualTabs } from './ribbon/pivot-tabs.js';
@@ -271,6 +267,9 @@ export interface BuildRibbonModelOptions {
   /** Contextual tabs to show after the others, such as
    *  `CHART_CONTEXTUAL_RIBBON_TABS` while a chart is selected. */
   contextualTabs?: readonly RibbonTab[];
+  /** Strings to build the labels from. Defaults to the bundled dictionary for
+   *  the `lang` argument; `lang` still decides locale-specific layout and fonts. */
+  strings?: Strings;
 }
 
 const COMMAND_SURFACE_LANG: ToolbarLang = 'en';
@@ -302,15 +301,19 @@ const colorCmd = (id: string, label: string, title: string, icon: string): Ribbo
 
 const breakCmd = (id: string): RibbonCommand => ({ id, title: '', label: '', kind: 'break' });
 
+/**
+ * Builds the ribbon tabs for `lang`. The locale always comes from the caller: it picks
+ * the dictionary, the profile layout and the font catalog. Pass `opts.strings` to
+ * replace the bundled dictionary's text for that locale (for example a customized copy).
+ */
 export function buildRibbonModel(
-  input: Strings | ToolbarLang,
+  lang: ToolbarLang,
   opts: BuildRibbonModelOptions = {},
 ): RibbonTabModel[] {
-  const strings = resolveStrings(input);
+  const strings = opts.strings ?? dictionaries[lang];
   const tr = strings.ribbon;
-  const profileLang: ToolbarLang =
-    typeof input === 'string' ? input : (dictionaryLocaleOf(strings) ?? 'ja');
-  const fontLocale = typeof input === 'string' ? input : localeForStrings(strings);
+  const profileLang: ToolbarLang = lang;
+  const fontLocale = lang;
   const menuText = toolbarMenuText(strings);
   const pageScaleText = pageScaleMenuText(strings);
   const viewText = viewToggleMenuText(strings);
@@ -981,10 +984,10 @@ export function buildRibbonModel(
 }
 
 export const ribbonCommands = (
-  input: Strings | ToolbarLang,
+  lang: ToolbarLang,
   opts: BuildRibbonModelOptions = {},
 ): RibbonCommand[] =>
-  buildRibbonModel(input, opts)
+  buildRibbonModel(lang, opts)
     .flatMap((tab) => tab.groups)
     .flatMap((group) => group.commands)
     .filter((command) => command.kind !== 'break' && command.kind !== 'label');
@@ -995,19 +998,17 @@ export const isRibbonActivatableCommand = (command: RibbonCommand): boolean =>
   !['select', 'color', 'input'].includes(command.kind ?? 'button');
 
 export const ribbonActivatableCommands = (
-  input: Strings | ToolbarLang,
+  lang: ToolbarLang,
   opts: BuildRibbonModelOptions = {},
-): RibbonCommand[] => ribbonCommands(input, opts).filter(isRibbonActivatableCommand);
+): RibbonCommand[] => ribbonCommands(lang, opts).filter(isRibbonActivatableCommand);
 
-export const ribbonCommandIds = (
-  input: Strings | ToolbarLang,
-  opts: BuildRibbonModelOptions = {},
-): string[] => ribbonCommands(input, opts).map((command) => command.id);
+export const ribbonCommandIds = (lang: ToolbarLang, opts: BuildRibbonModelOptions = {}): string[] =>
+  ribbonCommands(lang, opts).map((command) => command.id);
 
 export const ribbonActivatableCommandIds = (
-  input: Strings | ToolbarLang,
+  lang: ToolbarLang,
   opts: BuildRibbonModelOptions = {},
-): string[] => ribbonActivatableCommands(input, opts).map((command) => command.id);
+): string[] => ribbonActivatableCommands(lang, opts).map((command) => command.id);
 
 /** Every tab the ribbon can show, the contextual ones included unless `opts` says otherwise. */
 const surfaceOptions = (opts: BuildRibbonModelOptions): BuildRibbonModelOptions => ({
@@ -1029,10 +1030,10 @@ export const ribbonActivatableSurfaceCommandIds = (opts: BuildRibbonModelOptions
   ribbonActivatableCommandIds(COMMAND_SURFACE_LANG, surfaceOptions(opts));
 
 export const ribbonTabCommandIds = (
-  input: Strings | ToolbarLang,
+  lang: ToolbarLang,
   tabId: RibbonTab,
   opts: BuildRibbonModelOptions = {},
 ): string[] =>
-  buildRibbonModel(input, opts)
+  buildRibbonModel(lang, opts)
     .find((tab) => tab.id === tabId)
     ?.groups.flatMap((group) => group.commands.map((command) => command.id)) ?? [];

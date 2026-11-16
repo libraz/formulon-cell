@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { dictionaries } from '../../../src/i18n/strings.js';
 import { projectMacRibbonState } from '../../../src/toolbar/ribbon/mac/state-projection.js';
 import { projectRibbonActiveState } from '../../../src/toolbar/ribbon-active-state.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
+
+const textFor = (locale: keyof typeof dictionaries) => ({
+  background: dictionaries[locale].ribbon.background,
+  sheetBackgroundClear: dictionaries[locale].ribbonMenu.sheetBackgroundClear,
+});
 
 describe('Split availability', () => {
   let sheet: MountedStubSheet | undefined;
@@ -24,7 +30,7 @@ describe('Split availability', () => {
   it('is offered on an engine that saves split panes', async () => {
     sheet = await mountStubSheet({ workbook: await WorkbookHandle.createDefault(), locale: 'en' });
     const { host, windows, mac } = ribbon();
-    projectRibbonActiveState(host, sheet.instance);
+    projectRibbonActiveState(host, sheet.instance, textFor('en'));
     projectMacRibbonState(host, sheet.instance);
     expect(windows.getAttribute('aria-disabled')).not.toBe('true');
     expect(mac.getAttribute('aria-disabled')).not.toBe('true');
@@ -33,7 +39,7 @@ describe('Split availability', () => {
   it('is disabled up front, with the reason, where a split cannot be saved', async () => {
     sheet = await mountStubSheet({ locale: 'en' });
     const { host, windows, mac } = ribbon();
-    projectRibbonActiveState(host, sheet.instance);
+    projectRibbonActiveState(host, sheet.instance, textFor('en'));
     projectMacRibbonState(host, sheet.instance);
     const reason = sheet.instance.i18n.strings.ribbonMenu.splitNotSaved;
     expect(reason).toBeTruthy();
