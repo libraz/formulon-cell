@@ -7,6 +7,7 @@ import {
 } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { PivotDefinition } from '../engine/workbook-handle-pivot.js';
+import { sameJsonValue } from './prepared-change.js';
 
 /** One field's settings as submitted from the pivot edit form. */
 export interface PivotEditField {
@@ -293,7 +294,7 @@ export function restorePivotFieldLayout(
 ): boolean {
   const grouped = wb.getPivotDefinition(sheetIndex, pivotIndex);
   if (!grouped) return false;
-  const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+  const same = sameJsonValue;
   let ok = true;
   // Grouping lives on the cache and adds or removes group fields, so it is restored first, on the
   // fields it groups.

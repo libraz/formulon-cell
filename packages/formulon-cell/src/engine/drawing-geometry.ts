@@ -1,5 +1,6 @@
 import type { DrawingAnchorPatch } from '@libraz/formulon';
 import { AnchorKind } from '@libraz/formulon';
+import { sameJsonValue } from '../commands/prepared-change.js';
 import {
   bodyBandOrigin,
   cellRectUnclamped,
@@ -32,7 +33,7 @@ export const viewportZoom = (store: SpreadsheetStore | undefined): number => {
 export const sameAnchor = (
   a: EngineDrawingAnchor | undefined,
   b: EngineDrawingAnchor | undefined,
-) => a === b || (!!a && !!b && JSON.stringify(a) === JSON.stringify(b));
+) => a === b || (!!a && !!b && sameJsonValue(a, b));
 
 /** The anchor fields of a drawing object, as the store keeps them. */
 export const drawingAnchorOf = (object: {

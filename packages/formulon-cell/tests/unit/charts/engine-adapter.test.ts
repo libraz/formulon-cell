@@ -1323,6 +1323,20 @@ const normalizeChartSpecLine = (spec: ChartSpec) =>
   }).seriesStyles?.[0]?.line;
 
 describe('chartSpecOps', () => {
+  it('emits nothing for a marker that only differs in key order', () => {
+    const info = chartInfo(
+      'line',
+      {},
+      { series: [seriesInfo(0, { marker: markerInfo({ symbol: ChartMarkerSymbol.Plus }) })] },
+    );
+    const spec = read(info);
+    const reordered: ChartSpec = {
+      ...spec,
+      seriesStyles: [{ seriesId: 'series-0', marker: { shape: 'plus', visible: true } }],
+    };
+    expect(ops(info, spec, reordered)).toEqual([]);
+  });
+
   it('emits nothing for an unchanged spec', () => {
     for (const kind of KINDS) {
       const info = chartInfo(kind, {}, { series: [seriesInfo(0, { labels: labelsInfo() })] });

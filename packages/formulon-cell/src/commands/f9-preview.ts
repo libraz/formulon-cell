@@ -1,6 +1,6 @@
 import { addrKey, colFromLetters, parseA1Atom } from '../engine/address.js';
 import type { Addr, CellValue, Value } from '../engine/types.js';
-import { fromEngineValue } from '../engine/value.js';
+import { formulaValueLiteral, fromEngineValue } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 
 /**
@@ -83,25 +83,7 @@ function renderArrayForF9(cells: readonly (readonly Value[])[]): string | null {
 }
 
 /** Render a CellValue the way the formula bar would substitute it after F9. */
-export function renderCellValueForF9(v: CellValue | undefined): string {
-  if (!v || v.kind === 'blank') return '0';
-  if (v.kind === 'number') return String(v.value);
-  if (v.kind === 'text') return quoteF9Text(v.value);
-  if (v.kind === 'bool') return v.value ? 'TRUE' : 'FALSE';
-  if (v.kind === 'error') return v.text || '#ERROR!';
-  return '';
-}
-
-const quoteF9Text = (value: string): string => `"${value.replaceAll('"', '""')}"`;
-
-function cellValueLiteral(v: CellValue | undefined): string {
-  if (!v || v.kind === 'blank') return '0';
-  if (v.kind === 'number') return String(v.value);
-  if (v.kind === 'bool') return v.value ? 'TRUE' : 'FALSE';
-  if (v.kind === 'text') return quoteF9Text(v.value);
-  if (v.kind === 'error') return v.text || '#ERROR!';
-  return '0';
-}
+export const renderCellValueForF9 = formulaValueLiteral;
 
 /** Compute the F9 substitution for `selection` taken from `formula`. The
  *  selection is the substring the user has highlighted while editing. The
@@ -209,7 +191,7 @@ function substituteSingleCellRefs(
     const replacement =
       ref.kind === 'range'
         ? rangeLiteralList(sheet, ref, cells)
-        : cellValueLiteral(cells.get(addrKey({ sheet, row: ref.row, col: ref.col }))?.value);
+        : formulaValueLiteral(cells.get(addrKey({ sheet, row: ref.row, col: ref.col }))?.value);
     if (replacement === null) return null;
     out = `${out.slice(0, ref.start - 1)}${replacement}${out.slice(ref.end - 1)}`;
   }
@@ -250,7 +232,7 @@ function rangeLiteralList(
   const values: string[] = [];
   for (let row = r0; row <= r1; row += 1) {
     for (let col = c0; col <= c1; col += 1) {
-      values.push(cellValueLiteral(cells.get(addrKey({ sheet, row, col }))?.value));
+      values.push(formulaValueLiteral(cells.get(addrKey({ sheet, row, col }))?.value));
     }
   }
   return values.join(',');

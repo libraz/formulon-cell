@@ -1,5 +1,6 @@
 import { formatNumber } from '../../commands/format.js';
 import type { CellValue } from '../../engine/types.js';
+import { formulaTextLiteral } from '../../engine/value.js';
 import { escapeRegExp } from '../../text-escape.js';
 import {
   booleanValue,
@@ -324,7 +325,7 @@ const valueToText = (value: CellValue, formatValue: CellValue | null): CellValue
   if (text === null) return { kind: 'error', code: 15, text: '#VALUE!' };
   return {
     kind: 'text',
-    value: mode === 1 && value.kind === 'text' ? `"${text.replace(/"/g, '""')}"` : text,
+    value: mode === 1 && value.kind === 'text' ? formulaTextLiteral(text) : text,
   };
 };
 const coerceScalar = (fn: 'N' | 'T', value: CellValue): CellValue => {

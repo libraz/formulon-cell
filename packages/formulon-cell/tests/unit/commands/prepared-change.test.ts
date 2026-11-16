@@ -3,6 +3,7 @@ import {
   changedFormatAddresses,
   type PreparedChange,
   projectPreparedFormats,
+  sameJsonValue,
   sameStructuredValue,
   unionAddresses,
 } from '../../../src/commands/prepared-change.js';
@@ -28,6 +29,22 @@ describe('sameStructuredValue', () => {
     expect(sameStructuredValue([], {})).toBe(false);
     expect(sameStructuredValue(undefined, undefined)).toBe(true);
     expect(sameStructuredValue(null, {})).toBe(false);
+  });
+
+  it('keeps array order significant and an own undefined key distinct from a missing key', () => {
+    expect(sameStructuredValue([{ a: 1 }, { b: 2 }], [{ b: 2 }, { a: 1 }])).toBe(false);
+    expect(sameStructuredValue({ a: { y: 1, x: 2 } }, { a: { x: 2, y: 1 } })).toBe(true);
+    expect(sameStructuredValue({ a: undefined }, {})).toBe(false);
+  });
+});
+
+describe('sameJsonValue', () => {
+  it('treats an undefined-valued key as missing and keeps array order significant', () => {
+    expect(sameJsonValue([{ a: 1 }, { b: 2 }], [{ b: 2 }, { a: 1 }])).toBe(false);
+    expect(sameJsonValue({ a: { y: 1, x: 2 } }, { a: { x: 2, y: 1 } })).toBe(true);
+    expect(sameJsonValue({ a: undefined }, {})).toBe(true);
+    expect(sameJsonValue({ a: { b: undefined, c: 1 } }, { a: { c: 1 } })).toBe(true);
+    expect(sameJsonValue({ a: undefined }, { b: 1 })).toBe(false);
   });
 });
 

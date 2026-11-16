@@ -21,6 +21,7 @@ import {
 import type { AuthorizedIntentFactory } from './authorized-write.js';
 import { blockDataTableEdit } from './data-table-guard.js';
 import type { History } from './history.js';
+import { sameJsonValue } from './prepared-change.js';
 import { isCellWritable, isSheetProtected, warnProtected } from './protection.js';
 import { recordFormatChange, recordMergesChangeWithEngine } from './slice-history.js';
 
@@ -304,7 +305,7 @@ const mergeVisualFormat = (
 };
 
 const sameFormat = (a: CellFormat | undefined, b: CellFormat | undefined): boolean =>
-  JSON.stringify(a) === JSON.stringify(b);
+  sameJsonValue(a, b);
 
 const copyMergeVisualFormats = (store: SpreadsheetStore, range: Range): void => {
   const state = store.getState();

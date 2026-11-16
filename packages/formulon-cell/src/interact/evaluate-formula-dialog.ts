@@ -1,8 +1,7 @@
 import { formulaForDisplaySafe, inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { extractRefs, type FormulaRef } from '../commands/refs.js';
 import { addrKey, formatA1Cell } from '../engine/address.js';
-import type { CellValue } from '../engine/types.js';
-import { formatCell } from '../engine/value.js';
+import { formatCell, formulaValueLiteral } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -28,21 +27,6 @@ export interface EvaluateFormulaDialogHandle {
 
 const formulaRefKey = (ref: FormulaRef, formula = ''): string =>
   `${ref.r0}:${ref.c0}:${ref.r1}:${ref.c1}:${formula.slice(ref.start, ref.end)}`;
-
-const canonicalValueText = (value: CellValue): string => {
-  switch (value.kind) {
-    case 'blank':
-      return '0';
-    case 'number':
-      return String(value.value);
-    case 'bool':
-      return value.value ? 'TRUE' : 'FALSE';
-    case 'error':
-      return value.text || '#ERROR!';
-    case 'text':
-      return `"${value.value.replaceAll('"', '""')}"`;
-  }
-};
 
 const formulaRefSheet = (
   formula: string,
@@ -75,7 +59,7 @@ const formulaRefValueText = (
   // Reference substitution is structural work on the canonical formula. A
   // localized decimal separator, boolean spelling, or function alias is
   // applied only after all offsets have been consumed for display.
-  return canonicalValueText(value);
+  return formulaValueLiteral(value);
 };
 
 const evaluatedFormulaText = (

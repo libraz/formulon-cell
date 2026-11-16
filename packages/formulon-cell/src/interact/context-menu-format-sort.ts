@@ -1,3 +1,4 @@
+import { formatHasContent } from '../commands/current-region.js';
 import {
   applyValueFilter,
   distinctFilterItemsResult,
@@ -58,8 +59,7 @@ const boundRowsToData = (store: SpreadsheetStore, range: Range): Range => {
   };
   for (const key of state.data.cells.keys()) visitKey(key);
   for (const [key, format] of state.format.formats) {
-    if (Object.keys(format).length === 0) continue;
-    visitKey(key);
+    if (formatHasContent(format)) visitKey(key);
   }
   return { ...range, r1: maxRow };
 };

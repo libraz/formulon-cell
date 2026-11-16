@@ -20,6 +20,7 @@ import type {
   ChartSeriesStyleSpec,
   ChartSpec,
 } from '../charts/types.js';
+import { sameJsonValue } from '../commands/prepared-change.js';
 import type { SessionChart } from '../store/store.js';
 import {
   DEFAULT_LABELS,
@@ -445,12 +446,9 @@ export const updateDataLabel = <Key extends keyof MutableDataLabels>(
   value: MutableDataLabels[Key],
 ): void => {
   draft.dataLabels[key] = value;
-  if (jsonEqual(value, draft.dataLabelsBaseline[key])) draft.dataLabelsChanged.delete(key);
+  if (sameJsonValue(value, draft.dataLabelsBaseline[key])) draft.dataLabelsChanged.delete(key);
   else draft.dataLabelsChanged.add(key);
 };
-
-const jsonEqual = (left: unknown, right: unknown): boolean =>
-  JSON.stringify(left) === JSON.stringify(right);
 
 export const boundedGapWidth = (value: number | undefined): number =>
   clamp(finiteOr(value ?? 150, 150), 0, 500);
@@ -489,7 +487,7 @@ export const updateAxisField = <Key extends ChartAxisField>(
   const baseline = draft[axisName === 'xAxis' ? 'xAxisBaseline' : 'yAxisBaseline'];
   const changed = draft[axisName === 'xAxis' ? 'xAxisChanged' : 'yAxisChanged'];
   axis[key] = value as never;
-  if (jsonEqual(value, baseline[key])) changed.delete(key);
+  if (sameJsonValue(value, baseline[key])) changed.delete(key);
   else changed.add(key);
 };
 
@@ -695,7 +693,7 @@ export const toPatch = (
     if (valueDefaultsToImplicit) dataLabels.showValue = true;
     patch.dataLabels = dataLabels as ChartDataLabelSpec;
   }
-  if (!jsonEqual(draft.palette, draft.paletteBaseline)) patch.palette = [...draft.palette];
+  if (!sameJsonValue(draft.palette, draft.paletteBaseline)) patch.palette = [...draft.palette];
   const currentVaryColorsOverride = chart.varyColors;
   const varyColorsChanged = draft.varyColorsOverride !== currentVaryColorsOverride;
   if (varyColorsChanged) {
@@ -710,10 +708,10 @@ export const toPatch = (
     hiddenSeriesIds: [...(chart.filter?.hiddenSeriesIds ?? [])],
     hiddenCategoryIds: [...(chart.filter?.hiddenCategoryIds ?? [])],
   };
-  if (!jsonEqual(filter, currentFilter)) patch.filter = filter;
+  if (!sameJsonValue(filter, currentFilter)) patch.filter = filter;
 
   const seriesStyles = cloneStyles(draft.seriesStyles) ?? [];
-  if (!jsonEqual(seriesStyles, chart.seriesStyles ?? [])) patch.seriesStyles = seriesStyles;
+  if (!sameJsonValue(seriesStyles, chart.seriesStyles ?? [])) patch.seriesStyles = seriesStyles;
   return patch;
 };
 

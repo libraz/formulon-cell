@@ -1,6 +1,7 @@
 import { authorizedBatch } from './authorized-write.js';
 import { hyperlinkIntents, hyperlinkOperation } from './hyperlink-actions.js';
 import type { RefusedDecision } from './permission-reasons.js';
+import { sameJsonValue } from './prepared-change.js';
 // Shared "Clear" ribbon split-button action — invoked by every host wrapper.
 // The command owns selection planning, policy preflight, sparse metadata
 // mutation, and the history boundary so all ribbon hosts have the same
@@ -212,15 +213,10 @@ const snapshotScopedFormats = (state: State, addrs: readonly Addr[]): ScopedForm
   return snapshot;
 };
 
-const sameValue = (left: unknown, right: unknown): boolean => {
-  if (left === right) return true;
-  return JSON.stringify(left) === JSON.stringify(right);
-};
-
 const sameScopedFormats = (before: ScopedFormatSnapshot, after: ScopedFormatSnapshot): boolean => {
   if (before.size !== after.size) return false;
   for (const [key, value] of before) {
-    if (!sameValue(value, after.get(key))) return false;
+    if (!sameJsonValue(value, after.get(key))) return false;
   }
   return true;
 };
@@ -279,7 +275,7 @@ const recordClearFormatEntries = (
   const changedAfter = new Map<string, CellFormat | undefined>();
   for (const [key, value] of before) {
     const next = after.get(key);
-    if (sameValue(value, next)) continue;
+    if (sameJsonValue(value, next)) continue;
     changedBefore.set(key, value);
     changedAfter.set(key, next);
   }

@@ -27,24 +27,45 @@ export const snapshotToPatch = (snapshot: CellSnapshot): CellPatch => ({
   formula: snapshot.formula,
 });
 
-export const sameStructuredValue = (left: unknown, right: unknown): boolean => {
+const allKeys = (record: Record<string, unknown>): string[] => Object.keys(record).sort();
+
+const definedKeys = (record: Record<string, unknown>): string[] =>
+  Object.keys(record)
+    .filter((key) => record[key] !== undefined)
+    .sort();
+
+const structurallyEqual = (
+  left: unknown,
+  right: unknown,
+  keysOf: (record: Record<string, unknown>) => string[],
+): boolean => {
   if (Object.is(left, right)) return true;
   if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object')
     return false;
   if (Array.isArray(left) || Array.isArray(right)) {
     if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
-    return left.every((value, index) => sameStructuredValue(value, right[index]));
+    return left.every((value, index) => structurallyEqual(value, right[index], keysOf));
   }
   const leftRecord = left as Record<string, unknown>;
   const rightRecord = right as Record<string, unknown>;
-  const leftKeys = Object.keys(leftRecord).sort();
-  const rightKeys = Object.keys(rightRecord).sort();
+  const leftKeys = keysOf(leftRecord);
+  const rightKeys = keysOf(rightRecord);
   if (leftKeys.length !== rightKeys.length) return false;
   return leftKeys.every(
     (key, index) =>
-      key === rightKeys[index] && sameStructuredValue(leftRecord[key], rightRecord[key]),
+      key === rightKeys[index] && structurallyEqual(leftRecord[key], rightRecord[key], keysOf),
   );
 };
+
+/** Structural equality: key order is ignored, array order is not, and an own key holding
+ *  `undefined` differs from a missing key. */
+export const sameStructuredValue = (left: unknown, right: unknown): boolean =>
+  structurallyEqual(left, right, allKeys);
+
+/** Structural equality with the key semantics of comparing JSON forms: a key holding
+ *  `undefined` equals a missing key. */
+export const sameJsonValue = (left: unknown, right: unknown): boolean =>
+  structurallyEqual(left, right, definedKeys);
 
 const mergeInheritedFormat = (
   current: CellFormat | undefined,

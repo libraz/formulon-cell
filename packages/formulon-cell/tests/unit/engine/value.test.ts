@@ -6,6 +6,8 @@ import {
   formatError,
   formatGeneralNumber,
   formatScientificNumber,
+  formulaTextLiteral,
+  formulaValueLiteral,
 } from '../../../src/engine/value.js';
 
 describe('formatGeneralNumber', () => {
@@ -80,5 +82,56 @@ describe('formatBoolean', () => {
     expect(formatBoolean(true, 'ja-JP')).toBe('TRUE');
     expect(formatBoolean(false, 'en-US')).toBe('FALSE');
     expect(formatCell({ kind: 'bool', value: true }, 'de-DE')).toBe('WAHR');
+  });
+});
+
+describe('formulaTextLiteral', () => {
+  it('doubles quotes and leaves backslashes literal', () => {
+    expect(formulaTextLiteral('say "hi"')).toBe('"say ""hi"""');
+    expect(formulaTextLiteral('a\\b')).toBe('"a\\b"');
+    expect(formulaTextLiteral('')).toBe('""');
+  });
+});
+
+describe('formulaValueLiteral', () => {
+  it('renders text with formula quoting', () => {
+    expect(formulaValueLiteral({ kind: 'text', value: 'a"b\\c' })).toBe('"a""b\\c"');
+    expect(formulaValueLiteral({ kind: 'text', value: '' })).toBe('""');
+  });
+
+  it.each([
+    [0, '#NULL!'],
+    [1, '#DIV/0!'],
+    [2, '#VALUE!'],
+    [3, '#REF!'],
+    [4, '#NAME?'],
+    [5, '#NUM!'],
+    [6, '#N/A'],
+    [8, '#SPILL!'],
+    [9, '#CALC!'],
+  ])('renders error code %i as %s', (code, text) => {
+    expect(formulaValueLiteral({ kind: 'error', code, text })).toBe(text);
+  });
+
+  it('falls back to the canonical name when the carried text is empty', () => {
+    expect(formulaValueLiteral({ kind: 'error', code: 2, text: '' })).toBe('#VALUE!');
+  });
+
+  it('falls back to the carried text for unknown codes', () => {
+    expect(formulaValueLiteral({ kind: 'error', code: 999, text: '#WEIRD!' })).toBe('#WEIRD!');
+  });
+
+  it('renders bool, blank and undefined', () => {
+    expect(formulaValueLiteral({ kind: 'bool', value: true })).toBe('TRUE');
+    expect(formulaValueLiteral({ kind: 'bool', value: false })).toBe('FALSE');
+    expect(formulaValueLiteral({ kind: 'blank' })).toBe('0');
+    expect(formulaValueLiteral(undefined)).toBe('0');
+  });
+
+  it('round-trips a 17-significant-digit number exactly', () => {
+    const n = 0.12345678901234568;
+    expect(Number(formulaValueLiteral({ kind: 'number', value: n }))).toBe(n);
+    const big = 1234567890123456.8;
+    expect(Number(formulaValueLiteral({ kind: 'number', value: big }))).toBe(big);
   });
 });

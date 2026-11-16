@@ -1,4 +1,5 @@
 import { associatePaginationEngine } from '../commands/pagination.js';
+import { sameJsonValue } from '../commands/prepared-change.js';
 import { hiddenRowsOf } from '../store/row-visibility.js';
 import {
   type CellFormat,
@@ -107,8 +108,6 @@ const changedMapKeys = <V>(
 
 const sameOutlineSummary = (a: OutlineSummary, b: OutlineSummary): boolean =>
   a.below === b.below && a.right === b.right;
-
-const sameJson = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
 const sameHiddenRows = (
   before: ReadonlySet<number> | null,
@@ -250,7 +249,7 @@ export class StoreMirror {
       for (const sheet of changedMapKeys(
         this.lastSheetFontOverrides ?? undefined,
         nextSheetFontOverrides,
-        sameJson,
+        sameJsonValue,
       )) {
         formatSheets.add(sheet);
       }
@@ -258,7 +257,7 @@ export class StoreMirror {
       const axisSheets = changedMapKeys(
         this.lastSheetAxisOverrides ?? undefined,
         nextSheetAxisOverrides,
-        sameJson,
+        sameJsonValue,
       );
       for (const sheet of axisSheets) formatSheets.add(sheet);
       const stylesChanged = (state.format.customCellStyles ?? null) !== this.lastCustomCellStyles;

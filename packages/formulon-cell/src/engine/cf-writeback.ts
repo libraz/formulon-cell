@@ -11,6 +11,7 @@ import {
   type ConditionalFormat,
   DatePeriod,
 } from '@libraz/formulon';
+import { sameJsonValue } from '../commands/prepared-change.js';
 import { iconSetSlotCount } from '../render/conditional.js';
 import type { CellFormat } from '../store/store.js';
 import type { ConditionalRule, ConditionalScalePoint } from '../store/types.js';
@@ -24,6 +25,7 @@ import {
   numFmtToFormatCode,
 } from './format-writeback.js';
 import type { ConditionalFormatInput, DxfRecord } from './types.js';
+import { formulaTextLiteral } from './value.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 /** `DatePeriod` of each store date-occurring period. */
@@ -76,9 +78,6 @@ const CELL_IS_OP: Record<string, ComparisonOperator> = {
 };
 
 const rangesOf = (rule: ConditionalRule): CellRect[] => [rectOfRange(rule.range)];
-
-/** Encode a text-contains operand as an Excel formula string literal. */
-const formulaTextLiteral = (text: string): string => `"${text.replaceAll('"', '""')}"`;
 
 /**
  * Build the case-sensitive equivalent of the native contains-text predicates.
@@ -184,9 +183,9 @@ function entryMatchesInput(
     bareFormula(entry.formula1) === bareFormula(loose.formula1) &&
     bareFormula(entry.formula2) === bareFormula(loose.formula2) &&
     COMPARED_FIELDS.every((field) => (entry[field] ?? null) === (loose[field] ?? null)) &&
-    JSON.stringify(entry.colorScale ?? null) === JSON.stringify(loose.colorScale ?? null) &&
-    JSON.stringify(entry.dataBar ?? null) === JSON.stringify(loose.dataBar ?? null) &&
-    JSON.stringify(entry.iconSet ?? null) === JSON.stringify(loose.iconSet ?? null)
+    sameJsonValue(entry.colorScale ?? null, loose.colorScale ?? null) &&
+    sameJsonValue(entry.dataBar ?? null, loose.dataBar ?? null) &&
+    sameJsonValue(entry.iconSet ?? null, loose.iconSet ?? null)
   );
 }
 

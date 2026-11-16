@@ -82,6 +82,28 @@ export function formatError(code: number, fallbackText: string, locale = 'en-US'
   return canonical;
 }
 
+/** Encode text as a formula string literal: `"` is doubled, nothing else is escaped. */
+export function formulaTextLiteral(text: string): string {
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+/** Render a cell value as an en-US formula literal token; blank (or absent) reads as 0. */
+export function formulaValueLiteral(v: CellValue | undefined): string {
+  if (!v) return '0';
+  switch (v.kind) {
+    case 'number':
+      return String(v.value);
+    case 'bool':
+      return v.value ? 'TRUE' : 'FALSE';
+    case 'text':
+      return formulaTextLiteral(v.value);
+    case 'error':
+      return v.text || formatError(v.code, '') || '#ERROR!';
+    default:
+      return '0';
+  }
+}
+
 /** Render a logical value using the display token of the active UI profile. */
 export function formatBoolean(value: boolean, locale = 'en-US'): string {
   const tokens: readonly [string, string] =

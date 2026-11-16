@@ -1,5 +1,6 @@
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import type { OperationIntent } from '../commands/interaction-policy.js';
+import { sameJsonValue } from '../commands/prepared-change.js';
 import { hydrateCellFormatsFromEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookTheme } from '../engine/workbook-handle-styles.js';
 import {
@@ -38,10 +39,7 @@ export function applyWorkbookTheme(
     colors: part === 'fonts' ? [...before.colors] : [...preset.colors],
     fonts: part === 'colors' ? { ...before.fonts } : { ...preset.fonts },
   };
-  if (
-    JSON.stringify(before.colors) === JSON.stringify(after.colors) &&
-    JSON.stringify(before.fonts) === JSON.stringify(after.fonts)
-  )
+  if (sameJsonValue(before.colors, after.colors) && sameJsonValue(before.fonts, after.fonts))
     return true;
   const write = (next: Pick<WorkbookTheme, 'colors' | 'fonts'>): void => {
     const current = wb.getTheme();

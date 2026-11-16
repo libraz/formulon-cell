@@ -6,6 +6,7 @@ import { rangeArea, rangesIntersect } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { inputLocaleForWorkbook } from './coerce-input.js';
 import type { History } from './history.js';
+import { sameJsonValue } from './prepared-change.js';
 import {
   blockedByProtection,
   isCellWritable,
@@ -617,7 +618,7 @@ function storedOverlay(
   if (stored === written) return stored;
   if (!stored) return null;
   const settled = (t: TableOverlay) => ({ ...t, totals: 0, ...(engineShaped ? { range: 0 } : {}) });
-  return JSON.stringify(settled(stored)) === JSON.stringify(settled(written)) ? stored : null;
+  return sameJsonValue(settled(stored), settled(written)) ? stored : null;
 }
 
 /** Default factory — keeps the construction site small. */
@@ -890,7 +891,7 @@ const totalCellsWritable = (
   const { sheet, r1, c0 } = table.range;
   return totals.every(
     (next, i) =>
-      JSON.stringify(next) === JSON.stringify(table.totals?.[i]) ||
+      sameJsonValue(next, table.totals?.[i]) ||
       isCellWritable(state, { sheet, row: r1, col: c0 + i }),
   );
 };

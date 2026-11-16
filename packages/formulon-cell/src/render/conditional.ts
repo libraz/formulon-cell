@@ -1,5 +1,6 @@
 import { addrKey, formatA1Cell } from '../engine/address.js';
 import type { CellValue, Range } from '../engine/types.js';
+import { formulaTextLiteral } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { excelSerialToDate } from '../format/date-serial.js';
 import type {
@@ -201,7 +202,7 @@ function nativeBoundaryOperand(value: number | string): string | null {
     const expression = trimmed.slice(1).trim();
     return expression === '' ? null : `(${expression})`;
   }
-  return `"${value.replaceAll('"', '""')}"`;
+  return formulaTextLiteral(value);
 }
 
 /** Build the native formula for a cell-value rule. The left operand is the

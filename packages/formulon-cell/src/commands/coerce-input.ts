@@ -2,8 +2,14 @@ import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import { formatCodeToNumFmt } from '../engine/format-writeback.js';
 import { makeRangeResolver } from '../engine/range-resolver.js';
 import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
-import type { Addr, CellValue, SpreadsheetProfileId } from '../engine/types.js';
-import { formatError, fromEngineValue, writeCell } from '../engine/value.js';
+import type { Addr, SpreadsheetProfileId } from '../engine/types.js';
+import {
+  formatError,
+  formulaTextLiteral,
+  formulaValueLiteral,
+  fromEngineValue,
+  writeCell,
+} from '../engine/value.js';
 import type { CellPatch, WorkbookHandle } from '../engine/workbook-handle.js';
 import { spreadsheetProfileForLocale } from '../mount/locale-profile.js';
 import { directCellFormat } from '../store/direct-format.js';
@@ -425,25 +431,11 @@ function coercedLiteral(input: CoercedInput): string {
     case 'error':
       return formatError(input.code, input.text);
     case 'text':
-      return JSON.stringify(input.value);
+      return formulaTextLiteral(input.value);
     case 'formula':
       return input.text.startsWith('=') ? input.text.slice(1) : input.text;
     default:
       return '0'; // blank → 0 in a numeric context
-  }
-}
-
-/** Render an engine cell value as a formula literal token. */
-function cellValueLiteral(v: CellValue): string {
-  switch (v.kind) {
-    case 'number':
-      return String(v.value);
-    case 'bool':
-      return v.value ? 'TRUE' : 'FALSE';
-    case 'text':
-      return JSON.stringify(v.value);
-    default:
-      return '0';
   }
 }
 
@@ -467,7 +459,7 @@ function substituteCellRefs(
     const isTarget = ref.r0 === a.row && ref.c0 === a.col;
     const text = isTarget
       ? coercedLiteral(candidate)
-      : cellValueLiteral(wb.getValue({ sheet: a.sheet, row: ref.r0, col: ref.c0 }));
+      : formulaValueLiteral(wb.getValue({ sheet: a.sheet, row: ref.r0, col: ref.c0 }));
     replacements.push({ start: ref.start, end: ref.end, text });
   }
   let out = formula;

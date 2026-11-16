@@ -27,6 +27,7 @@ import { dateInPeriod, localToday } from './date-periods.js';
 import { activeFilterRange, withFilterRange, withoutFilterRange } from './filter-ranges.js';
 import { formatNumber } from './format.js';
 import type { History } from './history.js';
+import { sameJsonValue } from './prepared-change.js';
 
 export type FilterPredicate = (
   cell: { value: unknown; formula: string | null } | undefined,
@@ -187,7 +188,7 @@ function sameFilterSnapshot(a: FilterSnapshot, b: FilterSnapshot): boolean {
   if (!sameRangeList(a.filterRanges, b.filterRanges)) return false;
   if (a.hiddenRows.size !== b.hiddenRows.size) return false;
   if (!sameCriteriaList(a.filterCriteria, b.filterCriteria)) return false;
-  if (JSON.stringify(a.filterSorts) !== JSON.stringify(b.filterSorts)) return false;
+  if (!sameJsonValue(a.filterSorts, b.filterSorts)) return false;
   for (const row of a.hiddenRows) {
     if (!b.hiddenRows.has(row)) return false;
   }
@@ -205,8 +206,8 @@ function sameCriteriaList(
       !!right &&
       left.byCol === right.byCol &&
       sameRange(left.range, right.range) &&
-      JSON.stringify(left.condition ?? null) === JSON.stringify(right.condition ?? null) &&
-      JSON.stringify(left.color ?? null) === JSON.stringify(right.color ?? null) &&
+      sameJsonValue(left.condition ?? null, right.condition ?? null) &&
+      sameJsonValue(left.color ?? null, right.color ?? null) &&
       left.hiddenValues.length === right.hiddenValues.length &&
       left.hiddenValues.every((value, index) => value === right.hiddenValues[index])
     );

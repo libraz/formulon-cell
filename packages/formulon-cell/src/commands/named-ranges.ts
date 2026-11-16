@@ -8,7 +8,7 @@ import {
 } from '../engine/address.js';
 import { rangeForRef } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
-import { formatCell, fromEngineValue } from '../engine/value.js';
+import { formatCell, formulaTextLiteral, fromEngineValue } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isSingleCell } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
@@ -286,10 +286,8 @@ const MAX_VALUE_TEXT = 64;
 const NUMBER_LITERAL = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
 const STRING_LITERAL = /^"(?:[^"]|"")*"$/;
 
-const quoteText = (text: string): string => `"${text.replace(/"/g, '""')}"`;
-
 const arrayElementText = (v: CellValue): string =>
-  v.kind === 'text' ? quoteText(v.value) : v.kind === 'blank' ? '""' : formatCell(v);
+  v.kind === 'text' ? formulaTextLiteral(v.value) : v.kind === 'blank' ? '""' : formatCell(v);
 
 const truncateValueText = (text: string): string =>
   text.length > MAX_VALUE_TEXT ? `${text.slice(0, MAX_VALUE_TEXT)}…` : text;
@@ -331,7 +329,9 @@ export function definedNameValueText(wb: WorkbookHandle, entry: DefinedNameEntry
     const result = wb.evaluateFormulaText({ sheet: ownSheet, row: 0, col: 0 }, `=${body}`);
     if (!result) return '';
     const value = fromEngineValue(result);
-    return truncateValueText(value.kind === 'text' ? quoteText(value.value) : formatCell(value));
+    return truncateValueText(
+      value.kind === 'text' ? formulaTextLiteral(value.value) : formatCell(value),
+    );
   } catch {
     return '';
   }

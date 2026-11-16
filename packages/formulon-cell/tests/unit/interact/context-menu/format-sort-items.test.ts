@@ -235,6 +235,23 @@ describe('attachContextMenu', () => {
       expect(onAfterCommit).toHaveBeenCalled();
     });
 
+    it('does not extend a whole-column sort bound over an empty format entry', () => {
+      setRange(store, 0, 0, 1048575, 0);
+      setFormat(store, 50000, 0, { hyperlink: 'https://example.test' });
+      setFormat(store, 70000, 0, {});
+      const setBlank = vi.spyOn(wb, 'setBlank');
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+
+      fireContextMenu(host, 200, 70);
+      document
+        .querySelector<HTMLButtonElement>('[data-fc-submenu="sortMenu"]')
+        ?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+      item('sortAsc')?.click();
+
+      expect(setBlank).toHaveBeenCalledWith({ sheet: 0, row: 50000, col: 0 });
+      expect(setBlank).not.toHaveBeenCalledWith({ sheet: 0, row: 70000, col: 0 });
+    });
+
     it('Sort Descending orders the selected column high to low as one undo step', () => {
       const history = new History();
       seed(store, wb, [

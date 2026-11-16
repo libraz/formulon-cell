@@ -392,3 +392,27 @@ describe('#GETTING_DATA typed on the Mac profile', () => {
     expect(coerceInput('#N/A', { mac: true })).toMatchObject({ kind: 'error', code: 6 });
   });
 });
+
+describe('custom validation literal substitution', () => {
+  it('substitutes referenced text with a doubled quote and errors by name', async () => {
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    const seen: string[] = [];
+    vi.spyOn(wb, 'evalFormula').mockImplementation((formula: string) => {
+      seen.push(formula);
+      return null;
+    });
+    const values = new Map<string, import('../../../src/engine/types.js').CellValue>([
+      ['1', { kind: 'text', value: 'say "hi" \\ there' }],
+      ['2', { kind: 'error', code: 1, text: '#DIV/0!' }],
+    ]);
+    vi.spyOn(wb, 'getValue').mockImplementation(
+      (addr: Addr) => values.get(String(addr.row)) ?? { kind: 'blank' },
+    );
+    const validation = { kind: 'custom' as const, formula: '=LEN(A2)>0' };
+    const target = { sheet: 0, row: 0, col: 0 };
+    writeInputValidated(wb, target, '1', { ...validation, formula: '=LEN(A2)>0' });
+    writeInputValidated(wb, target, '1', { ...validation, formula: '=ISERROR(A3)' });
+    expect(seen).toContain('=LEN("say ""hi"" \\ there")>0');
+    expect(seen).toContain('=ISERROR(#DIV/0!)');
+  });
+});

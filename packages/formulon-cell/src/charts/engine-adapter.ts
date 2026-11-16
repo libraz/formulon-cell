@@ -60,6 +60,7 @@ import {
   ChartPointState as EngineChartPointState,
   ChartSeriesDirection as EngineChartSeriesDirection,
 } from '@libraz/formulon';
+import { sameJsonValue } from '../commands/prepared-change.js';
 import { argbFromCssColor, cssColorFromArgb } from '../engine/theme-color.js';
 import { autoSeriesColor } from './series-colors.js';
 import type {
@@ -370,9 +371,6 @@ const defined = <T extends object>(value: T): T | undefined => {
 const nonEmpty = <T>(values: readonly T[] | undefined): readonly T[] | undefined =>
   values && values.length > 0 ? values : undefined;
 
-const sameValue = (left: unknown, right: unknown): boolean =>
-  JSON.stringify(left) === JSON.stringify(right);
-
 // ---------------------------------------------------------------------------
 // Engine → ChartSpec
 // ---------------------------------------------------------------------------
@@ -460,7 +458,7 @@ const sharedLabels = (
 ): { readonly shared: boolean; readonly labels: ChartDataLabelsSpec | undefined } => {
   const each = series.map((entry) => readLabels(entry.labels));
   const first = each[0];
-  return each.every((labels) => sameValue(labels, first))
+  return each.every((labels) => sameJsonValue(labels, first))
     ? { shared: true, labels: first }
     : { shared: false, labels: undefined };
 };
@@ -767,7 +765,7 @@ const markerPatch = (
   before: ChartMarkerSpec | undefined,
   after: ChartMarkerSpec | undefined,
 ): ChartMarkerPatch | null | undefined => {
-  if (sameValue(before, after)) return undefined;
+  if (sameJsonValue(before, after)) return undefined;
   if (after === undefined) return null;
   const patch: Mutable<ChartMarkerPatch> = {};
   const symbol = markerSymbol(before, after);
@@ -968,7 +966,7 @@ const writeLabels = (context: WriteContext): void => {
   for (const series of context.series) {
     const id = seriesId(series.seriesId);
     const after = effectiveLabels(context.after, id);
-    if (!sameValue(effectiveLabels(context.before, id), after)) {
+    if (!sameJsonValue(effectiveLabels(context.before, id), after)) {
       context.ops.seriesPatch(series.seriesId, { labels: labelsPatch(after) });
     }
   }
@@ -1142,7 +1140,7 @@ const writeDisplay = (context: WriteContext): void => {
 const writeTitle = (context: WriteContext): void => {
   const after = context.after.title;
   // An omitted title keeps the current one.
-  if (after === undefined || sameValue(after, context.before.title)) return;
+  if (after === undefined || sameJsonValue(after, context.before.title)) return;
   context.ops.title = {
     op: 'setChartTitle',
     title: typeof after !== 'string' ? AUTO_TITLE : after === '' ? null : after,
@@ -1158,7 +1156,7 @@ const canonicalLegend = (legend: ChartLegendSpec | undefined): ChartLegendSpec |
 
 const writeLegend = (context: WriteContext): void => {
   const after = canonicalLegend(context.after.legend);
-  if (after === undefined || sameValue(canonicalLegend(context.before.legend), after)) return;
+  if (after === undefined || sameJsonValue(canonicalLegend(context.before.legend), after)) return;
   context.ops.legend = {
     op: 'setChartLegend',
     position: after.position ? LEGEND_TO_ENGINE[after.position] : null,
@@ -1185,7 +1183,7 @@ const writeFilter = (context: WriteContext): void => {
   const empty = (indices: typeof after): boolean =>
     indices.series.length === 0 && indices.categories.length === 0;
   // A rebuild clears the engine's filter, so a filter on either side is written again.
-  if (context.rebuilt ? empty(before) && empty(after) : sameValue(before, after)) return;
+  if (context.rebuilt ? empty(before) && empty(after) : sameJsonValue(before, after)) return;
   context.ops.filter = {
     op: 'setChartFilter',
     hiddenSeries: after.series,
@@ -1199,9 +1197,9 @@ const writeAxis =
     const key = role === 'x' ? 'xAxis' : 'yAxis';
     const before = context.before[key];
     const after = context.after[key];
-    if (sameValue(before, after)) return;
+    if (sameJsonValue(before, after)) return;
     const changed = (field: keyof ChartAxisSpec): boolean =>
-      !sameValue(before?.[field], after?.[field]);
+      !sameJsonValue(before?.[field], after?.[field]);
     const patch: Mutable<ChartAxisPatch> = {};
     if (changed('visible')) patch.visible = after?.visible ?? true;
     if (changed('title'))
@@ -1704,7 +1702,7 @@ export const normalizeChartSpec = (spec: ChartSpec, context: ChartNormalizeConte
   const { kind } = spec;
   const { seriesIds } = context;
   const labels = seriesIds.map((id) => effectiveLabels(spec, id));
-  const labelsShared = labels.every((entry) => sameValue(entry, labels[0]));
+  const labelsShared = labels.every((entry) => sameJsonValue(entry, labels[0]));
   const normalized: Record<string, unknown> = {
     ...spec,
     grouping: spec.grouping ?? 'clustered',
