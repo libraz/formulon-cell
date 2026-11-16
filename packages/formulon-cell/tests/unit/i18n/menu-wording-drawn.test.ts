@@ -5,6 +5,7 @@ import { macRibbonLabelForCommand } from '../../../src/toolbar/ribbon/mac/labels
 
 /** The ribbon draws these zero-width spaces between the words of some labels. */
 const ZWSP = String.fromCodePoint(0x200b);
+const NBSP = String.fromCodePoint(0xa0);
 
 describe('menu wording', () => {
   it.each([
@@ -69,6 +70,27 @@ describe('menu wording', () => {
       'ja Previous Comment',
       macRibbonLabelForCommand('mac.review.previousComment', 'ja'),
       `前の${ZWSP}${ZWSP}コメント`,
+    ],
+    ['en Analysis Tools', macRibbonLabelForCommand('mac.data.analysis', 'en'), 'Analysis Tools'],
+    ['de Analysis Tools', macRibbonLabelForCommand('mac.data.analysis', 'de'), 'Analysetools'],
+    ['zh Analysis Tools', macRibbonLabelForCommand('mac.data.analysis', 'zh'), '分析工具'],
+    [
+      'ja Text to Columns',
+      macRibbonLabelForCommand('mac.data.textToColumns', 'ja'),
+      `区切り位置${ZWSP}${ZWSP}`,
+    ],
+    [
+      'zh Text to Columns',
+      macRibbonLabelForCommand('mac.data.textToColumns', 'zh'),
+      `分列${ZWSP}${ZWSP}`,
+    ],
+    ['de View Macros', macRibbonLabelForCommand('mac.view.macros', 'de'), 'Makros'],
+    ['fr View Macros', macRibbonLabelForCommand('mac.view.macros', 'fr'), 'Macros'],
+    ['th View Macros', macRibbonLabelForCommand('mac.view.macros', 'th'), 'แสดงแมโคร'],
+    [
+      'de Page Setup',
+      macRibbonLabelForCommand('mac.page.pageSetup', 'de'),
+      `Seiteneinrichtung${NBSP}…`,
     ],
   ])('reads %s as the desktop draws it', (_, ours, drawn) => {
     expect(ours).toBe(drawn);

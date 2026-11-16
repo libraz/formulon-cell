@@ -23,6 +23,7 @@ import type { MacPivotOptionsStrings } from './pivot-options.js';
 import type { MacPivotTableDialogStrings } from './pivot-table-dialog.js';
 import type { MacProtectSheetStrings } from './protect-sheet.js';
 import type { MacRemoveDuplicatesStrings } from './remove-duplicates.js';
+import type { MacRibbonLabelStrings } from './ribbon-labels.js';
 import type { MacRibbonMenuItemStrings } from './ribbon-menu-items.js';
 import type { MacRibbonReasonStrings } from './ribbon-reasons.js';
 import type { MacSheetTabMenuStrings } from './sheet-tab-menu.js';
@@ -81,6 +82,8 @@ export interface MacStrings {
   ribbonReasons: MacRibbonReasonStrings;
   /** Ribbon menu items the app has no string for. */
   ribbonMenuItems: MacRibbonMenuItemStrings;
+  /** Ribbon command labels the app has no string for. */
+  ribbonLabels: MacRibbonLabelStrings;
   /** Overrides of `cfRulesDialog`, plus its Mac-only labels, that apply on the Mac host only. */
   cfRulesDialog: MacCfRulesDialogStrings;
   /** Overrides of `hyperlinkDialog`, plus its Mac-only labels, that apply on the Mac host only. */

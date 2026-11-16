@@ -2,6 +2,7 @@ import {
   COMPATIBILITY_VERSIONS,
   compatibilityVersionLabel,
 } from '../../../commands/compatibility-version.js';
+import type { MacRibbonLabelStrings } from '../../../i18n/strings/mac/ribbon-labels.js';
 import type { MacRibbonMenuItemStrings } from '../../../i18n/strings/mac/ribbon-menu-items.js';
 import { dictionaries } from '../../../i18n/strings.js';
 import type { ToolbarLang } from '../../ribbon-model.js';
@@ -200,37 +201,46 @@ const BUNDLE_LABEL_KEYS: readonly string[] = [
   'relativeRecording',
   'newScript',
   'showScripts',
+  'chartBar',
+  'chartArea',
+  'shapeRectangle',
+  'shapeArrow',
+  'headerFooter',
+  'pageSetup',
+  'headingsHeading',
+  'reset',
+  'textToColumns',
+  'analysis',
+  'macros',
 ];
 
+/** Command labels the app has no string for, by their `mac.ribbonLabels` dictionary field. */
+const DICTIONARY_LABEL_KEYS: Readonly<Record<string, keyof MacRibbonLabelStrings>> = {
+  trackpad: 'trackpad',
+};
+
 const labelSeeds: Record<string, LegacyLabel> = {
-  chartBar: { ja: '横棒', en: 'Bar' },
-  chartArea: { ja: '面', en: 'Area' },
   shapeLine: { ja: '直線', en: 'Line' },
-  shapeRectangle: { ja: '四角形', en: 'Rectangle' },
   shapeOval: { ja: '楕円', en: 'Oval' },
   shapeDiamond: { ja: 'ひし形', en: 'Diamond' },
-  shapeArrow: { ja: '矢印', en: 'Arrow' },
-  headerFooter: { ja: 'ヘッダーとフッター', en: 'Header & Footer' },
   penBlack: { ja: 'ペン（黒）', en: 'Black Pen' },
   penRed: { ja: 'ペン（赤）', en: 'Red Pen' },
-  trackpad: { ja: 'トラックパッドで 描画', en: 'Draw with Trackpad' },
-  pageSetup: { ja: 'ページ設定', en: 'Page Setup' },
-  headingsHeading: { ja: '見出し', en: 'Headings' },
-  dynamicArray: { ja: '動的配列', en: 'Dynamic Array' },
-  reset: { ja: 'リセット', en: 'Reset' },
-  textToColumns: { ja: '区切り位置', en: 'Text to Columns' },
-  analysis: { ja: '分析ツール', en: 'Analysis ToolPak' },
-  macros: { ja: 'マクロの表示', en: 'View Macros' },
 };
+
+const perLocale = (text: (locale: (typeof MAC_LOCALES)[number]) => string): Label =>
+  Object.fromEntries(MAC_LOCALES.map((locale) => [locale, text(locale)])) as Label;
 
 export const labels: Record<string, Label> = Object.fromEntries([
   ...BUNDLE_LABEL_KEYS.map((key) => [key, macBundleLabel(`labels:${key}`)] as const),
+  ...Object.entries(DICTIONARY_LABEL_KEYS).map(
+    ([key, field]) =>
+      [key, perLocale((locale) => dictionaries[locale].mac.ribbonLabels[field])] as const,
+  ),
   ...Object.entries(labelSeeds).map(([key, seed]) => [key, localizedLabel(key, seed)]),
   ...MAC_AUTOMATION_GALLERY.map((script) => [script.id, script.labels] as const),
 ]);
 
-const unknownLabel = (key: string): Label =>
-  Object.fromEntries(MAC_LOCALES.map((locale) => [locale, key])) as Label;
+const unknownLabel = (key: string): Label => perLocale(() => key);
 
 export const t = (key: string): Label => labels[key] ?? unknownLabel(key);
 
@@ -552,12 +562,7 @@ const MENU_LABELS: Readonly<Record<string, Label>> = Object.fromEntries([
   ...BUNDLE_MENU_KEYS.map((key) => [key, macBundleLabel(`menu:${key}`)] as const),
   ...Object.entries(DICTIONARY_MENU_KEYS).map(
     ([key, field]) =>
-      [
-        key,
-        Object.fromEntries(
-          MAC_LOCALES.map((locale) => [locale, dictionaries[locale].mac.ribbonMenuItems[field]]),
-        ) as Label,
-      ] as const,
+      [key, perLocale((locale) => dictionaries[locale].mac.ribbonMenuItems[field])] as const,
   ),
   ...Object.entries(menuLabelSeeds).map(([key, seed]) => [key, localizedMenuLabel(key, seed)]),
   ...MAC_AUTOMATION_GALLERY.map((script) => [script.commandId, script.labels] as const),
@@ -566,12 +571,7 @@ const MENU_LABELS: Readonly<Record<string, Label>> = Object.fromEntries([
     (version) =>
       [
         `mac.formulas.calc.compatVersion.${version}`,
-        Object.fromEntries(
-          MAC_LOCALES.map((locale) => [
-            locale,
-            compatibilityVersionLabel(dictionaries[locale].ribbonMenu, version),
-          ]),
-        ) as Label,
+        perLocale((locale) => compatibilityVersionLabel(dictionaries[locale].ribbonMenu, version)),
       ] as const,
   ),
 ]);

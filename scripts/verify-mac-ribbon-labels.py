@@ -192,7 +192,8 @@ class Surface:
 
     def __init__(self):
         labels = (MAC / 'labels.ts').read_text(encoding='utf-8')
-        self.label_keys = set(seed_keys(labels, 'labelSeeds')) | set(list_keys(labels, 'BUNDLE_LABEL_KEYS'))
+        self.label_keys = (set(seed_keys(labels, 'labelSeeds')) | set(list_keys(labels, 'BUNDLE_LABEL_KEYS'))
+                           | set(seed_keys(labels, 'DICTIONARY_LABEL_KEYS')))
         self.menu_keys = (set(seed_keys(labels, 'menuLabelSeeds')) | set(list_keys(labels, 'BUNDLE_MENU_KEYS'))
                           | set(seed_keys(labels, 'DICTIONARY_MENU_KEYS')))
         self.group_keys = set(seed_keys(labels, 'groupSeeds')) | set(list_keys(labels, 'BUNDLE_GROUP_KEYS'))

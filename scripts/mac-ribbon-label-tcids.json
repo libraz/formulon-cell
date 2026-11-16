@@ -598,6 +598,21 @@
         "zh": "审阅: 0.1.0.7.0"
       }
     },
+    "labels:analysis": {
+      "file": "mso99.framework/mso_intl.bundle/strman_fbc9.strings",
+      "key": "a82076fc",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.7.0",
+        "ja": "データ: 0.1.0.7.0",
+        "de": "Daten: 0.1.0.7.0",
+        "fr": "Données: 0.1.0.7.0",
+        "ko": "데이터: 0.1.0.7.0",
+        "th": "ข้อมูล: 0.1.0.7.0",
+        "zh": "数据: 0.1.0.7.0"
+      }
+    },
     "labels:arrange": {
       "tcid": 298,
       "source": "tbbtn",
@@ -700,6 +715,14 @@
         "th": "มุมมอง: 0.1.0.2.6",
         "zh": "视图: 0.1.0.2.6"
       }
+    },
+    "labels:chartArea": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1133938954"
+    },
+    "labels:chartBar": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1282567308"
     },
     "labels:chartColumn": {
       "tcid": 15534,
@@ -1360,6 +1383,21 @@
         "zh": "数据: 0.1.0.6.0"
       }
     },
+    "labels:headerFooter": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "287974645",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Insert: 0.1.0.10.1",
+        "ja": "挿入: 0.1.0.10.1",
+        "de": "Einfügen: 0.1.0.10.1",
+        "fr": "Insérer: 0.1.0.10.1",
+        "ko": "삽입: 0.1.0.10.1",
+        "th": "แทรก: 0.1.0.10.1",
+        "zh": "插入: 0.1.0.10.1"
+      }
+    },
     "labels:headings": {
       "tcid": 15644,
       "source": "tbbtn",
@@ -1376,6 +1414,10 @@
         "th": "มุมมอง: 0.1.0.2.4",
         "zh": "视图: 0.1.0.2.4"
       }
+    },
+    "labels:headingsHeading": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3823024752"
     },
     "labels:hide": {
       "tcid": 865,
@@ -2231,6 +2273,21 @@
         "zh": "数据: 0.1.0.4.4"
       }
     },
+    "labels:reset": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3477859011",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Formulas: 0.1.0.1.1",
+        "ja": "数式: 0.1.0.1.1",
+        "de": "Formeln: 0.1.0.1.1",
+        "fr": "Formules: 0.1.0.1.1",
+        "ko": "수식: 0.1.0.1.1",
+        "th": "สูตร: 0.1.0.1.1",
+        "zh": "公式: 0.1.0.1.1"
+      }
+    },
     "labels:resetWindow": {
       "tcid": 7874,
       "source": "tbbtn",
@@ -2311,6 +2368,10 @@
         "zh": "插入: 0.1.0.3.5"
       }
     },
+    "labels:shapeArrow": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "684616370"
+    },
     "labels:shapeFormat": {
       "tcid": 11528,
       "source": "tbbtn",
@@ -2318,6 +2379,10 @@
       "match": "en+ja",
       "control": "button",
       "strip_ellipsis": true
+    },
+    "labels:shapeRectangle": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3477866766"
     },
     "labels:shapeRoundedRectangle": {
       "tcid": 1115,
@@ -2861,6 +2926,19 @@
         "ko": "삽입: 0.1.0.10.0",
         "th": "แทรก: 0.1.0.10.0",
         "zh": "插入: 0.1.0.10.0"
+      }
+    },
+    "labels:textToColumns": {
+      "file": "strman_000c.strings",
+      "key": "196",
+      "control": "button",
+      "strip_ellipsis": true,
+      "verified": {
+        "en": "Data: 0.1.0.4.0",
+        "ja": "データ: 0.1.0.4.0",
+        "de": "Daten: 0.1.0.4.0",
+        "fr": "Données: 0.1.0.4.0",
+        "zh": "数据: 0.1.0.4.0"
       }
     },
     "labels:theme": {
@@ -5868,27 +5946,7 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "labels:analysis": {
-      "status": "pinned-pending",
-      "tcid": null,
-      "reason": "run-time label: the Data slot draws en \"Analysis Tools\" / ja 分析ツール / de Analysetools / fr Outils d’analyse / ko 분석 도구 / th เครื่องมือการวิเคราะห์ / zh 分析工具; no bundle string matches"
-    },
-    "labels:chartArea": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "labels:chartBar": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
     "labels:countEmptyRows": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "labels:dynamicArray": {
       "status": "unresolved",
       "tcid": null,
       "reason": "no node with matching ja label"
@@ -5897,18 +5955,6 @@
       "status": "unresolved",
       "tcid": null,
       "reason": "no node with matching ja label"
-    },
-    "labels:headerFooter": {
-      "status": "drawn-disagrees",
-      "tcid": 762,
-      "name": "HeaderAndFooter",
-      "reason": "tbbtn of TCID 762 disagrees with the drawn label: en at AX Insert: 0.1.0.10.1: drawn 'Header & Footer', bundle 'Header and Footer'; ko at AX 삽입: 0.1.0.10.1: drawn '머리글 및 바닥글', bundle '머리글/바닥글'; th at AX แทรก: 0.1.0.10.1: drawn 'หัวกระดาษและท้ายกระดาษ', bundle 'ส่วนหัวและส่วนท้าย'"
-    },
-    "labels:headingsHeading": {
-      "status": "drawn-disagrees",
-      "tcid": 12576,
-      "name": "LabelHeadings",
-      "reason": "tbbtn of TCID 12576 disagrees with the drawn label: th at AX มุมมอง: 0.1.0.2.4: drawn 'ส่วนหัว', bundle 'หัวเรื่อง'"
     },
     "labels:height": {
       "status": "no-consumer",
@@ -5924,7 +5970,15 @@
       "status": "drawn-disagrees",
       "tcid": 16105,
       "name": "PlayMacro",
-      "reason": "tbbtn of TCID 16105 disagrees with the drawn label: de at AX Ansicht: 0.1.0.5.0: drawn 'Makros', bundle 'Makros anzeigen'; fr at AX Affichage: 0.1.0.5.0: drawn 'Macros', bundle 'Afficher les macros'"
+      "reason": "tbbtn of TCID 16105 disagrees with the drawn label: de at AX Ansicht: 0.1.0.5.0: drawn 'Makros', bundle 'Makros anzeigen'; fr at AX Affichage: 0.1.0.5.0: drawn 'Macros', bundle 'Afficher les macros'",
+      "provisional": {
+        "file": "mso40ui.framework/tbbtn.strings",
+        "key": "2212358799"
+      },
+      "text": {
+        "de": "Makros",
+        "fr": "Macros"
+      }
     },
     "labels:makeSubtable": {
       "status": "unresolved",
@@ -5970,9 +6024,15 @@
     },
     "labels:pageSetup": {
       "status": "drawn-disagrees",
-      "tcid": 11551,
-      "name": "ChunkPageSetup",
-      "reason": "tbbtn of TCID 11551 disagrees with the drawn label: de at AX Seitenlayout: 0.1.0.1.7: drawn 'Seiteneinrichtung\\xa0…', bundle 'Seite einrichten'"
+      "tcid": null,
+      "reason": "mso40ui.framework/tbbar.strings key 2242 disagrees with the drawn label: de at AX Seitenlayout: 0.1.0.1.7: drawn 'Seiteneinrichtung\\xa0…', bundle 'Seite einrichten'",
+      "provisional": {
+        "file": "mso40ui.framework/tbbar.strings",
+        "key": "2242"
+      },
+      "text": {
+        "de": "Seiteneinrichtung\u00a0…"
+      }
     },
     "labels:penBlack": {
       "status": "unresolved",
@@ -6014,17 +6074,6 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "labels:reset": {
-      "status": "drawn-disagrees",
-      "tcid": 12273,
-      "name": "IgxChunkReset",
-      "reason": "tbbtn of TCID 12273 disagrees with the drawn label: fr at AX Formules: 0.1.0.1.1: drawn 'Réinitialiser', bundle 'Rétablir'; ko at AX 수식: 0.1.0.1.1: drawn '다시 설정', bundle '원래대로'"
-    },
-    "labels:shapeArrow": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
     "labels:shapeDiamond": {
       "status": "unresolved",
       "tcid": null,
@@ -6036,11 +6085,6 @@
       "reason": "no node with matching ja label"
     },
     "labels:shapeOval": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "labels:shapeRectangle": {
       "status": "unresolved",
       "tcid": null,
       "reason": "no node with matching ja label"
@@ -6074,16 +6118,10 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "labels:textToColumns": {
-      "status": "pinned-pending",
-      "tcid": 806,
-      "name": "TextToTable",
-      "reason": "run-time substitution: the slot draws en \"Text to Columns\" and de \"Text in Spalten\", while tbbtn reads \"Convert Text to Table...\""
-    },
     "labels:trackpad": {
-      "status": "unresolved",
+      "status": "no-bundle-entry",
       "tcid": null,
-      "reason": "no node with matching ja label"
+      "reason": "no app string; worded in the i18n dictionaries (mac.ribbonLabels)"
     },
     "labels:validation": {
       "status": "pinned-pending",
@@ -7477,12 +7515,15 @@
     "labels:addins",
     "labels:advancedFilter",
     "labels:alwaysReadOnly",
+    "labels:analysis",
     "labels:arrange",
     "labels:autoSum",
     "labels:automate",
     "labels:background",
     "labels:calcOptions",
     "labels:cellFocus",
+    "labels:chartArea",
+    "labels:chartBar",
     "labels:chartColumn",
     "labels:chartCombo",
     "labels:chartHierarchy",
@@ -7523,7 +7564,9 @@
     "labels:gridlines",
     "labels:gridlinesHeading",
     "labels:group",
+    "labels:headerFooter",
     "labels:headings",
+    "labels:headingsHeading",
     "labels:hide",
     "labels:hideDetail",
     "labels:hideInk",
@@ -7574,13 +7617,16 @@
     "labels:relativeRecording",
     "labels:removeArrows",
     "labels:removeDuplicates",
+    "labels:reset",
     "labels:resetWindow",
     "labels:review",
     "labels:ruler",
     "labels:scaleHeight",
     "labels:scaleWidth",
     "labels:screenshot",
+    "labels:shapeArrow",
     "labels:shapeFormat",
+    "labels:shapeRectangle",
     "labels:shapeRoundedRectangle",
     "labels:shapeTriangle",
     "labels:shapes",
@@ -7616,6 +7662,7 @@
     "labels:table",
     "labels:text",
     "labels:textBox",
+    "labels:textToColumns",
     "labels:theme",
     "labels:thesaurus",
     "labels:threeDModel",

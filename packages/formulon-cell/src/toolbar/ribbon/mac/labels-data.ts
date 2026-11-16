@@ -29,20 +29,9 @@ type RibbonKey = Exclude<keyof Strings['ribbon'], 'tabs' | 'fontFamilies'>;
  * remain unchanged where that is the Excel UI term.
  */
 export const MAC_LABEL_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> = {
-  chartBar: { de: 'Balken', fr: 'Barres', zh: '条形图', ko: '가로 막대형', th: 'แท่ง' },
-  chartArea: { de: 'Fläche', fr: 'Aires', zh: '面积图', ko: '영역형', th: 'พื้นที่' },
   shapeLine: { de: 'Linie', fr: 'Ligne', zh: '直线', ko: '선', th: 'เส้น' },
-  shapeRectangle: { de: 'Rechteck', fr: 'Rectangle', zh: '矩形', ko: '직사각형', th: 'สี่เหลี่ยมผืนผ้า' },
   shapeOval: { de: 'Oval', fr: 'Ovale', zh: '椭圆', ko: '타원', th: 'วงรี' },
   shapeDiamond: { de: 'Raute', fr: 'Losange', zh: '菱形', ko: '마름모', th: 'ข้าวหลามตัด' },
-  shapeArrow: { de: 'Pfeil', fr: 'Flèche', zh: '箭头', ko: '화살표', th: 'ลูกศร' },
-  headerFooter: {
-    de: 'Kopf- und Fußzeile',
-    fr: 'En-tête et pied de page',
-    zh: '页眉和页脚',
-    ko: '머리글 및 바닥글',
-    th: 'หัวกระดาษและท้ายกระดาษ',
-  },
   penBlack: {
     de: 'Schwarzer Stift',
     fr: 'Stylet noir',
@@ -51,56 +40,6 @@ export const MAC_LABEL_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>>
     th: 'ปากกาสีดำ',
   },
   penRed: { de: 'Roter Stift', fr: 'Stylet rouge', zh: '红色笔', ko: '빨간색 펜', th: 'ปากกาสีแดง' },
-  trackpad: {
-    de: 'Mit Trackpad zeichnen',
-    fr: 'Dessiner avec le Trackpad',
-    zh: '使用触控板绘图',
-    ko: '트랙피드로 그리기',
-    th: 'วาดด้วยแทร็คแพ็ด',
-  },
-  pageSetup: {
-    de: 'Seiteneinrichtung',
-    fr: 'Mise en page',
-    zh: '页面设置',
-    ko: '페이지 설정',
-    th: 'ตั้งค่าหน้ากระดาษ',
-  },
-  headingsHeading: {
-    de: 'Überschriften',
-    fr: 'Titres',
-    zh: '标题',
-    ko: '머리글',
-    th: 'หัวเรื่อง',
-  },
-  dynamicArray: {
-    de: 'Dynamisches Array',
-    fr: 'Tableau dynamique',
-    zh: '动态数组',
-    ko: '동적 배열',
-    th: 'อาร์เรย์แบบไดนามิก',
-  },
-  reset: { de: 'Zurücksetzen', fr: 'Réinitialiser', zh: '重置', ko: '다시 설정', th: 'รีเซ็ต' },
-  textToColumns: {
-    de: 'Text in Spalten',
-    fr: 'Convertir',
-    zh: '分列',
-    ko: '텍스트 나누기',
-    th: 'ข้อความเป็นคอลัมน์',
-  },
-  analysis: {
-    de: 'Analyse-Funktionen',
-    fr: 'Utilitaire d’analyse',
-    zh: '分析工具库',
-    ko: '분석 도구',
-    th: 'เครื่องมือวิเคราะห์',
-  },
-  macros: {
-    de: 'Makros anzeigen',
-    fr: 'Afficher les macros',
-    zh: '查看宏',
-    ko: '매크로 보기',
-    th: 'ดูแมโคร',
-  },
 };
 
 /** Group titles worded by a ribbon dictionary entry. */

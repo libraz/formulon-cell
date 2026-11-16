@@ -29,6 +29,7 @@ import { macPivotOptionsDe } from './pivot-options.js';
 import { macPivotTableDialogDe, macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetDe, macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesDe, macRemoveDuplicatesFrom } from './remove-duplicates.js';
+import { macRibbonLabelsDe } from './ribbon-labels.js';
 import { macRibbonMenuItemsDe } from './ribbon-menu-items.js';
 import { macRibbonReasonsDe } from './ribbon-reasons.js';
 import { macSheetTabMenuDe } from './sheet-tab-menu.js';
@@ -320,6 +321,7 @@ export const macDe: MacStrings = {
   commentsPane: macCommentsPaneDe,
   ribbonReasons: macRibbonReasonsDe,
   ribbonMenuItems: macRibbonMenuItemsDe,
+  ribbonLabels: macRibbonLabelsDe,
   cfRulesDialog: {
     ...{
       ...macCfRulesDialogFrom(cellFormatDe.cfRulesDialog, {
