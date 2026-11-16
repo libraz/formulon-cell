@@ -761,7 +761,15 @@ const runObjectsFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
     fieldList.locator('.fc-pivotdlg__field-chip').filter({ hasText: 'Region' }),
   ).toBeVisible();
   await withinViewport(page, fieldList);
+  // The field list is a docked pane: Escape keeps it open and moves focus to the grid, even with
+  // focus on the pane's own root.
+  await fieldList.focus();
   await page.keyboard.press('Escape');
+  await expect(page.locator('.fc-host__grid').first()).toBeFocused();
+  await expect(fieldList).toBeVisible();
+  await page.evaluate(() =>
+    (window as unknown as ProbeWindow).__fcInst?.dialogs.close('activePivotFieldList'),
+  );
   await expect(fieldList).toBeHidden();
 
   const slicer = page.locator('.fc-slicer').first();
