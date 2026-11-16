@@ -118,7 +118,7 @@ const unsaveable = (item: SessionIllustration): Partial<SessionIllustration> => 
 
 /** The overlay for a shape of the file, or null for a hidden one, which stays
  *  untouched in the engine. A shape the overlay cannot draw (unknown preset,
- *  gradient or picture paint, rotation, group) becomes a locked bounding box. */
+ *  gradient or picture paint, group) becomes a locked bounding box. */
 export function shapeFromNative(
   store: SpreadsheetStore,
   sheet: number,
@@ -133,7 +133,6 @@ export function shapeFromNative(
     kind === 'line' ||
     shape.kind === DrawingObjectKind.Connector ||
     shape.kind === DrawingObjectKind.Group ||
-    shape.rotationDeg !== 0 ||
     paintOf(shape.fill) === 'other' ||
     paintOf(shape.line) === 'other';
   const anchor = drawingAnchorOf(shape);
@@ -146,6 +145,7 @@ export function shapeFromNative(
     nativeObjectId: shape.objectId,
     nativeAnchor: anchor,
     nativeGeometryEditable: shape.anchor.kind !== ANCHOR_KIND_ABSOLUTE,
+    ...(shape.rotationDeg !== 0 ? { rotationDeg: shape.rotationDeg } : {}),
   };
   if (locked) {
     return {
@@ -357,6 +357,7 @@ export class ShapeMirror {
       presetGeometry: PRST_OF_KIND[item.shape as SessionShapeKind] as string,
       ...paintInput(item),
       ...(item.text && !isLineKind(item.shape) ? { text: item.text } : {}),
+      ...(item.rotationDeg !== undefined ? { rotationDeg: item.rotationDeg } : {}),
     };
     if (item.nativeAnchor) return { ...spec, ...anchorInput(item.nativeAnchor) };
     const frame = {

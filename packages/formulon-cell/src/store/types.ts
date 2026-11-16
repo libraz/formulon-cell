@@ -595,8 +595,11 @@ export interface SessionIllustration {
   opacity?: number;
   /** A shape's text, lines joined with `\n`. */
   text?: string;
+  /** A shape's rotation in degrees as the file stores it (may be negative or
+   *  360 and over), kept raw so it is written back unchanged; drawn normalised. */
+  rotationDeg?: number;
   /** A loaded shape the overlay can only approximate (unknown preset, gradient
-   *  or rotation, group): drawn as its bounding box, and only its anchor is
+   *  paint, group): drawn as its bounding box, and only its anchor is
    *  written back. */
   nativeLocked?: boolean;
 }

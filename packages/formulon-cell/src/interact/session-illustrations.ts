@@ -20,6 +20,7 @@ import {
   shapeStyleEditable,
 } from '../commands/shape-format.js';
 import {
+  displayRotation,
   drawingClipPath,
   nearestGridline,
   sessionPosition,
@@ -468,6 +469,7 @@ export function attachSessionIllustrations(deps: {
       ...(handle ? { handle } : {}),
       min: { w: MIN_W, h: MIN_H },
       snap: (axis, value) => nearestGridline(store, axis, value),
+      rotationDeg: displayRotation(item.rotationDeg ?? 0),
       // Excel locks a picture's aspect ratio; a shape keeps it with Shift.
       keepRatio: (move) => item.kind === 'image' || move.shiftKey,
       preview: (patch) => previewFrame(panel, patch),
@@ -646,8 +648,14 @@ export function attachSessionIllustrations(deps: {
       panel.style.top = `${placement.y}px`;
       panel.style.width = `${placement.w}px`;
       panel.style.height = `${placement.h}px`;
+      // Turning the panel turns its shape, text, outline and handles, and its hit area, together.
+      const angle = displayRotation(item.rotationDeg ?? 0);
+      if (angle !== 0) {
+        panel.style.transform = `rotate(${angle}deg)`;
+        panel.style.transformOrigin = '50% 50%';
+      }
       if (item.nativeAnchor) {
-        panel.style.clipPath = drawingClipPath(store, item.nativeAnchor, placement);
+        panel.style.clipPath = drawingClipPath(store, item.nativeAnchor, placement, angle);
       }
       panel.addEventListener('focus', () => {
         selectedId = item.id;

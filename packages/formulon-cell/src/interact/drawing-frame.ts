@@ -1,3 +1,4 @@
+import { rotatePoint } from '../engine/drawing-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { ChartSourceHighlight, SelectedObject, State } from '../store/types.js';
 import { focusSheet } from './dialog-focus.js';
@@ -141,6 +142,33 @@ export const resizedFrame = (
   };
 };
 
+/** Like {@link resizedFrame} for a frame turned by `rotationDeg` about its centre,
+ *  with (dx, dy) in screen pixels: the delta is taken into the frame's own axes,
+ *  and the box is moved so the edge or corner opposite `handle` stays put on screen. */
+export const rotatedResizedFrame = (
+  start: DrawingFrame,
+  handle: DrawingHandle,
+  dx: number,
+  dy: number,
+  keepRatio: boolean,
+  min: { w: number; h: number },
+  rotationDeg: number,
+): DrawingFrame => {
+  if (rotationDeg === 0) return resizedFrame(start, handle, dx, dy, keepRatio, min);
+  const [lx, ly] = rotatePoint(dx, dy, -rotationDeg);
+  const next = resizedFrame(start, handle, lx, ly, keepRatio, min);
+  // The fixed point as a fraction of the box: the side opposite the dragged one, else the middle.
+  const fx = handle.endsWith('w') ? 1 : handle.endsWith('e') ? 0 : 0.5;
+  const fy = handle.startsWith('n') ? 1 : handle.startsWith('s') ? 0 : 0.5;
+  const onScreen = (frame: DrawingFrame): [number, number] => {
+    const [ox, oy] = rotatePoint(frame.w * (fx - 0.5), frame.h * (fy - 0.5), rotationDeg);
+    return [frame.x + frame.w / 2 + ox, frame.y + frame.h / 2 + oy];
+  };
+  const [bx, by] = onScreen(start);
+  const [ax, ay] = onScreen(next);
+  return { ...next, x: next.x + bx - ax, y: next.y + by - ay };
+};
+
 /** `frame` with the edges `handle` drags moved to their nearest gridlines. */
 const snappedFrame = (
   frame: DrawingFrame,
@@ -207,6 +235,8 @@ export const trackFrameDrag = (
     keepRatio: (move: PointerEvent) => boolean;
     /** The gridline nearest a value; with Alt held the dragged edges snap to it. */
     snap?: (axis: 'x' | 'y', value: number) => number;
+    /** The frame's rotation in degrees; a handle then drags along the frame's own axes. */
+    rotationDeg?: number;
     preview: (patch: Partial<DrawingFrame>) => void;
     commit: (patch: Partial<DrawingFrame>) => void;
   },
@@ -227,8 +257,18 @@ export const trackFrameDrag = (
       // Like the spreadsheet, Alt docks the object's top-left corner to a cell.
       latest = snap ? { x: snap('x', x), y: snap('y', y) } : { x, y };
     } else {
-      let frame = resizedFrame(start, handle, dx, dy, options.keepRatio(move), options.min);
-      if (snap) frame = snappedFrame(frame, handle, snap, options.min);
+      const angle = options.rotationDeg ?? 0;
+      let frame = rotatedResizedFrame(
+        start,
+        handle,
+        dx,
+        dy,
+        options.keepRatio(move),
+        options.min,
+        angle,
+      );
+      // Gridlines are screen-aligned, so a turned frame does not snap.
+      if (snap && angle === 0) frame = snappedFrame(frame, handle, snap, options.min);
       latest = {
         ...(frame.x === start.x ? {} : { x: frame.x }),
         ...(frame.y === start.y ? {} : { y: frame.y }),

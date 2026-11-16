@@ -365,6 +365,7 @@ export const drawingClipPath = (
   store: SpreadsheetStore,
   object: EngineDrawingAnchor,
   position: { x: number; y: number; w: number; h: number },
+  rotationDeg = 0,
 ): string => {
   try {
     const state = store.getState();
@@ -382,6 +383,28 @@ export const drawingClipPath = (
       hiddenLead = edge - position.x;
     }
     if (hiddenTop <= 0 && hiddenLead <= 0) return '';
+    if (rotationDeg !== 0) {
+      // The clip turns with the object, so give the visible screen rectangle in its frame.
+      const far = DECORATION_OUTSET;
+      const left = layout.rtl ? -far : hiddenLead > 0 ? hiddenLead : -far;
+      const right = layout.rtl
+        ? position.w - (hiddenLead > 0 ? hiddenLead : -far)
+        : position.w + far;
+      const upper = hiddenTop > 0 ? hiddenTop : -far;
+      const lower = position.h + far;
+      const corners: [number, number][] = [
+        [left, upper],
+        [right, upper],
+        [right, lower],
+        [left, lower],
+      ];
+      return `polygon(${corners
+        .map(([x, y]) => {
+          const [lx, ly] = rotatePoint(x - position.w / 2, y - position.h / 2, -rotationDeg);
+          return `${lx + position.w / 2}px ${ly + position.h / 2}px`;
+        })
+        .join(', ')})`;
+    }
     const inset = (hidden: number): string =>
       hidden > 0 ? `${hidden}px` : `-${DECORATION_OUTSET}px`;
     const outset = `-${DECORATION_OUTSET}px`;
@@ -391,4 +414,13 @@ export const drawingClipPath = (
   } catch {
     return '';
   }
+};
+
+/** A stored rotation as it is displayed: normalised into [0, 360). */
+export const displayRotation = (rotationDeg: number): number => ((rotationDeg % 360) + 360) % 360;
+
+/** (x, y) turned by `deg` degrees clockwise on screen about the origin. */
+export const rotatePoint = (x: number, y: number, deg: number): [number, number] => {
+  const t = (deg * Math.PI) / 180;
+  return [x * Math.cos(t) - y * Math.sin(t), x * Math.sin(t) + y * Math.cos(t)];
 };
