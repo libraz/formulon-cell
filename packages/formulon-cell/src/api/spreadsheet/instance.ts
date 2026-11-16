@@ -25,6 +25,7 @@ import { refusedBatch } from '../../commands/interaction-policy.js';
 import { sheetPermits } from '../../commands/protection.js';
 import type { SpellingService } from '../../commands/spelling.js';
 import { clearTraceArrows, traceDependents, tracePrecedents } from '../../commands/traces.js';
+import { rangeOfRect, rectOfRange } from '../../engine/address.js';
 import { resolveCellInput, resolveRangeInput } from '../../engine/range-input.js';
 import type { Addr, Range } from '../../engine/types.js';
 import { fromEngineValue } from '../../engine/value.js';
@@ -319,13 +320,6 @@ const ribbonOptionsOf = (config: RibbonToolbarConfig, notify: () => void): Mount
   };
 };
 
-const toRect = (r: Range): CellRect => ({
-  firstRow: r.r0,
-  firstCol: r.c0,
-  lastRow: r.r1,
-  lastCol: r.c1,
-});
-
 /** The navigation policy a config installs; `'auto'` without `selectable` installs none, since its
  *  Tab options would have no stops to walk. */
 const legacyViewport = (config: ViewportConfig | null | undefined): ViewportOptions | undefined => {
@@ -385,11 +379,11 @@ const commandRefusal = (legacy: LegacyInstance, id: string): CommandRefusal => {
 
 const selectionOf = (legacy: LegacyInstance): SelectionState => {
   const { selection, data } = legacy.store.getState();
-  const ranges = selectionRangeList(selection).map(toRect);
+  const ranges = selectionRangeList(selection).map(rectOfRange);
   return {
     sheet: data.sheetIndex,
     active: { row: selection.active.row, col: selection.active.col },
-    range: toRect(selection.range),
+    range: rectOfRange(selection.range),
     ranges,
   };
 };
@@ -868,8 +862,7 @@ const intentRange = (target: LegacyInstance, workbook: Workbook, intent: EditInt
       : workbook.sheet(intent.sheet).index;
   const { at } = intent;
   if (typeof at === 'string') return resolveRangeInput(at, workbookHandleOf(workbook), sheet, 'at');
-  if ('firstRow' in at)
-    return { sheet, r0: at.firstRow, c0: at.firstCol, r1: at.lastRow, c1: at.lastCol };
+  if ('firstRow' in at) return rangeOfRect(sheet, at);
   return { sheet, r0: at.row, c0: at.col, r1: at.row, c1: at.col };
 };
 

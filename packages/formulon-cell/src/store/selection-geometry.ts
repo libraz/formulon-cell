@@ -4,9 +4,8 @@ import type { SelectionSlice } from './types.js';
 
 export type SelectionGestureMode = 'add' | 'subtract';
 
-/** A well-formed, in-bounds range on `sheet`. */
-export const isValidSheetRange = (range: Range, sheet: number): boolean =>
-  range.sheet === sheet &&
+/** Whether `range` is a non-inverted, in-grid range on a valid sheet index. */
+export const isValidRange = (range: Range): boolean =>
   Number.isInteger(range.sheet) &&
   Number.isInteger(range.r0) &&
   Number.isInteger(range.c0) &&
@@ -19,6 +18,10 @@ export const isValidSheetRange = (range: Range, sheet: number): boolean =>
   range.c0 <= range.c1 &&
   range.r1 <= MAX_ROW &&
   range.c1 <= MAX_COL;
+
+/** A well-formed, in-bounds range on `sheet`. */
+export const isValidSheetRange = (range: Range, sheet: number): boolean =>
+  range.sheet === sheet && isValidRange(range);
 
 export const cloneRange = (range: Range): Range => ({
   sheet: range.sheet,

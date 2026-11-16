@@ -47,10 +47,7 @@ export const phoneticPropertiesFor = (
 
 /** Read how a cell's guide renders; a guide with no `<phoneticPr>` hydrates as
  *  "unset" rather than as the all-zero triple the engine resolves it to. */
-export function readPhoneticProperties(
-  wb: WorkbookHandle,
-  addr: Addr,
-): PhoneticProperties | undefined {
+function readPhoneticProperties(wb: WorkbookHandle, addr: Addr): PhoneticProperties | undefined {
   if (!wb.capabilities.phoneticProperties) return undefined;
   const properties = wb.getCellPhoneticProperties(addr.sheet, addr.row, addr.col);
   if (properties === null) return undefined;
@@ -82,10 +79,7 @@ export function withPhoneticProperties(
 
 /** What a new guide gets: the schema default the desktop spreadsheet writes.
  *  The engine's unset state is half-width katakana, so it is stated outright. */
-export const DEFAULT_PHONETIC_PROPERTIES: PhoneticProperties = phoneticPropertiesFor(
-  'katakana',
-  'left',
-);
+const DEFAULT_PHONETIC_PROPERTIES: PhoneticProperties = phoneticPropertiesFor('katakana', 'left');
 
 /**
  * Write a cell's guide properties after its runs, the default ones when the

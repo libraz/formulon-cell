@@ -13,6 +13,18 @@ import type {
 } from './types.js';
 import { defaultPageSetup } from './types.js';
 
+/** The password fields of `options` that are set, with the hash copied. */
+const passwordFieldsOf = (
+  options?: WorkbookStructureProtectionState,
+): WorkbookStructureProtectionState => {
+  const fields: WorkbookStructureProtectionState = {};
+  if (options?.password !== undefined) fields.password = options.password;
+  if (options?.legacyPasswordHash !== undefined)
+    fields.legacyPasswordHash = options.legacyPasswordHash;
+  if (options?.passwordHash !== undefined) fields.passwordHash = { ...options.passwordHash };
+  return fields;
+};
+
 const withoutSheetUnlocks = (
   protection: ProtectionSlice,
   sheet: number,
@@ -70,12 +82,7 @@ export const sheetSettingsMutators = {
     store.setState((s) => {
       const next = new Map(s.protection.protectedSheets);
       if (on) {
-        const entry: SheetProtectionState = {};
-        if (options?.password !== undefined) entry.password = options.password;
-        if (options?.legacyPasswordHash !== undefined) {
-          entry.legacyPasswordHash = options.legacyPasswordHash;
-        }
-        if (options?.passwordHash !== undefined) entry.passwordHash = { ...options.passwordHash };
+        const entry: SheetProtectionState = passwordFieldsOf(options);
         if (options?.permissions !== undefined) entry.permissions = { ...options.permissions };
         next.set(sheet, entry);
       } else if (next.has(sheet)) {
@@ -110,12 +117,7 @@ export const sheetSettingsMutators = {
     store.setState((s) => {
       const current = s.protection.workbookStructure;
       if (on) {
-        const next: WorkbookStructureProtectionState = {};
-        if (options?.password !== undefined) next.password = options.password;
-        if (options?.legacyPasswordHash !== undefined) {
-          next.legacyPasswordHash = options.legacyPasswordHash;
-        }
-        if (options?.passwordHash !== undefined) next.passwordHash = { ...options.passwordHash };
+        const next = passwordFieldsOf(options);
         if (current && JSON.stringify(current) === JSON.stringify(next)) return s;
         return { ...s, protection: { ...s.protection, workbookStructure: next } };
       }

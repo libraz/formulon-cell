@@ -1,48 +1,17 @@
 import type {
   ProtectedRangeInput,
-  Sheet,
   SheetProtectionInput,
   WorkbookProtectionInput,
 } from '@libraz/formulon';
-import { isFormulonError, orFallback } from './result.js';
-import type { EngineCapabilities, ProtectedRange, Workbook, WorkbookProtection } from './types.js';
+import { attemptWrite, orFallback } from './result.js';
+import type { EngineCapabilities, ProtectedRange, WorkbookProtection } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import { assertAlive, wb, ws } from './workbook-handle-internals.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
-type WorkbookHandleInternals = {
-  wb: Workbook;
-  assertAlive(): void;
-};
 
 declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandleProtectionMethods {}
-}
-
-function internals(handle: unknown): WorkbookHandleInternals {
-  return handle as WorkbookHandleInternals;
-}
-
-function assertAlive(handle: unknown): void {
-  internals(handle).assertAlive();
-}
-
-function wb(handle: unknown): Workbook {
-  return internals(handle).wb;
-}
-
-function ws(handle: unknown, sheet: number): Sheet {
-  return wb(handle).sheet(sheet);
-}
-
-/** Run an engine call; an engine refusal is a soft `false`, anything else rethrows. */
-function attempt(fn: () => void): boolean {
-  try {
-    fn();
-    return true;
-  } catch (e) {
-    if (!isFormulonError(e)) throw e;
-    return false;
-  }
 }
 
 export abstract class WorkbookHandleProtectionMethods {
@@ -139,7 +108,7 @@ export abstract class WorkbookHandleProtectionMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetProtectionRoundtrip) return false;
-    if (!protection.enabled) return attempt(() => ws(this, sheet).setSheetProtection(null));
+    if (!protection.enabled) return attemptWrite(() => ws(this, sheet).setSheetProtection(null));
     const input: SheetProtectionInput = {
       algorithmName: protection.algorithmName || null,
       hashValue: protection.hashValue || null,
@@ -166,7 +135,7 @@ export abstract class WorkbookHandleProtectionMethods {
     const defined = Object.fromEntries(
       Object.entries(input).filter(([, value]) => value !== undefined),
     ) as SheetProtectionInput;
-    return attempt(() => ws(this, sheet).setSheetProtection(defined));
+    return attemptWrite(() => ws(this, sheet).setSheetProtection(defined));
   }
 
   /** Reads `<workbookProtection>`. `null` when the workbook carries none or
@@ -181,7 +150,7 @@ export abstract class WorkbookHandleProtectionMethods {
   setWorkbookProtection(protection: WorkbookProtectionInput | null): boolean {
     assertAlive(this);
     if (!this.capabilities.workbookProtectionRoundtrip) return false;
-    return attempt(() => wb(this).setWorkbookProtection(protection));
+    return attemptWrite(() => wb(this).setWorkbookProtection(protection));
   }
 
   /** The `<protectedRange>` records of `sheet` in file order; empty when the
@@ -195,7 +164,7 @@ export abstract class WorkbookHandleProtectionMethods {
   addProtectedRange(sheet: number, range: ProtectedRangeInput): boolean {
     assertAlive(this);
     if (!this.capabilities.protectedRanges) return false;
-    return attempt(() => {
+    return attemptWrite(() => {
       ws(this, sheet).addProtectedRange(range);
     });
   }
@@ -203,13 +172,13 @@ export abstract class WorkbookHandleProtectionMethods {
   updateProtectedRange(sheet: number, index: number, range: ProtectedRangeInput): boolean {
     assertAlive(this);
     if (!this.capabilities.protectedRanges) return false;
-    return attempt(() => ws(this, sheet).updateProtectedRange(index, range));
+    return attemptWrite(() => ws(this, sheet).updateProtectedRange(index, range));
   }
 
   removeProtectedRange(sheet: number, index: number): boolean {
     assertAlive(this);
     if (!this.capabilities.protectedRanges) return false;
-    return attempt(() => ws(this, sheet).removeProtectedRange(index));
+    return attemptWrite(() => ws(this, sheet).removeProtectedRange(index));
   }
 }
 

@@ -2,9 +2,6 @@ import type { Formulon } from '@libraz/formulon';
 import { isUsingStub } from './loader.js';
 import type { EngineCapabilities } from './types.js';
 
-export const ENGINE_SPREADSHEET_PROFILE_GETTER = 'getProfileId';
-export const ENGINE_SPREADSHEET_PROFILE_SETTER = 'setProfileId';
-
 /** The pinned engine provides every capability. */
 const ENGINE_CAPABILITIES: EngineCapabilities = Object.freeze({
   typedAutoFilter: true,

@@ -8,7 +8,7 @@ import type { WorkbookHandle } from './workbook-handle.js';
  * language, which makes the same workbook sort differently after it moves
  * between hosts.
  */
-export interface ProfileTextSemantics {
+interface ProfileTextSemantics {
   readonly locale: string;
   readonly compare: (left: string, right: string) => number;
   readonly equals: (left: string, right: string) => boolean;

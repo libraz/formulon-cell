@@ -1,5 +1,6 @@
 import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
+import { sameAddr } from './direct-format.js';
 import { rangeArea } from './selection-geometry.js';
 import type { SpreadsheetStore } from './store.js';
 import type { TraceArrow } from './types.js';
@@ -14,9 +15,7 @@ export const auditingMutators = {
    *  already watched — duplicate entries would render redundant rows. */
   addWatch(store: SpreadsheetStore, addr: Addr): void {
     store.setState((s) => {
-      const exists = s.watch.watches.some(
-        (w) => w.sheet === addr.sheet && w.row === addr.row && w.col === addr.col,
-      );
+      const exists = s.watch.watches.some((w) => sameAddr(w, addr));
       if (exists) return s;
       return {
         ...s,
@@ -36,7 +35,7 @@ export const auditingMutators = {
       for (const range of ranges) {
         for (let row = range.r0; row <= range.r1; row += 1) {
           for (let col = range.c0; col <= range.c1; col += 1) {
-            const key = `${range.sheet}:${row}:${col}`;
+            const key = addrKey({ sheet: range.sheet, row, col });
             if (seen.has(key)) continue;
             seen.add(key);
             next.push({ sheet: range.sheet, row, col });
@@ -52,9 +51,7 @@ export const auditingMutators = {
   /** Unpin `addr` from the Watch Window. No-op when not present. */
   removeWatch(store: SpreadsheetStore, addr: Addr): void {
     store.setState((s) => {
-      const next = s.watch.watches.filter(
-        (w) => !(w.sheet === addr.sheet && w.row === addr.row && w.col === addr.col),
-      );
+      const next = s.watch.watches.filter((w) => !sameAddr(w, addr));
       if (next.length === s.watch.watches.length) return s;
       return { ...s, watch: { watches: next } };
     });
@@ -100,14 +97,7 @@ export const auditingMutators = {
   addTrace(store: SpreadsheetStore, item: TraceArrow): void {
     store.setState((s) => {
       const exists = s.traces.items.some(
-        (t) =>
-          t.kind === item.kind &&
-          t.from.sheet === item.from.sheet &&
-          t.from.row === item.from.row &&
-          t.from.col === item.from.col &&
-          t.to.sheet === item.to.sheet &&
-          t.to.row === item.to.row &&
-          t.to.col === item.to.col,
+        (t) => t.kind === item.kind && sameAddr(t.from, item.from) && sameAddr(t.to, item.to),
       );
       if (exists) return s;
       return {

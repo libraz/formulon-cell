@@ -7,10 +7,10 @@ import { isSingleCell } from './selection-geometry.js';
 import type { SpreadsheetStore } from './store.js';
 import type { CellFormat, CustomCellStyle } from './types.js';
 
-/** Cell values, the active sheet's data, per-cell formats and merges. */
 /** Largest area `setRangeFormat` paints; larger ranges are ignored. */
 export const MAX_RANGE_FORMAT_CELLS = 100_000;
 
+/** Cell values, the active sheet's data, per-cell formats and merges. */
 export const cellMutators = {
   setCell(
     store: SpreadsheetStore,

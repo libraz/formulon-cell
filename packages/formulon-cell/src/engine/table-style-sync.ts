@@ -7,6 +7,7 @@ import {
   type StripeElement,
 } from '../commands/format-as-table.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { nameKey } from '../store/table-names.js';
 import type { CellFormat, TablesSlice } from '../store/types.js';
 import { dxfToApply } from './cf-sync.js';
 import { dxfRecordFromApply } from './cf-writeback.js';
@@ -122,7 +123,7 @@ export function customStyleFromEngine(
 }
 
 /** Custom styles, and the PivotTable assignments naming them, as the engine holds them. */
-export function tableStylesFromEngine(
+function tableStylesFromEngine(
   wb: StyleReader,
 ): Pick<TablesSlice, 'customTableStyles' | 'customPivotTableStyles' | 'pivotTableStyles'> {
   const customTableStyles: CustomTableStyle[] = [];
@@ -207,7 +208,7 @@ export class TableStyleMirror {
     const pivots = after.customPivotTableStyles ?? [];
     const rejected: string[] = [];
     const sameLabel = (list: readonly CustomTableStyle[], label: string) =>
-      list.find((s) => s.label.toLocaleLowerCase() === label.toLocaleLowerCase());
+      list.find((s) => nameKey(s.label) === nameKey(label));
     const write = (
       list: readonly CustomTableStyle[],
       previous: readonly CustomTableStyle[],

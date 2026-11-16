@@ -3,7 +3,7 @@ import type { WorkbookHandle } from './workbook-handle.js';
 /** The two workbook theme presets exposed by the Page Layout and Mac ribbon. */
 export type WorkbookThemePresetId = 'office' | 'gray';
 
-export interface WorkbookThemePreset {
+interface WorkbookThemePreset {
   readonly colors: readonly number[];
   readonly fonts: {
     readonly majorLatin: string;

@@ -1,6 +1,7 @@
 import type { CellFormat, SpreadsheetStore } from '../store/store.js';
 import { addrKey, parseAddrKey } from './address.js';
 import type { EngineSyncOptions } from './cell-format-sync.js';
+import { strictSyncError } from './strict-sync-error.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 /** The grid fields of a note the engine holds. */
@@ -14,8 +15,8 @@ const commentPatch = (e: {
   ...(e.visible ? { commentVisible: true } : {}),
 });
 
-const strictSyncError = (operation: string, address: string): Error =>
-  new Error(`Strict engine sync failed: hyperlinks ${operation} at ${address}`);
+const strictError = (operation: string, address: string): Error =>
+  strictSyncError('hyperlinks', operation, address);
 
 /**
  * Seed cell-level comment and hyperlink fields from engine state for `sheet`.
@@ -126,7 +127,7 @@ export function syncHyperlinksToEngine(
   const strict = options?.strict === true;
   const clearSucceeded = wb.clearHyperlinks(sheet);
   if (strict && !clearSucceeded) {
-    throw strictSyncError('clearHyperlinks', `sheet:${sheet}`);
+    throw strictError('clearHyperlinks', `sheet:${sheet}`);
   }
   const formats = store.getState().format.formats;
   for (const [key, fmt] of formats) {
@@ -162,7 +163,7 @@ export function syncHyperlinksToEngine(
             ...(location ? [location] : []),
           );
     if (strict && !addSucceeded) {
-      throw strictSyncError('addHyperlink', key);
+      throw strictError('addHyperlink', key);
     }
   }
 }

@@ -20,55 +20,23 @@ import type {
   SheetRect,
 } from '@libraz/formulon';
 import { ColorContext, ColorKind } from '@libraz/formulon';
-import { isFormulonError } from './result.js';
-import type { EngineCapabilities, Workbook } from './types.js';
+import { attemptWrite, orFallback } from './result.js';
+import type { EngineCapabilities } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import { assertAlive, internals } from './workbook-handle-internals.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
-type WorkbookHandleInternals = {
-  wb: Workbook;
-  assertAlive(): void;
-};
 
 export type EngineChartInfo = ChartProperties;
 export type EngineChartData = ChartData;
-export type EngineChartInsertOptions = ChartInput;
+type EngineChartInsertOptions = ChartInput;
 
 declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandleChartsMethods {}
 }
 
-function internals(handle: unknown): WorkbookHandleInternals {
-  return handle as WorkbookHandleInternals;
-}
-
-function assertAlive(handle: unknown): void {
-  internals(handle).assertAlive();
-}
-
 function chartOf(handle: unknown, sheet: number, objectId: number): Chart {
   return internals(handle).wb.sheet(sheet).chart(objectId);
-}
-
-/** Run a chart edit; an engine error is a `false` outcome. */
-function edit(run: () => void): boolean {
-  try {
-    run();
-    return true;
-  } catch (e) {
-    if (!isFormulonError(e)) throw e;
-    return false;
-  }
-}
-
-/** Run a chart read; an engine error reads as null. */
-function read<T>(run: () => T): T | null {
-  try {
-    return run();
-  } catch (e) {
-    if (!isFormulonError(e)) throw e;
-    return null;
-  }
 }
 
 const isThemeColor = (value: object): value is Color =>
@@ -96,7 +64,7 @@ export abstract class WorkbookHandleChartsMethods {
     assertAlive(this);
     if (!this.capabilities.charts) return null;
     const wb = internals(this).wb;
-    const info = read(() => chartOf(this, sheet, objectId).getProperties());
+    const info = orFallback(null, () => chartOf(this, sheet, objectId).getProperties());
     if (!info) return null;
     return renderThemeColors(info, (color) => ({
       ...color,
@@ -109,7 +77,7 @@ export abstract class WorkbookHandleChartsMethods {
   getChartData(sheet: number, objectId: number): EngineChartData | null {
     assertAlive(this);
     if (!this.capabilities.charts) return null;
-    return read(() => chartOf(this, sheet, objectId).getData());
+    return orFallback(null, () => chartOf(this, sheet, objectId).getData());
   }
 
   /** Resolve the series as if `overrides` were applied; the workbook is unchanged. */
@@ -120,14 +88,15 @@ export abstract class WorkbookHandleChartsMethods {
   ): EngineChartData | null {
     assertAlive(this);
     if (!this.capabilities.charts) return null;
-    return read(() => chartOf(this, sheet, objectId).getPreview({ ...overrides }));
+    return orFallback(null, () => chartOf(this, sheet, objectId).getPreview({ ...overrides }));
   }
 
   /** Create a chart and return its object id. */
   insertChart(sheet: number, options: EngineChartInsertOptions): number | null {
     assertAlive(this);
     if (!this.capabilities.charts) return null;
-    return read(
+    return orFallback(
+      null,
       () =>
         internals(this)
           .wb.sheet(sheet)
@@ -144,14 +113,14 @@ export abstract class WorkbookHandleChartsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return edit(() => chartOf(this, sheet, objectId).setType(plot, type, options));
+    return attemptWrite(() => chartOf(this, sheet, objectId).setType(plot, type, options));
   }
 
   /** Set the title text; null removes the title, an `Auto` title returns it to Excel's automatic one. */
   setChartTitle(sheet: number, objectId: number, title: string | null | ChartTitle): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return edit(() => chartOf(this, sheet, objectId).setTitle(title));
+    return attemptWrite(() => chartOf(this, sheet, objectId).setTitle(title));
   }
 
   /** Place the legend; a null position removes it. */
@@ -164,7 +133,7 @@ export abstract class WorkbookHandleChartsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return edit(() => {
+    return attemptWrite(() => {
       const chart = chartOf(this, sheet, objectId);
       if (position === null) chart.setLegend(null);
       else {
@@ -180,7 +149,7 @@ export abstract class WorkbookHandleChartsMethods {
   setChartAxis(sheet: number, objectId: number, axisId: number, patch: ChartAxisPatch): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return edit(() => chartOf(this, sheet, objectId).updateAxis(axisId, { ...patch }));
+    return attemptWrite(() => chartOf(this, sheet, objectId).updateAxis(axisId, { ...patch }));
   }
 
   /** Set how blanks plot and whether hidden cells are skipped; null removes the element. */
@@ -192,7 +161,9 @@ export abstract class WorkbookHandleChartsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return edit(() => chartOf(this, sheet, objectId).updateDisplay({ blanksAs, plotVisibleOnly }));
+    return attemptWrite(() =>
+      chartOf(this, sheet, objectId).updateDisplay({ blanksAs, plotVisibleOnly }),
+    );
   }
 
   setChartSeries(
@@ -204,7 +175,7 @@ export abstract class WorkbookHandleChartsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return edit(() => chartOf(this, sheet, objectId).updateSeries(plot, seriesIdx, patch));
+    return attemptWrite(() => chartOf(this, sheet, objectId).updateSeries(plot, seriesIdx, patch));
   }
 
   /** Patch a data point; null removes its formatting. */
@@ -218,7 +189,7 @@ export abstract class WorkbookHandleChartsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return edit(() => {
+    return attemptWrite(() => {
       const chart = chartOf(this, sheet, objectId);
       if (patch === null) chart.setPoint(plot, seriesIdx, pointIdx, null);
       else chart.updatePoint(plot, seriesIdx, pointIdx, patch);
@@ -228,7 +199,7 @@ export abstract class WorkbookHandleChartsMethods {
   setChartPlot(sheet: number, objectId: number, plot: number, patch: ChartPlotPatch): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return edit(() => chartOf(this, sheet, objectId).updatePlot(plot, { ...patch }));
+    return attemptWrite(() => chartOf(this, sheet, objectId).updatePlot(plot, { ...patch }));
   }
 
   /** Replace the chart filter: series by `c:idx`, categories by position. */
@@ -240,7 +211,7 @@ export abstract class WorkbookHandleChartsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return edit(() =>
+    return attemptWrite(() =>
       chartOf(this, sheet, objectId).setFilter({
         hiddenSeries: [...hiddenSeries],
         hiddenCategories: [...hiddenCategories],
@@ -257,13 +228,13 @@ export abstract class WorkbookHandleChartsMethods {
   ): number | null {
     assertAlive(this);
     if (!this.capabilities.charts) return null;
-    return read(() => chartOf(this, sheet, objectId).addSeries(plot, input));
+    return orFallback(null, () => chartOf(this, sheet, objectId).addSeries(plot, input));
   }
 
   removeChartSeries(sheet: number, objectId: number, plot: number, seriesIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return edit(() => chartOf(this, sheet, objectId).removeSeries(plot, seriesIdx));
+    return attemptWrite(() => chartOf(this, sheet, objectId).removeSeries(plot, seriesIdx));
   }
 
   setChartSource(
@@ -276,7 +247,7 @@ export abstract class WorkbookHandleChartsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.charts) return false;
-    return edit(() =>
+    return attemptWrite(() =>
       chartOf(this, sheet, objectId).setSource({
         range: source,
         direction,

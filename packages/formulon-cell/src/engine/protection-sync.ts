@@ -1,4 +1,4 @@
-import type { CellRect, ProtectedRangeInput, WorkbookProtectionInput } from '@libraz/formulon';
+import type { ProtectedRangeInput, WorkbookProtectionInput } from '@libraz/formulon';
 import { newAllowedEditRangeId } from '../store/sheet-settings-mutators.js';
 import {
   type AllowedEditRange,
@@ -9,7 +9,14 @@ import {
   type SpreadsheetStore,
   type WorkbookStructureProtectionState,
 } from '../store/store.js';
-import { colFromLetters, formatA1Range, MAX_COL, MAX_ROW } from './address.js';
+import {
+  colFromLetters,
+  formatA1Range,
+  MAX_COL,
+  MAX_ROW,
+  rangeOfRect,
+  rectOfRange,
+} from './address.js';
 import { legacySheetPasswordHash } from './protection-password.js';
 import { parseRangeRef } from './range-resolver.js';
 import type { Range } from './types.js';
@@ -90,10 +97,7 @@ export function hydrateSheetProtectionFromEngine(
 }
 
 /** Mirror `<workbookProtection lockStructure>` and its password into the store. */
-export function hydrateWorkbookProtectionFromEngine(
-  wb: WorkbookHandle,
-  store: SpreadsheetStore,
-): void {
+function hydrateWorkbookProtectionFromEngine(wb: WorkbookHandle, store: SpreadsheetStore): void {
   if (!wb.capabilities.workbookProtectionRoundtrip) return;
   const p = wb.getWorkbookProtection();
   if (!p?.lockStructure) {
@@ -146,13 +150,6 @@ export function flushWorkbookProtectionToEngine(
   wb.setWorkbookProtection(next);
 }
 
-const rectOfArea = (area: Range): CellRect => ({
-  firstRow: area.r0,
-  firstCol: area.c0,
-  lastRow: area.r1,
-  lastCol: area.c1,
-});
-
 const parseSqrefArea = (token: string, sheet: number): Range | null => {
   const col = /^\$?([A-Za-z]+)(?::\$?([A-Za-z]+))?$/.exec(token);
   if (col) {
@@ -198,7 +195,7 @@ const protectedRangeFromEntry = (entry: AllowedEditRange): ProtectedRangeInput =
   const hash = entry.passwordHash;
   return {
     name: entry.title,
-    ranges: allowedEditRangeAreas(entry).map(rectOfArea),
+    ranges: allowedEditRangeAreas(entry).map(rectOfRange),
     legacyPasswordHash: hash
       ? null
       : (entry.legacyPasswordHash ??
@@ -222,15 +219,7 @@ export function hydrateProtectedRangesFromEngine(
   const existing = store.getState().protection.allowedEditRanges;
   const entries: AllowedEditRange[] = [];
   for (const record of wb.getProtectedRanges(sheet)) {
-    const [range, ...extraAreas] = record.ranges.map(
-      (rect): Range => ({
-        sheet,
-        r0: rect.firstRow,
-        c0: rect.firstCol,
-        r1: rect.lastRow,
-        c1: rect.lastCol,
-      }),
-    );
+    const [range, ...extraAreas] = record.ranges.map((rect) => rangeOfRect(sheet, rect));
     if (!range) continue;
     const previous = existing.find((e) => e.range.sheet === sheet && e.title === record.name);
     const passwordHash = sheetProtectionPasswordHashFromEngine(record);

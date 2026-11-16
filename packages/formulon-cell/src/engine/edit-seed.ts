@@ -6,7 +6,7 @@ import type { Addr, CellValue } from './types.js';
 import { formatBoolean, formatEditableNumber } from './value.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
-export interface FormatCellForEditOptions {
+interface FormatCellForEditOptions {
   formulaHidden?: boolean;
   sheetProtected?: boolean;
   formulaOverride?: string | null;

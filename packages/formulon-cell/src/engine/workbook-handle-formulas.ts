@@ -1,4 +1,5 @@
 import { type CalcMode, type ProfileId, RefMode } from '@libraz/formulon';
+import { cloneAddr, rangeOfRect } from './address.js';
 import { CALC_MODE_MANUAL, type CalcModeCode, type CompatibilityVersionCode } from './calc-mode.js';
 import {
   canonicalizeFormula,
@@ -14,7 +15,7 @@ import {
   localeTag,
   mergeFunctionMetadata,
 } from './function-metadata.js';
-import { isFormulonError } from './result.js';
+import { attemptWrite, orFallback } from './result.js';
 import { computeEngineSpillRanges } from './spill.js';
 import {
   type EngineSpreadsheetProfileId,
@@ -34,13 +35,17 @@ import type {
   Workbook,
 } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import {
+  assertAlive,
+  type WorkbookHandleInternals as SharedInternals,
+  wb,
+  ws,
+} from './workbook-handle-internals.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
-type WorkbookHandleInternals = {
-  wb: Workbook;
+type WorkbookHandleInternals = SharedInternals & {
   module: Formulon;
   functionMetadataProvider: FunctionMetadataProvider | null;
-  assertAlive(): void;
 };
 
 declare module './workbook-handle.js' {
@@ -63,45 +68,12 @@ function internals(handle: unknown): WorkbookHandleInternals {
   return handle as WorkbookHandleInternals;
 }
 
-function assertAlive(handle: unknown): void {
-  internals(handle).assertAlive();
-}
-
-function wb(handle: unknown): Workbook {
-  return internals(handle).wb;
-}
-
 function moduleOf(handle: unknown): Formulon {
   return internals(handle).module;
 }
 
-function ws(handle: unknown, sheet: number): Sheet {
-  return internals(handle).wb.sheet(sheet);
-}
-
 function engineProfile(profileId: SpreadsheetProfileId): ProfileId {
   return publicProfileToEngine(profileId) as ProfileId;
-}
-
-/** Run an engine call; null when the engine rejects it. */
-function attempt<T>(call: () => T): T | null {
-  try {
-    return call();
-  } catch (e) {
-    if (!isFormulonError(e)) throw e;
-    return null;
-  }
-}
-
-/** Run an engine write; false when the engine rejects it. */
-function attemptWrite(write: () => void): boolean {
-  try {
-    write();
-    return true;
-  } catch (e) {
-    if (!isFormulonError(e)) throw e;
-    return false;
-  }
 }
 
 /** The engine's circular-reference listing, absent from engine builds that predate it. */
@@ -151,13 +123,13 @@ export abstract class WorkbookHandleFormulasMethods {
     const canonical = this.formulaForEvaluation(formula);
     const module = moduleOf(this);
     const profile = this.capabilities.spreadsheetProfile ? wb(this).getProfileId() : null;
-    if (!profile) return attempt(() => module.evaluateTypedFormula(canonical));
+    if (!profile) return orFallback(null, () => module.evaluateTypedFormula(canonical));
     let scratch: Workbook | null = null;
     try {
       scratch = module.Workbook.createDefault();
       scratch.setProfileId(profile);
       const fresh = scratch;
-      return attempt(() => fresh.sheet(0).evaluateTypedFormula(0, 0, canonical));
+      return orFallback(null, () => fresh.sheet(0).evaluateTypedFormula(0, 0, canonical));
     } finally {
       scratch?.dispose();
     }
@@ -169,7 +141,9 @@ export abstract class WorkbookHandleFormulasMethods {
     assertAlive(this);
     if (!this.capabilities.formulaTextEvaluation) return null;
     const canonical = this.formulaForEvaluation(formula);
-    return attempt(() => ws(this, addr.sheet).evaluateTypedFormula(addr.row, addr.col, canonical));
+    return orFallback(null, () =>
+      ws(this, addr.sheet).evaluateTypedFormula(addr.row, addr.col, canonical),
+    );
   }
 
   /** Ad-hoc evaluation that returns the *whole* dynamic-array / spilled
@@ -183,7 +157,7 @@ export abstract class WorkbookHandleFormulasMethods {
       return single ? [[single]] : null;
     }
     const canonical = this.formulaForEvaluation(formula);
-    const rows = attempt(() =>
+    const rows = orFallback(null, () =>
       ws(this, addr.sheet).evaluateTypedFormulaArray(addr.row, addr.col, canonical),
     );
     return rows ? [...rows] : null;
@@ -200,7 +174,7 @@ export abstract class WorkbookHandleFormulasMethods {
     assertAlive(this);
     if (!this.capabilities.conditionalFormulaEvaluation) return null;
     const canonical = this.formulaForEvaluation(formula);
-    return attempt(() =>
+    return orFallback(null, () =>
       ws(this, addr.sheet).evaluateCfFormula(addr.row, addr.col, anchor.row, anchor.col, canonical),
     );
   }
@@ -226,9 +200,10 @@ export abstract class WorkbookHandleFormulasMethods {
   ): { anchorRow: number; anchorCol: number; rows: number; cols: number } | null {
     assertAlive(this);
     if (!this.capabilities.spillInfo) return null;
-    const r = attempt(() => ws(this, sheet).getSpill(row, col));
+    const r = orFallback(null, () => ws(this, sheet).getSpill(row, col));
     if (!r || r.blocked) return null;
-    if (!attempt(() => ws(this, sheet).getFormula(r.range.firstRow, r.range.firstCol))) return null;
+    if (!orFallback(null, () => ws(this, sheet).getFormula(r.range.firstRow, r.range.firstCol)))
+      return null;
     return {
       anchorRow: r.range.firstRow,
       anchorCol: r.range.firstCol,
@@ -243,15 +218,9 @@ export abstract class WorkbookHandleFormulasMethods {
   blockedSpillRange(sheet: number, row: number, col: number): Range | null {
     assertAlive(this);
     if (!this.capabilities.spillInfo) return null;
-    const r = attempt(() => ws(this, sheet).getSpill(row, col));
+    const r = orFallback(null, () => ws(this, sheet).getSpill(row, col));
     if (!r?.blocked) return null;
-    return {
-      sheet,
-      r0: r.range.firstRow,
-      c0: r.range.firstCol,
-      r1: r.range.lastRow,
-      c1: r.range.lastCol,
-    };
+    return rangeOfRect(sheet, r.range);
   }
 
   /** Returns every spill rect on `sheet` at engine precision. Returns
@@ -272,9 +241,11 @@ export abstract class WorkbookHandleFormulasMethods {
   precedents(addr: Addr, depth = 1): Addr[] | null {
     assertAlive(this);
     if (!this.capabilities.traceArrows) return null;
-    const arr = attempt(() => ws(this, addr.sheet).getPrecedents(addr.row, addr.col, depth));
+    const arr = orFallback(null, () =>
+      ws(this, addr.sheet).getPrecedents(addr.row, addr.col, depth),
+    );
     if (!arr) return null;
-    return arr.map((n) => ({ sheet: n.sheet, row: n.row, col: n.col }));
+    return arr.map(cloneAddr);
   }
 
   /** Cells whose formulas read from `addr` (1-step dependents by default).
@@ -283,9 +254,11 @@ export abstract class WorkbookHandleFormulasMethods {
   dependents(addr: Addr, depth = 1): Addr[] | null {
     assertAlive(this);
     if (!this.capabilities.traceArrows) return null;
-    const arr = attempt(() => ws(this, addr.sheet).getDependents(addr.row, addr.col, depth));
+    const arr = orFallback(null, () =>
+      ws(this, addr.sheet).getDependents(addr.row, addr.col, depth),
+    );
     if (!arr) return null;
-    return arr.map((n) => ({ sheet: n.sheet, row: n.row, col: n.col }));
+    return arr.map(cloneAddr);
   }
 
   /** Every registered function's canonical name in ascending sort order.
@@ -295,7 +268,7 @@ export abstract class WorkbookHandleFormulasMethods {
   functionNames(): readonly string[] | null {
     assertAlive(this);
     if (!this.capabilities.functionMetadata) return null;
-    const names = attempt(() => moduleOf(this).listFunctionNames());
+    const names = orFallback(null, () => moduleOf(this).listFunctionNames());
     return names ? [...names] : null;
   }
 
@@ -352,7 +325,7 @@ export abstract class WorkbookHandleFormulasMethods {
     assertAlive(this);
     if (!this.capabilities.functionMetadata) return null;
     const tag = displayLocaleTag(locale);
-    const m = attempt(() => moduleOf(this).getFunctionMetadata(name));
+    const m = orFallback(null, () => moduleOf(this).getFunctionMetadata(name));
     if (!m) return null;
     const provider = internals(this).functionMetadataProvider;
     const canonical = m.name ?? name;
@@ -397,7 +370,9 @@ export abstract class WorkbookHandleFormulasMethods {
     const profile = engineProfile(
       spreadsheetProfileForLocaleOrdinal(this.spreadsheetProfileId(), locale as LocaleOrdinal),
     );
-    return attempt(() => moduleOf(this).localizeFunctionName(canonicalName, profile)) ?? '';
+    return (
+      orFallback(null, () => moduleOf(this).localizeFunctionName(canonicalName, profile)) ?? ''
+    );
   }
 
   /** Localized → canonical function-name lookup. Falls through to a
@@ -411,7 +386,9 @@ export abstract class WorkbookHandleFormulasMethods {
     const profile = engineProfile(
       spreadsheetProfileForLocaleOrdinal(this.spreadsheetProfileId(), locale as LocaleOrdinal),
     );
-    return attempt(() => moduleOf(this).canonicalizeFunctionName(localizedName, profile)) ?? '';
+    return (
+      orFallback(null, () => moduleOf(this).canonicalizeFunctionName(localizedName, profile)) ?? ''
+    );
   }
 
   /**
@@ -433,7 +410,8 @@ export abstract class WorkbookHandleFormulasMethods {
     if (!this.capabilities.formulaLocale) return aliasOnly();
     if (!profile) return aliasOnly();
     return (
-      attempt(() => moduleOf(this).localizeFormula(formula, engineProfile(profile))) ?? aliasOnly()
+      orFallback(null, () => moduleOf(this).localizeFormula(formula, engineProfile(profile))) ??
+      aliasOnly()
     );
   }
 
@@ -446,7 +424,7 @@ export abstract class WorkbookHandleFormulasMethods {
     assertAlive(this);
     const profile = this.spreadsheetProfileId();
     if (!this.capabilities.formulaLocale || !profile) return null;
-    return attempt(() =>
+    return orFallback(null, () =>
       moduleOf(this).localizeFormula(formula, engineProfile(profile), {
         r1c1: true,
         baseRow: base.row,
@@ -474,7 +452,7 @@ export abstract class WorkbookHandleFormulasMethods {
     if (!this.capabilities.formulaLocale) return aliasOnly();
     if (!profile) return aliasOnly();
     return (
-      attempt(() => moduleOf(this).canonicalizeFormula(formula, engineProfile(profile))) ??
+      orFallback(null, () => moduleOf(this).canonicalizeFormula(formula, engineProfile(profile))) ??
       aliasOnly()
     );
   }
@@ -485,7 +463,7 @@ export abstract class WorkbookHandleFormulasMethods {
     if (!this.capabilities.localeFacts) return null;
     const profile = profileOverride ?? this.spreadsheetProfileId();
     if (!profile) return null;
-    return attempt(() => moduleOf(this).getLocaleFacts(engineProfile(profile)));
+    return orFallback(null, () => moduleOf(this).getLocaleFacts(engineProfile(profile)));
   }
 
   /** Workbook calc-mode metadata mirroring `<calcPr calcMode>`. The engine
@@ -499,7 +477,7 @@ export abstract class WorkbookHandleFormulasMethods {
   calcMode(): CalcModeCode | null {
     assertAlive(this);
     if (!this.capabilities.calcMode) return null;
-    return attempt(() => wb(this).getCalcMode());
+    return orFallback(null, () => wb(this).getCalcMode());
   }
 
   /** Whether the engine lists a sheet's circular references (`Sheet.listCircularReferences`). */
@@ -515,7 +493,7 @@ export abstract class WorkbookHandleFormulasMethods {
     assertAlive(this);
     if (!sheetHasMethod(this, 'listCircularReferences')) return null;
     const s = ws(this, sheet) as Sheet & CircularReferenceAccess;
-    const cells = attempt(() => s.listCircularReferences?.() ?? []);
+    const cells = orFallback(null, () => s.listCircularReferences?.() ?? []);
     return cells?.map(({ row, col }) => ({ row, col })) ?? null;
   }
 
@@ -531,7 +509,7 @@ export abstract class WorkbookHandleFormulasMethods {
     assertAlive(this);
     const s = ws(this, addr.sheet) as Sheet & StaleValueAccess;
     if (!hasMethod(s, 'isCellStale')) return false;
-    return attempt(() => s.isCellStale?.(addr.row, addr.col)) === true;
+    return orFallback(null, () => s.isCellStale?.(addr.row, addr.col)) === true;
   }
 
   /** The workbook's Compatibility Version stamp, or `null` when the engine has no accessor. A
@@ -540,7 +518,7 @@ export abstract class WorkbookHandleFormulasMethods {
     assertAlive(this);
     const w = wb(this) as Workbook & CompatibilityVersionAccess;
     if (!hasMethod(w, 'getCompatibilityVersion')) return null;
-    return attempt(() => w.getCompatibilityVersion?.() ?? null);
+    return orFallback(null, () => w.getCompatibilityVersion?.() ?? null);
   }
 
   /** Sets the Compatibility Version and recalculates the formulas the engine marked. Returns
@@ -583,10 +561,10 @@ export abstract class WorkbookHandleFormulasMethods {
     if (!this.capabilities.calcSettings) return null;
     const w = wb(this);
     return {
-      fullPrecision: attempt(() => w.getFullPrecision()) ?? true,
-      calcOnSave: attempt(() => w.getCalcOnSave()) ?? true,
-      r1c1: (attempt(() => w.getRefMode()) ?? RefMode.A1) !== RefMode.A1,
-      date1904: attempt(() => w.getDate1904()) ?? false,
+      fullPrecision: orFallback(null, () => w.getFullPrecision()) ?? true,
+      calcOnSave: orFallback(null, () => w.getCalcOnSave()) ?? true,
+      r1c1: (orFallback(null, () => w.getRefMode()) ?? RefMode.A1) !== RefMode.A1,
+      date1904: orFallback(null, () => w.getDate1904()) ?? false,
     };
   }
 
@@ -619,7 +597,7 @@ export abstract class WorkbookHandleFormulasMethods {
   spreadsheetProfileId(): SpreadsheetProfileId | null {
     assertAlive(this);
     if (!this.capabilities.spreadsheetProfile) return null;
-    const profile = attempt(() => wb(this).getProfileId());
+    const profile = orFallback(null, () => wb(this).getProfileId());
     return profile ? engineProfileToPublic(profile as EngineSpreadsheetProfileId) : null;
   }
 
@@ -649,7 +627,7 @@ export abstract class WorkbookHandleFormulasMethods {
   getIterative(): { enabled: boolean; maxIterations: number; maxChange: number } | null {
     assertAlive(this);
     if (!this.capabilities.iterativeSettings) return null;
-    const r = attempt(() => wb(this).getIterative());
+    const r = orFallback(null, () => wb(this).getIterative());
     if (!r) return null;
     return { enabled: r.enabled, maxIterations: r.maxIterations, maxChange: r.maxChange };
   }
@@ -682,7 +660,7 @@ export abstract class WorkbookHandleFormulasMethods {
   getLambdaText(addr: Addr): string | null {
     assertAlive(this);
     if (!this.capabilities.lambdaText) return null;
-    const text = attempt(() => ws(this, addr.sheet).getLambdaText(addr.row, addr.col));
+    const text = orFallback(null, () => ws(this, addr.sheet).getLambdaText(addr.row, addr.col));
     return text ? nameFormulaText(text) || null : null;
   }
 
@@ -718,7 +696,7 @@ export abstract class WorkbookHandleFormulasMethods {
     const w = wb(this);
     if (formula.length === 0) return attemptWrite(() => w.removeDefinedName(name, scope));
     // The engine replaces every attribute; a formula edit keeps the note and flag.
-    const existing = attempt(() => w.getDefinedName(name, scope));
+    const existing = orFallback(null, () => w.getDefinedName(name, scope));
     return attemptWrite(() =>
       w.setDefinedName({
         name,
@@ -742,7 +720,7 @@ export abstract class WorkbookHandleFormulasMethods {
     if (!this.capabilities.definedNameAttrs) return false;
     const scope = localSheetId < 0 ? null : localSheetId;
     const w = wb(this);
-    const existing = attempt(() => w.getDefinedName(name, scope));
+    const existing = orFallback(null, () => w.getDefinedName(name, scope));
     if (!existing) return false;
     return attemptWrite(() =>
       w.setDefinedName({

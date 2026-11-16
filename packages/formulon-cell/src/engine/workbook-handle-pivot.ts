@@ -16,6 +16,7 @@ import type {
   PivotWorksheetSourceInput,
 } from '@libraz/formulon';
 import { PivotDatePeriod, StatusCode } from '@libraz/formulon';
+import { rangeOfRect } from './address.js';
 import {
   isEmptyPivotLayout,
   PIVOT_CELL_KIND,
@@ -23,7 +24,7 @@ import {
   PIVOT_PLACEHOLDER_ROWS,
   type PivotCellExpansion,
 } from './pivot-cell-kind.js';
-import { isFormulonError } from './result.js';
+import { isFormulonError, orFallback } from './result.js';
 import { type SpillOccupantSource, spillBlockers, spillOccupancy } from './spill-blockers.js';
 import type {
   Addr,
@@ -157,16 +158,6 @@ function assertAlive(handle: unknown): void {
   internals(handle).assertAlive();
 }
 
-/** Run an engine call whose failure is a soft outcome: an engine error yields `fallback`. */
-function attempt<T>(fallback: T, run: () => T): T {
-  try {
-    return run();
-  } catch (e) {
-    if (!isFormulonError(e)) throw e;
-    return fallback;
-  }
-}
-
 function pivotOf(handle: unknown, sheet: number, pivotIdx: number): Pivot {
   return rawWb(handle).sheet(sheet).pivot(pivotIdx);
 }
@@ -177,7 +168,7 @@ function cacheOf(handle: unknown, cacheId: number): PivotCache {
 
 /** Number of reports on `sheet`; null when the sheet cannot be read. */
 function pivotCount(handle: unknown, sheet: number): number | null {
-  return attempt(null, () => rawWb(handle).sheet(sheet).listPivots().length);
+  return orFallback(null, () => rawWb(handle).sheet(sheet).listPivots().length);
 }
 
 /** Cache index of `fieldName`. When the engine cannot tie the report to its
@@ -254,7 +245,7 @@ function fromNativeValue(v: NativeValue): CellValue {
 
 /** The engine's layout of a report, or null when it cannot be read. */
 function readLayout(handle: unknown, sheet: number, pivotIndex: number): RawPivotLayout | null {
-  const layout = attempt(null, () => pivotOf(handle, sheet, pivotIndex).getLayout());
+  const layout = orFallback(null, () => pivotOf(handle, sheet, pivotIndex).getLayout());
   if (!layout) return null;
   const cells = layout.cells.map((c) => ({
     row: c.row,
@@ -287,7 +278,7 @@ function effectiveLayout(
 ): RawPivotLayout | null {
   const layout = readLayout(handle, sheet, pivotIndex);
   if (!layout || layout.rows <= 0 || layout.cols <= 0) return layout;
-  if (attempt(null, () => pivotOf(handle, sheet, pivotIndex).getSpill())?.blocked) {
+  if (orFallback(null, () => pivotOf(handle, sheet, pivotIndex).getSpill())?.blocked) {
     const anchor = { sheet, row: layout.top, col: layout.left };
     const cell: LayoutCell = {
       row: anchor.row,
@@ -324,17 +315,11 @@ export abstract class WorkbookHandlePivotMethods {
     if (n === null) return [];
     const out: PivotSpill[] = [];
     for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
-      const spill = attempt(null, () => pivotOf(this, sheet, pivotIndex).getSpill());
+      const spill = orFallback(null, () => pivotOf(this, sheet, pivotIndex).getSpill());
       if (!spill?.blocked) continue;
       const layout = readLayout(this, sheet, pivotIndex);
       const { range } = spill;
-      const needed: Range = {
-        sheet,
-        r0: range.firstRow,
-        c0: range.firstCol,
-        r1: range.lastRow,
-        c1: range.lastCol,
-      };
+      const needed: Range = rangeOfRect(sheet, range);
       const anchor: Addr = layout
         ? { sheet, row: layout.top, col: layout.left }
         : { sheet, row: needed.r0, col: needed.c0 };
@@ -576,13 +561,13 @@ export abstract class WorkbookHandlePivotMethods {
   pivotCacheCount(): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return 0;
-    return attempt(0, () => rawWb(this).listPivotCaches().length);
+    return orFallback(0, () => rawWb(this).listPivotCaches().length);
   }
 
   pivotCacheIds(): number[] {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return [];
-    return attempt([], () =>
+    return orFallback([], () =>
       rawWb(this)
         .listPivotCaches()
         .map((cache) => cache.cacheId),
@@ -593,13 +578,13 @@ export abstract class WorkbookHandlePivotMethods {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return -1;
     // 0 asks the engine to assign the id.
-    return attempt(-1, () => rawWb(this).addPivotCache(requestedId || null).cacheId);
+    return orFallback(-1, () => rawWb(this).addPivotCache(requestedId || null).cacheId);
   }
 
   removePivotCache(cacheId: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       rawWb(this).removePivotCache(cacheId);
       return true;
     });
@@ -608,13 +593,13 @@ export abstract class WorkbookHandlePivotMethods {
   getPivotCacheWorksheetSource(cacheId: number): PivotWorksheetSource | null {
     assertAlive(this);
     if (!this.capabilities.pivotCacheSource) return null;
-    return attempt(null, () => cacheOf(this, cacheId).getWorksheetSource());
+    return orFallback(null, () => cacheOf(this, cacheId).getWorksheetSource());
   }
 
   setPivotCacheWorksheetSource(cacheId: number, source: PivotWorksheetSourceInput | null): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotCacheSource) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       cacheOf(this, cacheId).setWorksheetSource(source);
       return true;
     });
@@ -623,14 +608,14 @@ export abstract class WorkbookHandlePivotMethods {
   pivotCacheFieldCount(cacheId: number): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return 0;
-    return attempt(0, () => cacheOf(this, cacheId).listFields().length);
+    return orFallback(0, () => cacheOf(this, cacheId).listFields().length);
   }
 
   /** The fields of a pivot cache with the value kinds their source column holds. */
   pivotCacheFields(cacheId: number): readonly PivotCacheField[] {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return [];
-    return attempt([], () => cacheOf(this, cacheId).listFields());
+    return orFallback([], () => cacheOf(this, cacheId).listFields());
   }
 
   /** Rebuilds a cache from its worksheet source and re-projects its reports, as Refresh does.
@@ -650,7 +635,7 @@ export abstract class WorkbookHandlePivotMethods {
   pivotCacheFieldNames(cacheId: number): string[] {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return [];
-    return attempt([], () =>
+    return orFallback([], () =>
       cacheOf(this, cacheId)
         .listFields()
         .map((field) => field.name),
@@ -662,7 +647,7 @@ export abstract class WorkbookHandlePivotMethods {
   pivotCacheSharedItems(cacheId: number, fieldIdx: number): CellValue[] {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return [];
-    return attempt([], () =>
+    return orFallback([], () =>
       cacheOf(this, cacheId)
         .listFieldSharedItems(fieldIdx)
         .map((item) => fromNativeValue(item.value)),
@@ -672,13 +657,13 @@ export abstract class WorkbookHandlePivotMethods {
   addPivotCacheField(cacheId: number, name: string): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return -1;
-    return attempt(-1, () => cacheOf(this, cacheId).addField(name));
+    return orFallback(-1, () => cacheOf(this, cacheId).addField(name));
   }
 
   clearPivotCacheFields(cacheId: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       cacheOf(this, cacheId).clearFields();
       return true;
     });
@@ -687,7 +672,7 @@ export abstract class WorkbookHandlePivotMethods {
   addPivotCacheSharedItem(cacheId: number, fieldIdx: number, value: CellValue): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       cacheOf(this, cacheId).addFieldSharedItem(fieldIdx, toCacheValue(value));
       return true;
     });
@@ -696,7 +681,7 @@ export abstract class WorkbookHandlePivotMethods {
   clearPivotCacheSharedItems(cacheId: number, fieldIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       cacheOf(this, cacheId).clearFieldSharedItems(fieldIdx);
       return true;
     });
@@ -705,13 +690,13 @@ export abstract class WorkbookHandlePivotMethods {
   addPivotCacheRecord(cacheId: number): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return -1;
-    return attempt(-1, () => cacheOf(this, cacheId).addRecord());
+    return orFallback(-1, () => cacheOf(this, cacheId).addRecord());
   }
 
   clearPivotCacheRecords(cacheId: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       cacheOf(this, cacheId).clearRecords();
       return true;
     });
@@ -725,7 +710,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       cacheOf(this, cacheId).setRecordValue(recordIdx, fieldIdx, toCacheValue(value));
       return true;
     });
@@ -739,7 +724,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return -1;
-    return attempt(
+    return orFallback(
       -1,
       () =>
         rawWb(this)
@@ -751,14 +736,14 @@ export abstract class WorkbookHandlePivotMethods {
   pivotTableCacheId(sheet: number, pivotIdx: number): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return -1;
-    return attempt(-1, () => pivotOf(this, sheet, pivotIdx).cache().cacheId);
+    return orFallback(-1, () => pivotOf(this, sheet, pivotIdx).cache().cacheId);
   }
 
   /** The PivotTable's stored name, or null when it cannot be read. */
   pivotTableName(sheet: number, pivotIdx: number): string | null {
     assertAlive(this);
     if (!this.capabilities.pivotDefinitionRead) return null;
-    return attempt(null, () => pivotOf(this, sheet, pivotIdx).name);
+    return orFallback(null, () => pivotOf(this, sheet, pivotIdx).name);
   }
 
   getPivotTableGrandTotals(
@@ -767,7 +752,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): { rows: boolean; cols: boolean } | null {
     assertAlive(this);
     if (!this.capabilities.pivotDefinitionRead) return null;
-    return attempt(null, () => {
+    return orFallback(null, () => {
       const totals = pivotOf(this, sheet, pivotIdx).getGrandTotals();
       return { rows: totals.rows, cols: totals.columns };
     });
@@ -777,20 +762,20 @@ export abstract class WorkbookHandlePivotMethods {
   pivotRowFieldOrder(sheet: number, pivotIdx: number): number[] | null {
     assertAlive(this);
     if (!this.capabilities.pivotDefinitionRead) return null;
-    return attempt(null, () => [...pivotOf(this, sheet, pivotIdx).getRowFieldOrder()]);
+    return orFallback(null, () => [...pivotOf(this, sheet, pivotIdx).getRowFieldOrder()]);
   }
 
   /** Pivot field indices on the column axis, in display order; null when unreadable. */
   pivotColFieldOrder(sheet: number, pivotIdx: number): number[] | null {
     assertAlive(this);
     if (!this.capabilities.pivotDefinitionRead) return null;
-    return attempt(null, () => [...pivotOf(this, sheet, pivotIdx).getColumnFieldOrder()]);
+    return orFallback(null, () => [...pivotOf(this, sheet, pivotIdx).getColumnFieldOrder()]);
   }
 
   getPivotField(sheet: number, pivotIdx: number, fieldIdx: number): PivotFieldDefinition | null {
     assertAlive(this);
     if (!this.capabilities.pivotDefinitionRead) return null;
-    return attempt(null, () => {
+    return orFallback(null, () => {
       const pivot = pivotOf(this, sheet, pivotIdx);
       const r = pivot.getField(fieldIdx);
       const items: PivotItemDefinition[] = pivot.listFieldItems(fieldIdx).map((item) => ({
@@ -853,7 +838,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): PivotDataFieldSpec | null {
     assertAlive(this);
     if (!this.capabilities.pivotDefinitionRead) return null;
-    return attempt(null, () => {
+    return orFallback(null, () => {
       const r = pivotOf(this, sheet, pivotIdx).getDataField(dataFieldIdx);
       return {
         name: r.name,
@@ -911,7 +896,7 @@ export abstract class WorkbookHandlePivotMethods {
   removePivotTable(sheet: number, pivotIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       rawWb(this).sheet(sheet).removePivot(pivotIdx);
       return true;
     });
@@ -920,7 +905,7 @@ export abstract class WorkbookHandlePivotMethods {
   renamePivotTable(sheet: number, pivotIdx: number, name: string): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).rename(name);
       return true;
     });
@@ -934,7 +919,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).setAnchor({ row: anchor.row, col: anchor.col });
       return true;
     });
@@ -948,7 +933,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).updateGrandTotals({ rows: rowsEnabled, columns: colsEnabled });
       return true;
     });
@@ -958,21 +943,21 @@ export abstract class WorkbookHandlePivotMethods {
   pivotAutofitColumns(sheet: number, pivotIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotDefinitionRead) return true;
-    return attempt(true, () => pivotOf(this, sheet, pivotIdx).getOptions().autoFormatting);
+    return orFallback(true, () => pivotOf(this, sheet, pivotIdx).getOptions().autoFormatting);
   }
 
   /** The report's PivotTable Options; null when unreadable. */
   pivotOptions(sheet: number, pivotIdx: number): PivotOptions | null {
     assertAlive(this);
     if (!this.capabilities.pivotDefinitionRead) return null;
-    return attempt(null, () => pivotOf(this, sheet, pivotIdx).getOptions());
+    return orFallback(null, () => pivotOf(this, sheet, pivotIdx).getOptions());
   }
 
   /** Writes the members of `patch` to the report's options; an omitted member keeps its value. */
   updatePivotOptions(sheet: number, pivotIdx: number, patch: PivotOptionsPatch): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).updateOptions(patch);
       return true;
     });
@@ -982,14 +967,14 @@ export abstract class WorkbookHandlePivotMethods {
   pivotCacheOptions(sheet: number, pivotIdx: number): PivotCacheOptions | null {
     assertAlive(this);
     if (!this.capabilities.pivotDefinitionRead) return null;
-    return attempt(null, () => pivotOf(this, sheet, pivotIdx).cache().getOptions());
+    return orFallback(null, () => pivotOf(this, sheet, pivotIdx).cache().getOptions());
   }
 
   /** Writes the members of `patch` to the options of the cache the report reads. */
   updatePivotCacheOptions(sheet: number, pivotIdx: number, patch: PivotCacheOptionsPatch): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).cache().updateOptions(patch);
       return true;
     });
@@ -998,13 +983,13 @@ export abstract class WorkbookHandlePivotMethods {
   getPivotReportLayout(sheet: number, pivotIdx: number): PivotReportLayout | null {
     assertAlive(this);
     if (!this.capabilities.pivotReportLayout) return null;
-    return attempt(null, () => pivotOf(this, sheet, pivotIdx).getReportLayout());
+    return orFallback(null, () => pivotOf(this, sheet, pivotIdx).getReportLayout());
   }
 
   setPivotReportLayout(sheet: number, pivotIdx: number, layout: PivotReportLayout): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotReportLayout) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).setReportLayout(layout);
       return true;
     });
@@ -1013,7 +998,7 @@ export abstract class WorkbookHandlePivotMethods {
   pivotFieldCount(sheet: number, pivotIdx: number): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return 0;
-    return attempt(0, () => pivotOf(this, sheet, pivotIdx).listFields().length);
+    return orFallback(0, () => pivotOf(this, sheet, pivotIdx).listFields().length);
   }
 
   /** Place the pivot field mirroring cache field `spec.sourceName` on `spec.axis`
@@ -1021,7 +1006,7 @@ export abstract class WorkbookHandlePivotMethods {
   addPivotField(sheet: number, pivotIdx: number, spec: PivotFieldSpec): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return -1;
-    return attempt(-1, () => {
+    return orFallback(-1, () => {
       const pivot = pivotOf(this, sheet, pivotIdx);
       const index = pivot.listFields().findIndex((f) => f.sourceName === spec.sourceName);
       if (index < 0) return -1;
@@ -1038,7 +1023,7 @@ export abstract class WorkbookHandlePivotMethods {
   clearPivotFields(sheet: number, pivotIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).clearFields();
       return true;
     });
@@ -1054,7 +1039,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).setFieldAxis(fieldIdx, axis);
       return true;
     });
@@ -1069,7 +1054,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).updateField(fieldIdx, {
         sortOrder: order,
         sortByField: byField || null,
@@ -1086,7 +1071,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).updateField(fieldIdx, { subtotalTop: top });
       return true;
     });
@@ -1105,7 +1090,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).addFieldItem(fieldIdx, name, { visible });
       return true;
     });
@@ -1123,7 +1108,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotItemByCacheIndex) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).addFieldItem(fieldIdx, { cacheIndex }, { visible });
       return true;
     });
@@ -1132,7 +1117,7 @@ export abstract class WorkbookHandlePivotMethods {
   clearPivotFieldItems(sheet: number, pivotIdx: number, fieldIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).clearFieldItems(fieldIdx);
       return true;
     });
@@ -1148,7 +1133,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).updateFieldItem(fieldIdx, itemIdx, { showDetail: show });
       return true;
     });
@@ -1163,7 +1148,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).updateField(fieldIdx, { showDetail: show });
       return true;
     });
@@ -1178,7 +1163,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).updateFieldItem(fieldIdx, itemIdx, { visible });
       return true;
     });
@@ -1192,7 +1177,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       const pivot = pivotOf(this, sheet, pivotIdx);
       const current = pivot.getField(fieldIdx).subtotalFunctions;
       pivot.setFieldSubtotalFunctions(fieldIdx, [...current, agg]);
@@ -1203,7 +1188,7 @@ export abstract class WorkbookHandlePivotMethods {
   clearPivotFieldSubtotalFns(sheet: number, pivotIdx: number, fieldIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).setFieldSubtotalFunctions(fieldIdx, []);
       return true;
     });
@@ -1227,7 +1212,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       const start = dateBound(this, bounds.startSerial, bounds.startYear, 'start');
       const end = dateBound(this, bounds.endSerial, bounds.endYear, 'end');
       pivotOf(this, sheet, pivotIdx).setFieldDateGroup(fieldIdx, {
@@ -1244,7 +1229,7 @@ export abstract class WorkbookHandlePivotMethods {
   clearPivotFieldDateGroup(sheet: number, pivotIdx: number, fieldIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).setFieldDateGroup(fieldIdx, null);
       return true;
     });
@@ -1259,7 +1244,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).setFieldNumericGroup(
         fieldIdx,
         group === null
@@ -1282,7 +1267,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).updateField(fieldIdx, {
         numberFormat: format.trim() || null,
       });
@@ -1293,7 +1278,7 @@ export abstract class WorkbookHandlePivotMethods {
   setPivotRowFieldOrder(sheet: number, pivotIdx: number, indices: readonly number[]): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).setRowFieldOrder(indices);
       return true;
     });
@@ -1302,7 +1287,7 @@ export abstract class WorkbookHandlePivotMethods {
   setPivotColFieldOrder(sheet: number, pivotIdx: number, indices: readonly number[]): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).setColumnFieldOrder(indices);
       return true;
     });
@@ -1311,13 +1296,15 @@ export abstract class WorkbookHandlePivotMethods {
   pivotDataFieldCount(sheet: number, pivotIdx: number): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return 0;
-    return attempt(0, () => pivotOf(this, sheet, pivotIdx).listDataFields().length);
+    return orFallback(0, () => pivotOf(this, sheet, pivotIdx).listDataFields().length);
   }
 
   addPivotDataField(sheet: number, pivotIdx: number, spec: PivotDataFieldSpec): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return -1;
-    return attempt(-1, () => pivotOf(this, sheet, pivotIdx).addDataField(toDataFieldInput(spec)));
+    return orFallback(-1, () =>
+      pivotOf(this, sheet, pivotIdx).addDataField(toDataFieldInput(spec)),
+    );
   }
 
   setPivotDataField(
@@ -1328,7 +1315,7 @@ export abstract class WorkbookHandlePivotMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).setDataField(dataFieldIdx, toDataFieldInput(spec));
       return true;
     });
@@ -1337,7 +1324,7 @@ export abstract class WorkbookHandlePivotMethods {
   clearPivotDataFields(sheet: number, pivotIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).clearDataFields();
       return true;
     });
@@ -1346,13 +1333,13 @@ export abstract class WorkbookHandlePivotMethods {
   pivotFilterCount(sheet: number, pivotIdx: number): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return 0;
-    return attempt(0, () => pivotOf(this, sheet, pivotIdx).listFilters().length);
+    return orFallback(0, () => pivotOf(this, sheet, pivotIdx).listFilters().length);
   }
 
   addPivotFilter(sheet: number, pivotIdx: number, spec: PivotFilterSpec): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).addFilter(toFilterInput(spec));
       return true;
     });
@@ -1361,7 +1348,7 @@ export abstract class WorkbookHandlePivotMethods {
   clearPivotFilters(sheet: number, pivotIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).clearFilters();
       return true;
     });
@@ -1370,7 +1357,7 @@ export abstract class WorkbookHandlePivotMethods {
   removePivotFilter(sheet: number, pivotIdx: number, filterIdx: number): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return attempt(false, () => {
+    return orFallback(false, () => {
       pivotOf(this, sheet, pivotIdx).removeFilter(filterIdx);
       return true;
     });
@@ -1510,7 +1497,7 @@ function pivotFilterSpecs(
   sheet: number,
   pivotIndex: number,
 ): PivotFilterSpec[] {
-  const read = attempt(null, () => {
+  const read = orFallback(null, () => {
     const pivot = pivotOf(handle, sheet, pivotIndex);
     const filters = pivot.listFilters();
     return filters.length === 0 ? null : { filters, fields: pivot.listFields() };

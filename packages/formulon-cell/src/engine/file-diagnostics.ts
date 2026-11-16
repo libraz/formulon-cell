@@ -18,7 +18,7 @@ export interface SaveDiagnostics {
   renumberedPartCount: number;
 }
 
-export type FileLossPhase = 'load' | 'save';
+type FileLossPhase = 'load' | 'save';
 
 export type FileLossId =
   | 'undecodedFormula'

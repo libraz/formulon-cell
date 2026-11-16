@@ -1,4 +1,5 @@
 import { StatusCode } from '@libraz/formulon';
+import { rangeOfRect, rectOfRange } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import { lastPivotStyleLayer, pivotStyleLayer } from '../engine/pivot-style.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
@@ -141,7 +142,7 @@ const writePivotCacheWorksheetSource = (
   return wb.setPivotCacheWorksheetSource(cacheId, {
     range: {
       sheet: source.sheet,
-      rect: { firstRow: source.r0, firstCol: source.c0, lastRow: source.r1, lastCol: source.c1 },
+      rect: rectOfRange(source),
     },
   });
 };
@@ -152,14 +153,7 @@ export const pivotCacheWorksheetSourceRange = (
 ): Range | null => {
   const range = wb.getPivotCacheWorksheetSource(cacheId)?.range;
   if (!range) return null;
-  const { rect } = range;
-  return {
-    sheet: range.sheet,
-    r0: rect.firstRow,
-    c0: rect.firstCol,
-    r1: rect.lastRow,
-    c1: rect.lastCol,
-  };
+  return rangeOfRect(range.sheet, range.rect);
 };
 
 /** The fields of a pivot cache, as the engine named and typed them from the source's header row. */

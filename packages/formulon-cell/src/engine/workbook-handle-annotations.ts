@@ -6,7 +6,6 @@ import type {
   Hyperlink,
   HyperlinkInput,
   ImageInfo,
-  Mention,
   MentionInput,
   Person,
   PersonInput,
@@ -17,22 +16,25 @@ import type {
   ThreadedComment,
   ThreadedCommentInput,
 } from '@libraz/formulon';
-import { isFormulonError } from './result.js';
+import { attemptWrite, orFallback } from './result.js';
 import type {
   Addr,
   EngineCapabilities,
   PhoneticProperties,
   PhoneticPropertiesRead,
   PhoneticRun,
-  Workbook,
 } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import {
+  assertAlive,
+  type WorkbookHandleInternals as SharedInternals,
+  wb,
+  ws,
+} from './workbook-handle-internals.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
-type WorkbookHandleInternals = {
+type WorkbookHandleInternals = SharedInternals & {
   module: Formulon;
-  wb: Workbook;
-  assertAlive(): void;
 };
 
 /** A legacy note. `visible` is present only for a note shown without hovering. */
@@ -52,15 +54,14 @@ export type EngineHyperlinkRecord = Hyperlink;
  * callers do not have to depend on the generated formulon declaration. */
 export type EngineThreadedComment = ThreadedComment;
 export type EngineThreadedCommentInput = ThreadedCommentInput;
-export type EngineMention = Mention;
 export type EngineMentionInput = MentionInput;
-export type EnginePerson = Person;
+type EnginePerson = Person;
 export type EnginePersonInput = PersonInput;
 export type EngineDrawingObject = DrawingProperties;
-export type EngineImageInfo = ImageInfo;
+type EngineImageInfo = ImageInfo;
 export type EngineImage = PictureProperties;
-export type EngineImageInsertOptions = DrawingPlacementInput;
-export type EngineDrawingAnchorPatch = DrawingAnchorPatch;
+type EngineImageInsertOptions = DrawingPlacementInput;
+type EngineDrawingAnchorPatch = DrawingAnchorPatch;
 
 declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandleAnnotationsMethods {}
@@ -70,39 +71,6 @@ function internals(handle: unknown): WorkbookHandleInternals {
   return handle as WorkbookHandleInternals;
 }
 
-function assertAlive(handle: unknown): void {
-  internals(handle).assertAlive();
-}
-
-function wb(handle: unknown): Workbook {
-  return internals(handle).wb;
-}
-
-function ws(handle: unknown, sheet: number): Sheet {
-  return internals(handle).wb.sheet(sheet);
-}
-
-/** Run an engine write; false when the engine rejects it. */
-function attempt(write: () => void): boolean {
-  try {
-    write();
-    return true;
-  } catch (e) {
-    if (!isFormulonError(e)) throw e;
-    return false;
-  }
-}
-
-/** Run an engine read; null when the engine rejects it. */
-function attemptRead<T>(read: () => T): T | null {
-  try {
-    return read();
-  } catch (e) {
-    if (!isFormulonError(e)) throw e;
-    return null;
-  }
-}
-
 export abstract class WorkbookHandleAnnotationsMethods {
   declare readonly capabilities: EngineCapabilities;
 
@@ -110,7 +78,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   getCellPhonetic(sheet: number, row: number, col: number): string | null {
     assertAlive(this);
     if (!this.capabilities.phonetic) return null;
-    return attemptRead(() => ws(this, sheet).getCellPhonetic(row, col)) || null;
+    return orFallback(null, () => ws(this, sheet).getCellPhonetic(row, col)) || null;
   }
 
   /** Set (or, with an empty string, clear) the cell's phonetic guide. The
@@ -119,7 +87,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   setCellPhonetic(sheet: number, row: number, col: number, phonetic: string): boolean {
     assertAlive(this);
     if (!this.capabilities.phonetic) return false;
-    return attempt(() =>
+    return attemptWrite(() =>
       ws(this, sheet).setCellPhonetic(row, col, phonetic.length > 0 ? phonetic : null),
     );
   }
@@ -130,7 +98,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   getCellPhoneticRuns(sheet: number, row: number, col: number): PhoneticRun[] | null {
     assertAlive(this);
     if (!this.capabilities.phoneticRuns) return null;
-    const runs = attemptRead(() => ws(this, sheet).getCellPhoneticRuns(row, col));
+    const runs = orFallback(null, () => ws(this, sheet).getCellPhoneticRuns(row, col));
     if (!runs) return null;
     return runs.map((run) => ({ start: run.start, end: run.end, text: run.text }));
   }
@@ -145,7 +113,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.phoneticRuns) return false;
-    return attempt(() =>
+    return attemptWrite(() =>
       ws(this, sheet).setCellPhoneticRuns(
         row,
         col,
@@ -163,7 +131,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   ): PhoneticPropertiesRead | null {
     assertAlive(this);
     if (!this.capabilities.phoneticProperties) return null;
-    const r = attemptRead(() => ws(this, sheet).getCellPhoneticProperties(row, col));
+    const r = orFallback(null, () => ws(this, sheet).getCellPhoneticProperties(row, col));
     if (!r) return null;
     return { fontId: r.fontIndex, type: r.type, alignment: r.alignment, present: r.stated };
   }
@@ -173,7 +141,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   getCellShowPhonetic(sheet: number, row: number, col: number): boolean | null {
     assertAlive(this);
     if (!this.capabilities.showPhonetic) return null;
-    return attemptRead(() => ws(this, sheet).getCellShowPhonetic(row, col));
+    return orFallback(null, () => ws(this, sheet).getCellShowPhonetic(row, col));
   }
 
   /** Every stored cell on `sheet` whose "Show Phonetic" flag is on, blanks carrying only the flag
@@ -181,7 +149,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   showPhoneticCells(sheet: number): readonly Addr[] {
     assertAlive(this);
     if (!this.capabilities.showPhonetic) return [];
-    const cells = attemptRead(() => ws(this, sheet).listShowPhoneticCells());
+    const cells = orFallback(null, () => ws(this, sheet).listShowPhoneticCells());
     return cells ? cells.map((c) => ({ sheet, row: c.row, col: c.col })) : [];
   }
 
@@ -190,7 +158,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   setCellShowPhonetic(sheet: number, row: number, col: number, show: boolean): boolean {
     assertAlive(this);
     if (!this.capabilities.showPhonetic) return false;
-    return attempt(() => ws(this, sheet).setCellShowPhonetic(row, col, show));
+    return attemptWrite(() => ws(this, sheet).setCellShowPhonetic(row, col, show));
   }
 
   /** Store how the cell's guide renders. The engine drops the properties when
@@ -203,7 +171,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.phoneticProperties) return false;
-    return attempt(() =>
+    return attemptWrite(() =>
       ws(this, sheet).setCellPhoneticProperties(row, col, {
         fontIndex: properties.fontId,
         type: properties.type as PhoneticType,
@@ -217,7 +185,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   getComment(sheet: number, row: number, col: number): EngineNoteEntry | null {
     assertAlive(this);
     if (!this.capabilities.comments) return null;
-    const e = attemptRead(() => ws(this, sheet).getComment(row, col));
+    const e = orFallback(null, () => ws(this, sheet).getComment(row, col));
     if (!e) return null;
     return this.getCommentVisible(sheet, row, col)
       ? { author: e.author, text: e.text, visible: true }
@@ -229,21 +197,21 @@ export abstract class WorkbookHandleAnnotationsMethods {
   getCommentVisible(sheet: number, row: number, col: number): boolean {
     assertAlive(this);
     if (!this.capabilities.commentVisibility) return false;
-    return attemptRead(() => ws(this, sheet).getCommentVisible(row, col)) === true;
+    return orFallback(null, () => ws(this, sheet).getCommentVisible(row, col)) === true;
   }
 
   /** Show or hide an existing note; the engine keeps its box geometry. */
   setCommentVisible(sheet: number, row: number, col: number, visible: boolean): boolean {
     assertAlive(this);
     if (!this.capabilities.commentVisibility) return false;
-    return attempt(() => ws(this, sheet).setCommentVisible(row, col, visible));
+    return attemptWrite(() => ws(this, sheet).setCommentVisible(row, col, visible));
   }
 
   /** Snapshot every comment on `sheet`. Empty under the stub. */
   getComments(sheet: number): ({ row: number; col: number } & EngineNoteEntry)[] {
     assertAlive(this);
     if (!this.capabilities.commentsEnumerable) return [];
-    const entries = attemptRead(() => ws(this, sheet).listComments());
+    const entries = orFallback(null, () => ws(this, sheet).listComments());
     if (!entries) return [];
     return entries.map((e) => ({
       row: e.cell.row,
@@ -267,14 +235,14 @@ export abstract class WorkbookHandleAnnotationsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.comments) return false;
-    const written = attempt(() =>
+    const written = attemptWrite(() =>
       ws(this, sheet).setComment(row, col, text.length > 0 ? { text, author } : null),
     );
     if (!written) return false;
     if (visible === undefined || text.length === 0 || !this.capabilities.commentVisibility) {
       return true;
     }
-    return attempt(() => ws(this, sheet).setCommentVisible(row, col, visible));
+    return attemptWrite(() => ws(this, sheet).setCommentVisible(row, col, visible));
   }
 
   /** Read every native threaded comment on a sheet, including replies. Notes
@@ -283,7 +251,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   getThreadedComments(sheet: number): EngineThreadedComment[] {
     assertAlive(this);
     if (!this.capabilities.threadedComments) return [];
-    const comments = attemptRead(() => ws(this, sheet).listThreadedComments());
+    const comments = orFallback(null, () => ws(this, sheet).listThreadedComments());
     return comments
       ? comments.map((comment) => ({
           ...comment,
@@ -297,7 +265,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   addThreadedComment(sheet: number, comment: EngineThreadedCommentInput): boolean {
     assertAlive(this);
     if (!this.capabilities.threadedComments) return false;
-    return attempt(() => {
+    return attemptWrite(() => {
       ws(this, sheet).addThreadedComment({
         ...comment,
         mentions: comment.mentions?.map((mention) => ({ ...mention })),
@@ -313,7 +281,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.threadedComments) return false;
-    return attempt(() =>
+    return attemptWrite(() =>
       ws(this, sheet).updateThreadedComment(id, {
         text,
         mentions: mentions.map((mention) => ({ ...mention })),
@@ -324,13 +292,13 @@ export abstract class WorkbookHandleAnnotationsMethods {
   setThreadResolved(sheet: number, threadId: string, done: boolean): boolean {
     assertAlive(this);
     if (!this.capabilities.threadedComments) return false;
-    return attempt(() => ws(this, sheet).updateThreadedComment(threadId, { done }));
+    return attemptWrite(() => ws(this, sheet).updateThreadedComment(threadId, { done }));
   }
 
   removeThreadedComment(sheet: number, id: string): boolean {
     assertAlive(this);
     if (!this.capabilities.threadedComments) return false;
-    return attempt(() => ws(this, sheet).removeThreadedComment(id));
+    return attemptWrite(() => ws(this, sheet).removeThreadedComment(id));
   }
 
   getPersons(): EnginePerson[] {
@@ -344,7 +312,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   addPerson(person: EnginePersonInput): boolean {
     assertAlive(this);
     if (!this.capabilities.threadedComments) return false;
-    return attempt(() => {
+    return attemptWrite(() => {
       wb(this).addPerson({ ...person });
     });
   }
@@ -352,7 +320,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   removePerson(id: string): boolean {
     assertAlive(this);
     if (!this.capabilities.threadedComments) return false;
-    return attempt(() => wb(this).removePerson(id));
+    return attemptWrite(() => wb(this).removePerson(id));
   }
 
   /** Inspect image bytes before inserting them. This is useful to reject an
@@ -360,7 +328,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   probeImage(bytes: Uint8Array): EngineImageInfo | null {
     assertAlive(this);
     if (!this.capabilities.images) return null;
-    const info = attemptRead(() => internals(this).module.getImageInfo(bytes));
+    const info = orFallback(null, () => internals(this).module.getImageInfo(bytes));
     return info ? { ...info } : null;
   }
 
@@ -368,7 +336,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
     assertAlive(this);
     if (!this.capabilities.drawings) return [];
     return (
-      attemptRead(() =>
+      orFallback(null, () =>
         ws(this, sheet)
           .listDrawings()
           .map((drawing) => drawing.getDrawingProperties()),
@@ -379,7 +347,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   getImage(sheet: number, objectId: number): EngineImage | null {
     assertAlive(this);
     if (!this.capabilities.images) return null;
-    const image = attemptRead(() => ws(this, sheet).picture(objectId).getProperties());
+    const image = orFallback(null, () => ws(this, sheet).picture(objectId).getProperties());
     return image ? { ...image, bytes: Uint8Array.from(image.bytes) } : null;
   }
 
@@ -390,21 +358,21 @@ export abstract class WorkbookHandleAnnotationsMethods {
   ): number | null {
     assertAlive(this);
     if (!this.capabilities.images) return null;
-    return attemptRead(() => ws(this, sheet).addPicture(bytes, { ...options }).objectId);
+    return orFallback(null, () => ws(this, sheet).addPicture(bytes, { ...options }).objectId);
   }
 
   /** Remove the picture or chart `objectId` and the parts only it reached. */
   removeDrawing(sheet: number, objectId: number): boolean {
     assertAlive(this);
     if (!this.capabilities.drawings) return false;
-    return attempt(() => ws(this, sheet).removeDrawing(objectId));
+    return attemptWrite(() => ws(this, sheet).removeDrawing(objectId));
   }
 
   /** Move and resize a picture or chart, keeping its object id. */
   setDrawingAnchor(sheet: number, objectId: number, placement: EngineDrawingAnchorPatch): boolean {
     assertAlive(this);
     if (!this.capabilities.drawings) return false;
-    return attempt(() =>
+    return attemptWrite(() =>
       ws(this, sheet)
         .drawing(objectId)
         .update({ anchor: { ...placement } }),
@@ -415,7 +383,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   setDrawingZOrder(sheet: number, objectId: number, index: number): boolean {
     assertAlive(this);
     if (!this.capabilities.drawings) return false;
-    return attempt(() => {
+    return attemptWrite(() => {
       const drawing = ws(this, sheet).drawing(objectId) as StackableDrawing;
       if (!drawing.setZOrder) throw new TypeError('drawing object has no stacking order');
       drawing.setZOrder(index);
@@ -426,7 +394,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   snapshotDrawing(sheet: number, objectId: number): Uint8Array | null {
     assertAlive(this);
     if (!this.capabilities.drawings) return null;
-    const bytes = attemptRead(() => {
+    const bytes = orFallback(null, () => {
       const drawing = ws(this, sheet).drawing(objectId) as StackableDrawing;
       return drawing.snapshot ? drawing.snapshot() : null;
     });
@@ -442,7 +410,8 @@ export abstract class WorkbookHandleAnnotationsMethods {
   ): number | null {
     assertAlive(this);
     if (!this.capabilities.drawings) return null;
-    return attemptRead(
+    return orFallback(
+      null,
       () =>
         ws(this, sheet).restoreDrawing(bytes, {
           ...(options.newId !== undefined ? { assignNewId: options.newId } : {}),
@@ -456,7 +425,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   getHyperlinksFull(sheet: number): EngineHyperlinkRecord[] | null {
     assertAlive(this);
     if (!this.capabilities.hyperlinks) return [];
-    const links = attemptRead(() => ws(this, sheet).listHyperlinks());
+    const links = orFallback(null, () => ws(this, sheet).listHyperlinks());
     if (!links) return null;
     return links.map((h) => ({
       range: { ...h.range },
@@ -504,7 +473,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.supportsHyperlinkRangeWrite()) return false;
-    return attempt(() =>
+    return attemptWrite(() =>
       appendHyperlink(
         ws(this, sheet),
         hyperlinkInput(target, display, tooltip, location, {
@@ -530,7 +499,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.hyperlinks) return false;
-    return attempt(() =>
+    return attemptWrite(() =>
       appendHyperlink(
         ws(this, sheet),
         hyperlinkInput(target, display, tooltip, location, {
@@ -548,7 +517,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   removeHyperlink(sheet: number, row: number, col: number): boolean {
     assertAlive(this);
     if (!this.capabilities.hyperlinks) return false;
-    return attempt(() => {
+    return attemptWrite(() => {
       const sheetHandle = ws(this, sheet);
       const index = sheetHandle
         .listHyperlinks()
@@ -562,7 +531,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   removeHyperlinkAt(sheet: number, index: number): boolean {
     assertAlive(this);
     if (!this.capabilities.hyperlinks) return false;
-    return attempt(() => ws(this, sheet).removeHyperlinkAt(index));
+    return attemptWrite(() => ws(this, sheet).removeHyperlinkAt(index));
   }
 
   /** Insert `record` at `index` of `getHyperlinksFull(sheet)`, replacing nothing; `index` equal to
@@ -570,7 +539,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   insertHyperlinkAt(sheet: number, index: number, record: EngineHyperlinkRecord): boolean {
     assertAlive(this);
     if (!this.capabilities.hyperlinks) return false;
-    return attempt(() =>
+    return attemptWrite(() =>
       ws(this, sheet).insertHyperlinkAt(index, {
         target: record.target,
         location: record.location,
@@ -585,7 +554,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
   clearHyperlinks(sheet: number): boolean {
     assertAlive(this);
     if (!this.capabilities.hyperlinks) return false;
-    return attempt(() => {
+    return attemptWrite(() => {
       const sheetHandle = ws(this, sheet);
       for (let i = sheetHandle.listHyperlinks().length - 1; i >= 0; i -= 1) {
         sheetHandle.removeHyperlinkAt(i);

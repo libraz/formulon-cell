@@ -28,6 +28,35 @@ const snapToScreenPx = (layout: State['layout'], px: number): number => {
 /** One screen pixel in canonical px: the narrowest visible row or column. */
 const minScreenPx = (layout: State['layout']): number => 1 / renderScale(layout);
 
+/** The navigation bounds and the first-visible row / column limits for a viewport of
+ *  `rows` x `cols`: the body keeps at least one row and column past the freeze band and
+ *  never scrolls past the sheet (or navigation) edge. */
+const viewportStartBounds = (store: SpreadsheetStore, s: State, rows: number, cols: number) => {
+  const bounds = navigationBoundsFor(store);
+  const minRowStart = Math.max(frozenRowEnd(s.layout), bounds?.r0 ?? 0);
+  const minColStart = Math.max(frozenColEnd(s.layout), bounds?.c0 ?? 0);
+  const maxRowStart = bounds
+    ? Math.max(minRowStart, bounds.r1 + 1 - rows)
+    : Math.max(minRowStart, MAX_ROW + 1 - rows);
+  const maxColStart = bounds
+    ? Math.max(minColStart, bounds.c1 + 1 - cols)
+    : Math.max(minColStart, MAX_COL + 1 - cols);
+  return { bounds, minRowStart, minColStart, maxRowStart, maxColStart };
+};
+
+/** Set the preview range under `key`; a range equal to the current one changes nothing. */
+const setRangePreview = (
+  store: SpreadsheetStore,
+  key: 'fillPreview' | 'movePreview',
+  range: Range | null,
+): void => {
+  store.setState((s) => {
+    const cur = s.ui[key];
+    if (cur === range || (cur && range && sameRange(cur, range))) return s;
+    return { ...s, ui: { ...s.ui, [key]: range } };
+  });
+};
+
 /** UI chrome flags, viewport scroll/zoom, freeze panes and row/column sizes. */
 export const viewMutators = {
   setEditor(store: SpreadsheetStore, mode: EditorMode): void {
@@ -229,15 +258,12 @@ export const viewMutators = {
       ) {
         return s;
       }
-      const bounds = navigationBoundsFor(store);
-      const minRowStart = Math.max(frozenRowEnd(s.layout), bounds?.r0 ?? 0);
-      const minColStart = Math.max(frozenColEnd(s.layout), bounds?.c0 ?? 0);
-      const maxRowStart = bounds
-        ? Math.max(minRowStart, bounds.r1 + 1 - rows)
-        : Math.max(minRowStart, MAX_ROW + 1 - rows);
-      const maxColStart = bounds
-        ? Math.max(minColStart, bounds.c1 + 1 - cols)
-        : Math.max(minColStart, MAX_COL + 1 - cols);
+      const { bounds, minRowStart, minColStart, maxRowStart, maxColStart } = viewportStartBounds(
+        store,
+        s,
+        rows,
+        cols,
+      );
       return {
         ...s,
         viewport: {
@@ -254,19 +280,11 @@ export const viewMutators = {
   },
 
   setFillPreview(store: SpreadsheetStore, range: Range | null): void {
-    store.setState((s) => {
-      const cur = s.ui.fillPreview;
-      if (cur === range || (cur && range && sameRange(cur, range))) return s;
-      return { ...s, ui: { ...s.ui, fillPreview: range } };
-    });
+    setRangePreview(store, 'fillPreview', range);
   },
 
   setMovePreview(store: SpreadsheetStore, range: Range | null): void {
-    store.setState((s) => {
-      const cur = s.ui.movePreview;
-      if (cur === range || (cur && range && sameRange(cur, range))) return s;
-      return { ...s, ui: { ...s.ui, movePreview: range } };
-    });
+    setRangePreview(store, 'movePreview', range);
   },
 
   setCopyRange(store: SpreadsheetStore, range: Range | null, mode: CopyMode = 'copy'): void {
@@ -347,15 +365,12 @@ export const viewMutators = {
     // Keep at least one body row/col visible past the freeze zone, otherwise the
     // viewport disappears off the right/bottom.
     store.setState((s) => {
-      const bounds = navigationBoundsFor(store);
-      const minRowStart = Math.max(frozenRowEnd(s.layout), bounds?.r0 ?? 0);
-      const minColStart = Math.max(frozenColEnd(s.layout), bounds?.c0 ?? 0);
-      const maxRowStart = bounds
-        ? Math.max(minRowStart, bounds.r1 + 1 - s.viewport.rowCount)
-        : Math.max(minRowStart, MAX_ROW + 1 - s.viewport.rowCount);
-      const maxColStart = bounds
-        ? Math.max(minColStart, bounds.c1 + 1 - s.viewport.colCount)
-        : Math.max(minColStart, MAX_COL + 1 - s.viewport.colCount);
+      const { minRowStart, minColStart, maxRowStart, maxColStart } = viewportStartBounds(
+        store,
+        s,
+        s.viewport.rowCount,
+        s.viewport.colCount,
+      );
       return {
         ...s,
         viewport: {

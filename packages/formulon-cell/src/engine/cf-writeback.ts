@@ -14,7 +14,7 @@ import {
 import { iconSetSlotCount } from '../render/conditional.js';
 import type { CellFormat } from '../store/store.js';
 import type { ConditionalRule, ConditionalScalePoint } from '../store/types.js';
-import { formatA1Cell } from './address.js';
+import { formatA1Cell, rectOfRange } from './address.js';
 import { iconSetToEngine } from './cf-icon-sets.js';
 import {
   borderRecordFromFormat,
@@ -75,14 +75,7 @@ const CELL_IS_OP: Record<string, ComparisonOperator> = {
   'not-between': ComparisonOperator.NotBetween,
 };
 
-const rangesOf = (rule: ConditionalRule): CellRect[] => [
-  {
-    firstRow: rule.range.r0,
-    firstCol: rule.range.c0,
-    lastRow: rule.range.r1,
-    lastCol: rule.range.c1,
-  },
-];
+const rangesOf = (rule: ConditionalRule): CellRect[] => [rectOfRange(rule.range)];
 
 /** Encode a text-contains operand as an Excel formula string literal. */
 const formulaTextLiteral = (text: string): string => `"${text.replaceAll('"', '""')}"`;
@@ -172,8 +165,12 @@ const COMPARED_FIELDS = [
 ] as const;
 
 /** Formula text without the leading `=` a read carries. */
+/** `formula` without its leading `=`. */
+export const stripLeadingEquals = (formula: string): string =>
+  formula.startsWith('=') ? formula.slice(1) : formula;
+
 const bareFormula = (formula: unknown): unknown =>
-  typeof formula === 'string' && formula.startsWith('=') ? formula.slice(1) : (formula ?? null);
+  typeof formula === 'string' ? stripLeadingEquals(formula) : (formula ?? null);
 
 function entryMatchesInput(
   entry: ConditionalFormatEntry | undefined,

@@ -56,7 +56,7 @@ const KIND_OF_PRST = new Map<string, SessionShapeKind>([
 ]);
 
 /** Whether the engine can store `item`. */
-export const shapeIsSaved = (item: SessionIllustration): boolean =>
+const shapeIsSaved = (item: SessionIllustration): boolean =>
   item.kind === 'shape' && item.shape !== undefined && PRST_OF_KIND[item.shape] !== undefined;
 
 const isLineKind = (kind: SessionShapeKind | undefined): boolean =>

@@ -4,26 +4,21 @@ import type {
   ShapeInput,
   ShapePatch,
   ShapeProperties,
-  Sheet,
   SlicerInput,
   SlicerPatch,
   SlicerProperties,
-  Sparkline,
   SparklineGroup,
   SparklineGroupInput,
   SparklineGroupPatch,
   SparklineInput,
 } from '@libraz/formulon';
-import { isFormulonError } from './result.js';
-import type { EngineCapabilities, Workbook } from './types.js';
+import { attemptWrite, orFallback } from './result.js';
+import type { EngineCapabilities } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import { assertAlive, internals, ws } from './workbook-handle-internals.js';
 import { workbookTableAt } from './workbook-handle-tables.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
-type WorkbookHandleInternals = {
-  wb: Workbook;
-  assertAlive(): void;
-};
 
 declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandleDrawingObjectsMethods {}
@@ -37,44 +32,10 @@ export type EngineShapePatch = ShapePatch & DrawingPatch;
 export type EngineSlicer = SlicerProperties & DrawingProperties;
 export type EngineSlicerInput = SlicerInput;
 export type EngineSlicerPatch = SlicerPatch & Omit<DrawingPatch, 'name'>;
-export type EngineSparkline = Sparkline;
 export type EngineSparklineInput = SparklineInput;
-export type EngineSparklineGroup = SparklineGroup;
-export type EngineSparklineGroupInput = SparklineGroupInput;
-export type EngineSparklineGroupPatch = SparklineGroupPatch;
-
-function internals(handle: unknown): WorkbookHandleInternals {
-  return handle as WorkbookHandleInternals;
-}
-
-function assertAlive(handle: unknown): void {
-  internals(handle).assertAlive();
-}
-
-function ws(handle: unknown, sheet: number): Sheet {
-  return internals(handle).wb.sheet(sheet);
-}
-
-/** Run an engine edit; an engine error is a `false` outcome. */
-function edit(run: () => void): boolean {
-  try {
-    run();
-    return true;
-  } catch (e) {
-    if (!isFormulonError(e)) throw e;
-    return false;
-  }
-}
-
-/** Run an engine read; an engine error reads as `fallback`. */
-function read<T>(fallback: T, run: () => T): T {
-  try {
-    return run();
-  } catch (e) {
-    if (!isFormulonError(e)) throw e;
-    return fallback;
-  }
-}
+type EngineSparklineGroup = SparklineGroup;
+type EngineSparklineGroupInput = SparklineGroupInput;
+type EngineSparklineGroupPatch = SparklineGroupPatch;
 
 /** Shapes, sparkline groups and table slicers of a sheet. Sparkline groups and
  *  slicers are addressed by their position in the sheet's list, which a removal
@@ -86,7 +47,7 @@ export abstract class WorkbookHandleDrawingObjectsMethods {
   listShapes(sheet: number): EngineShape[] {
     assertAlive(this);
     if (!this.capabilities.shapes) return [];
-    return read([], () =>
+    return orFallback([], () =>
       ws(this, sheet)
         .listShapes()
         .map((shape) => ({ ...shape.getDrawingProperties(), ...shape.getProperties() })),
@@ -97,33 +58,33 @@ export abstract class WorkbookHandleDrawingObjectsMethods {
   insertShape(sheet: number, spec: EngineShapeInput): number | null {
     assertAlive(this);
     if (!this.capabilities.shapes) return null;
-    return read(null, () => ws(this, sheet).addShape(spec).objectId);
+    return orFallback(null, () => ws(this, sheet).addShape(spec).objectId);
   }
 
   /** Apply the fields `patch` names to shape `objectId`. */
   updateShape(sheet: number, objectId: number, patch: EngineShapePatch): boolean {
     assertAlive(this);
     if (!this.capabilities.shapes) return false;
-    return edit(() => ws(this, sheet).shape(objectId).update(patch));
+    return attemptWrite(() => ws(this, sheet).shape(objectId).update(patch));
   }
 
   removeShape(sheet: number, objectId: number): boolean {
     assertAlive(this);
     if (!this.capabilities.shapes) return false;
-    return edit(() => ws(this, sheet).removeDrawing(objectId));
+    return attemptWrite(() => ws(this, sheet).removeDrawing(objectId));
   }
 
   /** Sparkline groups of `sheet` in document order. */
   listSparklineGroups(sheet: number): EngineSparklineGroup[] {
     assertAlive(this);
     if (!this.capabilities.sparklines) return [];
-    return read([], () => [...ws(this, sheet).listSparklineGroups()]);
+    return orFallback([], () => [...ws(this, sheet).listSparklineGroups()]);
   }
 
   addSparklineGroup(sheet: number, spec: EngineSparklineGroupInput): boolean {
     assertAlive(this);
     if (!this.capabilities.sparklines) return false;
-    return edit(() => {
+    return attemptWrite(() => {
       ws(this, sheet).addSparklineGroup(spec);
     });
   }
@@ -131,7 +92,7 @@ export abstract class WorkbookHandleDrawingObjectsMethods {
   updateSparklineGroup(sheet: number, index: number, patch: EngineSparklineGroupPatch): boolean {
     assertAlive(this);
     if (!this.capabilities.sparklines) return false;
-    return edit(() => ws(this, sheet).updateSparklineGroup(index, patch));
+    return attemptWrite(() => ws(this, sheet).updateSparklineGroup(index, patch));
   }
 
   /** Replace the members of group `index`. */
@@ -142,20 +103,22 @@ export abstract class WorkbookHandleDrawingObjectsMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.sparklines) return false;
-    return edit(() => ws(this, sheet).updateSparklineGroup(index, { sparklines: [...sparklines] }));
+    return attemptWrite(() =>
+      ws(this, sheet).updateSparklineGroup(index, { sparklines: [...sparklines] }),
+    );
   }
 
   removeSparklineGroup(sheet: number, index: number): boolean {
     assertAlive(this);
     if (!this.capabilities.sparklines) return false;
-    return edit(() => ws(this, sheet).removeSparklineGroup(index));
+    return attemptWrite(() => ws(this, sheet).removeSparklineGroup(index));
   }
 
   /** Table slicers hosted on `sheet`, in document order. */
   listSlicers(sheet: number): EngineSlicer[] {
     assertAlive(this);
     if (!this.capabilities.slicers) return [];
-    return read([], () =>
+    return orFallback([], () =>
       ws(this, sheet)
         .listSlicers()
         .map((slicer) => ({ ...slicer.getDrawingProperties(), ...slicer.getProperties() })),
@@ -169,21 +132,21 @@ export abstract class WorkbookHandleDrawingObjectsMethods {
     if (!this.capabilities.slicers) return null;
     const target = workbookTableAt(internals(this).wb, table);
     if (!target) return null;
-    return read(null, () => ws(this, sheet).addSlicer(target, column, spec).objectId);
+    return orFallback(null, () => ws(this, sheet).addSlicer(target, column, spec).objectId);
   }
 
   updateSlicer(sheet: number, index: number, patch: EngineSlicerPatch): boolean {
     assertAlive(this);
     if (!this.capabilities.slicers) return false;
-    const slicer = read(undefined, () => ws(this, sheet).listSlicers()[index]);
-    return slicer ? edit(() => slicer.update(patch)) : false;
+    const slicer = orFallback(undefined, () => ws(this, sheet).listSlicers()[index]);
+    return slicer ? attemptWrite(() => slicer.update(patch)) : false;
   }
 
   removeSlicer(sheet: number, index: number): boolean {
     assertAlive(this);
     if (!this.capabilities.slicers) return false;
-    const slicer = read(undefined, () => ws(this, sheet).listSlicers()[index]);
-    return slicer ? edit(() => ws(this, sheet).removeDrawing(slicer)) : false;
+    const slicer = orFallback(undefined, () => ws(this, sheet).listSlicers()[index]);
+    return slicer ? attemptWrite(() => ws(this, sheet).removeDrawing(slicer)) : false;
   }
 }
 

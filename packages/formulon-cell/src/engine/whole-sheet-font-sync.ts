@@ -357,7 +357,7 @@ export const hasWholeSheetFontStoreBinding = (
  * workbook has already applied the operation, so keep the workbook-local
  * baseline cache in lockstep with the store's remap.
  */
-export const remapActiveWholeSheetFontOverrides = (
+const remapActiveWholeSheetFontOverrides = (
   wb: WorkbookHandle,
   mapIndex: (index: number) => number | null,
 ): void => {

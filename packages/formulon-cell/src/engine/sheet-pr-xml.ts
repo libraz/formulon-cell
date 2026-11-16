@@ -1,3 +1,5 @@
+import { parseXmlFragment, serializeXmlFragment } from './xml-fragment.js';
+
 /** Tab colour as `<tabColor>` states it. Exactly one selector is meaningful. */
 export interface SheetTabColorSpec {
   /** `AARRGGBB` hex, e.g. `FFC00000`. */
@@ -24,24 +26,6 @@ export type EngineSheetPrInput = Partial<{
   summaryRight: boolean;
 }>;
 
-const FRAGMENT_WRAPPER = 'fc-fragment';
-const RELATIONSHIPS_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
-
-/** Parse a `<sheetPr>` fragment inside a wrapper, so a fragment without its own
- *  namespace declarations still parses. Null for an empty or malformed fragment. */
-function parseSheetPr(xml: string): Element | null {
-  if (!xml || typeof DOMParser === 'undefined') return null;
-  const doc = new DOMParser().parseFromString(
-    `<${FRAGMENT_WRAPPER} xmlns:r="${RELATIONSHIPS_NS}">${xml}</${FRAGMENT_WRAPPER}>`,
-    'application/xml',
-  );
-  const root = doc.documentElement;
-  if (!root || root.nodeName !== FRAGMENT_WRAPPER) return null;
-  if (root.getElementsByTagName('parsererror').length > 0) return null;
-  const el = root.firstElementChild;
-  return el?.nodeName === 'sheetPr' ? el : null;
-}
-
 const childNamed = (parent: Element, name: string): Element | null =>
   Array.from(parent.children).find((child) => child.nodeName === name) ?? null;
 
@@ -52,7 +36,7 @@ const flag = (el: Element | null, name: string): boolean => {
 
 /** Read the modelled `<sheetPr>` settings; an absent fragment yields the defaults. */
 export function readSheetPr(xml: string): EngineSheetPr {
-  const el = parseSheetPr(xml);
+  const el = parseXmlFragment(xml, 'sheetPr');
   const color = el ? childNamed(el, 'tabColor') : null;
   const outline = el ? childNamed(el, 'outlinePr') : null;
   let tabColor: SheetTabColorSpec | null = null;
@@ -83,7 +67,7 @@ export function readSheetPr(xml: string): EngineSheetPr {
  */
 export function mergeSheetPrFragment(xml: string, change: EngineSheetPrInput): string | null {
   if (typeof DOMParser === 'undefined' || typeof XMLSerializer === 'undefined') return null;
-  const el = parseSheetPr(xml || '<sheetPr/>');
+  const el = parseXmlFragment(xml || '<sheetPr/>', 'sheetPr');
   if (!el) return null;
   const doc = el.ownerDocument;
 
@@ -119,9 +103,5 @@ export function mergeSheetPrFragment(xml: string, change: EngineSheetPrInput): s
   }
 
   if (el.attributes.length === 0 && el.children.length === 0) return '';
-  const wrapped = new XMLSerializer().serializeToString(el.parentNode as Element);
-  const open = wrapped.indexOf('>');
-  const close = wrapped.lastIndexOf(`</${FRAGMENT_WRAPPER}>`);
-  if (open < 0 || close < open) return null;
-  return wrapped.slice(open + 1, close);
+  return serializeXmlFragment(el);
 }

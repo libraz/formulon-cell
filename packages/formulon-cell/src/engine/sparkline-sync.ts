@@ -2,7 +2,14 @@ import type { SheetRect } from '@libraz/formulon';
 import { newSparklineGroupId, splitSourceQualifier } from '../commands/sparkline.js';
 import { sameSparklineSettings, withSparklineMembers } from '../store/sparkline-slice.js';
 import type { Sparkline, SparklineGroupSettings, SpreadsheetStore, State } from '../store/store.js';
-import { addrKey, formatA1Cell, formatA1Range, parseAddrKey, quoteSheetName } from './address.js';
+import {
+  addrKey,
+  formatA1Cell,
+  formatA1Range,
+  parseAddrKey,
+  quoteSheetName,
+  rangeOfRect,
+} from './address.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 import type { EngineSparklineInput } from './workbook-handle-drawing-objects.js';
 
@@ -13,12 +20,7 @@ const engineFormula = (source: string, hostSheet: string): string =>
 /** Source as the store keeps it: bare when it is on the host sheet. */
 const storeSource = (wb: WorkbookHandle, source: SheetRect, hostSheet: number): string => {
   const { rect } = source;
-  const range = formatA1Range({
-    r0: rect.firstRow,
-    c0: rect.firstCol,
-    r1: rect.lastRow,
-    c1: rect.lastCol,
-  });
+  const range = formatA1Range(rangeOfRect(source.sheet, rect));
   return source.sheet === hostSheet
     ? range
     : `${quoteSheetName(wb.sheetName(source.sheet))}!${range}`;

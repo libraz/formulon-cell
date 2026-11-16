@@ -391,7 +391,7 @@ export function numFmtToFormatCode(
 }
 
 /** Map a UI horizontal-align string to its OOXML ordinal. */
-export function halignOrdinal(align: CellFormat['align']): HorizontalAlign {
+function halignOrdinal(align: CellFormat['align']): HorizontalAlign {
   switch (align) {
     case 'left':
       return HALIGN_LEFT;
@@ -414,7 +414,7 @@ export function halignOrdinal(align: CellFormat['align']): HorizontalAlign {
 
 /** Map a UI vertical-align string to its OOXML ordinal. the spreadsheet's default is
  *  bottom; we treat "middle" as ordinal 1 (center). */
-export function valignOrdinal(vAlign: CellFormat['vAlign']): VerticalAlign {
+function valignOrdinal(vAlign: CellFormat['vAlign']): VerticalAlign {
   switch (vAlign) {
     case 'top':
       return VALIGN_TOP;

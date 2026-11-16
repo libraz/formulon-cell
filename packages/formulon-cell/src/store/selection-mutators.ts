@@ -10,9 +10,12 @@ import {
 import { sameAddr } from './direct-format.js';
 import {
   applySelectionRectangle,
+  cloneRange,
+  isValidRange,
   normalizeRange,
   rangeContainsAddr,
   rangeContainsRange,
+  rangeOfAddr,
   rangesIntersect,
   type SelectionGestureMode,
   sameRange,
@@ -27,18 +30,7 @@ const permittedAddr = (store: SpreadsheetStore, addr: Addr): Addr | null =>
   navigationPolicyFor(store) ? clampNavigationAddr(store, addr) : addr;
 
 const validSelectionRange = (range: Range): boolean =>
-  Number.isSafeInteger(range.sheet) &&
-  range.sheet >= 0 &&
-  Number.isSafeInteger(range.r0) &&
-  Number.isSafeInteger(range.c0) &&
-  Number.isSafeInteger(range.r1) &&
-  Number.isSafeInteger(range.c1) &&
-  range.r0 >= 0 &&
-  range.c0 >= 0 &&
-  range.r1 <= MAX_ROW &&
-  range.c1 <= MAX_COL &&
-  range.r0 <= range.r1 &&
-  range.c0 <= range.c1;
+  Number.isSafeInteger(range.sheet) && isValidRange(range);
 
 /** Inverted ranges are stored normalized; off-sheet ranges are rejected before
  *  any navigation clamp. */
@@ -59,7 +51,7 @@ const selectionForAddr = (state: State, addr: Addr): { active: Addr; range: Rang
   if (!merge) {
     return {
       active: addr,
-      range: { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col },
+      range: rangeOfAddr(addr),
     };
   }
   return {
@@ -114,22 +106,10 @@ const boundedAxisRange = (
       : { sheet, r0: 0, c0: first, r1: MAX_ROW, c1: last };
   }
   const bound = navigationSelectionBoundsFor(store);
-  const axisMin =
-    axis === 'row'
-      ? bound?.sheet === sheet
-        ? bound.r0
-        : 0
-      : bound?.sheet === sheet
-        ? bound.c0
-        : 0;
+  const inSheet = bound?.sheet === sheet ? bound : null;
+  const axisMin = axis === 'row' ? (inSheet ? inSheet.r0 : 0) : inSheet ? inSheet.c0 : 0;
   const axisMax =
-    axis === 'row'
-      ? bound?.sheet === sheet
-        ? bound.r1
-        : MAX_ROW
-      : bound?.sheet === sheet
-        ? bound.c1
-        : MAX_COL;
+    axis === 'row' ? (inSheet ? inSheet.r1 : MAX_ROW) : inSheet ? inSheet.c1 : MAX_COL;
   const boundedFirst = Math.max(axisMin, Math.min(axisMax, first));
   const boundedLast = Math.max(axisMin, Math.min(axisMax, last));
   const range: Range =
@@ -137,15 +117,15 @@ const boundedAxisRange = (
       ? {
           sheet,
           r0: Math.min(boundedFirst, boundedLast),
-          c0: bound?.sheet === sheet ? bound.c0 : 0,
+          c0: inSheet ? inSheet.c0 : 0,
           r1: Math.max(boundedFirst, boundedLast),
-          c1: bound?.sheet === sheet ? bound.c1 : MAX_COL,
+          c1: inSheet ? inSheet.c1 : MAX_COL,
         }
       : {
           sheet,
-          r0: bound?.sheet === sheet ? bound.r0 : 0,
+          r0: inSheet ? inSheet.r0 : 0,
           c0: Math.min(boundedFirst, boundedLast),
-          r1: bound?.sheet === sheet ? bound.r1 : MAX_ROW,
+          r1: inSheet ? inSheet.r1 : MAX_ROW,
           c1: Math.max(boundedFirst, boundedLast),
         };
   return permittedRange(store, range);
@@ -226,11 +206,7 @@ export const selectionMutators = {
       const next = permittedAddr(store, resolved.active);
       const nextRange = permittedRange(store, resolved.range);
       if (!next || !nextRange) return s;
-      const sameAsActive =
-        s.selection.active.sheet === next.sheet &&
-        s.selection.active.row === next.row &&
-        s.selection.active.col === next.col;
-      if (sameAsActive) return s;
+      if (sameAddr(s.selection.active, next)) return s;
       const prevPrimary = s.selection.range;
       // Demote the current primary range into extraRanges, promote the new
       // cell to primary so future shift-extends widen the new band.
@@ -259,13 +235,7 @@ export const selectionMutators = {
     if (!nextActive) return;
     store.setState((s) => {
       const prevPrimary = s.selection.range;
-      const sameAsPrimary =
-        prevPrimary.sheet === nextRange.sheet &&
-        prevPrimary.r0 === nextRange.r0 &&
-        prevPrimary.c0 === nextRange.c0 &&
-        prevPrimary.r1 === nextRange.r1 &&
-        prevPrimary.c1 === nextRange.c1;
-      if (sameAsPrimary) return s;
+      if (sameRange(prevPrimary, nextRange)) return s;
       return {
         ...s,
         selection: {
@@ -336,7 +306,7 @@ export const selectionMutators = {
           active,
           anchor: anchorAddr,
           range: { ...next.range },
-          extraRanges: (next.extraRanges ?? []).map((range) => ({ ...range })),
+          extraRanges: (next.extraRanges ?? []).map(cloneRange),
         },
       };
     });
@@ -393,19 +363,16 @@ export const selectionMutators = {
     const range = boundedAxisRange(store, 'row', r0, r1);
     if (!range) return;
     const col = clampInto(activeCol, range.c0, range.c1);
+    const at = {
+      sheet: range.sheet,
+      row: Math.max(range.r0, Math.min(range.r1, anchorRow)),
+      col,
+    };
     store.setState((s) => ({
       ...s,
       selection: {
-        active: {
-          sheet: range.sheet,
-          row: Math.max(range.r0, Math.min(range.r1, anchorRow)),
-          col,
-        },
-        anchor: {
-          sheet: range.sheet,
-          row: Math.max(range.r0, Math.min(range.r1, anchorRow)),
-          col,
-        },
+        active: at,
+        anchor: { ...at },
         range,
         extraRanges: [],
       },
@@ -435,19 +402,16 @@ export const selectionMutators = {
     const range = boundedAxisRange(store, 'col', c0, c1);
     if (!range) return;
     const row = clampInto(activeRow, range.r0, range.r1);
+    const at = {
+      sheet: range.sheet,
+      row,
+      col: Math.max(range.c0, Math.min(range.c1, anchorCol)),
+    };
     store.setState((s) => ({
       ...s,
       selection: {
-        active: {
-          sheet: range.sheet,
-          row,
-          col: Math.max(range.c0, Math.min(range.c1, anchorCol)),
-        },
-        anchor: {
-          sheet: range.sheet,
-          row,
-          col: Math.max(range.c0, Math.min(range.c1, anchorCol)),
-        },
+        active: at,
+        anchor: { ...at },
         range,
         extraRanges: [],
       },

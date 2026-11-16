@@ -1,7 +1,7 @@
 import type { Addr, PivotFilterSpec } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
-export interface PassthroughSummary {
+interface PassthroughSummary {
   /** Total preserved OOXML object parts surfaced for host chrome. */
   count: number;
   /** Path roots seen — `xl/charts`, `xl/drawings`, `xl/pivotTables`, etc.

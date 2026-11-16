@@ -9,7 +9,7 @@ import {
 import type { CellValidation, FormatSlice, RangeValidation, State } from './types.js';
 
 /** Rules covering more cells than this are stored by range, not per cell. */
-export const MAX_MATERIALIZED_VALIDATION_CELLS = 10_000;
+const MAX_MATERIALIZED_VALIDATION_CELLS = 10_000;
 
 /** Validation governing `addr`: the cell's own rule, else a range-stored one. */
 export function validationAt(format: FormatSlice, addr: Addr): CellValidation | undefined {

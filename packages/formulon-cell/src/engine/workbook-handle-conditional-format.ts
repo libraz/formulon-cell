@@ -7,20 +7,18 @@ import {
 } from '@libraz/formulon';
 import { orFallback } from './result.js';
 import { completeDxfRecord } from './style-records.js';
-import type {
-  ConditionalFormatInput,
-  DxfRecord,
-  EngineCapabilities,
-  Sheet,
-  Workbook,
-} from './types.js';
+import type { ConditionalFormatInput, DxfRecord, EngineCapabilities } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import {
+  assertAlive,
+  type WorkbookHandleInternals as SharedInternals,
+  wb,
+  ws,
+} from './workbook-handle-internals.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
-type WorkbookHandleInternals = {
-  wb: Workbook;
+type WorkbookHandleInternals = SharedInternals & {
   module: Formulon;
-  assertAlive(): void;
 };
 
 declare module './workbook-handle.js' {
@@ -29,18 +27,6 @@ declare module './workbook-handle.js' {
 
 function internals(handle: unknown): WorkbookHandleInternals {
   return handle as WorkbookHandleInternals;
-}
-
-function assertAlive(handle: unknown): void {
-  internals(handle).assertAlive();
-}
-
-function wb(handle: unknown): Workbook {
-  return internals(handle).wb;
-}
-
-function ws(handle: unknown, sheet: number): Sheet {
-  return internals(handle).wb.sheet(sheet);
 }
 
 type Rgba = { r: number; g: number; b: number; a: number };

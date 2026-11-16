@@ -1,50 +1,20 @@
 import type {
   ComparisonOperator,
   ErrorCode,
-  Sheet,
   ValidationErrorStyle,
   ValidationType,
 } from '@libraz/formulon';
-import { isFormulonError, orFallback } from './result.js';
-import type { DataValidationInput, EngineCapabilities, Range, Workbook } from './types.js';
+import { rangeOfRect, rectOfRange } from './address.js';
+import { attemptWrite, orFallback } from './result.js';
+import type { DataValidationInput, EngineCapabilities, Range } from './types.js';
 import { type CellValue, type Value, ValueKind } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import { assertAlive, ws } from './workbook-handle-internals.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
-type WorkbookHandleInternals = {
-  wb: Workbook;
-  assertAlive(): void;
-};
 
 declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandleValidationMethods {}
-}
-
-function internals(handle: unknown): WorkbookHandleInternals {
-  return handle as WorkbookHandleInternals;
-}
-
-function assertAlive(handle: unknown): void {
-  internals(handle).assertAlive();
-}
-
-function wb(handle: unknown): Workbook {
-  return internals(handle).wb;
-}
-
-function ws(handle: unknown, sheet: number): Sheet {
-  return wb(handle).sheet(sheet);
-}
-
-/** Run an engine call; an engine refusal is a soft `false`, anything else rethrows. */
-function attempt(fn: () => void): boolean {
-  try {
-    fn();
-    return true;
-  } catch (e) {
-    if (!isFormulonError(e)) throw e;
-    return false;
-  }
 }
 
 function toEngineValue(value: CellValue): Value {
@@ -141,13 +111,7 @@ export abstract class WorkbookHandleValidationMethods {
     assertAlive(this);
     if (!this.capabilities.dataValidation) return [];
     return orFallback([], () => ws(this, sheet).listValidations()).map((v) => ({
-      ranges: v.ranges.map((m) => ({
-        sheet,
-        r0: m.firstRow,
-        c0: m.firstCol,
-        r1: m.lastRow,
-        c1: m.lastCol,
-      })),
+      ranges: v.ranges.map((m) => rangeOfRect(sheet, m)),
       type: v.type,
       op: v.operator,
       errorStyle: v.errorStyle,
@@ -190,12 +154,7 @@ export abstract class WorkbookHandleValidationMethods {
     if (!this.capabilities.dataValidation) return false;
     const dv: DataValidationInput = {
       type: input.type,
-      ranges: input.ranges.map((r) => ({
-        firstRow: r.r0,
-        firstCol: r.c0,
-        lastRow: r.r1,
-        lastCol: r.c1,
-      })),
+      ranges: input.ranges.map(rectOfRange),
       ...(input.op !== undefined ? { operator: input.op } : {}),
       ...(input.errorStyle !== undefined ? { errorStyle: input.errorStyle } : {}),
       ...(input.allowBlank !== undefined ? { allowBlank: input.allowBlank } : {}),
@@ -209,7 +168,7 @@ export abstract class WorkbookHandleValidationMethods {
       ...(input.promptTitle !== undefined ? { promptTitle: input.promptTitle } : {}),
       ...(input.promptMessage !== undefined ? { promptMessage: input.promptMessage } : {}),
     };
-    return attempt(() => {
+    return attemptWrite(() => {
       ws(this, sheet).addValidation(dv);
     });
   }
@@ -218,14 +177,14 @@ export abstract class WorkbookHandleValidationMethods {
   removeValidationAt(sheet: number, index: number): boolean {
     assertAlive(this);
     if (!this.capabilities.dataValidation) return false;
-    return attempt(() => ws(this, sheet).removeValidation(index));
+    return attemptWrite(() => ws(this, sheet).removeValidation(index));
   }
 
   /** Drop every validation rule on `sheet`. */
   clearValidations(sheet: number): boolean {
     assertAlive(this);
     if (!this.capabilities.dataValidation) return false;
-    return attempt(() => ws(this, sheet).clearValidations());
+    return attemptWrite(() => ws(this, sheet).clearValidations());
   }
 }
 

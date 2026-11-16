@@ -17,7 +17,9 @@ export const macColumnPaddingPt = (mdw: number): number => 2 * Math.ceil(mdw / 4
 /** Digit-advance em for a family the table does not list. */
 const UNKNOWN_FAMILY_EM = 0.55;
 
-const normalizeFontName = (name: string): string => name.normalize('NFKC').trim().toLowerCase();
+/** Font name as the Mac tables key it: NFKC, trimmed, lower-cased. */
+export const normalizeFontName = (name: string): string =>
+  name.normalize('NFKC').trim().toLowerCase();
 
 const FAMILY_EM: ReadonlyMap<string, number> = new Map(
   (

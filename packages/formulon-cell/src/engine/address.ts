@@ -1,10 +1,27 @@
-import type { Addr, Range } from './types.js';
+import type { Addr, CellRect, Range } from './types.js';
 
 export const addrKey = (a: Addr): string => `${a.sheet}:${a.row}:${a.col}`;
 
 export const rangeKey = (r: Range): string => `${r.sheet}:${r.r0}:${r.c0}:${r.r1}:${r.c1}`;
 
 export const cloneAddr = (a: Addr): Addr => ({ sheet: a.sheet, row: a.row, col: a.col });
+
+/** The engine rectangle covering `range`; the sheet is carried separately. */
+export const rectOfRange = (range: Omit<Range, 'sheet'>): CellRect => ({
+  firstRow: range.r0,
+  firstCol: range.c0,
+  lastRow: range.r1,
+  lastCol: range.c1,
+});
+
+/** The store range of `rect` on `sheet`. */
+export const rangeOfRect = (sheet: number, rect: CellRect): Range => ({
+  sheet,
+  r0: rect.firstRow,
+  c0: rect.firstCol,
+  r1: rect.lastRow,
+  c1: rect.lastCol,
+});
 
 /** `addrs` without repeats (first occurrence wins), each cloned. */
 export const uniqueAddrs = (addrs: readonly Addr[]): Addr[] => {

@@ -27,7 +27,7 @@ import {
   syncColorPaletteTheme,
   themeColorColumns,
 } from '../../components/color-palette.js';
-import { addrKey, formatA1Range } from '../../engine/address.js';
+import { addrKey, formatA1Range, rangeOfRect, rectOfRange } from '../../engine/address.js';
 import { cssOfColorSpec } from '../../engine/theme-color.js';
 import { focusSheet } from '../../interact/dialog-focus.js';
 import type { SpreadsheetInstance } from '../../mount.js';
@@ -181,21 +181,14 @@ export function createSparklineDropdownDefaults(
     const range = await promptRange(
       mac() ? m.dateTitle : t.dateRangeTitle,
       mac() ? m.dateRangeLabel : t.dateRangeLabel,
-      current
-        ? formatA1Range({
-            r0: current.rect.firstRow,
-            c0: current.rect.firstCol,
-            r1: current.rect.lastRow,
-            c1: current.rect.lastCol,
-          })
-        : '',
+      current ? formatA1Range(rangeOfRect(current.sheet, current.rect)) : '',
     );
     if (!range) return;
     patchSelectedSparklineGroupsAction(ctxFor(SPARKLINE_COMMANDS.axis), {
       dateAxis: true,
       dateAxisRange: {
         sheet: range.sheet,
-        rect: { firstRow: range.r0, firstCol: range.c0, lastRow: range.r1, lastCol: range.c1 },
+        rect: rectOfRange(range),
       },
     });
   };

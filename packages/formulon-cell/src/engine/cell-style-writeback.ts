@@ -38,7 +38,7 @@ export interface NamedStyleRegistration {
   groups: readonly CellStyleFormatGroup[];
 }
 
-export interface NamedStyleSyncPlan {
+interface NamedStyleSyncPlan {
   readonly styleXfIds: ReadonlyMap<string, number>;
   commit(): void;
 }

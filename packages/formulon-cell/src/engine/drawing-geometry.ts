@@ -10,7 +10,7 @@ import {
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import { renderScale } from '../store/render-scale.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
-import { MAX_ROW } from './address.js';
+import { MAX_COL, MAX_ROW } from './address.js';
 import type { EngineDrawingAnchor } from './types.js';
 
 /** `AnchorKind.Absolute`: the engine cannot re-anchor such an object. */
@@ -122,11 +122,11 @@ type ViewportOf = ReturnType<SpreadsheetStore['getState']>['viewport'];
 const colAtX = (layout: ViewLayoutOf, viewport: ViewportOf, x: number, zoom: number): number => {
   const origin = cellRectUnclamped(layout, viewport, 0, 0);
   let col = Math.max(0, Math.floor((x - origin.x) / Math.max(1, layout.defaultColWidth * zoom)));
-  col = Math.min(16_383, col);
-  for (let i = 0; i < 16_384; i += 1) {
+  col = Math.min(MAX_COL, col);
+  for (let i = 0; i <= MAX_COL; i += 1) {
     const rect = cellRectUnclamped(layout, viewport, 0, col);
     if (x < rect.x) col = Math.max(0, col - 1);
-    else if (x >= rect.x + rect.w) col = Math.min(16_383, col + 1);
+    else if (x >= rect.x + rect.w) col = Math.min(MAX_COL, col + 1);
     else break;
   }
   return col;

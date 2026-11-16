@@ -1,14 +1,13 @@
 import type { DataTable } from '@libraz/formulon';
-import { MAX_COL, MAX_ROW } from './address.js';
+import { MAX_COL, MAX_ROW, rangeOfRect, rectOfRange } from './address.js';
 import { CALC_MODE_MANUAL } from './calc-mode.js';
-import { isFormulonError } from './result.js';
-import type { Addr, EngineCapabilities, Range, Workbook } from './types.js';
+import { attemptWrite } from './result.js';
+import type { Addr, EngineCapabilities, Range } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import type { WorkbookHandleInternals as SharedInternals } from './workbook-handle-internals.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
-type WorkbookHandleInternals = {
-  wb: Workbook;
-  assertAlive(): void;
+type WorkbookHandleInternals = SharedInternals & {
   emitRecalc(): void;
 };
 
@@ -55,13 +54,7 @@ function toInfo(sheet: number, table: DataTable): DataTableInfo {
   const input = (i: DataTable['rowInput']): Addr | null =>
     i ? { sheet, row: i.row, col: i.col } : null;
   return {
-    range: {
-      sheet,
-      r0: table.range.firstRow,
-      c0: table.range.firstCol,
-      r1: table.range.lastRow,
-      c1: table.range.lastCol,
-    },
+    range: rangeOfRect(sheet, table.range),
     rowInput: input(table.rowInput),
     colInput: input(table.columnInput),
     inputDeleted: !!table.rowInput?.deleted || !!table.columnInput?.deleted,
@@ -123,16 +116,14 @@ export abstract class WorkbookHandleDataTablesMethods {
     self.assertAlive();
     if (!this.capabilities.dataTables) return false;
     const { range } = def;
-    try {
+    const added = attemptWrite(() =>
       self.wb.sheet(range.sheet).addDataTable({
-        range: { firstRow: range.r0, firstCol: range.c0, lastRow: range.r1, lastCol: range.c1 },
+        range: rectOfRange(range),
         rowInput: def.rowInput ? { row: def.rowInput.row, col: def.rowInput.col } : null,
         columnInput: def.colInput ? { row: def.colInput.row, col: def.colInput.col } : null,
-      });
-    } catch (e) {
-      if (!isFormulonError(e)) throw e;
-      return false;
-    }
+      }),
+    );
+    if (!added) return false;
     computeUnlessManual(this);
     return true;
   }
@@ -142,10 +133,7 @@ export abstract class WorkbookHandleDataTablesMethods {
     const self = internals(this);
     self.assertAlive();
     if (!this.capabilities.dataTables) return false;
-    try {
-      self.wb.sheet(addr.sheet).removeDataTable(addr.row, addr.col);
-    } catch (e) {
-      if (!isFormulonError(e)) throw e;
+    if (!attemptWrite(() => self.wb.sheet(addr.sheet).removeDataTable(addr.row, addr.col))) {
       return false;
     }
     self.emitRecalc();

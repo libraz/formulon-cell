@@ -4,16 +4,15 @@ import {
   type PageSetupPatch,
   type Pagination,
   type PrintTitlesInput,
-  type Sheet,
   type Span,
 } from '@libraz/formulon';
-import { colLetter, formatA1Range } from './address.js';
+import { colLetter, formatA1Range, rangeOfRect } from './address.js';
 import {
   type EnginePageSetupExtrasInput,
   mergePageSetupFragment,
   readPageSetupExtras,
 } from './page-setup-xml.js';
-import { isFormulonError } from './result.js';
+import { attemptWrite } from './result.js';
 import {
   type EngineSheetPr,
   type EngineSheetPrInput,
@@ -29,21 +28,17 @@ import type {
   EnginePageSetup,
   EnginePageSetupExtras,
   EnginePrintOptions,
-  Workbook,
 } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import { assertAlive, ws } from './workbook-handle-internals.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
-type WorkbookHandleInternals = {
-  wb: Workbook;
-  assertAlive(): void;
-};
 
 /** Partial `<pageSetup>` update. Mirrors the engine's `PageSetupInput`: only
  *  the keys present are applied. `fitToPage` selects the fit-to-page mode
  *  while `fitToWidth` / `fitToHeight` state the target, so "fit onto one
  *  page" needs all three. */
-export type EnginePageSetupInput = Partial<{
+type EnginePageSetupInput = Partial<{
   orientation: EngineOrientation;
   paperSize: number;
   scale: number;
@@ -54,7 +49,7 @@ export type EnginePageSetupInput = Partial<{
 
 /** Partial `<headerFooter>` update. Every key is optional and the section
  *  strings are tri-state — see `setSheetHeaderFooter`. */
-export type EngineHeaderFooterInput = Partial<{
+type EngineHeaderFooterInput = Partial<{
   oddHeader: string;
   oddFooter: string;
   evenHeader: string;
@@ -69,33 +64,6 @@ export type EngineHeaderFooterInput = Partial<{
 
 declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandlePrintMethods {}
-}
-
-function internals(handle: unknown): WorkbookHandleInternals {
-  return handle as WorkbookHandleInternals;
-}
-
-function assertAlive(handle: unknown): void {
-  internals(handle).assertAlive();
-}
-
-function wb(handle: unknown): Workbook {
-  return internals(handle).wb;
-}
-
-function ws(handle: unknown, sheet: number): Sheet {
-  return wb(handle).sheet(sheet);
-}
-
-/** Run an engine call; an engine refusal is a soft `false`, anything else rethrows. */
-function attempt(fn: () => void): boolean {
-  try {
-    fn();
-    return true;
-  } catch (e) {
-    if (!isFormulonError(e)) throw e;
-    return false;
-  }
 }
 
 /** `<pageSetup orientation>` as the store-facing code: 0 absent, 1 portrait, 2 landscape. */
@@ -164,7 +132,7 @@ export abstract class WorkbookHandlePrintMethods {
       ...(orientation !== undefined ? { orientation: engineOrientationOf(orientation) } : {}),
       ...(scale !== undefined ? { scalePct: scale } : {}),
     };
-    return attempt(() => ws(this, sheet).updatePageSetup(patch));
+    return attemptWrite(() => ws(this, sheet).updatePageSetup(patch));
   }
 
   /** The complete worksheet `<pageSetup>` fragment, or null when the engine
@@ -184,7 +152,7 @@ export abstract class WorkbookHandlePrintMethods {
   setSheetPageSetupXml(sheet: number, xml: string): boolean {
     assertAlive(this);
     if (!this.capabilities.printSettingsXml) return false;
-    return attempt(() => ws(this, sheet).ooxml.setPageSetupXml(xml || null));
+    return attemptWrite(() => ws(this, sheet).ooxml.setPageSetupXml(xml || null));
   }
 
   /** The `<pageSetup>` attributes beside the typed setter's own. Read from the
@@ -211,7 +179,7 @@ export abstract class WorkbookHandlePrintMethods {
     const current = sh.ooxml.getPageSetupXml() ?? '';
     const next = mergePageSetupFragment(current, extras);
     if (next === null || next === current) return next !== null;
-    return attempt(() => sh.ooxml.setPageSetupXml(next || null));
+    return attemptWrite(() => sh.ooxml.setPageSetupXml(next || null));
   }
 
   /** Effective page margins for `sheet`, in inches. */
@@ -234,7 +202,7 @@ export abstract class WorkbookHandlePrintMethods {
   setSheetPageMargins(sheet: number, margins: Partial<EnginePageMargins>): boolean {
     assertAlive(this);
     if (!this.capabilities.printSettings) return false;
-    return attempt(() =>
+    return attemptWrite(() =>
       ws(this, sheet).updatePageMargins({
         leftIn: margins.left,
         rightIn: margins.right,
@@ -263,7 +231,7 @@ export abstract class WorkbookHandlePrintMethods {
   setSheetPrintOptions(sheet: number, options: Partial<EnginePrintOptions>): boolean {
     assertAlive(this);
     if (!this.capabilities.printSettings) return false;
-    return attempt(() => ws(this, sheet).updatePrintOptions(options));
+    return attemptWrite(() => ws(this, sheet).updatePrintOptions(options));
   }
 
   /** Worksheet `<headerFooter>` state with the section strings decoded; a
@@ -294,7 +262,7 @@ export abstract class WorkbookHandlePrintMethods {
   setSheetHeaderFooter(sheet: number, headerFooter: EngineHeaderFooterInput): boolean {
     assertAlive(this);
     if (!this.capabilities.printSettings) return false;
-    return attempt(() => ws(this, sheet).updateHeaderFooter(headerFooter));
+    return attemptWrite(() => ws(this, sheet).updateHeaderFooter(headerFooter));
   }
 
   /** Tab colour and outline summary position from the raw `<sheetPr>` fragment,
@@ -314,7 +282,7 @@ export abstract class WorkbookHandlePrintMethods {
     const current = sh.ooxml.getSheetPrXml() ?? '';
     const next = mergeSheetPrFragment(current, change);
     if (next === null) return false;
-    return next === current || attempt(() => sh.ooxml.setSheetPrXml(next || null));
+    return next === current || attemptWrite(() => sh.ooxml.setSheetPrXml(next || null));
   }
 
   /** `_xlnm.Print_Area` as comma-separated A1 ranges; empty when unset. */
@@ -322,9 +290,7 @@ export abstract class WorkbookHandlePrintMethods {
     assertAlive(this);
     if (!this.capabilities.printSettings) return null;
     const rects: readonly CellRect[] | null = ws(this, sheet).getPrintArea();
-    return (rects ?? [])
-      .map((r) => formatA1Range({ r0: r.firstRow, c0: r.firstCol, r1: r.lastRow, c1: r.lastCol }))
-      .join(',');
+    return (rects ?? []).map((r) => formatA1Range(rangeOfRect(sheet, r))).join(',');
   }
 
   /** Write `_xlnm.Print_Area`. An empty string removes it. */
@@ -335,7 +301,7 @@ export abstract class WorkbookHandlePrintMethods {
       .split(',')
       .map((part) => part.trim())
       .filter(Boolean);
-    return attempt(() => ws(this, sheet).setPrintArea(parts.length > 0 ? parts : null));
+    return attemptWrite(() => ws(this, sheet).setPrintArea(parts.length > 0 ? parts : null));
   }
 
   /** `_xlnm.Print_Titles` as a row span and a column span; either may be
@@ -359,7 +325,7 @@ export abstract class WorkbookHandlePrintMethods {
       columns: titleInput(repeatCols),
     };
     const none = titles.rows === null && titles.columns === null;
-    return attempt(() => ws(this, sheet).setPrintTitles(none ? null : titles));
+    return attemptWrite(() => ws(this, sheet).setPrintTitles(none ? null : titles));
   }
 
   /** Manual page breaks on `sheet`. Breaks the engine computed rather than a
@@ -386,11 +352,12 @@ export abstract class WorkbookHandlePrintMethods {
     assertAlive(this);
     if (!this.capabilities.pageBreaks) return false;
     const sh = ws(this, sheet);
-    if (!attempt(() => sh.clearBreaks())) return false;
+    if (!attemptWrite(() => sh.clearBreaks())) return false;
     let ok = true;
-    for (const row of breaks.rows) ok = attempt(() => sh.setRowBreak(row, { manual: true })) && ok;
+    for (const row of breaks.rows)
+      ok = attemptWrite(() => sh.setRowBreak(row, { manual: true })) && ok;
     for (const col of breaks.cols) {
-      ok = attempt(() => sh.setColumnBreak(col, { manual: true })) && ok;
+      ok = attemptWrite(() => sh.setColumnBreak(col, { manual: true })) && ok;
     }
     return ok;
   }

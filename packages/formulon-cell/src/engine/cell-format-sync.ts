@@ -23,6 +23,7 @@ import {
   writeShowPhonetic,
 } from './phonetic-sync.js';
 import { axisLocksFromEngine, inheritsUnlocked } from './protection-sync.js';
+import { strictSyncError } from './strict-sync-error.js';
 import { formattedKeySet, seedSyncedFormatKeys } from './synced-format-keys.js';
 import type { Addr, CellValue } from './types.js';
 import { syncValidationsToEngine } from './validation-sync.js';
@@ -103,8 +104,8 @@ export interface EngineSyncOptions {
   readonly strict?: boolean;
 }
 
-const strictSyncError = (operation: string, address: string): Error =>
-  new Error(`Strict engine sync failed: cell-format ${operation} at ${address}`);
+const strictError = (operation: string, address: string): Error =>
+  strictSyncError('cell-format', operation, address);
 
 /**
  * Push every format entry on `sheet` from FormatSlice into the engine's XF
@@ -141,7 +142,7 @@ export function syncCellFormatsToEngine(
     : syncNamedCellStylesToEngine(wb, state, resolveStyleXfForSync);
   const namedStyleXfs = resolveNamedStyleXfs(wb, state, styleXfIds);
   if (strict && styleXfConstructionFailed) {
-    throw strictSyncError('resolveStyleXf', `sheet:${sheet}`);
+    throw strictError('resolveStyleXf', `sheet:${sheet}`);
   }
   const previous = formattedKeySet(wb, sheet);
   const current = new Set<string>();
@@ -231,12 +232,12 @@ export function syncCellFormatsToEngine(
       if (resolution.cacheable) rememberXf(cacheKey, fmt, xfIndex);
     }
     if (xfIndex < 0) {
-      if (strict) throw strictSyncError('resolveXf', key);
+      if (strict) throw strictError('resolveXf', key);
       continue;
     }
     const setXfSucceeded = wb.setCellXfIndex(sheet, row, col, xfIndex);
     if (strict && !setXfSucceeded) {
-      throw strictSyncError('setCellXfIndex', key);
+      throw strictError('setCellXfIndex', key);
     }
     if (strict) previous.add(key);
     // Per-run first: `setCellPhonetic` spans the whole cell, so on a partially
@@ -249,7 +250,7 @@ export function syncCellFormatsToEngine(
         boundPhoneticRuns(wb, { sheet, row, col }, fmt.phonetic),
       );
       if (strict && !setPhoneticSucceeded) {
-        throw strictSyncError('setCellPhoneticRuns', key);
+        throw strictError('setCellPhoneticRuns', key);
       }
     } else if (wb.capabilities.phonetic) {
       const setPhoneticSucceeded = wb.setCellPhonetic(
@@ -259,11 +260,11 @@ export function syncCellFormatsToEngine(
         flattenPhoneticRuns(fmt.phonetic),
       );
       if (strict && !setPhoneticSucceeded) {
-        throw strictSyncError('setCellPhonetic', key);
+        throw strictError('setCellPhonetic', key);
       }
     }
     if (!writePhoneticProperties(wb, { sheet, row, col }, fmt) && strict) {
-      throw strictSyncError('setCellPhoneticProperties', key);
+      throw strictError('setCellPhoneticProperties', key);
     }
     if (
       !writeShowPhonetic(
@@ -274,7 +275,7 @@ export function syncCellFormatsToEngine(
       ) &&
       strict
     ) {
-      throw strictSyncError('setCellShowPhonetic', key);
+      throw strictError('setCellShowPhonetic', key);
     }
     current.add(key);
   }
@@ -286,7 +287,7 @@ export function syncCellFormatsToEngine(
     if (!addr) continue;
     const resetSucceeded = wb.setCellXfIndex(sheet, addr.row, addr.col, 0);
     if (strict && !resetSucceeded) {
-      throw strictSyncError('resetCellXfIndex', key);
+      throw strictError('resetCellXfIndex', key);
     }
   }
   strictStylePlan?.commit();
@@ -429,11 +430,11 @@ export function flushFormatToEngine(
 ): boolean {
   const sheetFontsOk = syncWholeSheetFontOverrides(wb, store, [sheet]);
   if (options?.strict && !sheetFontsOk) {
-    throw strictSyncError('sheetFontStyles', `sheet:${sheet}`);
+    throw strictError('sheetFontStyles', `sheet:${sheet}`);
   }
   const axesOk = syncAxisFormatOverrides(wb, store, [sheet]);
   if (options?.strict && !axesOk) {
-    throw strictSyncError('axisFormatStyles', `sheet:${sheet}`);
+    throw strictError('axisFormatStyles', `sheet:${sheet}`);
   }
   // Publish compact native row/column styles before sparse cell XFs. Axis
   // application can clear dimension records and must therefore be complete

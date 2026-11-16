@@ -10,7 +10,7 @@
  * folding; "Yu Gothic" is a different face from 游ゴシック on Mac and is kept apart.
  */
 
-const normalizeFontName = (name: string): string => name.normalize('NFKC').trim().toLowerCase();
+import { normalizeFontName } from './mac-digit-metrics.js';
 
 /** Default row height in points by family, keyed by Normal font size in points. */
 const FAMILY_ROW_PT: ReadonlyArray<readonly [string, Readonly<Record<number, number>>]> = [

@@ -8,9 +8,10 @@ import type { SheetView, SheetViewPatch } from '../commands/sheet-views.js';
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { frozenColEnd, frozenRowEnd } from './freeze-band.js';
-import { rangesIntersect } from './selection-geometry.js';
+import { rangeContainsAddr, rangesIntersect } from './selection-geometry.js';
 import { cloneSparklineSettings, withSparklineMembers } from './sparkline-slice.js';
 import type { SpreadsheetStore } from './store.js';
+import { engineOverlaysByName, nameKey } from './table-names.js';
 import type {
   ConditionalRule,
   SessionChart,
@@ -32,14 +33,7 @@ export const cloneSessionChart = (chart: SessionChart): SessionChart => ({
 
 function keyInRange(key: string, range: Range): boolean {
   const addr = parseAddrKey(key);
-  return (
-    addr !== null &&
-    addr.sheet === range.sheet &&
-    addr.row >= range.r0 &&
-    addr.row <= range.r1 &&
-    addr.col >= range.c0 &&
-    addr.col <= range.c1
-  );
+  return addr !== null && rangeContainsAddr(range, addr);
 }
 
 /** Session objects layered over the grid: conditional rules, sparklines,
@@ -289,12 +283,9 @@ export const sheetObjectMutators = {
    *  the engine reported none (`styleName` unset). */
   replaceEngineTableOverlays(store: SpreadsheetStore, tables: readonly TableOverlay[]): void {
     store.setState((s) => {
-      const known = new Map<string, TableOverlay>();
-      for (const t of s.tables.tables) {
-        if (t.source === 'engine' && t.name) known.set(t.name.toLocaleLowerCase(), t);
-      }
+      const known = engineOverlaysByName(s.tables.tables);
       const engine = tables.map((t) => {
-        const previous = t.name ? known.get(t.name.toLocaleLowerCase()) : undefined;
+        const previous = t.name ? known.get(nameKey(t.name)) : undefined;
         if (!previous) return t;
         if (t.styleName === undefined) return { ...previous, name: t.name, range: t.range };
         return { ...t, id: previous.id };
@@ -338,8 +329,7 @@ export const sheetObjectMutators = {
   /** Removes the custom table and PivotTable styles named `label`, and the PivotTable
    *  assignments of the PivotTable one. */
   removeCustomStylesNamed(store: SpreadsheetStore, label: string): void {
-    const named = (style: CustomTableStyle): boolean =>
-      style.label.toLocaleLowerCase() === label.toLocaleLowerCase();
+    const named = (style: CustomTableStyle): boolean => nameKey(style.label) === nameKey(label);
     store.setState((s) => {
       const pivotIds = new Set(
         (s.tables.customPivotTableStyles ?? []).filter(named).map((st) => st.id),

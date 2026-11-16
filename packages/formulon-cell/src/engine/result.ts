@@ -20,3 +20,11 @@ export function orFallback<T, F>(fallback: F, call: () => T): T | F {
     return fallback;
   }
 }
+
+/** `write()` as `true`, or `false` when the engine refuses it; any other error propagates. */
+export function attemptWrite(write: () => void): boolean {
+  return orFallback(false, () => {
+    write();
+    return true;
+  });
+}

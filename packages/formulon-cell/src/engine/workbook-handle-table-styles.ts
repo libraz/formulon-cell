@@ -1,14 +1,11 @@
 import type { TableColumn, TableStyle, TableStyleInput } from '@libraz/formulon';
 import { orFallback } from './result.js';
-import type { EngineCapabilities, Workbook } from './types.js';
+import type { EngineCapabilities } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import { assertAlive, wb } from './workbook-handle-internals.js';
 import { workbookTableAt } from './workbook-handle-tables.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
-type WorkbookHandleInternals = {
-  wb: Workbook;
-  assertAlive(): void;
-};
 
 declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandleTableStylesMethods {}
@@ -39,18 +36,6 @@ export interface PivotStyleInfo {
 
 /** A custom table / PivotTable style as stored in `<tableStyles>`. */
 export type CustomEngineTableStyle = TableStyle;
-
-function internals(handle: unknown): WorkbookHandleInternals {
-  return handle as WorkbookHandleInternals;
-}
-
-function assertAlive(handle: unknown): void {
-  internals(handle).assertAlive();
-}
-
-function wb(handle: unknown): Workbook {
-  return internals(handle).wb;
-}
 
 export abstract class WorkbookHandleTableStylesMethods {
   declare readonly capabilities: EngineCapabilities;

@@ -1,6 +1,6 @@
 import type { History } from '../commands/history.js';
 import { recordConditionalRulesChange } from '../commands/slice-history.js';
-import { formatA1Range } from '../engine/address.js';
+import { formatA1Range, rangeOfRect, rectOfRange } from '../engine/address.js';
 import { hydrateConditionalRulesFromEngine } from '../engine/cf-sync.js';
 import { rewriteEngineConditionalFormat } from '../engine/cf-writeback.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
@@ -430,7 +430,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   const parseAppliesTo = (text: string): SqrefArea | null => {
     const parsed = parseRangeRef(text.trim());
     if (!parsed || parsed.sheetName != null) return null;
-    return { firstRow: parsed.r0, firstCol: parsed.c0, lastRow: parsed.r1, lastCol: parsed.c1 };
+    return rectOfRange(parsed);
   };
 
   /** Applies the field's text to the rule it was loaded for; bad text reverts to the rule's range. */
@@ -454,13 +454,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
           const rules = [...state.conditional.rules];
           rules[target.index] = {
             ...source,
-            range: {
-              sheet: source.range.sheet,
-              r0: area.firstRow,
-              c0: area.firstCol,
-              r1: area.lastRow,
-              c1: area.lastCol,
-            },
+            range: rangeOfRect(source.range.sheet, area),
           };
           return { ...state, conditional: { rules } };
         });
@@ -774,13 +768,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
         ({ rule }) =>
           !scopeSelection ||
           rule.ranges.some((range) =>
-            rangesIntersect(scopeSelection, {
-              sheet: scopeSelection.sheet,
-              r0: range.firstRow,
-              c0: range.firstCol,
-              r1: range.lastRow,
-              c1: range.lastCol,
-            }),
+            rangesIntersect(scopeSelection, rangeOfRect(scopeSelection.sheet, range)),
           ),
       );
     const sessionRules = (deps.store?.getState().conditional.rules ?? [])
@@ -817,14 +805,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
         priority: String(engineRules.length + visibleIndex + 1),
         rule: sessionRuleTypeLabel(rule, t),
         format: sessionRuleTypeLabel(rule, t),
-        range: formatSqref([
-          {
-            firstRow: rule.range.r0,
-            firstCol: rule.range.c0,
-            lastRow: rule.range.r1,
-            lastCol: rule.range.c1,
-          },
-        ]),
+        range: formatSqref([rectOfRange(rule.range)]),
         stopIfTrue: rule.stopIfTrue === true,
       })),
     ];

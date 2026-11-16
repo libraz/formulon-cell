@@ -1,4 +1,4 @@
-import { parseA1Atom } from './address.js';
+import { tableRange } from './range-resolver.js';
 import type { Addr, CellValue, Range } from './types.js';
 
 /** A cell's content as the occupancy test reads it. */
@@ -14,13 +14,6 @@ export interface SpillOccupantSource {
   pivotBounds(sheet: number): { pivotIndex: number; range: Range }[];
   dataTables(sheet: number): readonly { readonly range: Range }[];
 }
-
-const tableRange = (sheet: number, ref: string): Range | null => {
-  const [first, last = first] = ref.split(':');
-  const a = first ? parseA1Atom(first) : null;
-  const b = last ? parseA1Atom(last) : null;
-  return a && b ? { sheet, r0: a.row, c0: a.col, r1: b.row, c1: b.col } : null;
-};
 
 const inRange = (r: Range, row: number, col: number): boolean =>
   row >= r.r0 && row <= r.r1 && col >= r.c0 && col <= r.c1;
@@ -62,7 +55,7 @@ export function spillOccupancy(
 }
 
 /** Rows and columns to read, in order; a renderer passes its visible axes. */
-export interface SpillAxes {
+interface SpillAxes {
   readonly rows: readonly number[];
   readonly cols: readonly number[];
 }

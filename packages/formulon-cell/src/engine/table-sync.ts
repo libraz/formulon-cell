@@ -8,9 +8,10 @@ import {
   type TableTotalsFunction,
 } from '../commands/format-as-table.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import { parseRangeRef } from './range-resolver.js';
+import { engineOverlaysByName, nameKey } from '../store/table-names.js';
+import { tableRange } from './range-resolver.js';
 import { hydrateTableStylesFromEngine } from './table-style-sync.js';
-import type { Addr, Range } from './types.js';
+import type { Addr } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 import type { TableStyleDetails } from './workbook-handle-table-styles.js';
 
@@ -31,18 +32,6 @@ type TableReader = Pick<WorkbookHandle, 'getTables'> &
 function tableId(name: string, sheet: number, ref: string): string {
   const safe = `${name || 'Table'}-${sheet}-${ref}`.replace(/[^A-Za-z0-9_-]+/g, '-');
   return `engine-table-${safe}`;
-}
-
-function tableRange(sheet: number, ref: string): Range | null {
-  const parsed = parseRangeRef(ref);
-  if (!parsed) return null;
-  return {
-    sheet,
-    r0: parsed.r0,
-    c0: parsed.c0,
-    r1: parsed.r1,
-    c1: parsed.c1,
-  };
 }
 
 const TOTALS_TO_ENGINE: Readonly<Record<TableTotalsFunction, TableTotalsRowFunction>> = {
@@ -201,12 +190,9 @@ export function hydrateTableOverlaysFromEngine(wb: TableReader, store: Spreadshe
     if (wb.capabilities?.customTableStyles) {
       hydrateTableStylesFromEngine(wb as Parameters<typeof hydrateTableStylesFromEngine>[0], store);
     }
-    const known = new Map<string, TableOverlay>();
-    for (const t of store.getState().tables.tables) {
-      if (t.source === 'engine' && t.name) known.set(t.name.toLocaleLowerCase(), t);
-    }
+    const known = engineOverlaysByName(store.getState().tables.tables);
     const overlays = tableOverlaysFromEngine(wb).map((t) => {
-      const previous = t.name ? known.get(t.name.toLocaleLowerCase()) : undefined;
+      const previous = t.name ? known.get(nameKey(t.name)) : undefined;
       return previous && t.styleName !== undefined && sameEngineLook(previous, t)
         ? { ...t, style: previous.style, color: previous.color, styleName: previous.styleName }
         : t;

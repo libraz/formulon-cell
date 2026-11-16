@@ -9,7 +9,6 @@ import type {
   GradientStop as EngineGradientStop,
   FunctionMetadata,
   PivotFilterKind,
-  PivotLayout,
 } from '@libraz/formulon';
 import { PivotSortOrder as EnginePivotSortOrder } from '@libraz/formulon';
 
@@ -47,9 +46,6 @@ export type {
 
 /** Function metadata as the public API names it; the engine's `FunctionMetadata`. */
 export type FunctionMetadataResult = FunctionMetadata;
-
-/** Evaluated PivotTable layout as the public API names it; the engine's `PivotLayout`. */
-export type PivotLayoutResult = PivotLayout;
 
 /** Anchor geometry of a drawing object (picture or chart), as the engine
  * reports it in `DrawingProperties.anchor`. */

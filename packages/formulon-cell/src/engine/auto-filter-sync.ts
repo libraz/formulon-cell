@@ -42,7 +42,7 @@ import type {
   State,
   ValueFilterCriteria,
 } from '../store/store.js';
-import { formatA1Range } from './address.js';
+import { formatA1Range, rangeOfRect, rectOfRange } from './address.js';
 import { customIconFromEngine, customIconToEngine } from './cf-icon-sets.js';
 import { dxfToApply } from './cf-sync.js';
 import { dxfRecordFromApply } from './cf-writeback.js';
@@ -201,13 +201,8 @@ const emptyAutoFilterColumn = (columnOffset: number): AutoFilterColumnInput => (
   iconIndex: null,
 });
 
-const rangeFromAutoFilter = (filter: AutoFilter, sheet: number): Range => ({
-  sheet,
-  r0: filter.range.firstRow,
-  c0: filter.range.firstCol,
-  r1: filter.range.lastRow,
-  c1: filter.range.lastCol,
-});
+const rangeFromAutoFilter = (filter: AutoFilter, sheet: number): Range =>
+  rangeOfRect(sheet, filter.range);
 
 const sameAutoFilterRange = (filter: AutoFilter, range: Range): boolean =>
   filter.range.firstRow === range.r0 &&
@@ -668,12 +663,7 @@ export function typedAutoFilterFromState(
   }
 
   return {
-    range: {
-      firstRow: range.r0,
-      firstCol: range.c0,
-      lastRow: range.r1,
-      lastCol: range.c1,
-    },
+    range: rectOfRange(range),
     columns: Array.from(columns.values()).sort((a, b) => a.columnOffset - b.columnOffset),
     sort: sortForRange(state, range, wb),
   };
@@ -1106,7 +1096,7 @@ function syncStoreOwnedAutoFilterVisibility(
 }
 
 const emptyTypedFilter = (range: Range): AutoFilterInput => ({
-  range: { firstRow: range.r0, firstCol: range.c0, lastRow: range.r1, lastCol: range.c1 },
+  range: rectOfRange(range),
   columns: [],
   sort: null,
 });

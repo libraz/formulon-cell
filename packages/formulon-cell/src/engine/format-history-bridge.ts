@@ -8,7 +8,7 @@ import type { WorkbookHandle } from './workbook-handle.js';
  * `effectiveXfIndex` is kept for cells whose formatting is inherited from a
  * row, column, or the workbook default.
  */
-export interface NativeFormatSnapshotEntry {
+interface NativeFormatSnapshotEntry {
   readonly directXfIndex: number | null;
   readonly effectiveXfIndex: number | null;
   /** Formulon's EffectiveStyleSource ordinal (Cell=0, Row=1, Column=2,

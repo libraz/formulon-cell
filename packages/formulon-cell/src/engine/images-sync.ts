@@ -17,7 +17,7 @@ import type { EngineDrawingObject, EngineImage } from './workbook-handle-annotat
  * They are intentionally optional so shapes and older hosts keep their old
  * session-only representation. The main store may later promote these fields
  * to its public object slice without changing this adapter. */
-export interface PersistedImageFields {
+interface PersistedImageFields {
   nativeObjectId: number;
   imageBytes: Uint8Array;
   imageFormat: number;
@@ -50,7 +50,7 @@ const mimeForFormat = (format: number): string => {
   }
 };
 
-export function imageBytesToDataUrl(bytes: Uint8Array, format: number): string {
+function imageBytesToDataUrl(bytes: Uint8Array, format: number): string {
   return `data:${mimeForFormat(format)};base64,${base64(bytes)}`;
 }
 

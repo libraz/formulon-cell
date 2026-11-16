@@ -2,7 +2,7 @@ import { type ErrorCode, type FontScheme, WorkbookFormat } from '@libraz/formulo
 import type { History } from '../commands/history.js';
 import { excelSerialFromParts } from '../format/date-serial.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { addrKey, parseAddrKey } from './address.js';
+import { addrKey, parseAddrKey, rectOfRange } from './address.js';
 import { CALC_MODE_AUTO_NO_TABLE, CALC_MODE_MANUAL } from './calc-mode.js';
 import { detectCapabilities } from './capabilities.js';
 import { type ExternalLinkKind, externalLinkKindLabel } from './external-links.js';
@@ -21,7 +21,7 @@ import {
 } from './function-locale.js';
 import type { LoadOptions } from './loader.js';
 import { isUsingStub, loadFormulon } from './loader.js';
-import { isFormulonError, orFallback } from './result.js';
+import { attemptWrite, isFormulonError, orFallback } from './result.js';
 import { engineProfileIdFor, type SpreadsheetPlatform } from './spreadsheet-profile.js';
 import { StoreMirror } from './store-mirror.js';
 import type {
@@ -37,53 +37,19 @@ import type {
   Workbook,
 } from './types.js';
 import { fromEngineValue, fromRangeCell, writeCell } from './value.js';
-import {
-  installAnnotationsMethods,
-  type WorkbookHandleAnnotationsMethods,
-} from './workbook-handle-annotations.js';
-import {
-  installChartsMethods,
-  type WorkbookHandleChartsMethods,
-} from './workbook-handle-charts.js';
-import {
-  installConditionalFormatMethods,
-  type WorkbookHandleConditionalFormatMethods,
-} from './workbook-handle-conditional-format.js';
-import {
-  installDataTablesMethods,
-  isDataTableFormula,
-  type WorkbookHandleDataTablesMethods,
-} from './workbook-handle-data-tables.js';
-import {
-  installDrawingObjectsMethods,
-  type WorkbookHandleDrawingObjectsMethods,
-} from './workbook-handle-drawing-objects.js';
-import {
-  installFormulasMethods,
-  type WorkbookHandleFormulasMethods,
-} from './workbook-handle-formulas.js';
-import {
-  installLayoutMethods,
-  type WorkbookHandleLayoutMethods,
-} from './workbook-handle-layout.js';
+import { installAnnotationsMethods } from './workbook-handle-annotations.js';
+import { installChartsMethods } from './workbook-handle-charts.js';
+import { installConditionalFormatMethods } from './workbook-handle-conditional-format.js';
+import { installDataTablesMethods, isDataTableFormula } from './workbook-handle-data-tables.js';
+import { installDrawingObjectsMethods } from './workbook-handle-drawing-objects.js';
+import { installFormulasMethods } from './workbook-handle-formulas.js';
+import { installLayoutMethods } from './workbook-handle-layout.js';
 import { installPivotMethods } from './workbook-handle-pivot.js';
-import { installPrintMethods, type WorkbookHandlePrintMethods } from './workbook-handle-print.js';
-import {
-  installProtectionMethods,
-  type WorkbookHandleProtectionMethods,
-} from './workbook-handle-protection.js';
-import {
-  installStylesMethods,
-  type WorkbookHandleStylesMethods,
-} from './workbook-handle-styles.js';
-import {
-  installTableStylesMethods,
-  type WorkbookHandleTableStylesMethods,
-} from './workbook-handle-table-styles.js';
-import {
-  installTablesMethods,
-  type WorkbookHandleTablesMethods,
-} from './workbook-handle-tables.js';
+import { installPrintMethods } from './workbook-handle-print.js';
+import { installProtectionMethods } from './workbook-handle-protection.js';
+import { installStylesMethods } from './workbook-handle-styles.js';
+import { installTableStylesMethods } from './workbook-handle-table-styles.js';
+import { installTablesMethods } from './workbook-handle-tables.js';
 import { installValidationMethods } from './workbook-handle-validation.js';
 
 export type ChangeListener = (e: ChangeEvent) => void;
@@ -146,7 +112,7 @@ export interface CellPatch {
   readonly formula?: string | null;
 }
 
-export interface CellPatchAtomicResult {
+interface CellPatchAtomicResult {
   readonly before: readonly CellSnapshot[];
   readonly after: readonly CellSnapshot[];
   readonly changed: readonly Addr[];
@@ -403,13 +369,8 @@ export class WorkbookHandle {
   addSheet(name?: string): number {
     this.assertAlive();
     const proposed = name ?? this.uniqueSheetName();
-    let idx: number;
-    try {
-      idx = this.wb.addSheet(proposed).index;
-    } catch (e) {
-      if (!isFormulonError(e)) throw e;
-      return -1;
-    }
+    const idx = orFallback(-1, () => this.wb.addSheet(proposed).index);
+    if (idx < 0) return -1;
     this.emit({ kind: 'sheet-add', index: idx, name: proposed });
     return idx;
   }
@@ -419,12 +380,7 @@ export class WorkbookHandle {
   renameSheet(idx: number, name: string): boolean {
     this.assertAlive();
     if (!this.capabilities.sheetMutate || !this.wb.hasSheet(idx)) return false;
-    try {
-      this.ws(idx).rename(name);
-    } catch (e) {
-      if (!isFormulonError(e)) throw e;
-      return false;
-    }
+    if (!attemptWrite(() => this.ws(idx).rename(name))) return false;
     this.emit({ kind: 'sheet-rename', index: idx, name });
     return true;
   }
@@ -434,12 +390,7 @@ export class WorkbookHandle {
   removeSheet(idx: number): boolean {
     this.assertAlive();
     if (!this.capabilities.sheetMutate || !this.wb.hasSheet(idx)) return false;
-    try {
-      this.wb.removeSheet(idx);
-    } catch (e) {
-      if (!isFormulonError(e)) throw e;
-      return false;
-    }
+    if (!attemptWrite(() => this.wb.removeSheet(idx))) return false;
     this.emit({ kind: 'sheet-remove', index: idx });
     return true;
   }
@@ -452,13 +403,8 @@ export class WorkbookHandle {
     const count = this.wb.sheetCount;
     if (!this.capabilities.sheetMutate || !this.wb.hasSheet(from)) return false;
     if (!Number.isInteger(to) || to < 0 || to >= count) return false;
-    try {
-      // `move` names a position of the current list; `to` is the final one.
-      this.ws(from).move(to > from ? to + 1 : to);
-    } catch (e) {
-      if (!isFormulonError(e)) throw e;
-      return false;
-    }
+    // `move` names a position of the current list; `to` is the final one.
+    if (!attemptWrite(() => this.ws(from).move(to > from ? to + 1 : to))) return false;
     this.emit({ kind: 'sheet-move', from, to });
     return true;
   }
@@ -934,15 +880,10 @@ export class WorkbookHandle {
     let cursor: number | null = null;
     const cursors = new Set<number>();
     do {
-      const result = this.ws(range.sheet).getCellsInRange(
-        {
-          firstRow: range.r0,
-          firstCol: range.c0,
-          lastRow: range.r1,
-          lastCol: range.c1,
-        },
-        { cursor, limit: pageSize },
-      );
+      const result = this.ws(range.sheet).getCellsInRange(rectOfRange(range), {
+        cursor,
+        limit: pageSize,
+      });
       for (const entry of result.cells) {
         yield {
           addr: { sheet: range.sheet, row: entry.row, col: entry.col },
@@ -971,12 +912,7 @@ export class WorkbookHandle {
   cellFormulaR1C1(a: Addr): string | null {
     this.assertAlive();
     if (!this.capabilities.formulaR1C1 || !this.wb.hasSheet(a.sheet)) return null;
-    try {
-      return this.ws(a.sheet).getFormulaR1C1(a.row, a.col);
-    } catch (e) {
-      if (!isFormulonError(e)) throw e;
-      return null;
-    }
+    return orFallback(null, () => this.ws(a.sheet).getFormulaR1C1(a.row, a.col));
   }
 
   cellFormula(a: Addr): string | null {
@@ -1426,21 +1362,6 @@ export class WorkbookHandle {
     }
   }
 }
-
-/** Aggregate of the feature mixins installed on `WorkbookHandle`. */
-export interface WorkbookHandleFeatureMethods
-  extends WorkbookHandleAnnotationsMethods,
-    WorkbookHandleChartsMethods,
-    WorkbookHandleConditionalFormatMethods,
-    WorkbookHandleDataTablesMethods,
-    WorkbookHandleDrawingObjectsMethods,
-    WorkbookHandleFormulasMethods,
-    WorkbookHandleLayoutMethods,
-    WorkbookHandlePrintMethods,
-    WorkbookHandleProtectionMethods,
-    WorkbookHandleStylesMethods,
-    WorkbookHandleTableStylesMethods,
-    WorkbookHandleTablesMethods {}
 
 installAnnotationsMethods(WorkbookHandle);
 installChartsMethods(WorkbookHandle);

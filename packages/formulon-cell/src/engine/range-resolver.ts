@@ -127,32 +127,6 @@ export function sheetIndexByName(wb: WorkbookHandle, name: string): number {
   return wb.sheetIndexByName(name) ?? -1;
 }
 
-/** Resolve a range ref to its numeric values in source order. Non-numeric
- *  cells (blank, text, bool, error) are skipped — sparklines plot a numeric
- *  series, mirroring the spreadsheet behaviour. */
-export function resolveNumericRange(
-  wb: WorkbookHandle,
-  ref: string,
-  fallbackSheet: number,
-): number[] {
-  const parsed = parseRangeRef(ref);
-  if (!parsed) return [];
-  let sheet = fallbackSheet;
-  if (parsed.sheetName !== null) {
-    const idx = sheetIndexByName(wb, parsed.sheetName);
-    if (idx < 0) return [];
-    sheet = idx;
-  }
-  const out: number[] = [];
-  for (let row = parsed.r0; row <= parsed.r1; row += 1) {
-    for (let col = parsed.c0; col <= parsed.c1; col += 1) {
-      const value = wb.getValue({ sheet, row, col });
-      if (value.kind === 'number' && Number.isFinite(value.value)) out.push(value.value);
-    }
-  }
-  return out;
-}
-
 /** Engine-free numeric resolver — pulls from a `data.cells` map keyed by
  *  `${sheet}:${row}:${col}`. Used by the renderer when no workbook handle is
  *  attached and by tests that exercise the painter in isolation. Refs that
@@ -184,4 +158,11 @@ export function resolveNumericRangeFromCells(
     }
   }
   return out;
+}
+
+/** The range a table `ref` (`A1:B5`) covers on `sheet`, or null when it does not parse. */
+export function tableRange(sheet: number, ref: string): Range | null {
+  const parsed = parseRangeRef(ref);
+  if (!parsed) return null;
+  return { sheet, r0: parsed.r0, c0: parsed.c0, r1: parsed.r1, c1: parsed.c1 };
 }

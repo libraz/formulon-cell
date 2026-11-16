@@ -1,15 +1,22 @@
-import { type Color, ColorKind, ComparisonOperator } from '@libraz/formulon';
+import {
+  CfDataBarAxisPosition,
+  CfDataBarDirection,
+  CfValueObjectType,
+  type Color,
+  ColorKind,
+  ComparisonOperator,
+} from '@libraz/formulon';
 import type { ConditionalCellOverlay } from '../render/conditional.js';
 import { iconSetSlotCount } from '../render/conditional.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { CellFormat, ConditionalRule, ConditionalScalePoint } from '../store/types.js';
-import { addrKey } from './address.js';
+import { addrKey, rangeOfRect } from './address.js';
 import {
   customIconFromEngine,
   iconSetFamilyForOrdinal,
   iconSetFromEngine,
 } from './cf-icon-sets.js';
-import { TIME_PERIOD } from './cf-writeback.js';
+import { stripLeadingEquals, TIME_PERIOD } from './cf-writeback.js';
 import {
   borderRecordToFormat,
   fillRecordToFormat,
@@ -44,14 +51,6 @@ const ENGINE_RULE_TYPE = {
   uniqueValues: 17,
 } as const;
 
-const VALUE_OBJECT_TYPE = {
-  number: 0,
-  percent: 1,
-  percentile: 2,
-  min: 3,
-  max: 4,
-} as const;
-
 type DatePeriod = Extract<ConditionalRule, { kind: 'date-occurring' }>['period'];
 const DATE_PERIOD_BY_ORDINAL: ReadonlyMap<number, DatePeriod> = new Map(
   (Object.entries(TIME_PERIOD) as [DatePeriod, number][]).map(([period, ordinal]) => [
@@ -60,11 +59,19 @@ const DATE_PERIOD_BY_ORDINAL: ReadonlyMap<number, DatePeriod> = new Map(
   ]),
 );
 
-const ENGINE_DATA_BAR_DIRECTIONS = ['context', 'left-to-right', 'right-to-left'] as const;
-type DataBarDirection = (typeof ENGINE_DATA_BAR_DIRECTIONS)[number];
+type DataBarDirection = 'context' | 'left-to-right' | 'right-to-left';
+const DATA_BAR_DIRECTION_BY_ORDINAL: ReadonlyMap<number, DataBarDirection> = new Map([
+  [CfDataBarDirection.Context, 'context'],
+  [CfDataBarDirection.LeftToRight, 'left-to-right'],
+  [CfDataBarDirection.RightToLeft, 'right-to-left'],
+]);
 
-const ENGINE_DATA_BAR_AXIS_POSITIONS = ['automatic', 'middle', 'none'] as const;
-type DataBarAxisPosition = (typeof ENGINE_DATA_BAR_AXIS_POSITIONS)[number];
+type DataBarAxisPosition = 'automatic' | 'middle' | 'none';
+const DATA_BAR_AXIS_POSITION_BY_ORDINAL: ReadonlyMap<number, DataBarAxisPosition> = new Map([
+  [CfDataBarAxisPosition.Automatic, 'automatic'],
+  [CfDataBarAxisPosition.Middle, 'middle'],
+  [CfDataBarAxisPosition.None, 'none'],
+]);
 
 const ENGINE_CELL_IS_OP: Record<number, Extract<ConditionalRule, { kind: 'cell-value' }>['op']> = {
   [ComparisonOperator.LessThan]: '<',
@@ -104,30 +111,26 @@ const isOpaqueBlack = (c: Color): boolean =>
 
 /** Formula text without the leading `=` a read carries. */
 const bareFormula = (formula: string | null): string | undefined =>
-  formula === null ? undefined : formula.startsWith('=') ? formula.slice(1) : formula;
+  formula === null ? undefined : stripLeadingEquals(formula);
 
 const engineDataBarDirection = (ordinal: number): DataBarDirection | undefined =>
-  Number.isInteger(ordinal) && ordinal >= 0 && ordinal < ENGINE_DATA_BAR_DIRECTIONS.length
-    ? ENGINE_DATA_BAR_DIRECTIONS[ordinal]
-    : undefined;
+  DATA_BAR_DIRECTION_BY_ORDINAL.get(ordinal);
 
 const engineDataBarAxisPosition = (ordinal: number): DataBarAxisPosition | undefined =>
-  Number.isInteger(ordinal) && ordinal >= 0 && ordinal < ENGINE_DATA_BAR_AXIS_POSITIONS.length
-    ? ENGINE_DATA_BAR_AXIS_POSITIONS[ordinal]
-    : undefined;
+  DATA_BAR_AXIS_POSITION_BY_ORDINAL.get(ordinal);
 
 function engineScalePoint(
   valueObject: NonNullable<ConditionalFormatEntry['colorScale']>['thresholds'][number] | undefined,
 ): ConditionalScalePoint {
   if (!valueObject) return { kind: 'min' };
   const comparison = valueObject.gte === undefined ? {} : { gte: valueObject.gte };
-  if (valueObject.type === VALUE_OBJECT_TYPE.min) return { kind: 'min', ...comparison };
-  if (valueObject.type === VALUE_OBJECT_TYPE.max) return { kind: 'max', ...comparison };
+  if (valueObject.type === CfValueObjectType.Min) return { kind: 'min', ...comparison };
+  if (valueObject.type === CfValueObjectType.Max) return { kind: 'max', ...comparison };
   const raw = Number(valueObject.value ?? '0');
   const value = Number.isFinite(raw) ? raw : 0;
-  if (valueObject.type === VALUE_OBJECT_TYPE.percent)
+  if (valueObject.type === CfValueObjectType.Percent)
     return { kind: 'percent', value, ...comparison };
-  if (valueObject.type === VALUE_OBJECT_TYPE.percentile) {
+  if (valueObject.type === CfValueObjectType.Percentile) {
     return { kind: 'percentile', value, ...comparison };
   }
   return { kind: 'number', value, ...comparison };
@@ -142,13 +145,7 @@ const maybeNumber = (raw: string | undefined): number | string => {
 };
 
 const rangesOf = (sheet: number, entry: ConditionalFormatEntry): ConditionalRule['range'][] =>
-  entry.ranges.map((range) => ({
-    sheet,
-    r0: range.firstRow,
-    c0: range.firstCol,
-    r1: range.lastRow,
-    c1: range.lastCol,
-  }));
+  entry.ranges.map((range) => rangeOfRect(sheet, range));
 
 type EngineRange = { firstRow: number; firstCol: number; lastRow: number; lastCol: number };
 

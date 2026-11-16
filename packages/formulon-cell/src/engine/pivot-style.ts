@@ -4,6 +4,7 @@ import {
   customPivotTableStyleById,
   pivotTableStyleAssignment,
 } from '../commands/format-as-table.js';
+import { nameKey } from '../store/table-names.js';
 import type { CellFormat, TablesSlice } from '../store/types.js';
 import { addrKey } from './address.js';
 import {
@@ -375,9 +376,7 @@ function reportStyleElements(
   const assigned = assignment ? customPivotTableStyleById(state, assignment.styleId) : null;
   const custom: CustomTableStyle | undefined =
     assigned ??
-    (tables.customPivotTableStyles ?? []).find(
-      (s) => s.label.toLocaleLowerCase() === name.toLocaleLowerCase(),
-    );
+    (tables.customPivotTableStyles ?? []).find((s) => nameKey(s.label) === nameKey(name));
   if (custom) return custom.elements;
   return builtinPivotStyleElements(name, themeColors);
 }

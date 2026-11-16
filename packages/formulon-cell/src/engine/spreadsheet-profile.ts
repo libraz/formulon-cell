@@ -63,7 +63,7 @@ export type ProfileLocale =
   | 'ko_KR'
   | 'th_TH';
 
-export const PROFILE_SUFFIX_FOR_LOCALE: Readonly<Record<BuiltInLocale, ProfileLocale>> = {
+const PROFILE_SUFFIX_FOR_LOCALE: Readonly<Record<BuiltInLocale, ProfileLocale>> = {
   ja: 'ja_JP',
   en: 'en_US',
   de: 'de_DE',

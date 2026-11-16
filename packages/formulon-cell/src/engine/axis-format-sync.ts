@@ -49,7 +49,7 @@ export type AxisFormatPatchResolver = (
   addr?: Addr,
 ) => Partial<CellFormat> | null;
 
-export interface AxisFormatPreparation {
+interface AxisFormatPreparation {
   readonly override: SheetAxisFormatOverride;
   readonly sheet: number;
   readonly directCells: readonly Addr[];

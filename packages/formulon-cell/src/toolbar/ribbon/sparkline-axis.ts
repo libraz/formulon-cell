@@ -4,7 +4,7 @@ import {
   activeSparklineGroup,
   patchSelectedSparklineGroupsAction,
 } from '../../commands/sparkline-design.js';
-import { formatA1Range } from '../../engine/address.js';
+import { formatA1Range, rangeOfRect, rectOfRange } from '../../engine/address.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import type { SparklineGroupSettings } from '../../store/store.js';
 import { showSparklineAxisDialog } from '../dialogs/sparkline.js';
@@ -18,7 +18,7 @@ export const openSparklineAxisDialog = async (instance: SpreadsheetInstance): Pr
   if (!group || isSheetProtected(state, state.selection.active.sheet)) return;
   const settings = group.settings;
   const m = instance.i18n.strings.mac.sparkline;
-  const range = settings.dateAxisRange?.rect;
+  const dateAxisRange = settings.dateAxisRange;
   const result = await showSparklineAxisDialog({
     host: instance.host,
     store: instance.store,
@@ -45,13 +45,8 @@ export const openSparklineAxisDialog = async (instance: SpreadsheetInstance): Pr
     },
     initial: {
       dateAxis: settings.dateAxis,
-      dateRange: range
-        ? formatA1Range({
-            r0: range.firstRow,
-            c0: range.firstCol,
-            r1: range.lastRow,
-            c1: range.lastCol,
-          })
+      dateRange: dateAxisRange
+        ? formatA1Range(rangeOfRect(dateAxisRange.sheet, dateAxisRange.rect))
         : '',
       displayXAxis: settings.displayXAxis,
       rightToLeft: settings.rightToLeft,
@@ -71,7 +66,7 @@ export const openSparklineAxisDialog = async (instance: SpreadsheetInstance): Pr
       ? {
           dateAxisRange: {
             sheet: r.sheet,
-            rect: { firstRow: r.r0, firstCol: r.c0, lastRow: r.r1, lastCol: r.c1 },
+            rect: rectOfRange(r),
           },
         }
       : {}),

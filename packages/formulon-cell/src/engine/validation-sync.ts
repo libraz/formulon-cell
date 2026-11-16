@@ -15,6 +15,7 @@ import type {
 } from '../store/store.js';
 import { addrKey, parseAddrKey } from './address.js';
 import type { EngineSyncOptions } from './cell-format-sync.js';
+import { strictSyncError } from './strict-sync-error.js';
 import type { Addr, Range } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -54,8 +55,8 @@ const ERROR_STYLE_FROM_ORDINAL = Object.fromEntries(
   Object.entries(ERROR_STYLE_ORDINAL).map(([style, ordinal]) => [ordinal, style]),
 ) as Record<number, ValidationErrorStyle>;
 
-const strictSyncError = (operation: string, address: string): Error =>
-  new Error(`Strict engine sync failed: validations ${operation} at ${address}`);
+const strictError = (operation: string, address: string): Error =>
+  strictSyncError('validations', operation, address);
 
 /**
  * Hydrate FormatSlice `validation` fields from engine entries on `sheet`.
@@ -169,22 +170,23 @@ export function syncValidationsToEngine(
   }
   const clearSucceeded = wb.clearValidations(sheet);
   if (strict && !clearSucceeded) {
-    throw strictSyncError('clearValidations', `sheet:${sheet}`);
+    throw strictError('clearValidations', `sheet:${sheet}`);
   }
   const written: CellValidation[] = [];
   for (const { validation, ranges } of rules) {
     if (ranges.length === 0) continue;
     const encoded = encodeValidation(validation, ranges);
-    const address = ranges[0]
-      ? `${ranges[0].sheet}:${ranges[0].r0}:${ranges[0].c0}`
+    const first = ranges[0];
+    const address = first
+      ? addrKey({ sheet: first.sheet, row: first.r0, col: first.c0 })
       : `sheet:${sheet}`;
     if (!encoded) {
-      if (strict) throw strictSyncError('encodeValidation', address);
+      if (strict) throw strictError('encodeValidation', address);
       continue;
     }
     const addSucceeded = wb.addValidationEntry(sheet, encoded);
     if (strict && !addSucceeded) {
-      throw strictSyncError('addValidationEntry', address);
+      throw strictError('addValidationEntry', address);
     }
     if (addSucceeded) written.push(validation);
   }

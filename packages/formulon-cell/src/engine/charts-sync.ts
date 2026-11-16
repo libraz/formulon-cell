@@ -1,4 +1,3 @@
-import type { SheetRect } from '@libraz/formulon';
 import { ChartTitleKind, DrawingObjectKind } from '@libraz/formulon';
 import {
   chartDataFromEngine,
@@ -7,25 +6,15 @@ import {
 } from '../charts/engine-adapter.js';
 import type { ChartData } from '../charts/types.js';
 import { mutators, type SessionChart, type SpreadsheetStore } from '../store/store.js';
+import { rangeOfRect } from './address.js';
 import { drawingAnchorOf } from './drawing-geometry.js';
-import type { Range } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 import type { EngineDrawingObject } from './workbook-handle-annotations.js';
 import type { EngineChartData, EngineChartInfo } from './workbook-handle-charts.js';
 
 const EMPTY_DATA: ChartData = { domain: 'category', categories: [], series: [] };
 
-export const chartIdFor = (sheet: number, objectId: number): string =>
-  `chart-native-${sheet}-${objectId}`;
-
-/** `ChartProperties.source.range` as a `Range`. */
-const sourceRange = ({ sheet, rect }: SheetRect): Range => ({
-  sheet,
-  r0: rect.firstRow,
-  c0: rect.firstCol,
-  r1: rect.lastRow,
-  c1: rect.lastCol,
-});
+const chartIdFor = (sheet: number, objectId: number): string => `chart-native-${sheet}-${objectId}`;
 
 /** Text the placeholder of an unsupported chart shows. */
 const placeholderTitle = (
@@ -61,7 +50,9 @@ export function projectChart(
       unsupported: { reason: 'unparseable', title: placeholderTitle(object, null, null) },
     };
   }
-  const source = info.source ? sourceRange(info.source.range) : undefined;
+  const source = info.source
+    ? rangeOfRect(info.source.range.sheet, info.source.range.rect)
+    : undefined;
   const extra = {
     ...(source ? { source } : {}),
     ...(info.isPivotChart ? { pivotChart: true } : {}),

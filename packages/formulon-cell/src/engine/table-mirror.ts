@@ -21,8 +21,9 @@ import {
   type State,
   type ValueFilterCriteria,
 } from '../store/store.js';
+import { nameKey } from '../store/table-names.js';
 import type { TablesSlice } from '../store/types.js';
-import { formatA1Range, MAX_ROW } from './address.js';
+import { formatA1Range, MAX_ROW, rangeOfRect } from './address.js';
 import { forgetTableAutoFilterImport } from './auto-filter-sync.js';
 import { parseRangeRef } from './range-resolver.js';
 import { TableStyleMirror } from './table-style-sync.js';
@@ -68,8 +69,6 @@ interface FilterEdits {
   ranges: Map<string, Range>;
 }
 
-const nameKey = (name: string): string => name.toLocaleLowerCase();
-
 const namedOverlays = (tables: readonly TableOverlay[]): Map<string, TableOverlay> => {
   const out = new Map<string, TableOverlay>();
   for (const table of tables) if (table.name) out.set(nameKey(table.name), table);
@@ -92,13 +91,7 @@ const engineTable = (wb: WorkbookHandle, name: string) => {
 const tableFilterRange = (wb: WorkbookHandle, index: number, sheet: number): Range | null => {
   const filter = wb.capabilities.typedTableAutoFilter ? wb.getTableAutoFilter(index) : null;
   if (!filter) return null;
-  return {
-    sheet,
-    r0: filter.range.firstRow,
-    c0: filter.range.firstCol,
-    r1: filter.range.lastRow,
-    c1: filter.range.lastCol,
-  };
+  return rangeOfRect(sheet, filter.range);
 };
 
 /** Remove the table's AutoFilter, or give it back one over the header and

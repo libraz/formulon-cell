@@ -1,6 +1,7 @@
 import type { SlicerCrossFilter, SlicerSortOrder } from '@libraz/formulon';
 import { AnchorEditAs, AnchorKind, FilterKind } from '@libraz/formulon';
 import type { SlicerSpec, SpreadsheetStore, State } from '../store/store.js';
+import { nameKey } from '../store/table-names.js';
 import {
   drawingAnchorOf,
   sameAnchor,
@@ -17,8 +18,6 @@ import type {
 
 /** Where and how large a slicer panel is when its spec carries no frame, in grid pixels. */
 export const DEFAULT_SLICER_FRAME = { x: 16, y: 16, w: 192, h: 240 } as const;
-
-const nameKey = (name: string): string => name.toLocaleLowerCase();
 
 const tableOf = (wb: WorkbookHandle, tableName: string) => {
   const index = wb.tableIndexByName(tableName);

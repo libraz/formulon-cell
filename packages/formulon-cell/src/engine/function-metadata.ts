@@ -1,7 +1,7 @@
 import type { FunctionMetadataEntry, FunctionMetadataResult } from './types.js';
 
 /** Engine metadata with the provider's locale alias, when one was merged. */
-export type MergedFunctionMetadataResult = FunctionMetadataResult & {
+type MergedFunctionMetadataResult = FunctionMetadataResult & {
   readonly localizedName?: string;
 };
 
@@ -13,20 +13,6 @@ export type MergedFunctionMetadataResult = FunctionMetadataResult & {
  * `aliases` / `localized` maps.
  */
 export const LOCALE_TAGS = ['en-US', 'ja-JP', 'de-DE', 'fr-FR'] as const;
-
-/** UI locale tags for the seven built-in dictionaries. These are deliberately
- * separate from {@link LOCALE_TAGS}: the native function-name API still uses
- * the historical four-value ordinal and the Chinese, Korean, and Thai
- * profiles keep canonical English function names. */
-export const UI_LOCALE_TAGS = [
-  'en-US',
-  'ja-JP',
-  'de-DE',
-  'fr-FR',
-  'zh-CN',
-  'ko-KR',
-  'th-TH',
-] as const;
 
 /** Normalize a host locale into the canonical tag used by metadata providers. */
 export function displayLocaleTag(locale: string | null | undefined): string {

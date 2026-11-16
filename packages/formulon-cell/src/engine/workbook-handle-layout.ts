@@ -1,8 +1,6 @@
 import {
   CellShift,
   GeometryMode,
-  type Sheet,
-  type SheetFormatDefaults,
   type SheetFormatDefaultsPatch,
   SheetViewMode,
   StatusCode,
@@ -10,19 +8,24 @@ import {
   WidthPlatform,
 } from '@libraz/formulon';
 import type { WorkbookViewMode } from '../store/types.js';
+import { rangeOfRect, rectOfRange } from './address.js';
 import { displayCharsForScreenPx, screenPxForDisplayChars } from './column-display-width.js';
 import { macDigitAdvance } from './mac-digit-metrics.js';
 import { macDefaultRowPt } from './mac-row-model.js';
-import { formulonErrorCode, isFormulonError, orFallback } from './result.js';
-import type { EngineCapabilities, Range, Workbook } from './types.js';
+import { attemptWrite, formulonErrorCode, orFallback } from './result.js';
+import type { EngineCapabilities, Range } from './types.js';
 import { SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import {
+  assertAlive,
+  type WorkbookHandleInternals as SharedInternals,
+  wb,
+  ws,
+} from './workbook-handle-internals.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
-type WorkbookHandleInternals = {
-  wb: Workbook;
+type WorkbookHandleInternals = SharedInternals & {
   geometryPlatform?: WorkbookHandle['geometryPlatform'];
-  assertAlive(): void;
 };
 
 const CSS_PX_PER_POINT = 96 / 72;
@@ -61,29 +64,6 @@ function internals(handle: unknown): WorkbookHandleInternals {
   return handle as WorkbookHandleInternals;
 }
 
-function assertAlive(handle: unknown): void {
-  internals(handle).assertAlive();
-}
-
-function wb(handle: unknown): Workbook {
-  return internals(handle).wb;
-}
-
-function ws(handle: unknown, sheet: number): Sheet {
-  return wb(handle).sheet(sheet);
-}
-
-/** Run an engine call; an engine refusal is a soft `false`, anything else rethrows. */
-function attempt(fn: () => void): boolean {
-  try {
-    fn();
-    return true;
-  } catch (e) {
-    if (!isFormulonError(e)) throw e;
-    return false;
-  }
-}
-
 /** Whether rows and the row-number strip follow the Mac layout; column widths come from the
  *  engine's profile instead. */
 function usesMacLayout(handle: unknown): boolean {
@@ -93,12 +73,7 @@ function usesMacLayout(handle: unknown): boolean {
 /** `sheet`'s display width model, or null when the engine cannot report it. */
 function displayWidthModel(handle: unknown, sheet: number): WidthModel | null {
   if ((handle as WorkbookHandle).capabilities.geometry !== true) return null;
-  try {
-    return ws(handle, sheet).getWidthModel(GeometryMode.Display);
-  } catch (e) {
-    if (!isFormulonError(e)) throw e;
-    return null;
-  }
+  return orFallback(null, () => ws(handle, sheet).getWidthModel(GeometryMode.Display));
 }
 
 /** `sheet`'s Normal font as displayed — a theme-linked record takes the face
@@ -135,27 +110,21 @@ function screenColumnMetrics(
 
 function columnCharsToPx(handle: unknown, sheet: number, chars: number): number | null {
   if (!Number.isFinite(chars)) return null;
-  try {
+  return orFallback(null, () => {
     const pt = ws(handle, sheet).convertColumnCharsToPt(chars, GeometryMode.Display);
     return Number.isFinite(pt) ? pt * CSS_PX_PER_POINT : null;
-  } catch (e) {
-    if (!isFormulonError(e)) throw e;
-    return null;
-  }
+  });
 }
 
 function columnPxToChars(handle: unknown, sheet: number, width: number): number | null {
   if (!Number.isFinite(width)) return null;
-  try {
+  return orFallback(null, () => {
     const chars = ws(handle, sheet).convertColumnPtToChars(
       width * POINTS_PER_CSS_PX,
       GeometryMode.Display,
     );
     return Number.isFinite(chars) ? chars : null;
-  } catch (e) {
-    if (!isFormulonError(e)) throw e;
-    return null;
-  }
+  });
 }
 
 /** Map the engine's `<sheetView view>` mode to the store's name. */
@@ -186,7 +155,7 @@ export abstract class WorkbookHandleLayoutMethods {
     const nativeWidth =
       this.capabilities.geometry === true ? columnPxToChars(this, sheet, width) : width;
     if (nativeWidth === null) return false;
-    return attempt(() => ws(this, sheet).setColumnWidth(first, last, nativeWidth));
+    return attemptWrite(() => ws(this, sheet).setColumnWidth(first, last, nativeWidth));
   }
 
   /** Persist a row-height override at `row` for `sheet`. See `setColumnWidth`
@@ -197,7 +166,7 @@ export abstract class WorkbookHandleLayoutMethods {
     if (!this.capabilities.colRowSize) return false;
     const nativeHeight = this.capabilities.geometry === true ? height * POINTS_PER_CSS_PX : height;
     if (!Number.isFinite(nativeHeight)) return false;
-    return attempt(() => ws(this, sheet).setRowHeight(row, row, nativeHeight));
+    return attemptWrite(() => ws(this, sheet).setRowHeight(row, row, nativeHeight));
   }
 
   /** Remove explicit column-width overrides on `[first, last]` so the columns
@@ -205,7 +174,7 @@ export abstract class WorkbookHandleLayoutMethods {
   clearColumnWidth(sheet: number, first: number, last: number): boolean {
     assertAlive(this);
     if (this.capabilities.columnWidthClear !== true) return false;
-    return attempt(() => ws(this, sheet).resetColumnWidth(first, last));
+    return attemptWrite(() => ws(this, sheet).resetColumnWidth(first, last));
   }
 
   /** Remove an explicit row-height override so the row follows its sheet
@@ -213,7 +182,7 @@ export abstract class WorkbookHandleLayoutMethods {
   clearRowHeight(sheet: number, row: number): boolean {
     assertAlive(this);
     if (this.capabilities.rowHeightClear !== true) return false;
-    return attempt(() => ws(this, sheet).resetRowHeight(row, row));
+    return attemptWrite(() => ws(this, sheet).resetRowHeight(row, row));
   }
 
   /** Snapshot of column overrides on `sheet`. Empty array under the stub.
@@ -263,13 +232,8 @@ export abstract class WorkbookHandleLayoutMethods {
   } | null {
     assertAlive(this);
     if (this.capabilities.geometry !== true) return null;
-    let defaults: SheetFormatDefaults;
-    try {
-      defaults = ws(this, sheet).getFormatDefaults();
-    } catch (e) {
-      if (!isFormulonError(e)) throw e;
-      return null;
-    }
+    const defaults = orFallback(null, () => ws(this, sheet).getFormatDefaults());
+    if (!defaults) return null;
 
     const colWidth = columnCharsToPx(
       this,
@@ -320,14 +284,14 @@ export abstract class WorkbookHandleLayoutMethods {
   setSheetFreeze(sheet: number, freezeRows: number, freezeCols: number): boolean {
     assertAlive(this);
     if (!this.capabilities.freeze) return false;
-    return attempt(() => ws(this, sheet).updateView({ freezeRows, freezeCols }));
+    return attemptWrite(() => ws(this, sheet).updateView({ freezeRows, freezeCols }));
   }
 
   /** Persist sheet zoom percentage (10..400, engine clamps). No-op under stub. */
   setSheetZoom(sheet: number, zoomScale: number): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetZoom) return false;
-    return attempt(() => ws(this, sheet).updateView({ zoomPct: zoomScale }));
+    return attemptWrite(() => ws(this, sheet).updateView({ zoomPct: zoomScale }));
   }
 
   /** Toggle the tab-hidden flag on `sheet`. Returns false on engine failure
@@ -339,7 +303,7 @@ export abstract class WorkbookHandleLayoutMethods {
   setSheetTabHidden(sheet: number, hidden: boolean): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetTabHidden) return false;
-    return attempt(() => {
+    return attemptWrite(() => {
       const sh = ws(this, sheet);
       const current = sh.getVisibility();
       if (hidden) {
@@ -356,7 +320,7 @@ export abstract class WorkbookHandleLayoutMethods {
   setSheetVisibility(sheet: number, visibility: SheetVisibility): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetVisibility) return false;
-    return attempt(() => ws(this, sheet).setVisibility(visibility));
+    return attemptWrite(() => ws(this, sheet).setVisibility(visibility));
   }
 
   /** Set the hidden flag on `[first, last]` columns. No-op under stub or
@@ -364,14 +328,14 @@ export abstract class WorkbookHandleLayoutMethods {
   setColumnHidden(sheet: number, first: number, last: number, hidden: boolean): boolean {
     assertAlive(this);
     if (!this.capabilities.hiddenRowsCols) return false;
-    return attempt(() => ws(this, sheet).setColumnHidden(first, last, hidden));
+    return attemptWrite(() => ws(this, sheet).setColumnHidden(first, last, hidden));
   }
 
   /** Set the hidden flag on `row`. */
   setRowHidden(sheet: number, row: number, hidden: boolean): boolean {
     assertAlive(this);
     if (!this.capabilities.hiddenRowsCols) return false;
-    const ok = attempt(() => ws(this, sheet).setRowHidden(row, row, hidden));
+    const ok = attemptWrite(() => ws(this, sheet).setRowHidden(row, row, hidden));
     if (ok) (this as unknown as WorkbookHandle).noteVisibilityChanged();
     return ok;
   }
@@ -380,28 +344,28 @@ export abstract class WorkbookHandleLayoutMethods {
   setColumnOutline(sheet: number, first: number, last: number, level: number): boolean {
     assertAlive(this);
     if (!this.capabilities.outlines) return false;
-    return attempt(() => ws(this, sheet).setColumnOutline(first, last, level));
+    return attemptWrite(() => ws(this, sheet).setColumnOutline(first, last, level));
   }
 
   /** Set the outline level on `row` (0..7). */
   setRowOutline(sheet: number, row: number, level: number): boolean {
     assertAlive(this);
     if (!this.capabilities.outlines) return false;
-    return attempt(() => ws(this, sheet).setRowOutline(row, row, level));
+    return attemptWrite(() => ws(this, sheet).setRowOutline(row, row, level));
   }
 
   /** Set or clear the `collapsed` flag on the summary columns `[first, last]`. */
   setColumnCollapsed(sheet: number, first: number, last: number, collapsed: boolean): boolean {
     assertAlive(this);
     if (!this.capabilities.outlineCollapse) return false;
-    return attempt(() => ws(this, sheet).setColumnCollapsed(first, last, collapsed));
+    return attemptWrite(() => ws(this, sheet).setColumnCollapsed(first, last, collapsed));
   }
 
   /** Set or clear the `collapsed` flag on the summary row `row`. */
   setRowCollapsed(sheet: number, row: number, collapsed: boolean): boolean {
     assertAlive(this);
     if (!this.capabilities.outlineCollapse) return false;
-    return attempt(() => ws(this, sheet).setRowCollapsed(row, row, collapsed));
+    return attemptWrite(() => ws(this, sheet).setRowCollapsed(row, row, collapsed));
   }
 
   /** Snapshot of `sheet`'s view, including display flags. Returns null when
@@ -465,14 +429,14 @@ export abstract class WorkbookHandleLayoutMethods {
   setSheetViewMode(sheet: number, mode: WorkbookViewMode): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetViewMode) return false;
-    return attempt(() => ws(this, sheet).updateView({ viewMode: engineViewModeOf(mode) }));
+    return attemptWrite(() => ws(this, sheet).updateView({ viewMode: engineViewModeOf(mode) }));
   }
 
   /** Mark `sheet`'s tab as selected or not (`<sheetView tabSelected>`). */
   setSheetTabSelected(sheet: number, selected: boolean): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetTabSelected) return false;
-    return attempt(() => ws(this, sheet).updateView({ tabSelected: selected }));
+    return attemptWrite(() => ws(this, sheet).updateView({ tabSelected: selected }));
   }
 
   /** Index of the sheet the workbook opens on, or null when the engine has no
@@ -487,7 +451,7 @@ export abstract class WorkbookHandleLayoutMethods {
   setActiveSheet(sheet: number): boolean {
     assertAlive(this);
     if (!this.capabilities.activeSheet) return false;
-    return attempt(() => wb(this).setActiveSheet(sheet));
+    return attemptWrite(() => wb(this).setActiveSheet(sheet));
   }
 
   /** The selection saved for `sheet`'s active pane; null without engine support. */
@@ -503,13 +467,7 @@ export abstract class WorkbookHandleLayoutMethods {
     return {
       activeRow: r.active.row,
       activeCol: r.active.col,
-      ranges: r.ranges.map((m) => ({
-        sheet,
-        r0: m.firstRow,
-        c0: m.firstCol,
-        r1: m.lastRow,
-        c1: m.lastCol,
-      })),
+      ranges: r.ranges.map((m) => rangeOfRect(sheet, m)),
     };
   }
 
@@ -520,15 +478,10 @@ export abstract class WorkbookHandleLayoutMethods {
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetSelection) return false;
-    return attempt(() =>
+    return attemptWrite(() =>
       ws(this, sheet).setSelection({
         active: { row: selection.activeRow, col: selection.activeCol },
-        ranges: selection.ranges.map((r) => ({
-          firstRow: r.r0,
-          firstCol: r.c0,
-          lastRow: r.r1,
-          lastCol: r.c1,
-        })),
+        ranges: selection.ranges.map(rectOfRange),
       }),
     );
   }
@@ -537,50 +490,50 @@ export abstract class WorkbookHandleLayoutMethods {
   setSheetTopLeft(sheet: number, row: number, col: number): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetScroll) return false;
-    return attempt(() => ws(this, sheet).updateView({ topLeft: { row, col } }));
+    return attemptWrite(() => ws(this, sheet).updateView({ topLeft: { row, col } }));
   }
 
   /** Set the first visible cell of a frozen view's scrolling pane. */
   setSheetPaneTopLeft(sheet: number, row: number, col: number): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetScroll) return false;
-    return attempt(() => ws(this, sheet).updateView({ paneTopLeft: { row, col } }));
+    return attemptWrite(() => ws(this, sheet).updateView({ paneTopLeft: { row, col } }));
   }
 
   setSheetShowGridLines(sheet: number, show: boolean): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetViewFlags) return false;
-    return attempt(() => ws(this, sheet).updateView({ showGridLines: show }));
+    return attemptWrite(() => ws(this, sheet).updateView({ showGridLines: show }));
   }
 
   setSheetShowRowColHeaders(sheet: number, show: boolean): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetViewFlags) return false;
-    return attempt(() => ws(this, sheet).updateView({ showRowColumnHeaders: show }));
+    return attemptWrite(() => ws(this, sheet).updateView({ showRowColumnHeaders: show }));
   }
 
   setSheetShowZeros(sheet: number, show: boolean): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetViewFlags) return false;
-    return attempt(() => ws(this, sheet).updateView({ showZeros: show }));
+    return attemptWrite(() => ws(this, sheet).updateView({ showZeros: show }));
   }
 
   setSheetRightToLeft(sheet: number, rightToLeft: boolean): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetViewFlags) return false;
-    return attempt(() => ws(this, sheet).updateView({ rightToLeft }));
+    return attemptWrite(() => ws(this, sheet).updateView({ rightToLeft }));
   }
 
   setSheetShowFormulas(sheet: number, show: boolean): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetShowFormulas) return false;
-    return attempt(() => ws(this, sheet).updateView({ showFormulas: show }));
+    return attemptWrite(() => ws(this, sheet).updateView({ showFormulas: show }));
   }
 
   setSheetShowOutlineSymbols(sheet: number, show: boolean): boolean {
     assertAlive(this);
     if (!this.capabilities.outlineSymbols) return false;
-    return attempt(() => ws(this, sheet).updateView({ showOutlineSymbols: show }));
+    return attemptWrite(() => ws(this, sheet).updateView({ showOutlineSymbols: show }));
   }
 
   /** Split the view at `xTwips` / `yTwips` of screen space, headers included;
@@ -588,7 +541,7 @@ export abstract class WorkbookHandleLayoutMethods {
   setSheetSplit(sheet: number, xTwips: number, yTwips: number): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetSplit) return false;
-    return attempt(() =>
+    return attemptWrite(() =>
       ws(this, sheet).updateView({
         splitXTwips: Math.round(xTwips),
         splitYTwips: Math.round(yTwips),
@@ -600,19 +553,14 @@ export abstract class WorkbookHandleLayoutMethods {
   sheetRowsHiddenByDefault(sheet: number): boolean {
     assertAlive(this);
     if (this.capabilities.geometry !== true) return false;
-    try {
-      return ws(this, sheet).getFormatDefaults().zeroHeight;
-    } catch (e) {
-      if (!isFormulonError(e)) throw e;
-      return false;
-    }
+    return orFallback(false, () => ws(this, sheet).getFormatDefaults().zeroHeight);
   }
 
   /** Merge `patch` into `sheet`'s `<sheetFormatPr>`; an omitted key keeps its value. */
   patchSheetFormatDefaults(sheet: number, patch: SheetFormatDefaultsPatch): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetFormatDefaults) return false;
-    return attempt(() => ws(this, sheet).updateFormatDefaults(patch));
+    return attemptWrite(() => ws(this, sheet).updateFormatDefaults(patch));
   }
 
   /** Insert `count` blank rows at `row` on `sheet`. The engine rewrites
@@ -622,7 +570,7 @@ export abstract class WorkbookHandleLayoutMethods {
   engineInsertRows(sheet: number, row: number, count: number): boolean {
     assertAlive(this);
     if (!this.capabilities.insertDeleteRowsCols) return false;
-    return attempt(() => ws(this, sheet).insertRows(row, row + count - 1));
+    return attemptWrite(() => ws(this, sheet).insertRows(row, row + count - 1));
   }
 
   /** Delete `count` rows starting at `row` on `sheet`. Refs that fall
@@ -630,21 +578,21 @@ export abstract class WorkbookHandleLayoutMethods {
   engineDeleteRows(sheet: number, row: number, count: number): boolean {
     assertAlive(this);
     if (!this.capabilities.insertDeleteRowsCols) return false;
-    return attempt(() => ws(this, sheet).deleteRows(row, row + count - 1));
+    return attemptWrite(() => ws(this, sheet).deleteRows(row, row + count - 1));
   }
 
   /** Insert `count` blank columns at `col` on `sheet`. */
   engineInsertCols(sheet: number, col: number, count: number): boolean {
     assertAlive(this);
     if (!this.capabilities.insertDeleteRowsCols) return false;
-    return attempt(() => ws(this, sheet).insertColumns(col, col + count - 1));
+    return attemptWrite(() => ws(this, sheet).insertColumns(col, col + count - 1));
   }
 
   /** Delete `count` columns starting at `col` on `sheet`. */
   engineDeleteCols(sheet: number, col: number, count: number): boolean {
     assertAlive(this);
     if (!this.capabilities.insertDeleteRowsCols) return false;
-    return attempt(() => ws(this, sheet).deleteColumns(col, col + count - 1));
+    return attemptWrite(() => ws(this, sheet).deleteColumns(col, col + count - 1));
   }
 
   /** Insert (`Down` / `Right`) or delete (`Up` / `Left`) the cells of `range`, shifting the band. False when
@@ -653,7 +601,7 @@ export abstract class WorkbookHandleLayoutMethods {
   engineShiftCells(range: Range, shift: CellShift): boolean {
     assertAlive(this);
     const target = ws(this, range.sheet);
-    const rect = { firstRow: range.r0, firstCol: range.c0, lastRow: range.r1, lastCol: range.c1 };
+    const rect = rectOfRange(range);
     try {
       if (shift === CellShift.Down || shift === CellShift.Right) target.insertCells(rect, shift);
       else target.deleteCells(rect, shift);
@@ -670,13 +618,8 @@ export abstract class WorkbookHandleLayoutMethods {
   engineAddMerge(sheet: number, range: Range): boolean {
     assertAlive(this);
     if (!this.capabilities.merges) return false;
-    return attempt(() => {
-      ws(this, sheet).addMerge({
-        firstRow: range.r0,
-        firstCol: range.c0,
-        lastRow: range.r1,
-        lastCol: range.c1,
-      });
+    return attemptWrite(() => {
+      ws(this, sheet).addMerge(rectOfRange(range));
     });
   }
 
@@ -685,16 +628,11 @@ export abstract class WorkbookHandleLayoutMethods {
   engineRemoveMerge(sheet: number, range: Range): boolean {
     assertAlive(this);
     if (!this.capabilities.merges) return false;
-    const rect = {
-      firstRow: range.r0,
-      firstCol: range.c0,
-      lastRow: range.r1,
-      lastCol: range.c1,
-    };
+    const rect = rectOfRange(range);
     const sh = ws(this, sheet);
     // The engine reports NotFound for a range no merge overlaps.
     if (sh.getMergesInRange(rect).length === 0) return true;
-    return attempt(() => sh.removeMerge(rect));
+    return attemptWrite(() => sh.removeMerge(rect));
   }
 
   /** Drop every merge on `sheet`. Returns false on engine failure or capability
@@ -702,7 +640,7 @@ export abstract class WorkbookHandleLayoutMethods {
   engineClearMerges(sheet: number): boolean {
     assertAlive(this);
     if (!this.capabilities.merges) return false;
-    return attempt(() => ws(this, sheet).clearMerges());
+    return attemptWrite(() => ws(this, sheet).clearMerges());
   }
 
   /** Snapshot of every merge on `sheet` as inclusive `Range` records. Empty
@@ -710,13 +648,7 @@ export abstract class WorkbookHandleLayoutMethods {
   getMerges(sheet: number): Range[] {
     assertAlive(this);
     if (!this.capabilities.merges) return [];
-    return orFallback([], () => ws(this, sheet).listMerges()).map((m) => ({
-      sheet,
-      r0: m.firstRow,
-      c0: m.firstCol,
-      r1: m.lastRow,
-      c1: m.lastCol,
-    }));
+    return orFallback([], () => ws(this, sheet).listMerges()).map((m) => rangeOfRect(sheet, m));
   }
 
   /** Snapshot of row overrides on `sheet`. See `getColumnLayouts`. */

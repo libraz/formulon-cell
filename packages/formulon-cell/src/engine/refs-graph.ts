@@ -40,7 +40,7 @@ export function findDependents(wb: WorkbookHandle, addr: Addr): Addr[] {
 
 /** Same-sheet regex fallback for `findPrecedents`. Exported for tests; the
  *  engine path is preferred at runtime when available. */
-export function scanPrecedents(wb: WorkbookHandle, addr: Addr): Addr[] {
+function scanPrecedents(wb: WorkbookHandle, addr: Addr): Addr[] {
   const formula = wb.cellFormula(addr);
   if (!formula) return [];
   const refs = extractRefs(formula);

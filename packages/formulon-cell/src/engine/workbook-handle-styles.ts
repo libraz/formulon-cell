@@ -11,30 +11,25 @@ import {
   type Value,
   ValueKind,
 } from '@libraz/formulon';
+import { rectOfRange } from './address.js';
 import { computeNamedCellStyles, type NamedCellStyle } from './cell-styles-meta.js';
 import { orFallback } from './result.js';
 import { completeBorderRecord, completeFillRecord, completeFontRecord } from './style-records.js';
 import type {
   Addr,
   BorderRecord,
-  CellRect,
   CellValue,
   CellXf,
   EngineCapabilities,
   FillRecord,
   FontRecord,
   Range,
-  Sheet,
   SheetFontAxisSnapshot,
-  Workbook,
 } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import { assertAlive, wb, ws } from './workbook-handle-internals.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
-type WorkbookHandleInternals = {
-  wb: Workbook;
-  assertAlive(): void;
-};
 
 type NamedCellStyleRecord = {
   name: string;
@@ -61,29 +56,6 @@ const CUSTOM_CELL_STYLE_BUILTIN_ID = 0xffffffff;
 declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandleStylesMethods {}
 }
-
-function internals(handle: unknown): WorkbookHandleInternals {
-  return handle as WorkbookHandleInternals;
-}
-
-function assertAlive(handle: unknown): void {
-  internals(handle).assertAlive();
-}
-
-function wb(handle: unknown): Workbook {
-  return internals(handle).wb;
-}
-
-function ws(handle: unknown, sheet: number): Sheet {
-  return internals(handle).wb.sheet(sheet);
-}
-
-const cellRect = (range: Range): CellRect => ({
-  firstRow: range.r0,
-  firstCol: range.c0,
-  lastRow: range.r1,
-  lastCol: range.c1,
-});
 
 /** Theme read per handle; the engine theme only changes through the setters
  *  below, and painting resolves a theme-linked font for every visible cell. */
@@ -223,7 +195,7 @@ export abstract class WorkbookHandleStylesMethods {
     assertAlive(this);
     if (!this.capabilities.rangeStylePatch) return null;
     return orFallback(null, () => [
-      ...ws(this, range.sheet).ooxml.getRangeXfBases(cellRect(range)),
+      ...ws(this, range.sheet).ooxml.getRangeXfBases(rectOfRange(range)),
     ]);
   }
 
@@ -236,7 +208,7 @@ export abstract class WorkbookHandleStylesMethods {
     // A repeated source XF is an ambiguous remap; refuse it rather than merge.
     if (mapping.size !== fromXfs.length) return false;
     return orFallback(false, () => {
-      ws(this, range.sheet).ooxml.remapRangeXfs(cellRect(range), mapping);
+      ws(this, range.sheet).ooxml.remapRangeXfs(rectOfRange(range), mapping);
       return true;
     });
   }
@@ -246,7 +218,7 @@ export abstract class WorkbookHandleStylesMethods {
     if (!this.capabilities.rangeStyleSnapshot) return null;
     return orFallback(
       null,
-      () => new Uint8Array(ws(this, range.sheet).ooxml.snapshotRangeXfs(cellRect(range))),
+      () => new Uint8Array(ws(this, range.sheet).ooxml.snapshotRangeXfs(rectOfRange(range))),
     );
   }
 
@@ -299,7 +271,7 @@ export abstract class WorkbookHandleStylesMethods {
     if (!this.capabilities.cellFormatting) return [];
     return orFallback([], () =>
       ws(this, sheet)
-        .ooxml.listCellXfIndices(range ? cellRect(range) : undefined)
+        .ooxml.listCellXfIndices(range ? rectOfRange(range) : undefined)
         .map((e) => ({ addr: { sheet, row: e.row, col: e.col }, xfIndex: e.xfIndex })),
     );
   }
