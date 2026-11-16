@@ -170,6 +170,7 @@ versioning is [SemVer](https://semver.org/).
 - A control in the PivotTable Fields pane keeps focus when the sheet or its selection changes, instead of losing it to the page, and a pane or dialog no longer pulls focus back to its first control once focus has moved elsewhere before it finished opening.
 - Keys pressed in a modal dialog no longer reach the ribbon's, the backstage's and the title bar's shortcuts: Ctrl+F1 in Go To, Paste Special, Hyperlink, Cell Styles and other dialogs used to collapse the ribbon behind them.
 - Closing a dialog returns focus to the control that opened it, also when that control is outside the sheet, such as a host's backstage card or toolbar button: Page Setup, Go To, Format Cells, Hyperlink, Paste Special, Define Name, Insert Function, Spelling and the other dialogs used to move focus to the sheet after closing.
+- Escape that closes the backstage leaves focus on the File tab instead of dropping it to the page.
 
 ### Removed
 

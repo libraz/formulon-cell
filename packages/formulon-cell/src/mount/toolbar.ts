@@ -1150,6 +1150,8 @@ export function mountToolbar(
     if (e.key === 'Escape' && backstageOpen) {
       e.preventDefault();
       closeBackstage();
+      // Escape leaves the backstage at the File tab that opened it.
+      host.querySelector<HTMLButtonElement>('[data-ribbon-tab="file"]')?.focus();
       return;
     }
     if (e.key === 'Escape' && hasOpenStaticMenu()) {

@@ -371,6 +371,12 @@ const searchItems = computed(() =>
   ),
 );
 
+// The File tab opens the backstage through the toolbar too, so its Escape closes it.
+watch(ribbonTab, (tab) => {
+  const current = toolbar.value;
+  if (tab === 'file' && current && !current.backstageOpen) current.update({ backstageOpen: true });
+});
+
 const openBackstage = (): void => {
   ribbonTab.value = 'file';
   toolbar.value?.update({ backstageOpen: true });

@@ -337,6 +337,14 @@ export const App = (): ReactElement => {
     [applyToolbarCommand, commands, locale, ribbonTabs],
   );
 
+  // The File tab opens the backstage through the toolbar too, so its Escape closes it.
+  useEffect(() => {
+    const toolbar = toolbarRef.current;
+    if (ribbonTab === 'file' && toolbar && !toolbar.backstageOpen) {
+      toolbar.update({ backstageOpen: true });
+    }
+  }, [ribbonTab]);
+
   const openBackstage = useCallback(() => {
     setRibbonTab('file');
     toolbarRef.current?.update({ backstageOpen: true });
