@@ -426,12 +426,15 @@ export const activateDemoModal = (root: HTMLElement, onClose: () => void): (() =
   root.addEventListener('keydown', onKeyDown);
   return () => {
     root.removeEventListener('keydown', onKeyDown);
-    if (
-      restoreFocusEl &&
-      (root.contains(document.activeElement) || document.activeElement === document.body)
-    ) {
+    if (!root.contains(document.activeElement) && document.activeElement !== document.body) return;
+    // A ribbon command keeps no focus, so a modal it opened hands focus to the sheet, as the
+    // spreadsheet's own dialogs do.
+    const fromRibbon = restoreFocusEl?.closest('.fc-tb, [data-ribbon-command], [data-ribbon-tab]');
+    if (restoreFocusEl?.isConnected && !fromRibbon) {
       restoreFocusEl.focus({ preventScroll: true });
+      return;
     }
+    document.querySelector<HTMLElement>('.fc-host__grid')?.focus({ preventScroll: true });
   };
 };
 
