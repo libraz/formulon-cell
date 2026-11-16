@@ -1,4 +1,5 @@
 import {
+  runTabNeverTrapsScenario,
   runTabWalkScenario,
   runViewportNavigationScenario,
 } from '../../../tests/e2e-shared/scenarios/viewport-navigation.js';
@@ -14,4 +15,10 @@ test('Shift+Tab mirrors Tab, and editable Tab navigation walks only the editable
   page,
 }) => {
   await runTabWalkScenario(page);
+});
+
+test('Tab never traps focus in the formula bar or at the edge of a grid-only mount', async ({
+  page,
+}) => {
+  await runTabNeverTrapsScenario(page);
 });

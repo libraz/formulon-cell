@@ -2,12 +2,20 @@ import { expect, type Page } from '@playwright/test';
 
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import type { ViewportConfig } from '../../../packages/formulon-cell/src/api/spreadsheet/types.js';
+import { hidePageRibbon } from '../pages/page-ribbon.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 type DemoWindow = Window & { __fcInst: SpreadsheetInstance };
 
 /** The address the name box shows for the active cell. */
 const active = (page: Page) => page.locator('.fc-host__formulabar-tag').inputValue();
+
+/** The active cell, read from the instance (a grid-only mount has no Name Box). */
+const activeCell = (page: Page) =>
+  page.evaluate(() => {
+    const { row, col } = (window as unknown as DemoWindow).__fcInst.selection.get().active;
+    return `${String.fromCharCode(65 + col)}${row + 1}`;
+  });
 
 /** Applies `viewport` (or clears it with `null`), then focuses the grid on `start`. */
 const applyViewport = async (
@@ -32,7 +40,7 @@ const applyViewport = async (
     },
     { viewport, start },
   );
-  await expect.poll(() => active(page)).toBe(start);
+  await expect.poll(() => activeCell(page)).toBe(start);
 };
 
 /** Presses `key` once per expected address and reads the active cell after each. */
@@ -148,5 +156,86 @@ export async function runTabWalkScenario(page: Page): Promise<void> {
   await page.keyboard.press('Shift+Tab');
   await expect.poll(() => gridFocused(page), 'Shift+Tab leaves the sheet').toBe(false);
   expect(await active(page)).toBe('A1');
+  await sp.expectNoConsoleErrors();
+}
+
+/** Records whether each Tab keydown that reaches the window was handled (default prevented). */
+const recordTabHandling = (page: Page) =>
+  page.evaluate(() => {
+    const w = window as unknown as { __fcTabHandled?: boolean[] };
+    w.__fcTabHandled = [];
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') w.__fcTabHandled?.push(e.defaultPrevented);
+    });
+  });
+
+const tabHandling = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __fcTabHandled?: boolean[] }).__fcTabHandled);
+
+/** Tab never traps focus. In the formula bar Tab commits an edit and returns to the grid, with or
+ *  without an edit; under a read-only policy the bar leaves Tab to the browser. In a grid-only
+ *  mount an unset `tabBoundary` lets Tab leave at the last cell and Shift+Tab at the first, while
+ *  an explicit `'stop'` keeps focus in the grid. */
+export async function runTabNeverTrapsScenario(page: Page): Promise<void> {
+  const sp = new UserJourneyPage(page);
+  await sp.mount({ fixture: 'empty' });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await sp.expectNoStub();
+  const bar = page.locator('.fc-host__formulabar-input').first();
+
+  await applyViewport(page, null, 'A1');
+  await bar.click();
+  await page.keyboard.type('5');
+  await page.keyboard.press('Tab');
+  await expect
+    .poll(() => gridFocused(page), 'Tab after an edit in the bar returns to the grid')
+    .toBe(true);
+  expect
+    .soft(await sp.readValue('A1'), 'Tab commits the edit')
+    .toEqual({ kind: 'number', value: 5 });
+
+  await applyViewport(page, null, 'C3');
+  await bar.click();
+  await page.keyboard.press('Tab');
+  await expect
+    .poll(() => gridFocused(page), 'Tab in the bar without an edit returns to the grid')
+    .toBe(true);
+  expect
+    .soft(await sp.readValue('C3'), 'Tab without an edit writes nothing')
+    .toEqual({ kind: 'blank' });
+
+  await page.evaluate(() =>
+    (window as unknown as DemoWindow).__fcInst.update({ policy: { readOnly: true } }),
+  );
+  await recordTabHandling(page);
+  await bar.click();
+  await page.keyboard.press('Tab');
+  expect
+    .soft(await tabHandling(page), 'a read-only bar leaves Tab to the browser')
+    .toEqual([false]);
+  await page.evaluate(() => (window as unknown as DemoWindow).__fcInst.update({ policy: null }));
+
+  await page.evaluate(() =>
+    (window as unknown as DemoWindow).__fcInst.update({
+      ui: { profile: 'embedded', features: { shortcuts: true } },
+    }),
+  );
+  await hidePageRibbon(page);
+  await applyViewport(page, { mode: 'fixed', range: 'A1:B2' }, 'B2');
+  await page.keyboard.press('Tab');
+  await expect.soft
+    .poll(() => gridFocused(page), 'grid-only: Tab at the last cell leaves')
+    .toBe(false);
+  expect.soft(await activeCell(page)).toBe('B2');
+  await applyViewport(page, { mode: 'fixed', range: 'A1:B2' }, 'A1');
+  await page.keyboard.press('Shift+Tab');
+  await expect
+    .poll(() => gridFocused(page), 'grid-only: Shift+Tab at the first cell leaves')
+    .toBe(false);
+  expect.soft(await activeCell(page)).toBe('A1');
+  await applyViewport(page, { mode: 'fixed', range: 'A1:B2', tabBoundary: 'stop' }, 'B2');
+  await page.keyboard.press('Tab');
+  expect.soft(await gridFocused(page), "grid-only: 'stop' keeps focus at the last cell").toBe(true);
+  expect.soft(await activeCell(page)).toBe('B2');
   await sp.expectNoConsoleErrors();
 }
