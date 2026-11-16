@@ -27,7 +27,7 @@ const mount = async (platform: 'mac' | 'default', text?: string) => {
   const store = createSpreadsheetStore();
   const wb = await newWb();
   if (text) seedText(store, wb, text);
-  const handle = attachFindReplace({ host, store, wb, strings: ja });
+  const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb, strings: ja });
   return { host, store, handle };
 };
 

@@ -20,7 +20,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('picks a font color from the palette flyout and closes it', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open('font');
 
     const toggle = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__color-toggle');
@@ -47,7 +47,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('picks a line color from the border palette flyout and closes it', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open('border');
 
     const panel = document.querySelector<HTMLElement>(
@@ -73,7 +73,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('lets Escape close the palette flyout without closing the dialog', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open('font');
 
     const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg');
@@ -93,7 +93,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('closes the palette flyout when another tab is opened', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open('font');
 
     const toggle = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__color-toggle');

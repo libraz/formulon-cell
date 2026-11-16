@@ -2,7 +2,6 @@ import { authorizeWrite } from '../commands/authorized-write.js';
 import {
   canonicalizeLocalizedFormulaForInput,
   formulaForDisplaySafe,
-  inputLocaleForWorkbook,
 } from '../commands/coerce-input.js';
 import { type SelectionFormatAction, setFont } from '../commands/format.js';
 import type { History } from '../commands/history.js';
@@ -25,7 +24,6 @@ import type { Addr, CellValue, Range } from '../engine/types.js';
 import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
-import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, dictionaryLocaleFor, type Strings } from '../i18n/strings.js';
 import { rangeValidationAt } from '../store/range-validations.js';
 import {
@@ -93,7 +91,7 @@ export interface FormatDialogDeps {
    *  stays in lockstep with `setWorkbook` swaps. */
   getWb?: () => WorkbookHandle | null;
   /** Locale used for number/date previews and locale-specific format presets. */
-  getLocale?: () => string;
+  getLocale: () => string;
 }
 
 export interface FormatDialogOpenOptions {
@@ -257,13 +255,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const history = deps.history ?? null;
   const getWb = deps.getWb ?? ((): WorkbookHandle | null => null);
   const strings = deps.strings ?? defaultStrings;
-  const getFormatLocale = (): string => {
-    const wb = getWb();
-    const wbLocale = wb ? inputLocaleForWorkbook(wb) : undefined;
-    return normalizeFormatLocale(
-      deps.getLocale?.() ?? wbLocale ?? bundledLocaleForStrings(strings) ?? 'en-US',
-    );
-  };
+  const getFormatLocale = (): string => normalizeFormatLocale(deps.getLocale());
   const getDate1904 = (): boolean => store.getState().ui.date1904 === true;
   const t = isMacHost(host)
     ? { ...strings.formatDialog, ...strings.mac.formatDialog }

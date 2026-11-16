@@ -26,6 +26,7 @@ const openEditor = async (
   const host = document.createElement('div');
   document.body.appendChild(host);
   const handle = attachWorkbookObjectsPanel({
+    getLocale: () => 'en-US',
     store: createSpreadsheetStore(),
     host,
     wb,

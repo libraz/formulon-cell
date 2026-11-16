@@ -87,7 +87,7 @@ describe('attachFindReplace', () => {
   });
 
   it('mounts a hidden overlay on attach and reveals it on open()', () => {
-    const handle = attachFindReplace({ host, store, wb, onAfterCommit });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
     const overlay = $<HTMLElement>(host, '.fc-find');
     expect(overlay.hidden).toBe(true);
     handle.open();
@@ -97,7 +97,7 @@ describe('attachFindReplace', () => {
 
   it('open() resets currentMatch and shows the empty pill', () => {
     seed(store, wb, [{ row: 0, col: 0, value: 'foo' }]);
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open();
     const pill = $<HTMLElement>(host, '.fc-find__pill');
     expect(pill.textContent).toBe('0 / 0');
@@ -105,7 +105,7 @@ describe('attachFindReplace', () => {
   });
 
   it('exposes match count as a polite live region and labels the close button', () => {
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     const overlay = $<HTMLElement>(host, '.fc-find');
     expect(overlay.getAttribute('aria-modal')).toBe('false');
     const pill = $<HTMLElement>(host, '.fc-find__pill');
@@ -134,7 +134,7 @@ describe('attachFindReplace', () => {
       { row: 1, col: 0, value: 'bar' },
       { row: 2, col: 0, value: 'foobar' },
     ]);
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open();
     const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
     setInputValue(findInput, 'foo');
@@ -144,7 +144,7 @@ describe('attachFindReplace', () => {
   });
 
   it('shows Excel-style tabs and options when Options is clicked', () => {
-    const handle = attachFindReplace({ host, store, wb, strings: en });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb, strings: en });
     handle.open();
     expect(
       $<HTMLButtonElement>(host, '.fc-find__tab[aria-selected="true"]').textContent,
@@ -165,7 +165,7 @@ describe('attachFindReplace', () => {
   });
 
   it('keeps Values as the replacement default while allowing Formula mode', () => {
-    const handle = attachFindReplace({ host, store, wb, strings: en });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb, strings: en });
     handle.open('replace');
     $<HTMLButtonElement>(host, '.fc-find__options-btn').click();
     const lookIn = $<HTMLSelectElement>(host, '#fc-find-look-in');
@@ -191,7 +191,7 @@ describe('attachFindReplace', () => {
       { row: 1, col: 0, value: 'apple' },
       { row: 3, col: 2, value: 'apple' },
     ]);
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open();
     setInputValue($<HTMLInputElement>(host, '#fc-find-find-input'), 'apple');
     $<HTMLButtonElement>(host, '.fc-find__btn--find-all').click();
@@ -209,7 +209,7 @@ describe('attachFindReplace', () => {
       { row: 3, col: 2, value: 'apple' },
       { row: 5, col: 1, value: 'apple' },
     ]);
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open();
     setInputValue($<HTMLInputElement>(host, '#fc-find-find-input'), 'apple');
     $<HTMLButtonElement>(host, '.fc-find__btn--find-all').click();
@@ -251,7 +251,7 @@ describe('attachFindReplace', () => {
     const navigation = attachNavigationPolicy(store, () => wb, {
       selectable: [{ sheet: otherSheet, r0: 0, c0: 0, r1: 0, c1: 0 }],
     });
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open();
     $<HTMLButtonElement>(host, '.fc-find__options-btn').click();
     const within = $<HTMLSelectElement>(host, '#fc-find-within');
@@ -283,7 +283,7 @@ describe('attachFindReplace', () => {
       { row: 5, col: 0, value: 'banana' },
       { row: 10, col: 0, value: 'apple' },
     ]);
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open();
     const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
     setInputValue(findInput, 'apple');
@@ -299,7 +299,7 @@ describe('attachFindReplace', () => {
 
   it('ignores the IME-confirm Enter in the Find and Replace fields', () => {
     seed(store, wb, [{ row: 1, col: 0, value: 'apple' }]);
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open();
     const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
     setInputValue(findInput, 'apple');
@@ -315,7 +315,7 @@ describe('attachFindReplace', () => {
         { row: 1, col: 0, value: 'apple' },
         { row: 5, col: 0, value: 'banana' },
       ]);
-      const handle = attachFindReplace({ host, store, wb });
+      const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
       handle.open();
       return { handle, findInput: $<HTMLInputElement>(host, '.fc-find input[type="text"]') };
     };
@@ -372,7 +372,7 @@ describe('attachFindReplace', () => {
       { row: 2, col: 0, value: 'a' },
     ]);
     mutators.setActive(store, { sheet: 0, row: 5, col: 0 });
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open();
     const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
     setInputValue(findInput, 'a');
@@ -387,7 +387,7 @@ describe('attachFindReplace', () => {
       { row: 1, col: 0, value: 'a' },
       { row: 3, col: 0, value: 'a' },
     ]);
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open();
     const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
     setInputValue(findInput, 'a');
@@ -403,7 +403,7 @@ describe('attachFindReplace', () => {
   });
 
   it('Escape closes the overlay (from either input)', () => {
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open();
     const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
     fireKey(findInput, 'Escape');
@@ -425,7 +425,7 @@ describe('attachFindReplace', () => {
       { row: 1, col: 0, value: 'Foo' },
       { row: 2, col: 0, value: 'foo' },
     ]);
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open();
     const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
     setInputValue(findInput, 'foo');
@@ -447,7 +447,7 @@ describe('attachFindReplace', () => {
       { row: 1, col: 0, value: 'aaa' },
       { row: 2, col: 0, value: 'aaa' },
     ]);
-    const handle = attachFindReplace({ host, store, wb, onAfterCommit });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
     handle.open('replace');
     const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
     const replaceInput = $<HTMLInputElement>(host, '#fc-find-replace-input');
@@ -469,7 +469,7 @@ describe('attachFindReplace', () => {
 
   it('replaceOne starts from the active matching cell without a prior Find Next', () => {
     seed(store, wb, [{ row: 0, col: 0, value: 'replace target' }]);
-    const handle = attachFindReplace({ host, store, wb, onAfterCommit });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
     handle.open('replace');
     setInputValue($<HTMLInputElement>(host, '#fc-find-find-input'), 'replace target');
     setInputValue($<HTMLInputElement>(host, '#fc-find-replace-input'), 'replaced target');
@@ -489,7 +489,7 @@ describe('attachFindReplace', () => {
     // Place the formula match at (1, 0) so step('next') from default (0, 0)
     // can land on it.
     seed(store, wb, [{ row: 1, col: 0, value: 'aaa', formula: '="aaa"' }]);
-    const handle = attachFindReplace({ host, store, wb, onAfterCommit });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
     handle.open('replace');
     const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
     const replaceInput = $<HTMLInputElement>(host, '#fc-find-replace-input');
@@ -510,7 +510,7 @@ describe('attachFindReplace', () => {
       { row: 1, col: 0, value: 'foo' },
       { row: 2, col: 0, value: 'foo' },
     ]);
-    const handle = attachFindReplace({ host, store, wb, onAfterCommit });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
     handle.open('replace');
     const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
     const replaceInput = $<HTMLInputElement>(host, '#fc-find-replace-input');
@@ -534,7 +534,14 @@ describe('attachFindReplace', () => {
     const history = new History();
     wb.attachHistory(history);
     history.clear();
-    const handle = attachFindReplace({ host, store, wb, history, onAfterCommit });
+    const handle = attachFindReplace({
+      getLocale: () => 'en-US',
+      host,
+      store,
+      wb,
+      history,
+      onAfterCommit,
+    });
     handle.open('replace');
     setInputValue($<HTMLInputElement>(host, '#fc-find-find-input'), 'foo');
     setInputValue($<HTMLInputElement>(host, '#fc-find-replace-input'), 'bar');
@@ -553,7 +560,7 @@ describe('attachFindReplace', () => {
   });
 
   it('replaceAll on empty query is a no-op', () => {
-    const handle = attachFindReplace({ host, store, wb, onAfterCommit });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
     handle.open('replace');
     const replaceAllBtn = $<HTMLButtonElement>(host, '.fc-find__btn--replace-all');
     replaceAllBtn.click();
@@ -563,7 +570,7 @@ describe('attachFindReplace', () => {
   });
 
   it('close button closes the overlay', () => {
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open();
     const closeBtn = $<HTMLButtonElement>(host, '.fc-find__btn--close');
     closeBtn.click();
@@ -572,7 +579,7 @@ describe('attachFindReplace', () => {
   });
 
   it('close() preserves the last query for the next open', () => {
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open();
     const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
     setInputValue(findInput, 'remembered');
@@ -583,7 +590,7 @@ describe('attachFindReplace', () => {
   });
 
   it('detach removes the overlay from the DOM', () => {
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     expect(host.querySelector('.fc-find')).not.toBeNull();
     handle.detach();
     expect(host.querySelector('.fc-find')).toBeNull();
@@ -591,7 +598,7 @@ describe('attachFindReplace', () => {
 
   it('Enter with empty query clears currentMatch and pill', () => {
     seed(store, wb, [{ row: 0, col: 0, value: 'a' }]);
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open();
     const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
     fireKey(findInput, 'Enter');
@@ -600,7 +607,7 @@ describe('attachFindReplace', () => {
   });
 
   it('overlay keydown stops propagation so grid handlers are not triggered', () => {
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open();
     const overlay = $<HTMLElement>(host, '.fc-find');
     let bubbled = false;
@@ -614,7 +621,7 @@ describe('attachFindReplace', () => {
   });
 
   it('keeps the title bar, tabs and footer outside the scrolling body', () => {
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     const overlay = $<HTMLElement>(host, '.fc-find');
     const parts = Array.from(overlay.children, (el) => el.classList[0]);
     expect(parts).toEqual([

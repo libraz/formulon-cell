@@ -169,7 +169,14 @@ describe('attachContextMenu', () => {
 
   describe('menu opening', () => {
     it('right-click on a cell opens the cell menu', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       const e = fireContextMenu(host, 200, 70);
       expect(e.defaultPrevented).toBe(true);
       const menu = visibleMenu();
@@ -185,7 +192,14 @@ describe('attachContextMenu', () => {
     });
 
     it('shows false toggle state for a blank cell and omits state from action buttons', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, -100, -100);
 
       for (const id of ['bold', 'italic', 'underline', 'alignLeft', 'alignCenter', 'alignRight']) {
@@ -201,7 +215,14 @@ describe('attachContextMenu', () => {
         { sheet: 0, row: 0, col: 0 },
         { bold: true, italic: true, underline: 'double', align: 'right' },
       );
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, -100, -100);
 
       expect(miniItem('bold')?.getAttribute('aria-pressed')).toBe('true');
@@ -234,7 +255,14 @@ describe('attachContextMenu', () => {
           align: 'right',
         },
       );
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, -100, -100);
 
       expect(miniItem('bold')?.getAttribute('aria-pressed')).toBe('true');
@@ -260,7 +288,14 @@ describe('attachContextMenu', () => {
           range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
         },
       }));
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, -100, -100);
 
       expect(miniItem('bold')?.getAttribute('aria-pressed')).toBe('true');
@@ -279,6 +314,7 @@ describe('attachContextMenu', () => {
       controller.setPolicy(viewerPolicy());
       mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true });
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         strings: ja,
         host,
         store,
@@ -297,7 +333,14 @@ describe('attachContextMenu', () => {
     it('clamps the root menu inside the viewport through shared positioning', () => {
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
       Object.defineProperty(window, 'innerHeight', { configurable: true, value: 180 });
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       const root = document.querySelector<HTMLElement>('.fc-ctxmenu');
       expect(root).toBeTruthy();
       if (root) {
@@ -314,7 +357,14 @@ describe('attachContextMenu', () => {
     it('flips and clamps submenus through the shared context menu positioning', () => {
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
       Object.defineProperty(window, 'innerHeight', { configurable: true, value: 160 });
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, 200, 70);
       const trigger = document.querySelector<HTMLButtonElement>(
         '[data-fc-submenu="pasteSpecialMenu"]',
@@ -364,7 +414,15 @@ describe('attachContextMenu', () => {
             selection: store.getState().selection,
             viewport: store.getState().viewport,
           };
-          detach = attachContextMenu({ strings: ja, host, grid, store, wb, onAfterCommit });
+          detach = attachContextMenu({
+            getLocale: () => 'en-US',
+            strings: ja,
+            host,
+            grid,
+            store,
+            wb,
+            onAfterCommit,
+          });
 
           sheetFocusTarget(host).focus();
           const event = new KeyboardEvent('keydown', {
@@ -413,7 +471,15 @@ describe('attachContextMenu', () => {
         const grid = document.createElement('div');
         host.appendChild(grid);
         grid.getBoundingClientRect = vi.fn(() => rect(10, 30, 600, 400));
-        detach = attachContextMenu({ strings: ja, host, grid, store, wb, onAfterCommit });
+        detach = attachContextMenu({
+          getLocale: () => 'en-US',
+          strings: ja,
+          host,
+          grid,
+          store,
+          wb,
+          onAfterCommit,
+        });
 
         sheetFocusTarget(host).focus();
         sheetFocusTarget(host).dispatchEvent(
@@ -458,7 +524,15 @@ describe('attachContextMenu', () => {
           const grid = document.createElement('div');
           host.appendChild(grid);
           grid.getBoundingClientRect = vi.fn(() => rect(50, 40, 600, 400));
-          detach = attachContextMenu({ strings: ja, host, grid, store, wb, onAfterCommit });
+          detach = attachContextMenu({
+            getLocale: () => 'en-US',
+            strings: ja,
+            host,
+            grid,
+            store,
+            wb,
+            onAfterCommit,
+          });
 
           sheetFocusTarget(host).focus();
           sheetFocusTarget(host).dispatchEvent(
@@ -484,7 +558,15 @@ describe('attachContextMenu', () => {
         const grid = document.createElement('div');
         host.appendChild(grid);
         grid.getBoundingClientRect = vi.fn(() => rect(50, 40, 0, 0));
-        detach = attachContextMenu({ strings: ja, host, grid, store, wb, onAfterCommit });
+        detach = attachContextMenu({
+          getLocale: () => 'en-US',
+          strings: ja,
+          host,
+          grid,
+          store,
+          wb,
+          onAfterCommit,
+        });
 
         sheetFocusTarget(host).focus();
         sheetFocusTarget(host).dispatchEvent(
@@ -548,7 +630,15 @@ describe('attachContextMenu', () => {
           const grid = document.createElement('div');
           host.appendChild(grid);
           grid.getBoundingClientRect = vi.fn(() => rect(50, 40, 600, 400));
-          detach = attachContextMenu({ strings: ja, host, grid, store, wb, onAfterCommit });
+          detach = attachContextMenu({
+            getLocale: () => 'en-US',
+            strings: ja,
+            host,
+            grid,
+            store,
+            wb,
+            onAfterCommit,
+          });
 
           sheetFocusTarget(host).focus();
           sheetFocusTarget(host).dispatchEvent(
@@ -585,7 +675,14 @@ describe('attachContextMenu', () => {
       const embeddedHost = ownerDocument.createElement('div');
       ownerDocument.body.appendChild(embeddedHost);
       try {
-        detach = attachContextMenu({ strings: ja, host: embeddedHost, store, wb, onAfterCommit });
+        detach = attachContextMenu({
+          getLocale: () => 'en-US',
+          strings: ja,
+          host: embeddedHost,
+          store,
+          wb,
+          onAfterCommit,
+        });
         fireContextMenu(embeddedHost, 200, 70);
         const trigger = ownerDocument.querySelector<HTMLButtonElement>(
           '[data-fc-submenu="pasteSpecialMenu"]',
@@ -617,7 +714,15 @@ describe('attachContextMenu', () => {
       const restoreViewport = setWindowViewport(1280, 900);
       vi.useFakeTimers();
       try {
-        detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit, onFormatDialog });
+        detach = attachContextMenu({
+          getLocale: () => 'en-US',
+          strings: ja,
+          host,
+          store,
+          wb,
+          onAfterCommit,
+          onFormatDialog,
+        });
         sheetFocusTarget(host).focus();
         sheetFocusTarget(host).dispatchEvent(
           new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true, cancelable: true }),
@@ -651,7 +756,14 @@ describe('attachContextMenu', () => {
     it('removes the owner-window resize listener when detached', () => {
       const addListener = vi.spyOn(window, 'addEventListener');
       const removeListener = vi.spyOn(window, 'removeEventListener');
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       const resizeCall = addListener.mock.calls.find(([type]) => type === 'resize');
       expect(resizeCall).toBeDefined();
 
@@ -662,7 +774,15 @@ describe('attachContextMenu', () => {
     });
 
     it('mini toolbar invokes cell formatting actions', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit, onFormatDialog });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+        onFormatDialog,
+      });
       fireContextMenu(host, 200, 70);
       miniItem('bold')?.click();
 
@@ -678,6 +798,7 @@ describe('attachContextMenu', () => {
       const shell = createActionDialog();
       const dialogButton = shell.panel.querySelector('button');
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         strings: ja,
         host,
         store,
@@ -700,6 +821,7 @@ describe('attachContextMenu', () => {
       const shell = createActionDialog();
       const dialogButton = shell.panel.querySelector('button');
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         strings: ja,
         host,
         store,
@@ -726,6 +848,7 @@ describe('attachContextMenu', () => {
       const dialogButton = shell.panel.querySelector('button');
       const received: ContextMenuContext[] = [];
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         strings: ja,
         host,
         store,
@@ -772,6 +895,7 @@ describe('attachContextMenu', () => {
     it('keeps host focus after a non-dialog custom menu action', () => {
       const action = vi.fn();
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         strings: ja,
         host,
         store,
@@ -795,6 +919,7 @@ describe('attachContextMenu', () => {
       const external = document.createElement('input');
       document.body.appendChild(external);
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         strings: ja,
         host,
         store,
@@ -820,7 +945,14 @@ describe('attachContextMenu', () => {
     });
 
     it('does not leave adjacent or trailing separators when optional entries are hidden', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, 200, 70);
       const menu = visibleMenu();
       expect(menu).not.toBeNull();
@@ -835,7 +967,14 @@ describe('attachContextMenu', () => {
     });
 
     it('right-click on the row header opens the row menu and promotes selection', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, 10, 30); // row 0 header
       expect(item('rowInsertAbove')).not.toBeNull();
       expect(item('rowDelete')).not.toBeNull();
@@ -844,7 +983,14 @@ describe('attachContextMenu', () => {
     });
 
     it('right-click on the col header opens the col menu and promotes selection', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, 60, 10); // col 0 header
       expect(item('colInsertLeft')).not.toBeNull();
       expect(item('colDelete')).not.toBeNull();
@@ -853,7 +999,14 @@ describe('attachContextMenu', () => {
     });
 
     it('does not promote selection when the header click falls inside an existing band', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       mutators.selectRow(store, 0);
       const before = store.getState().selection.range;
       fireContextMenu(host, 10, 30);
@@ -862,7 +1015,14 @@ describe('attachContextMenu', () => {
     });
 
     it('keeps a selected row when right-clicking near its top resize edge', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       mutators.selectRow(store, 1);
       fireContextMenu(host, 10, 59); // row 1 header, inside resize slack from row 0
 
@@ -901,7 +1061,15 @@ describe('attachContextMenu', () => {
         y: 200,
         toJSON: () => ({}),
       });
-      detach = attachContextMenu({ strings: ja, host, grid, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        grid,
+        store,
+        wb,
+        onAfterCommit,
+      });
       mutators.selectRow(store, 1);
       fireContextMenu(host, 10, 240); // grid-local y=40 => row 1 header
 
@@ -916,7 +1084,14 @@ describe('attachContextMenu', () => {
     });
 
     it('right-click inside an existing row band opens the row menu without changing selection', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       setRange(store, 1, 0, 3, 16383);
       fireContextMenu(host, 200, 70); // row 1 cell area
 
@@ -935,7 +1110,14 @@ describe('attachContextMenu', () => {
       const formulaBar = document.createElement('div');
       formulaBar.className = 'fc-host__formulabar';
       host.appendChild(formulaBar);
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       const e = new MouseEvent('contextmenu', {
         clientX: 50,
         clientY: 50,
@@ -951,7 +1133,14 @@ describe('attachContextMenu', () => {
       const sheetBar = document.createElement('div');
       sheetBar.className = 'fc-host__sheetbar';
       host.appendChild(sheetBar);
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       const e = new MouseEvent('contextmenu', {
         clientX: 50,
         clientY: 50,
@@ -974,7 +1163,14 @@ describe('attachContextMenu', () => {
       chooserItem.className = 'fc-statusbar__chooser-item';
       chooser.appendChild(chooserItem);
       host.append(statusbar, chooser);
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       setRange(store, 10, 10, 10, 10);
       const selectionBefore = store.getState().selection.range;
 
@@ -990,7 +1186,14 @@ describe('attachContextMenu', () => {
     it('mounts the menu into the host overlay portal so theme travels by cascade', () => {
       host.classList.add('fc-host');
       host.dataset.fcTheme = 'ink';
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
 
       fireContextMenu(host, 200, 70);
       const menu = visibleMenu();
@@ -1003,7 +1206,14 @@ describe('attachContextMenu', () => {
     });
 
     it('closes the open menu and rebuilds labels from the next string dictionary', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, 200, 70);
       expect(item('copy')?.textContent).toContain('コピー');
 
@@ -1032,7 +1242,14 @@ describe('attachContextMenu', () => {
           },
         ],
       };
-      detach = attachContextMenu({ strings: ja, host, store, wb, options });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        options,
+      });
 
       const event = fireContextMenu(host, 200, 70);
       expect(event.defaultPrevented).toBe(true);
@@ -1062,6 +1279,7 @@ describe('attachContextMenu', () => {
     it('does not let a custom item spoof a built-in ID', () => {
       const action = vi.fn();
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         strings: ja,
         host,
         store,
@@ -1098,6 +1316,7 @@ describe('attachContextMenu', () => {
         changes: [],
       };
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         strings: ja,
         host,
         store,
@@ -1135,6 +1354,7 @@ describe('attachContextMenu', () => {
     it('passes mouse and keyboard contexts to a host-owned menu', () => {
       const opens: ContextMenuContext[] = [];
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         strings: ja,
         host,
         store,
@@ -1168,7 +1388,14 @@ describe('attachContextMenu', () => {
       document.body.append(firstRoot, secondRoot);
       let currentRoot = firstRoot;
       setOverlayOptions(host, { root: () => currentRoot });
-      detach = attachContextMenu({ strings: ja, host, store, wb, options: { mode: 'builtIn' } });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        options: { mode: 'builtIn' },
+      });
       expect(firstRoot.querySelector('.fc-ctxmenu')).not.toBeNull();
 
       currentRoot = secondRoot;
@@ -1182,7 +1409,14 @@ describe('attachContextMenu', () => {
     });
 
     it('leaves the browser menu and selection untouched when disabled', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, options: { mode: 'disabled' } });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        options: { mode: 'disabled' },
+      });
       const before = store.getState().selection;
       const event = fireContextMenu(host, 200, 70);
       expect(event.defaultPrevented).toBe(false);
@@ -1216,7 +1450,14 @@ describe('attachContextMenu', () => {
         operations: { ...formPolicy.operations, clear: false },
       });
       setRange(store, 1, 1, 1, 1);
-      detach = attachContextMenu({ strings: ja, host, store, wb, options: { mode: 'builtIn' } });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        options: { mode: 'builtIn' },
+      });
       fireContextMenu(host, 100, 50);
       expect(item('cut')?.disabled).toBe(true);
       expect(item('clear')?.disabled).toBe(true);
@@ -1235,7 +1476,14 @@ describe('attachContextMenu', () => {
       const controller = registerPolicy('viewer');
       controller.setPolicy({ ...viewerPolicy(), selection: false });
       setRange(store, 0, 0, 0, 0);
-      detach = attachContextMenu({ strings: ja, host, store, wb, options: { mode: 'builtIn' } });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        options: { mode: 'builtIn' },
+      });
       fireContextMenu(host, 200, 70);
       expect(store.getState().selection.range).toEqual({
         sheet: 0,
@@ -1265,7 +1513,14 @@ describe('attachContextMenu', () => {
       unregisterController = registerInteractionController(store, controller);
       vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('inside\toutside');
       setRange(store, 0, 0, 0, 0);
-      detach = attachContextMenu({ strings: ja, host, store, wb, options: { mode: 'builtIn' } });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        options: { mode: 'builtIn' },
+      });
       fireContextMenu(host, 200, 70);
       item('paste')?.click();
       await Promise.resolve();
@@ -1279,7 +1534,14 @@ describe('attachContextMenu', () => {
 
   describe('dismissal', () => {
     it('clicking outside the menu hides it', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, 200, 70);
       expect(visibleMenu()).not.toBeNull();
       document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
@@ -1287,7 +1549,14 @@ describe('attachContextMenu', () => {
     });
 
     it('does not carry the cell mini toolbar into row or column menus after dismissal', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, 200, 70);
       expect(document.querySelector('.fc-ctxmenu__mini')).not.toBeNull();
 
@@ -1306,7 +1575,14 @@ describe('attachContextMenu', () => {
     });
 
     it('right-clicking outside the menu hides it without opening another menu', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, 200, 70);
       expect(visibleMenu()).not.toBeNull();
       document.body.dispatchEvent(
@@ -1316,7 +1592,14 @@ describe('attachContextMenu', () => {
     });
 
     it('Escape hides the menu', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       sheetFocusTarget(host).focus();
       fireContextMenu(host, 200, 70);
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
@@ -1325,7 +1608,14 @@ describe('attachContextMenu', () => {
     });
 
     it.each(['Tab', 'Shift+Tab'])('%s dismisses the menu without consuming the key', (key) => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, 200, 70);
       const focused = document.activeElement;
       const event = new KeyboardEvent('keydown', {
@@ -1342,7 +1632,14 @@ describe('attachContextMenu', () => {
     });
 
     it('closes on outside focus and does not consume the outside element arrow key', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       const outside = document.createElement('button');
       document.body.appendChild(outside);
       fireContextMenu(host, 200, 70);
@@ -1363,6 +1660,7 @@ describe('attachContextMenu', () => {
 
     it('keeps the menu open while focus moves between the root and submenu', () => {
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         strings: ja,
         host,
         store,
@@ -1401,6 +1699,7 @@ describe('attachContextMenu', () => {
       vi.useFakeTimers();
       try {
         detach = attachContextMenu({
+          getLocale: () => 'en-US',
           strings: ja,
           host,
           store,
@@ -1444,6 +1743,7 @@ describe('attachContextMenu', () => {
       vi.useFakeTimers();
       try {
         detach = attachContextMenu({
+          getLocale: () => 'en-US',
           strings: ja,
           host,
           store,
@@ -1489,6 +1789,7 @@ describe('attachContextMenu', () => {
 
     it('closes stale submenus on root keyboard movement and follows programmatic focus', () => {
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         strings: ja,
         host,
         store,
@@ -1527,6 +1828,7 @@ describe('attachContextMenu', () => {
       const nestedAction = vi.fn();
       const siblingAction = vi.fn();
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         strings: ja,
         host,
         store,
@@ -1569,6 +1871,7 @@ describe('attachContextMenu', () => {
         host.dataset.fcPlatform = platform;
         const firstAction = vi.fn();
         detach = attachContextMenu({
+          getLocale: () => 'en-US',
           strings: ja,
           host,
           store,
@@ -1607,6 +1910,7 @@ describe('attachContextMenu', () => {
 
     it('submenu Escape closes only the submenu and stops document bubbling', () => {
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         strings: ja,
         host,
         store,
@@ -1648,7 +1952,14 @@ describe('attachContextMenu', () => {
     });
 
     it('removes the focus dismissal listener when detached', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, 200, 70);
       const root = visibleMenu();
       expect(root?.style.display).toBe('block');
@@ -1663,7 +1974,15 @@ describe('attachContextMenu', () => {
     });
 
     it('Arrow keys move focus through enabled menu items and Enter invokes the focused item', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit, onFormatDialog });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+        onFormatDialog,
+      });
       fireContextMenu(host, 200, 70);
 
       expect(document.activeElement).toBe(item('cut'));
@@ -1679,14 +1998,28 @@ describe('attachContextMenu', () => {
     });
 
     it('scroll hides the menu', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, 200, 70);
       window.dispatchEvent(new Event('scroll'));
       expect(visibleMenu()).toBeNull();
     });
 
     it('scrolling the root menu does not dismiss it', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, 200, 70);
       const root = visibleMenu();
       root?.dispatchEvent(new Event('scroll', { bubbles: true }));
@@ -1696,6 +2029,7 @@ describe('attachContextMenu', () => {
 
     it('scrolling the submenu does not dismiss the menu', () => {
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         strings: ja,
         host,
         store,
@@ -1721,7 +2055,14 @@ describe('attachContextMenu', () => {
     });
 
     it('scrolling the host still dismisses the menu', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, 200, 70);
       host.dispatchEvent(new Event('scroll', { bubbles: true }));
 
@@ -1729,7 +2070,14 @@ describe('attachContextMenu', () => {
     });
 
     it('clicking inside the menu does not dismiss it', () => {
-      detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        strings: ja,
+        host,
+        store,
+        wb,
+        onAfterCommit,
+      });
       fireContextMenu(host, 200, 70);
       const root = document.querySelector<HTMLElement>('.fc-ctxmenu');
       if (root) {
@@ -1742,7 +2090,14 @@ describe('attachContextMenu', () => {
 
   describe('row and column action availability', () => {
     it('disables row unhide when the selected row band has no hidden rows', () => {
-      detach = attachContextMenu({ host, store, wb, onAfterCommit, strings: en });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        host,
+        store,
+        wb,
+        onAfterCommit,
+        strings: en,
+      });
       fireContextMenu(host, 10, 30);
 
       expect(item('rowUnhide')?.disabled).toBe(true);
@@ -1760,7 +2115,14 @@ describe('attachContextMenu', () => {
         ...s,
         layout: { ...s.layout, hiddenRows: new Set([1]) },
       }));
-      detach = attachContextMenu({ host, store, wb, onAfterCommit, strings: en });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        host,
+        store,
+        wb,
+        onAfterCommit,
+        strings: en,
+      });
       fireContextMenu(host, 10, 30);
 
       expect(item('rowUnhide')?.disabled).toBe(false);

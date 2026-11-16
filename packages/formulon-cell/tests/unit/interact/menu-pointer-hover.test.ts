@@ -26,6 +26,7 @@ describe('menu hover focus follows pointer movement', () => {
     const store = createSpreadsheetStore();
     const wb = await newWb();
     detach = attachContextMenu({
+      getLocale: () => 'en-US',
       strings: ja,
       host,
       store,

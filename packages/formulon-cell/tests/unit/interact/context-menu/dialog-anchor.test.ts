@@ -31,6 +31,7 @@ describe('context menu dialog anchor', () => {
     wb = await newWb();
     seen = [];
     detach = attachContextMenu({
+      getLocale: () => 'en-US',
       host,
       store,
       wb,

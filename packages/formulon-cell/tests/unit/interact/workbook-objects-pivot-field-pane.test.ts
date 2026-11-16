@@ -57,6 +57,7 @@ describe('PivotTable Fields pane', () => {
   const open = (wb: WorkbookHandle, history?: History, strings = en) => {
     let edits = 0;
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -274,6 +275,7 @@ describe('PivotTable Fields pane', () => {
     const history = new History();
     // The host pins a pushed-down report where it is after each edit.
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -435,6 +437,7 @@ describe('PivotTable Fields pane', () => {
     const store = createSpreadsheetStore();
     const listeners: Array<() => void> = [];
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store,
       host,
       wb,
@@ -491,6 +494,7 @@ describe('PivotTable Fields pane', () => {
     dock.hidden = true;
     host.appendChild(dock);
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,

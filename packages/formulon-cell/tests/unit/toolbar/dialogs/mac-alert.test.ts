@@ -136,7 +136,7 @@ describe('Find on the Mac with nothing found', () => {
       cells.set(addrKey(addr), { value: { kind: 'text', value: 'apple' }, formula: null });
       return { ...s, data: { ...s.data, cells } };
     });
-    const handle = attachFindReplace({ host, store, wb, strings: ja });
+    const handle = attachFindReplace({ host, store, wb, strings: ja, getLocale: () => 'ja-JP' });
     handle.open('find');
     const next = (query: string): void => {
       const input = host.querySelector<HTMLInputElement>('#fc-find-find-input');

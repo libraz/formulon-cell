@@ -31,6 +31,7 @@ describe('context menu on the Mac platform profile', () => {
 
   const attach = (strings = ja): void => {
     detach = attachContextMenu({
+      getLocale: () => 'en-US',
       host,
       store,
       wb,

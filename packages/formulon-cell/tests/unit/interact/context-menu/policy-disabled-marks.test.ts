@@ -58,6 +58,7 @@ describe('policy-disabled marks on explicitly disabled items', () => {
       },
     };
     detach = attachContextMenu({
+      getLocale: () => 'en-US',
       strings: ja,
       host,
       store: createSpreadsheetStore(),

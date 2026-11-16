@@ -46,7 +46,7 @@ describe('attachContextMenu', () => {
   describe('format items', () => {
     it('Bold/Italic/Underline toggle the format on the active cell', () => {
       const history = new History();
-      detach = attachContextMenu({ host, store, wb, history });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, history });
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
 
       fireContextMenu(host, 200, 70);
@@ -69,7 +69,7 @@ describe('attachContextMenu', () => {
     });
 
     it('Align Left / Center / Right set the alignment', () => {
-      detach = attachContextMenu({ host, store, wb });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb });
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       fireContextMenu(host, 200, 70);
       const a1 = () => store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
@@ -86,7 +86,7 @@ describe('attachContextMenu', () => {
     });
 
     it('Borders cycles through outline → all → clear', () => {
-      detach = attachContextMenu({ host, store, wb });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb });
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       fireContextMenu(host, 200, 70);
       miniItem('borders')?.click();
@@ -102,7 +102,7 @@ describe('attachContextMenu', () => {
         { row: 2, col: 2, value: 3 },
       ]);
       setRange(store, 0, 0, 0, 0);
-      detach = attachContextMenu({ host, store, wb, history });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, history });
 
       fireContextMenu(host, 200, 70);
       miniItem('borders')?.click();
@@ -122,6 +122,7 @@ describe('attachContextMenu', () => {
 
     it('built-in Underline item toggles underline on the active cell', () => {
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         host,
         store,
         wb,
@@ -147,7 +148,14 @@ describe('attachContextMenu', () => {
       const setCellPhonetic = vi.spyOn(wb, 'setCellPhonetic').mockReturnValue(true);
       vi.spyOn(wb, 'getCellPhoneticRuns').mockReturnValue(null);
       seed(store, wb, [{ row: 0, col: 0, value: '漢字' }]);
-      detach = attachContextMenu({ host, store, wb, strings: en, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        host,
+        store,
+        wb,
+        strings: en,
+        onAfterCommit,
+      });
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       fireContextMenu(host, 200, 70);
       const at = store.getState().selection.active;
@@ -168,7 +176,7 @@ describe('attachContextMenu', () => {
     });
 
     it('Format Cells… triggers the onFormatDialog callback', () => {
-      detach = attachContextMenu({ host, store, wb, onFormatDialog });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onFormatDialog });
       fireContextMenu(host, 200, 70);
       item('formatCells')?.click();
       expect(onFormatDialog).toHaveBeenCalled();
@@ -176,7 +184,7 @@ describe('attachContextMenu', () => {
 
     it('Row Height… prompts in points and applies the height to the selected rows', async () => {
       setRange(store, 1, 0, 2, 16383);
-      detach = attachContextMenu({ host, store, wb, strings: en });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, strings: en });
       fireContextMenu(host, 10, 70);
       item('rowHeight')?.click();
       const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
@@ -192,7 +200,7 @@ describe('attachContextMenu', () => {
 
     it('enables Open Hyperlink only for a safe hyperlink at the active cell', () => {
       const onOpenHyperlink = vi.fn();
-      detach = attachContextMenu({ host, store, wb, onOpenHyperlink });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onOpenHyperlink });
       fireContextMenu(host, 200, 70);
       expect(item('openHyperlink')?.disabled).toBe(true);
 
@@ -209,7 +217,7 @@ describe('attachContextMenu', () => {
     });
 
     it('Select All sets a full-sheet selection', () => {
-      detach = attachContextMenu({ host, store, wb });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb });
       fireContextMenu(host, 200, 70);
       item('selectAll')?.click();
       const r = store.getState().selection.range;
@@ -223,7 +231,7 @@ describe('attachContextMenu', () => {
       setRange(store, 0, 0, 1048575, 0);
       setFormat(store, 50000, 0, { hyperlink: 'https://example.test' });
       const setBlank = vi.spyOn(wb, 'setBlank');
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
 
       fireContextMenu(host, 200, 70);
       document
@@ -240,7 +248,7 @@ describe('attachContextMenu', () => {
       setFormat(store, 50000, 0, { hyperlink: 'https://example.test' });
       setFormat(store, 70000, 0, {});
       const setBlank = vi.spyOn(wb, 'setBlank');
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
 
       fireContextMenu(host, 200, 70);
       document
@@ -260,7 +268,14 @@ describe('attachContextMenu', () => {
         { row: 2, col: 0, value: 2 },
       ]);
       setRange(store, 0, 0, 2, 0);
-      detach = attachContextMenu({ host, store, wb, history, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        host,
+        store,
+        wb,
+        history,
+        onAfterCommit,
+      });
 
       fireContextMenu(host, 60, 30);
       document
@@ -288,7 +303,7 @@ describe('attachContextMenu', () => {
       ]);
       setRange(store, 1, 0, 1, 0);
       mutators.setFilterRanges(store, [{ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 }]);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
       const openFilterMenu = (): void => {
         fireContextMenu(host, 60, 50);
         document

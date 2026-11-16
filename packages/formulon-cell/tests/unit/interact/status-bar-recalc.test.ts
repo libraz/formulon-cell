@@ -15,6 +15,7 @@ const seed = (platform: 'mac' | null, stale: { value: boolean }) => {
     stale.value = false;
   });
   const handle = attachStatusBar({
+    getLocale: () => 'en-US',
     statusbar: bar,
     store: createSpreadsheetStore(),
     getEngineLabel: () => 'engine',

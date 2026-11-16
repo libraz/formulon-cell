@@ -13,7 +13,9 @@ describe('Data Validation dialog tabs', () => {
     document.body.appendChild(host);
     const store = createSpreadsheetStore();
     setActive(store, 0, 0);
-    attachFormatDialog({ host, store, strings: ja }).open('more', { mode: 'dataValidation' });
+    attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja }).open('more', {
+      mode: 'dataValidation',
+    });
   });
 
   afterEach(() => {
@@ -113,9 +115,12 @@ describe('Data Validation dialog tabs', () => {
     document.body.appendChild(macHost);
     const store = createSpreadsheetStore();
     setActive(store, 0, 0);
-    attachFormatDialog({ host: macHost, store, strings: ja }).open('more', {
-      mode: 'dataValidation',
-    });
+    attachFormatDialog({ getLocale: () => 'en-US', host: macHost, store, strings: ja }).open(
+      'more',
+      {
+        mode: 'dataValidation',
+      },
+    );
     const caption = (pane: string): string | null | undefined =>
       document.querySelector(`.fc-fmtdlg__vpane[data-fc-pane="${pane}"] .fc-fmtdlg__vmsg-caption`)
         ?.textContent;

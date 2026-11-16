@@ -32,7 +32,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('follows the rotation with the dial marker and its sample text', () => {
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open('align');
 
     const dial = document.querySelector<HTMLElement>('.fc-fmtdlg__align-preview-dial');
@@ -64,7 +64,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('alignment radios update draft (default → undefined)', () => {
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
 
     const center = document.querySelector<HTMLInputElement>(
@@ -83,7 +83,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('Alignment tab exposes Excel-style extended horizontal and vertical choices', () => {
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
     document
       .querySelector<HTMLButtonElement>('button[data-fc-tab="align"]')
@@ -134,7 +134,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('Alignment tab persists Shrink to Fit like Excel text control', () => {
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
     document
       .querySelector<HTMLButtonElement>('button[data-fc-tab="align"]')
@@ -157,7 +157,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('Alignment tab persists text direction', () => {
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
     document
       .querySelector<HTMLButtonElement>('button[data-fc-tab="align"]')
@@ -182,7 +182,7 @@ describe('attachFormatDialog', () => {
 
   it('Alignment tab Merge cells applies a merge to a multi-cell selection', () => {
     setRange(store, 0, 0, 1, 1);
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
     document
       .querySelector<HTMLButtonElement>('button[data-fc-tab="align"]')
@@ -218,7 +218,14 @@ describe('attachFormatDialog', () => {
       history,
     });
     const unregister = registerInteractionController(store, controller);
-    const handle = attachFormatDialog({ host, store, history, getWb: () => workbook, strings: ja });
+    const handle = attachFormatDialog({
+      getLocale: () => 'en-US',
+      host,
+      store,
+      history,
+      getWb: () => workbook,
+      strings: ja,
+    });
     const submit = (): void => {
       handle.open('align');
       const center = document.querySelector<HTMLInputElement>(
@@ -257,7 +264,7 @@ describe('attachFormatDialog', () => {
 
   it('Alignment tab Merge cells stays enabled on a single cell and applying it merges nothing', () => {
     setActive(store, 0, 0);
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
     document
       .querySelector<HTMLButtonElement>('button[data-fc-tab="align"]')
@@ -277,7 +284,7 @@ describe('attachFormatDialog', () => {
   it('Alignment tab Merge cells hydrates checked and can unmerge', () => {
     setRange(store, 0, 0, 1, 1);
     mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
     document
       .querySelector<HTMLButtonElement>('button[data-fc-tab="align"]')
@@ -301,7 +308,13 @@ describe('attachFormatDialog', () => {
     setRange(store, 0, 0, 0, 1);
     seedText(store, 0, 0, 'anchor');
     seedText(store, 0, 1, 'other');
-    const handle = attachFormatDialog({ host, store, getWb: () => mergeWorkbook(), strings: ja });
+    const handle = attachFormatDialog({
+      getLocale: () => 'en-US',
+      host,
+      store,
+      getWb: () => mergeWorkbook(),
+      strings: ja,
+    });
     handle.open('align');
 
     const merge = document.querySelector<HTMLInputElement>('input[data-fc-check="mergeCells"]');
@@ -329,7 +342,7 @@ describe('attachFormatDialog', () => {
     setRange(store, 0, 0, 0, 3);
     mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
     mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 3 });
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open('align');
 
     const merge = document.querySelector<HTMLInputElement>('input[data-fc-check="mergeCells"]');
@@ -343,7 +356,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('Protection tab persists the Hidden formula flag', () => {
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
     document
       .querySelector<HTMLButtonElement>('button[data-fc-tab="protection"]')
@@ -374,7 +387,7 @@ describe('attachFormatDialog', () => {
 
   it('alignment "default" radio clears align', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { align: 'right' });
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
 
     const dflt = document.querySelector<HTMLInputElement>(
@@ -393,7 +406,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('unchecked alignment radio change is ignored', () => {
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
     const left = document.querySelector<HTMLInputElement>(
       'input[type="radio"][value="left"]',

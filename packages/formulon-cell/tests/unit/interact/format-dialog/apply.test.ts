@@ -39,7 +39,7 @@ describe('attachFormatDialog', () => {
         hyperlinkTooltip: 'Open example',
       },
     );
-    const handle = attachFormatDialog({ strings: ja, host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', strings: ja, host, store });
     try {
       handle.open('more');
       const ok = Array.from(
@@ -68,7 +68,7 @@ describe('attachFormatDialog', () => {
         hyperlinkTooltip: 'Open old target',
       },
     );
-    const handle = attachFormatDialog({ strings: ja, host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', strings: ja, host, store });
     try {
       handle.open('more');
       const input = document.querySelector<HTMLInputElement>('input[aria-label="ハイパーリンク"]');
@@ -96,7 +96,7 @@ describe('attachFormatDialog', () => {
       { sheet: 0, row: 0, col: 0 },
       { comment: 'Keep this note', commentAuthor: 'Alice' },
     );
-    const handle = attachFormatDialog({ strings: ja, host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', strings: ja, host, store });
     try {
       handle.open('more');
       const ok = Array.from(
@@ -117,7 +117,7 @@ describe('attachFormatDialog', () => {
       { sheet: 0, row: 0, col: 0 },
       { comment: 'Delete this note', commentAuthor: 'Alice' },
     );
-    const handle = attachFormatDialog({ strings: ja, host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', strings: ja, host, store });
     try {
       handle.open('more');
       const comment = document.querySelector<HTMLTextAreaElement>(
@@ -142,7 +142,13 @@ describe('attachFormatDialog', () => {
 
   it('history records the format change as a single undo entry', () => {
     const history = new History();
-    const handle = attachFormatDialog({ strings: ja, host, store, history });
+    const handle = attachFormatDialog({
+      getLocale: () => 'en-US',
+      strings: ja,
+      host,
+      store,
+      history,
+    });
     handle.open();
 
     const center = document.querySelector<HTMLInputElement>(
@@ -182,7 +188,13 @@ describe('attachFormatDialog', () => {
     setRange(store, 0, 0, 1, 0);
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true, comment: 'source' });
     mutators.setCellFormat(store, { sheet: 0, row: 1, col: 0 }, { bold: false });
-    const handle = attachFormatDialog({ strings: ja, host, store, history });
+    const handle = attachFormatDialog({
+      getLocale: () => 'en-US',
+      strings: ja,
+      host,
+      store,
+      history,
+    });
     handle.open('font');
 
     const bold = document.querySelector<HTMLInputElement>('input[data-fc-check="bold"]');
@@ -209,7 +221,14 @@ describe('attachFormatDialog', () => {
   it('keeps the repeat action after a format plus merge transaction', () => {
     const history = new History();
     setRange(store, 0, 0, 0, 1);
-    const handle = attachFormatDialog({ strings: ja, host, store, history, getWb: mergeWorkbook });
+    const handle = attachFormatDialog({
+      getLocale: () => 'en-US',
+      strings: ja,
+      host,
+      store,
+      history,
+      getWb: mergeWorkbook,
+    });
     handle.open('align');
     const center = document.querySelector<HTMLInputElement>('input[type="radio"][value="center"]');
     const merge = document.querySelector<HTMLInputElement>('input[data-fc-check="mergeCells"]');
@@ -239,7 +258,14 @@ describe('attachFormatDialog', () => {
     setRange(store, 0, 0, 0, 1);
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true });
     setProtectedSheet(store, 0, true);
-    const handle = attachFormatDialog({ strings: ja, host, store, history, getWb: mergeWorkbook });
+    const handle = attachFormatDialog({
+      getLocale: () => 'en-US',
+      strings: ja,
+      host,
+      store,
+      history,
+      getWb: mergeWorkbook,
+    });
     try {
       handle.open('font');
       const bold = document.querySelector<HTMLInputElement>('input[data-fc-check="bold"]');
@@ -268,7 +294,7 @@ describe('attachFormatDialog', () => {
 
   it('applies patch over the entire selection range', () => {
     setRange(store, 0, 0, 1, 1);
-    const handle = attachFormatDialog({ strings: ja, host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', strings: ja, host, store });
     handle.open();
 
     const bold = document.querySelector<HTMLInputElement>(
@@ -297,7 +323,14 @@ describe('attachFormatDialog', () => {
         range: { sheet: 0, r0: 0, c0: 0, r1: MAX_ROW, c1: MAX_COL },
       },
     }));
-    const handle = attachFormatDialog({ strings: ja, host, store, history, getWb: mergeWorkbook });
+    const handle = attachFormatDialog({
+      getLocale: () => 'en-US',
+      strings: ja,
+      host,
+      store,
+      history,
+      getWb: mergeWorkbook,
+    });
     handle.open('font');
 
     const sizeInput = document.querySelector<HTMLInputElement>('input[type="number"][min="1"]');
@@ -327,7 +360,13 @@ describe('attachFormatDialog', () => {
         range: { sheet: 0, r0: 0, c0: 0, r1: MAX_ROW, c1: MAX_COL },
       },
     }));
-    const handle = attachFormatDialog({ strings: ja, host, store, getWb: unsupported });
+    const handle = attachFormatDialog({
+      getLocale: () => 'en-US',
+      strings: ja,
+      host,
+      store,
+      getWb: unsupported,
+    });
     handle.open('font');
     const sizeInput = document.querySelector<HTMLInputElement>('input[type="number"][min="1"]');
     if (!sizeInput) throw new Error('font size input missing');
@@ -342,7 +381,7 @@ describe('attachFormatDialog', () => {
     setRange(store, 0, 0, 0, 1);
     setCellLocked(store, { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 }, false);
     setProtectedSheet(store, 0, true);
-    const handle = attachFormatDialog({ strings: ja, host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', strings: ja, host, store });
     handle.open();
 
     const bold = document.querySelector<HTMLInputElement>(

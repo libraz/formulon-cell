@@ -37,7 +37,14 @@ describe('cell menu note rows on the default profile', () => {
   });
 
   const attach = (): void => {
-    detach = attachContextMenu({ host, store, wb, strings: en, onEditComment: () => {} });
+    detach = attachContextMenu({
+      getLocale: () => 'en-US',
+      host,
+      store,
+      wb,
+      strings: en,
+      onEditComment: () => {},
+    });
   };
 
   it('offers New Note alone on a cell without a note', () => {

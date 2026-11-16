@@ -1,9 +1,8 @@
-import { formulaForDisplaySafe, inputLocaleForWorkbook } from '../commands/coerce-input.js';
+import { formulaForDisplaySafe } from '../commands/coerce-input.js';
 import { extractRefs, type FormulaRef } from '../commands/refs.js';
 import { addrKey, formatA1Cell } from '../engine/address.js';
 import { formatCell, formulaValueLiteral } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -16,7 +15,7 @@ export interface EvaluateFormulaDialogDeps {
   strings?: Strings;
   /** Current UI locale for display fallbacks when the workbook adapter does
    * not expose native display text. */
-  getLocale?: () => string;
+  getLocale: () => string;
 }
 
 export interface EvaluateFormulaDialogHandle {
@@ -163,15 +162,7 @@ export function attachEvaluateFormulaDialog(
   let currentRefs: FormulaRef[] = [];
   let stepIndex = 0;
 
-  const displayLocale = (): string => {
-    const wb = getWb();
-    return (
-      deps.getLocale?.() ??
-      (wb ? inputLocaleForWorkbook(wb) : undefined) ??
-      bundledLocaleForStrings(strings) ??
-      'en-US'
-    );
-  };
+  const displayLocale = (): string => deps.getLocale();
 
   const valueForDisplay = (
     wb: WorkbookHandle | null,

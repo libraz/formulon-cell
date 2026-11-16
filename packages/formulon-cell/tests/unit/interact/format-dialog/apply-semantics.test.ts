@@ -50,7 +50,7 @@ describe('Format Cells apply on a mixed selection', () => {
   };
 
   it('setting only the font size leaves every other property alone', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open('font');
     document.querySelector<HTMLButtonElement>('[data-fc-font-size="20"]')?.click();
     ok();
@@ -72,7 +72,7 @@ describe('Format Cells apply on a mixed selection', () => {
   });
 
   it('setting only the number format leaves font and fill alone', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open('number');
     document.querySelector<HTMLButtonElement>('[data-fc-cat="fixed"]')?.click();
     const decimals = document.querySelector<HTMLInputElement>(
@@ -93,7 +93,7 @@ describe('Format Cells apply on a mixed selection', () => {
   });
 
   it('leaves the number format alone when only the font changes', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open('font');
     document.querySelector<HTMLButtonElement>('[data-fc-font-size="20"]')?.click();
     ok();

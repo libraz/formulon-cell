@@ -42,7 +42,13 @@ describe('attachEvaluateFormulaDialog', () => {
       }),
     } as unknown as WorkbookHandle;
 
-    const handle = attachEvaluateFormulaDialog({ host, store, getWb: () => wb, strings: en });
+    const handle = attachEvaluateFormulaDialog({
+      getLocale: () => 'en-US',
+      host,
+      store,
+      getWb: () => wb,
+      strings: en,
+    });
     handle.open();
 
     expect(overlay()?.hidden).toBe(false);
@@ -72,7 +78,13 @@ describe('attachEvaluateFormulaDialog', () => {
       getValue: vi.fn(() => ({ kind: 'blank' })),
     } as unknown as WorkbookHandle;
 
-    const handle = attachEvaluateFormulaDialog({ host, store, getWb: () => wb, strings: en });
+    const handle = attachEvaluateFormulaDialog({
+      getLocale: () => 'en-US',
+      host,
+      store,
+      getWb: () => wb,
+      strings: en,
+    });
     handle.open();
 
     expect(boxes()[0]?.textContent).toBe('The active cell does not contain a formula.');
@@ -146,7 +158,13 @@ describe('attachEvaluateFormulaDialog', () => {
       getDisplayText: () => '1235',
     } as unknown as WorkbookHandle;
 
-    const handle = attachEvaluateFormulaDialog({ host, store, getWb: () => wb, strings: en });
+    const handle = attachEvaluateFormulaDialog({
+      getLocale: () => 'en-US',
+      host,
+      store,
+      getWb: () => wb,
+      strings: en,
+    });
     handle.open();
     evalButton()?.click();
     expect(boxes()[1]?.textContent).toBe('=1234+Sheet3!A1');
@@ -171,7 +189,13 @@ describe('attachEvaluateFormulaDialog', () => {
       getDisplayText: () => '2468',
     } as unknown as WorkbookHandle;
 
-    const handle = attachEvaluateFormulaDialog({ host, store, getWb: () => wb, strings: en });
+    const handle = attachEvaluateFormulaDialog({
+      getLocale: () => 'en-US',
+      host,
+      store,
+      getWb: () => wb,
+      strings: en,
+    });
     handle.open();
     evalButton()?.click();
     expect(boxes()[1]?.textContent).toBe('=1234+1234+B1');
@@ -203,7 +227,13 @@ describe('attachEvaluateFormulaDialog', () => {
       getDisplayText: () => '20',
     } as unknown as WorkbookHandle;
 
-    const handle = attachEvaluateFormulaDialog({ host, store, getWb: () => wb, strings: en });
+    const handle = attachEvaluateFormulaDialog({
+      getLocale: () => 'en-US',
+      host,
+      store,
+      getWb: () => wb,
+      strings: en,
+    });
     handle.open();
     evalButton()?.click();
     expect(boxes()[1]?.textContent).toBe('=10+10');
@@ -222,7 +252,13 @@ describe('attachEvaluateFormulaDialog', () => {
       getValue: vi.fn(() => ({ kind: 'number', value: 3 })),
     } as unknown as WorkbookHandle;
 
-    const handle = attachEvaluateFormulaDialog({ host, store, getWb: () => wb, strings: en });
+    const handle = attachEvaluateFormulaDialog({
+      getLocale: () => 'en-US',
+      host,
+      store,
+      getWb: () => wb,
+      strings: en,
+    });
     handle.open();
 
     expect(evalButton()?.disabled).toBe(true);

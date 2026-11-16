@@ -24,7 +24,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('clicking number category updates draft and visibility', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
 
     const decimalsRow = document.querySelector<HTMLLabelElement>(
@@ -58,7 +58,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('lists number categories in Excel order without the custom Date & Time category', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
 
     expect(
@@ -95,7 +95,7 @@ describe('attachFormatDialog', () => {
       '# ?/10',
       '# ?/100',
     ];
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
     document
       .querySelector<HTMLButtonElement>('button[data-fc-cat="fraction"]')
@@ -131,7 +131,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('Number category can persist Excel-style 1000 separator option', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
 
     document
@@ -162,7 +162,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('Number category can persist Excel-style negative number style', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
 
     document
@@ -212,7 +212,7 @@ describe('attachFormatDialog', () => {
     ).toEqual({ kind: 'special', pattern: '00000-0000' });
     handle.detach();
 
-    const reopened = attachFormatDialog({ host, store });
+    const reopened = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     reopened.open();
     expect(
       document
@@ -223,7 +223,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('clicking on cat list outside button is a no-op', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
     const catList = document.querySelector<HTMLElement>('.fc-fmtdlg__cat');
     catList?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -233,7 +233,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('number categories support Excel-style arrow, Home, and End keyboard navigation', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
 
     const generalBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="general"]');
@@ -260,7 +260,7 @@ describe('attachFormatDialog', () => {
 
   it('decimals input clamps to [0, 10]', () => {
     const history = new History();
-    const handle = attachFormatDialog({ host, store, history });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, history });
     handle.open();
     const fixedBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]');
     fixedBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -280,7 +280,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('decimals input ignores non-numeric values', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
     const fixedBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]');
     fixedBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -300,7 +300,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('symbol select updates currency symbol', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
     const currencyBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="currency"]');
     currencyBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

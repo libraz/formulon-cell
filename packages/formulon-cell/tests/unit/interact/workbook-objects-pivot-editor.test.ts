@@ -44,6 +44,7 @@ describe('PivotTable editors against the engine', () => {
 
   const open = (wb: WorkbookHandle) => {
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -60,6 +61,7 @@ describe('PivotTable editors against the engine', () => {
 
   const openFieldList = (wb: WorkbookHandle) => {
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -175,6 +177,7 @@ describe('PivotTable editors against the engine', () => {
     const wb = await setup(['Sales']);
     const history = new History();
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,

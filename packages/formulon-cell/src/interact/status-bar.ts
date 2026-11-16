@@ -11,7 +11,6 @@ import { formatGeneralNumber } from '../engine/value.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import { normalizeFormatLocale } from '../format/locale.js';
 import { formatNumber } from '../format/number-format.js';
-import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
   clampZoom,
@@ -50,7 +49,7 @@ export interface StatusBarDeps {
   statusbar: HTMLElement;
   store: SpreadsheetStore;
   strings?: Strings;
-  getLocale?: () => string;
+  getLocale: () => string;
   /** Engine label for host/debug chrome. Excel profile hides this by default;
    *  pass `showEngineLabel: true` from a dev surface to expose it. */
   getEngineLabel: () => string;
@@ -613,7 +612,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       };
     }
     const keys = s.ui.statusAggs;
-    const aggLocale = deps.getLocale?.() ?? bundledLocaleForStrings(strings) ?? 'en-US';
+    const aggLocale = deps.getLocale();
     const first = stats.firstNumeric;
     const numFmt = first
       ? s.format.formats.get(addrKey({ sheet: first.sheet, row: first.row, col: first.col }))
@@ -708,7 +707,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
 
   const openZoomDialog = async (): Promise<void> => {
     const current = Math.round(store.getState().viewport.zoom * 100);
-    const locale = (): string => deps.getLocale?.() ?? bundledLocaleForStrings(strings) ?? 'en-US';
+    const locale = (): string => deps.getLocale();
     const common = {
       locale,
       title: strings.ribbon.zoomDialogTitle,

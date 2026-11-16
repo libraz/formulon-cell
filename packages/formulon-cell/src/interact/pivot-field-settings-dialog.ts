@@ -41,7 +41,7 @@ export function createPivotNumberFormatPicker(deps: {
   store: SpreadsheetStore;
   getStrings: () => Strings;
   getWb: () => WorkbookHandle | null;
-  getLocale?: () => string;
+  getLocale: () => string;
 }): { pick: PivotNumberFormatPicker; detach(): void } {
   let dialog: FormatDialogHandle | null = null;
   return {
@@ -51,7 +51,7 @@ export function createPivotNumberFormatPicker(deps: {
         store: deps.store,
         strings: deps.getStrings(),
         getWb: deps.getWb,
-        ...(deps.getLocale ? { getLocale: deps.getLocale } : {}),
+        getLocale: deps.getLocale,
       });
       const numFmt = formatCodeToNumFmt(current);
       dialog.open('number', {

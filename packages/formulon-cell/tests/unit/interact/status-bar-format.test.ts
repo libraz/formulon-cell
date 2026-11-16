@@ -28,7 +28,13 @@ const show = (values: number[], numFmt?: NumFmt): string => {
       },
     };
   });
-  const handle = attachStatusBar({ statusbar: bar, store, strings: en, getEngineLabel: () => '' });
+  const handle = attachStatusBar({
+    getLocale: () => 'en-US',
+    statusbar: bar,
+    store,
+    strings: en,
+    getEngineLabel: () => '',
+  });
   handle.refresh();
   const text = bar.querySelector('.fc-host__statusbar-aggs')?.textContent ?? '';
   handle.detach();

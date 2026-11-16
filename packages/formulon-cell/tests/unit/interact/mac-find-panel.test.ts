@@ -29,7 +29,7 @@ const mount = async (platform: 'mac' | 'default', texts: [number, number, string
     }
     return { ...s, data: { ...s.data, cells } };
   });
-  const handle = attachFindReplace({ host, store, wb, strings: ja });
+  const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb, strings: ja });
   const panel = () => host.querySelector<HTMLElement>('.fc-findpanel');
   const input = () => {
     const el = host.querySelector<HTMLInputElement>('.fc-findpanel__input');

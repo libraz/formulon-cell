@@ -160,6 +160,7 @@ export const statusBar = (): Extension =>
         statusbar: ctx.statusbar,
         store: ctx.store,
         strings: ctx.i18n.strings,
+        getLocale: () => ctx.i18n.locale,
         getEngineLabel: () => {
           const wb = ctx.workbook;
           return wb.isStub ? 'stub' : `formulon ${wb.version}`;
@@ -328,6 +329,7 @@ export const workbookObjects = (): Extension =>
         host: ctx.host,
         wb: ctx.workbook,
         strings: ctx.i18n.strings,
+        getLocale: () => ctx.i18n.locale,
         history: ctx.history,
         store: ctx.store,
         listSessionIllustrations: () => ctx.store.getState().illustrations.illustrations,
@@ -451,6 +453,7 @@ export const conditional = (): Extension =>
         store: ctx.store,
         history: ctx.history as History,
         strings,
+        getLocale: () => ctx.i18n.locale,
       }),
     (handle) => ({ open: () => handle().open() }),
   );
@@ -563,6 +566,7 @@ export const findReplace = (): Extension =>
           store: ctx.store,
           wb,
           strings: ctx.i18n.strings,
+          getLocale: () => ctx.i18n.locale,
           history: ctx.history as History,
           onAfterCommit: () => refreshCells(ctx),
         });

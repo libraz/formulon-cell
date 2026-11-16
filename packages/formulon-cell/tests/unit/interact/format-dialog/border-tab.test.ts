@@ -26,7 +26,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('border presets: outline, none, and inside disabled on one cell', () => {
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
 
     // The border tab buttons appear after the color reset button. Locate by label.
@@ -75,7 +75,7 @@ describe('attachFormatDialog', () => {
 
   it('border Inside preset draws only the inner edges of a multi-cell selection', () => {
     setRange(store, 0, 0, 1, 1);
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
 
     const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
@@ -100,7 +100,7 @@ describe('attachFormatDialog', () => {
 
   it('border Outline preset applies only the perimeter of a multi-cell selection', () => {
     setRange(store, 0, 0, 1, 1);
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
 
     const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
@@ -128,7 +128,7 @@ describe('attachFormatDialog', () => {
 
   it('border Outline preset does not materialize huge selections', () => {
     setRange(store, 0, 0, 100_000, 0);
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
 
     const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
@@ -144,7 +144,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('visual line style picker sets the active border style', () => {
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
 
     const thick = document.querySelector<HTMLButtonElement>(
@@ -179,7 +179,7 @@ describe('attachFormatDialog', () => {
         },
       },
     );
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
 
     document
@@ -230,7 +230,7 @@ describe('attachFormatDialog', () => {
           borders: { top: { style } },
         },
       );
-      const handle = attachFormatDialog({ host, store, strings: ja });
+      const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
       handle.open();
       expect(
         document.querySelector<HTMLSelectElement>(
@@ -242,7 +242,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('visual border preview buttons toggle sides', () => {
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
 
     const top = document.querySelector<HTMLButtonElement>(
@@ -270,7 +270,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('border color swatches set the active line color', () => {
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
     handle.open();
 
     const borderSwatch = document.querySelector<HTMLButtonElement>(

@@ -663,7 +663,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
         strings,
         history,
         getWb: deps.getWb,
-        getLocale: deps.getLocale,
+        getLocale,
       });
     }
     return dxfFormatDialog;

@@ -66,7 +66,7 @@ describe('PivotTable Grouping of a number field', () => {
     expect(created.ok).toBe(true);
     store = createSpreadsheetStore();
     history = new History();
-    detach = attachContextMenu({ host, store, wb, strings: ja, history });
+    detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, strings: ja, history });
   });
 
   afterEach(() => {

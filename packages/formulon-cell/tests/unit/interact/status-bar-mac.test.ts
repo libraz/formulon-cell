@@ -34,6 +34,7 @@ const seed = (platform: 'mac' | null) => {
     };
   });
   const handle = attachStatusBar({
+    getLocale: () => 'en-US',
     statusbar: bar,
     store,
     getEngineLabel: () => 'engine',
@@ -165,6 +166,7 @@ describe('status bar filter record count', () => {
     const filteredBar = document.createElement('div');
     document.body.appendChild(filteredBar);
     const filteredHandle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar: filteredBar,
       store,
       getEngineLabel: () => 'engine',

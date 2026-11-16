@@ -106,6 +106,7 @@ describe('attachStatusBar', () => {
     let issues = false;
     const open = vi.fn();
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       strings: ja,
@@ -125,13 +126,20 @@ describe('attachStatusBar', () => {
   });
 
   it('leaves the accessibility status out without a checker', () => {
-    const handle = attachStatusBar({ statusbar, store, getEngineLabel: () => 'stub', strings: ja });
+    const handle = attachStatusBar({
+      getLocale: () => 'en-US',
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+      strings: ja,
+    });
     expect(statusbar.querySelector('.fc-host__statusbar-a11y')).toBeNull();
     handle.detach();
   });
 
   it('renders left/center/right segments without leaking the engine label by default', () => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -167,6 +175,7 @@ describe('attachStatusBar', () => {
 
   it('can expose the engine label for dev/debug hosts', () => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -182,7 +191,13 @@ describe('attachStatusBar', () => {
     'counts the complete selection union, including deselected holes',
     (strings) => {
       setRange(store, 0, 0, 2, 2);
-      const handle = attachStatusBar({ statusbar, store, strings, getEngineLabel: () => 'stub' });
+      const handle = attachStatusBar({
+        getLocale: () => 'en-US',
+        statusbar,
+        store,
+        strings,
+        getEngineLabel: () => 'stub',
+      });
       const right = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-right');
       expect(right?.textContent).toBe(`9 ${strings.statusBar.cells}`);
       const center = { sheet: 0, row: 1, col: 1 };
@@ -220,6 +235,7 @@ describe('attachStatusBar', () => {
     setRange(store, 0, 0, 2, 0);
 
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -251,7 +267,13 @@ describe('attachStatusBar', () => {
         ]),
       },
     }));
-    const handle = attachStatusBar({ statusbar, store, strings: en, getEngineLabel: () => 'stub' });
+    const handle = attachStatusBar({
+      getLocale: () => 'en-US',
+      statusbar,
+      store,
+      strings: en,
+      getEngineLabel: () => 'stub',
+    });
     const scansAfterMount = IterationCountingMap.iterations;
     const lookupsAfterMount = IterationCountingMap.gets;
     expect(scansAfterMount).toBe(0);
@@ -331,7 +353,13 @@ describe('attachStatusBar', () => {
     store.setState((s) => ({ ...s, data: { ...s.data, cells } }));
     setRange(store, 0, 0, 0, MAX_COL);
 
-    const handle = attachStatusBar({ statusbar, store, strings: en, getEngineLabel: () => 'stub' });
+    const handle = attachStatusBar({
+      getLocale: () => 'en-US',
+      statusbar,
+      store,
+      strings: en,
+      getEngineLabel: () => 'stub',
+    });
     const center = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-aggs');
     expect(IterationCountingMap.iterations).toBe(1);
     const firstRowVisits = reads.cellVisits;
@@ -354,7 +382,13 @@ describe('attachStatusBar', () => {
     store.setState((s) => ({ ...s, data: { ...s.data, cells } }));
     setRange(store, 0, 0, MAX_ROW, 0);
 
-    const handle = attachStatusBar({ statusbar, store, strings: en, getEngineLabel: () => 'stub' });
+    const handle = attachStatusBar({
+      getLocale: () => 'en-US',
+      statusbar,
+      store,
+      strings: en,
+      getEngineLabel: () => 'stub',
+    });
     const center = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-aggs');
     expect(IterationCountingMap.iterations).toBe(1);
     const firstColumnVisits = reads.cellVisits;
@@ -385,7 +419,13 @@ describe('attachStatusBar', () => {
     store.setState((s) => ({ ...s, data: { ...s.data, cells } }));
     setRange(store, 0, 0, 0, MAX_COL);
 
-    const handle = attachStatusBar({ statusbar, store, strings: en, getEngineLabel: () => 'stub' });
+    const handle = attachStatusBar({
+      getLocale: () => 'en-US',
+      statusbar,
+      store,
+      strings: en,
+      getEngineLabel: () => 'stub',
+    });
     const center = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-aggs');
     expect(IterationCountingMap.iterations).toBe(1);
     expect(center?.textContent).toContain('Sum: 1');
@@ -442,7 +482,13 @@ describe('attachStatusBar', () => {
       selection: { ...s.selection, extraRanges: [{ sheet: 0, r0: 1, c0: 0, r1: 1, c1: 0 }] },
     }));
 
-    const handle = attachStatusBar({ statusbar, store, strings: en, getEngineLabel: () => 'stub' });
+    const handle = attachStatusBar({
+      getLocale: () => 'en-US',
+      statusbar,
+      store,
+      strings: en,
+      getEngineLabel: () => 'stub',
+    });
 
     expect(IterationCountingMap.iterations).toBe(1);
     expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toContain('Sum: 6');
@@ -455,6 +501,7 @@ describe('attachStatusBar', () => {
     setRange(store, 0, 0, 1, 0);
 
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       strings: en,
@@ -473,6 +520,7 @@ describe('attachStatusBar', () => {
 
   it('reflects Excel-style Ready, Enter, Edit, and Point modes', () => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       strings: en,
@@ -495,6 +543,7 @@ describe('attachStatusBar', () => {
   it('uses Edit mode while the formula bar is active', () => {
     let editing = false;
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       strings: en,
@@ -511,6 +560,7 @@ describe('attachStatusBar', () => {
   it('keeps center empty when nothing is selected (and no aggs apply)', () => {
     setRange(store, 0, 0, 0, 0);
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -525,6 +575,7 @@ describe('attachStatusBar', () => {
     seedNumber(store, 0, 0, 5);
     setRange(store, 0, 0, 0, 0);
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -571,6 +622,7 @@ describe('attachStatusBar', () => {
     const parentContextMenu = vi.fn();
     host.addEventListener('contextmenu', parentContextMenu);
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -628,6 +680,7 @@ describe('attachStatusBar', () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 180 });
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -656,6 +709,7 @@ describe('attachStatusBar', () => {
 
   it('right-click chooser toggles view shortcuts, zoom, and zoom slider', () => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       strings: en,
@@ -695,6 +749,7 @@ describe('attachStatusBar', () => {
       },
     }));
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       strings: en,
@@ -732,6 +787,7 @@ describe('attachStatusBar', () => {
       },
     }));
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       strings: ja,
@@ -768,6 +824,7 @@ describe('attachStatusBar', () => {
       },
     }));
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       strings: en,
@@ -785,6 +842,7 @@ describe('attachStatusBar', () => {
 
   it('shows active keyboard lock indicators when their status options are enabled', () => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       strings: en,
@@ -815,6 +873,7 @@ describe('attachStatusBar', () => {
 
   it('Escape closes the chooser and restores focus to the opener', () => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -832,6 +891,7 @@ describe('attachStatusBar', () => {
 
   it.each([false, true])('lets Tab navigation leave the chooser (shift=%s)', (shiftKey) => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -863,6 +923,7 @@ describe('attachStatusBar', () => {
 
   it('closes when focus leaves the chooser and leaves later keys to the new target', () => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -899,6 +960,7 @@ describe('attachStatusBar', () => {
 
   it('stops Escape from reaching outer listeners when handled by a chooser item', () => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -928,6 +990,7 @@ describe('attachStatusBar', () => {
 
   it('chooser supports arrow keys and Enter/Space toggles', () => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -953,6 +1016,7 @@ describe('attachStatusBar', () => {
 
   it('opens the chooser from keyboard context menu shortcuts', () => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -979,6 +1043,7 @@ describe('attachStatusBar', () => {
   it('refresh() re-reads the engine label', () => {
     let label = 'stub';
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       strings: ja,
       statusbar,
       store,
@@ -996,6 +1061,7 @@ describe('attachStatusBar', () => {
 
   it('detach removes the chooser node and stops subscribing', () => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -1010,6 +1076,7 @@ describe('attachStatusBar', () => {
 
   it('hides the calc-mode badge when getCalcMode is omitted or returns null', () => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -1025,6 +1092,7 @@ describe('attachStatusBar', () => {
   it('renders the calc-mode badge with the active mode label', () => {
     let mode: 0 | 1 | 2 = 1; // Manual
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -1048,6 +1116,7 @@ describe('attachStatusBar', () => {
     const cycle: number[] = [];
     const recalcs: number[] = [];
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -1066,6 +1135,7 @@ describe('attachStatusBar', () => {
 
   it('renders zoom controls and applies slider changes', () => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -1095,6 +1165,7 @@ describe('attachStatusBar', () => {
 
   it('moves the zoom slider by 100 units per arrow key', () => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -1129,6 +1200,7 @@ describe('attachStatusBar', () => {
   it('projects disabled reasons when zoom buttons hit their limits', () => {
     mutators.setZoom(store, 0.1);
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -1153,6 +1225,7 @@ describe('attachStatusBar', () => {
 
   it('renders workbook view shortcuts and switches the active view mode', () => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       strings: en,
@@ -1173,6 +1246,7 @@ describe('attachStatusBar', () => {
 
   it('setStrings relabels static status and zoom chrome', () => {
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -1192,6 +1266,7 @@ describe('attachStatusBar', () => {
   it('delegates zoom changes when onZoomChange is provided', () => {
     const calls: number[] = [];
     const handle = attachStatusBar({
+      getLocale: () => 'en-US',
       statusbar,
       store,
       getEngineLabel: () => 'stub',
@@ -1212,7 +1287,13 @@ describe('attachStatusBar', () => {
     seedNumber(store, 0, 0, 4);
     seedNumber(store, 1, 0, 6);
     setRange(store, 0, 0, 1, 0);
-    const handle = attachStatusBar({ statusbar, store, getEngineLabel: () => 'stub', strings: en });
+    const handle = attachStatusBar({
+      getLocale: () => 'en-US',
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+      strings: en,
+    });
     handle.refresh();
     const center = statusbar.querySelector('.fc-host__statusbar-aggs') as HTMLElement;
     expect(center.textContent).toContain('10');

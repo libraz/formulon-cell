@@ -44,7 +44,7 @@ describe('attachContextMenu', () => {
 
   describe('teardown', () => {
     it('detach removes the menu from the DOM', () => {
-      detach = attachContextMenu({ host, store, wb });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb });
       expect(document.querySelector('.fc-ctxmenu')).not.toBeNull();
       detach();
       detach = null;
@@ -52,7 +52,7 @@ describe('attachContextMenu', () => {
     });
 
     it('after detach, contextmenu events do not open the menu', () => {
-      detach = attachContextMenu({ host, store, wb });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb });
       detach();
       detach = null;
       fireContextMenu(host, 200, 70);
@@ -121,7 +121,7 @@ describe('attachContextMenu', () => {
 
     it('renders context submenu chevrons as fixed CSS glyphs, not text arrows', () => {
       const css = readFileSync(join(root, 'src/styles/core/app/overlays/context-menu.css'), 'utf8');
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
 
       fireContextMenu(host, 200, 70);
 

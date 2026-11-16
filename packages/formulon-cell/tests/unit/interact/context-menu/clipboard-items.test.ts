@@ -71,7 +71,7 @@ describe('attachContextMenu', () => {
       const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
       seed(store, wb, [{ row: 0, col: 0, value: 'X' }]);
       setRange(store, 0, 0, 0, 0);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
       fireContextMenu(host, 200, 70);
       item('copy')?.click();
       expect(writeText).toHaveBeenCalledWith('X');
@@ -160,7 +160,7 @@ describe('attachContextMenu', () => {
         { sheet: 0, r0: 4, c0: 0, r1: 4, c1: 16383 },
       ]);
       setRange(store, 0, 0, 1000, 999);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
       fireContextMenu(host, 200, 70);
       item('copy')?.click();
 
@@ -172,7 +172,7 @@ describe('attachContextMenu', () => {
       const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
       seed(store, wb, [{ row: 0, col: 0, value: 5 }]);
       setRange(store, 0, 0, 0, 0);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
       fireContextMenu(host, 200, 70);
       item('cut')?.click();
       expect(writeText).toHaveBeenCalled();
@@ -198,6 +198,7 @@ describe('attachContextMenu', () => {
         mutators.replaceCells(localizedStore, localizedWb.cells(0));
         setRange(localizedStore, 0, 0, 0, 2);
         detach = attachContextMenu({
+          getLocale: () => 'en-US',
           host,
           store: localizedStore,
           wb: localizedWb,
@@ -219,7 +220,7 @@ describe('attachContextMenu', () => {
     it('Paste reads from navigator.clipboard and writes via pasteTSV', async () => {
       vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('foo\t42');
       setRange(store, 1, 1, 1, 1);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
       fireContextMenu(host, 200, 70);
       item('paste')?.click();
       // readClipboard is async; wait for the microtask chain.
@@ -241,7 +242,14 @@ describe('attachContextMenu', () => {
       const source = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
       mutators.mergeRange(store, source);
       setRange(store, 0, 0, 1, 1);
-      detach = attachContextMenu({ host, store, wb, history, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        host,
+        store,
+        wb,
+        history,
+        onAfterCommit,
+      });
       fireContextMenu(host, 200, 70);
       item('cut')?.click();
       expect(history.canUndo()).toBe(false);
@@ -289,7 +297,7 @@ describe('attachContextMenu', () => {
       mutators.replaceCells(store, wb.cells(0));
       setFormat(store, 1, 0, { bold: true });
       setRange(store, 1, 0, 1, 0);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
       fireContextMenu(host, 200, 70);
       item('copy')?.click();
       insertRows(store, wb, null, 0);
@@ -308,7 +316,14 @@ describe('attachContextMenu', () => {
       const history = new History();
       vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('foo\t42\r\nbar\t99');
       setRange(store, 1, 1, 1, 1);
-      detach = attachContextMenu({ host, store, wb, history, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        host,
+        store,
+        wb,
+        history,
+        onAfterCommit,
+      });
       fireContextMenu(host, 200, 70);
       item('paste')?.click();
       await Promise.resolve();
@@ -330,7 +345,7 @@ describe('attachContextMenu', () => {
     it('Paste resolves to empty string and is a no-op', async () => {
       vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('');
       setRange(store, 1, 1, 1, 1);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
       fireContextMenu(host, 200, 70);
       item('paste')?.click();
       await Promise.resolve();
@@ -357,6 +372,7 @@ describe('attachContextMenu', () => {
       };
       setRange(store, 4, 4, 4, 4);
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         host,
         store,
         wb,
@@ -398,6 +414,7 @@ describe('attachContextMenu', () => {
       unregisterController = registerInteractionController(store, controller);
       setRange(store, 0, 0, 0, 2);
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         host,
         store,
         wb,
@@ -435,6 +452,7 @@ describe('attachContextMenu', () => {
       unregisterController = registerInteractionController(store, controller);
       setRange(store, 0, 0, 0, 2);
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         host,
         store,
         wb,
@@ -467,6 +485,7 @@ describe('attachContextMenu', () => {
         cells: [[{ value: { kind: 'number', value: 2 }, formula: '=1+1', format: undefined }]],
       };
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         host,
         store,
         wb,
@@ -505,6 +524,7 @@ describe('attachContextMenu', () => {
         ],
       };
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         host,
         store,
         wb,
@@ -528,7 +548,7 @@ describe('attachContextMenu', () => {
     });
 
     it('Paste Special triggers the onPasteSpecial callback', () => {
-      detach = attachContextMenu({ host, store, wb, onPasteSpecial });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onPasteSpecial });
       fireContextMenu(host, 200, 70);
       // Paste Special is a submenu — open it, then click the dialog entry.
       document
@@ -542,6 +562,7 @@ describe('attachContextMenu', () => {
 
     it('projects a shared disabled reason on Paste Special quick actions without a copied cell snapshot', () => {
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         host,
         store,
         wb,
@@ -568,7 +589,14 @@ describe('attachContextMenu', () => {
 
     it('delegates Copy/Cut/Paste to the shared clipboard path when wired', () => {
       const onClipboardShortcut = vi.fn();
-      detach = attachContextMenu({ host, store, wb, onAfterCommit, onClipboardShortcut });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        host,
+        store,
+        wb,
+        onAfterCommit,
+        onClipboardShortcut,
+      });
 
       fireContextMenu(host, 200, 70);
       item('copy')?.click();
@@ -587,7 +615,7 @@ describe('attachContextMenu', () => {
       vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('new');
       seed(store, wb, [{ row: 1, col: 1, value: 'old' }]);
       setRange(store, 1, 1, 1, 1);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
 
       fireContextMenu(host, 200, 70);
       expect(item('insertCopiedCells')).toBeNull();
@@ -619,7 +647,7 @@ describe('attachContextMenu', () => {
         { row: 2, col: 1, value: 'second' },
       ]);
       setRange(store, 1, 1, 1, 1);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
 
       fireContextMenu(host, 200, 70);
       item('insertCells')?.click();
@@ -658,6 +686,7 @@ describe('attachContextMenu', () => {
       setRange(store, 1, 1, 1, 1);
       mutators.setCopyRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         host,
         store,
         wb,
@@ -705,7 +734,7 @@ describe('attachContextMenu', () => {
         { row: 5, col: 5, value: 99 }, // outside range
       ]);
       setRange(store, 0, 0, 0, 1);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
       fireContextMenu(host, 200, 70);
       item('clear')?.click();
       wb.recalc();
@@ -723,7 +752,14 @@ describe('attachContextMenu', () => {
         { row: 0, col: 2, value: 3 },
       ]);
       setRange(store, 0, 0, 0, 2);
-      detach = attachContextMenu({ host, store, wb, history, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        host,
+        store,
+        wb,
+        history,
+        onAfterCommit,
+      });
 
       fireContextMenu(host, 200, 70);
       item('clear')?.click();
@@ -754,7 +790,14 @@ describe('attachContextMenu', () => {
         { sheet: 0, r0: 2, c0: 1, r1: 2, c1: 2 },
         { sheet: 0, r0: 4, c0: 4, r1: 4, c1: 4 },
       ]);
-      detach = attachContextMenu({ host, store, wb, history, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        host,
+        store,
+        wb,
+        history,
+        onAfterCommit,
+      });
 
       fireContextMenu(host, 200, 70);
       item('clear')?.click();
@@ -796,7 +839,14 @@ describe('attachContextMenu', () => {
       wb.recalc();
       expect(wb.cellFormula(formula)).toBe('=""');
       setRange(store, 0, 0, 1_048_575, 0);
-      detach = attachContextMenu({ host, store, wb, history, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        host,
+        store,
+        wb,
+        history,
+        onAfterCommit,
+      });
 
       fireContextMenu(host, 200, 70);
       item('clear')?.click();
@@ -830,7 +880,14 @@ describe('attachContextMenu', () => {
         { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
         { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
       ]);
-      detach = attachContextMenu({ host, store, wb, history, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        host,
+        store,
+        wb,
+        history,
+        onAfterCommit,
+      });
 
       fireContextMenu(host, 200, 70);
       item('clear')?.click();
@@ -871,6 +928,7 @@ describe('attachContextMenu', () => {
         { sheet: 0, r0: 4, c0: 4, r1: 4, c1: 4 },
       ]);
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         host,
         store,
         wb,
@@ -918,7 +976,7 @@ describe('attachContextMenu', () => {
       controller.setPolicy(formPolicy);
       unregisterController = registerInteractionController(store, controller);
       setSelectionRanges(store, primary, [{ sheet: 0, r0: 4, c0: 4, r1: 4, c1: 4 }]);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
 
       fireContextMenu(host, 200, 70);
       item('clear')?.click();
@@ -945,7 +1003,14 @@ describe('attachContextMenu', () => {
       const execute = vi.spyOn(emptyController, 'execute');
       unregisterController = registerInteractionController(store, emptyController);
       setRange(store, 0, 0, 0, 0);
-      detach = attachContextMenu({ host, store, wb, history: emptyHistory, onAfterCommit });
+      detach = attachContextMenu({
+        getLocale: () => 'en-US',
+        host,
+        store,
+        wb,
+        history: emptyHistory,
+        onAfterCommit,
+      });
 
       fireContextMenu(host, 200, 70);
       item('clear')?.click();
@@ -964,7 +1029,7 @@ describe('attachContextMenu', () => {
         configurable: true,
         value: undefined,
       });
-      detach = attachContextMenu({ host, store, wb, strings: en });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, strings: en });
       fireContextMenu(host, 200, 70);
       expect(item('paste')?.disabled).toBe(true);
       expect(item('paste')?.getAttribute('aria-disabled')).toBe('true');
@@ -978,7 +1043,7 @@ describe('attachContextMenu', () => {
     });
 
     it('enables the Paste button when navigator.clipboard.readText is available', () => {
-      detach = attachContextMenu({ host, store, wb, strings: en });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, strings: en });
       fireContextMenu(host, 200, 70);
       expect(item('paste')?.disabled).toBe(false);
       expect(item('paste')?.getAttribute('aria-disabled')).toBe('false');

@@ -46,7 +46,7 @@ describe('attachFormatDialog', () => {
     });
     mutators.setCellFormat(store, other, { bold: false, hyperlink: 'https://other.test' });
     mutators.setCellFormat(store, extra, { bold: false, comment: 'extra note' });
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     try {
       handle.open('font');
       const bold = document.querySelector<HTMLInputElement>('input[data-fc-check="bold"]');
@@ -86,7 +86,7 @@ describe('attachFormatDialog', () => {
     setRange(store, 0, 0, 1, 0);
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true });
     mutators.setCellFormat(store, { sheet: 0, row: 1, col: 0 }, { bold: false });
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     try {
       handle.open('font');
       const bold = document.querySelector<HTMLInputElement>('input[data-fc-check="bold"]');
@@ -111,7 +111,7 @@ describe('attachFormatDialog', () => {
     setRange(store, 0, 0, 0, 1);
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { underline: 'single' });
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 1 }, { bold: true });
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     try {
       await flushRaf();
       handle.open('font');
@@ -158,7 +158,7 @@ describe('attachFormatDialog', () => {
         fontSize: 409,
       },
     );
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     try {
       handle.open('font');
       const styleItems = document.querySelectorAll<HTMLButtonElement>('[data-fc-font-style]');
@@ -262,7 +262,7 @@ describe('attachFormatDialog', () => {
         { sheet: 0, row: 0, col: 1 },
         field === 'strike' ? { strike: false } : { color: '#0000ff' },
       );
-      const handle = attachFormatDialog({ host, store });
+      const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
       try {
         handle.open('font');
         const normal = document.querySelector<HTMLInputElement>('[data-fc-check="normalFont"]');
@@ -306,7 +306,7 @@ describe('attachFormatDialog', () => {
       );
       const before = store.getState().format.formats;
       const history = new History();
-      const handle = attachFormatDialog({ host, store, history });
+      const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, history });
       try {
         handle.open('number');
         const item = document.querySelector<HTMLElement>(
@@ -355,7 +355,7 @@ describe('attachFormatDialog', () => {
         validation: { kind: 'list', source: ['A', 'B'] },
       },
     );
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     try {
       handle.open('number');
       const numberPanel = document.querySelector<HTMLElement>(

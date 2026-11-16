@@ -64,7 +64,7 @@ export interface WorkbookObjectsPanelDeps {
   dock?: HTMLElement;
   /** Authorizes pivot edits; also lets the PivotTable Field dialog open Format Cells. */
   store: SpreadsheetStore;
-  getLocale?: () => string;
+  getLocale: () => string;
   onOpenPivotTableDialog?: () => void;
   onAfterPivotEdit?: () => void;
   onSelectSessionIllustration?: (id: string) => void;
@@ -118,7 +118,7 @@ export function attachWorkbookObjectsPanel(
         store: deps.store,
         getStrings: () => strings,
         getWb: () => wb,
-        ...(deps.getLocale ? { getLocale: deps.getLocale } : {}),
+        getLocale: deps.getLocale,
       })
     : null;
 

@@ -54,7 +54,14 @@ describe('PivotTable context menu', () => {
   it('replaces the cell menu on a label cell', () => {
     vi.spyOn(wb, 'pivotCellInfo').mockReturnValue(info());
     const onOpenPivotFieldList = vi.fn();
-    detach = attachContextMenu({ host, store, wb, strings: en, onOpenPivotFieldList });
+    detach = attachContextMenu({
+      getLocale: () => 'en-US',
+      host,
+      store,
+      wb,
+      strings: en,
+      onOpenPivotFieldList,
+    });
     setRange(store, 3, 0, 3, 0);
     fireContextMenu(host, 10, 10);
     expect(ids()).toEqual([
@@ -87,7 +94,14 @@ describe('PivotTable context menu', () => {
     vi.spyOn(wb, 'pivotCellInfo').mockReturnValue(
       info({ kind: 3, fieldName: 'Sum of Sales', fieldIndex: -1, isValue: true }),
     );
-    detach = attachContextMenu({ host, store, wb, strings: ja, onOpenPivotFieldList: vi.fn() });
+    detach = attachContextMenu({
+      getLocale: () => 'en-US',
+      host,
+      store,
+      wb,
+      strings: ja,
+      onOpenPivotFieldList: vi.fn(),
+    });
     fireContextMenu(host, 10, 10);
     expect(ids()).toEqual([
       'copy',
@@ -112,7 +126,7 @@ describe('PivotTable context menu', () => {
 
   it('drops Refresh without a cache and the field list without a host opener', () => {
     vi.spyOn(wb, 'pivotCellInfo').mockReturnValue(info({ cacheId: -1, fieldIndex: -1 }));
-    detach = attachContextMenu({ host, store, wb, strings: en });
+    detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, strings: en });
     fireContextMenu(host, 10, 10);
     expect(ids()).toEqual([
       'copy',
@@ -129,7 +143,7 @@ describe('PivotTable context menu', () => {
     vi.spyOn(wb, 'pivotCellInfo').mockReturnValue(info());
     const sort = vi.spyOn(wb, 'setPivotFieldSort').mockReturnValue(true);
     vi.spyOn(wb, 'cells').mockReturnValue([].values() as ReturnType<WorkbookHandle['cells']>);
-    detach = attachContextMenu({ host, store, wb, strings: en });
+    detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, strings: en });
     fireContextMenu(host, 10, 10);
     document
       .querySelector<HTMLButtonElement>('.fc-ctxmenu__item[data-fc-submenu="pivotSortMenu"]')
@@ -140,7 +154,7 @@ describe('PivotTable context menu', () => {
 
   it('keeps the normal menu outside a report', () => {
     vi.spyOn(wb, 'pivotCellInfo').mockReturnValue(null);
-    detach = attachContextMenu({ host, store, wb, strings: en });
+    detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, strings: en });
     fireContextMenu(host, 10, 10);
     expect(item('paste')).not.toBeNull();
     expect(item('pivotRefresh')).toBeNull();
@@ -173,7 +187,14 @@ describe('PivotTable context menu', () => {
       info({ kind: 3, fieldName: caption, fieldIndex: -1, isValue: true, cacheId: 0 }),
     );
     const onOpenPivotFieldList = vi.fn();
-    detach = attachContextMenu({ host, store, wb: engine, strings: ja, onOpenPivotFieldList });
+    detach = attachContextMenu({
+      getLocale: () => 'en-US',
+      host,
+      store,
+      wb: engine,
+      strings: ja,
+      onOpenPivotFieldList,
+    });
     fireContextMenu(host, 10, 10);
     item('pivotFieldSettings')?.click();
     const dialog = document.querySelector<HTMLElement>('.fc-pvfsdlg');

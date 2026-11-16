@@ -15,7 +15,7 @@ const mount = (platform: 'mac' | 'default') => {
   document.body.appendChild(fcHost);
   const store = createSpreadsheetStore();
   setActive(store, 0, 0);
-  const handle = attachFormatDialog({ host, store, strings: ja });
+  const handle = attachFormatDialog({ getLocale: () => 'ja-JP', host, store, strings: ja });
   return handle;
 };
 
@@ -293,7 +293,7 @@ describe('format dialog inside borders on a 2x2 selection (Mac)', () => {
     document.body.appendChild(fcHost);
     const store = createSpreadsheetStore();
     setRange(store, 0, 0, 1, 1);
-    const handle = attachFormatDialog({ host, store, strings: ja });
+    const handle = attachFormatDialog({ getLocale: () => 'ja-JP', host, store, strings: ja });
     handle.open('border');
     for (const axis of axes) {
       document
@@ -469,7 +469,13 @@ describe('format dialog Number category padding by workbook locale', () => {
       withEngineSyncMuted: <T>(fn: () => T): T => fn(),
       subscribe: () => () => {},
     } as unknown as never;
-    const handle = attachFormatDialog({ host, store, strings: ja, getWb: () => wb });
+    const handle = attachFormatDialog({
+      getLocale: () => 'ja-JP',
+      host,
+      store,
+      strings: ja,
+      getWb: () => wb,
+    });
     handle.open('number');
     const click = (el: Element | null): void => {
       el?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

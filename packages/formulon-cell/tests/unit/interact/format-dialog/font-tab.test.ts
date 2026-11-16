@@ -26,7 +26,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('font style controls wire the selected underline style to draft', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
 
     const bold = document.querySelector<HTMLInputElement>(
@@ -63,7 +63,7 @@ describe('attachFormatDialog', () => {
 
   it('font vertical-alignment controls are mutually exclusive and write the selected value', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { fontSize: 20 });
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
 
     const superscript = document.querySelector<HTMLInputElement>(
@@ -97,7 +97,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('Font tab style list applies Regular, Italic, Bold, and Bold Italic choices', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
     document
       .querySelector<HTMLButtonElement>('button[data-fc-tab="font"]')
@@ -125,7 +125,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('Font tab preview follows font family, size, style, and color draft', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open('font');
 
     const familyInput = document.querySelector<HTMLInputElement>('input[data-fc-input="family"]');
@@ -189,7 +189,7 @@ describe('attachFormatDialog', () => {
         color: '#ff0000',
       },
     );
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
     document
       .querySelector<HTMLButtonElement>('button[data-fc-tab="font"]')
@@ -216,7 +216,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('font family input sets draft and applies on OK', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
 
     const familyInput = document.querySelector<HTMLInputElement>(
@@ -296,7 +296,7 @@ describe('attachFormatDialog', () => {
 
   it('empty font family is converted to undefined on OK', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { fontFamily: 'Arial' });
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
 
     const familyInput = document.querySelector<HTMLInputElement>(
@@ -315,7 +315,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('font size input clamps Excel points to [1, 409] before storing CSS px', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
 
     const sizeInput = document.querySelector<HTMLInputElement>(
@@ -334,7 +334,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('accepts the Excel integer font-size bounds', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     for (const size of [1, 7, 100, 409]) {
       handle.open('font');
       const sizeInput = document.querySelector<HTMLInputElement>(
@@ -355,7 +355,7 @@ describe('attachFormatDialog', () => {
 
   it('empty font size becomes undefined on OK', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { fontSize: 18 });
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
 
     const sizeInput = document.querySelector<HTMLInputElement>(
@@ -375,7 +375,7 @@ describe('attachFormatDialog', () => {
 
   it('non-numeric font size leaves draft unchanged', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { fontSize: 12 });
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
 
     const sizeInput = document.querySelector<HTMLInputElement>(
@@ -400,7 +400,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('color input sets draft, color reset clears it', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
 
     const colorInputs = document.querySelectorAll<HTMLInputElement>('input[type="color"]');
@@ -431,7 +431,7 @@ describe('attachFormatDialog', () => {
 
   it('hydrates color picker default for non-hex existing color', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { color: 'rebeccapurple' });
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open();
     const colorInputs = document.querySelectorAll<HTMLInputElement>('input[type="color"]');
     expect(colorInputs[0]?.value).toBe('#000000');

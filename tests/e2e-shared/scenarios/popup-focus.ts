@@ -124,6 +124,7 @@ async function runOwnerDocumentMenuScenario(
       host,
       store: probes['mount/internals'].spreadsheetInternals(instance).store,
       wb: probes['api/workbook'].workbookHandleOf(instance.workbook),
+      getLocale: () => instance.i18n.locale,
       options: {
         mode: 'builtIn',
         transform: () => [

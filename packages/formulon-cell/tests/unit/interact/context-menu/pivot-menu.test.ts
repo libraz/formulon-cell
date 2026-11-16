@@ -59,6 +59,7 @@ describe('PivotTable context menu, as measured on the Mac app', () => {
     history = new History();
     fieldListOpened = 0;
     detach = attachContextMenu({
+      getLocale: () => 'en-US',
       host,
       store,
       wb,
@@ -507,6 +508,7 @@ describe('Hide Field List in the PivotTable menu', () => {
     const wb = await loadFixture('ja_c0_rows.xlsx');
     let open = true;
     const detach = attachContextMenu({
+      getLocale: () => 'en-US',
       host,
       store,
       wb,

@@ -226,6 +226,7 @@ describe('attachWorkbookObjectsPanel', () => {
   it('lists preserved OOXML categories, paths, and table names', () => {
     const { wb } = wbWithObjects();
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -269,6 +270,7 @@ describe('attachWorkbookObjectsPanel', () => {
 
   it('lists session illustrations supplied by the host feature', () => {
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb: emptyWb(),
@@ -301,6 +303,7 @@ describe('attachWorkbookObjectsPanel', () => {
   it('updates editable session shape appearance from the illustrations section', () => {
     const onUpdateSessionIllustration = vi.fn();
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb: emptyWb(),
@@ -375,6 +378,7 @@ describe('attachWorkbookObjectsPanel', () => {
       },
     ];
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb: emptyWb(),
@@ -423,6 +427,7 @@ describe('attachWorkbookObjectsPanel', () => {
     const onDuplicateSessionIllustration = vi.fn();
     const onClearSessionIllustration = vi.fn();
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb: emptyWb(),
@@ -456,6 +461,7 @@ describe('attachWorkbookObjectsPanel', () => {
     let illustrations: SessionIllustration[] = [];
     const listeners = new Set<() => void>();
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb: emptyWb(),
@@ -497,6 +503,7 @@ describe('attachWorkbookObjectsPanel', () => {
   it('opens the PivotTable creation flow from pivot details when supplied', () => {
     let opened = 0;
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb: wbWithObjects().wb,
@@ -520,6 +527,7 @@ describe('attachWorkbookObjectsPanel', () => {
     const { wb, calls } = wbWithObjects();
     const onAfterPivotEdit = vi.fn();
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -557,6 +565,7 @@ describe('attachWorkbookObjectsPanel', () => {
   it('updates the PivotTable report layout from workbook object details', () => {
     const { wb, calls } = wbWithObjects();
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -584,6 +593,7 @@ describe('attachWorkbookObjectsPanel', () => {
   it('edits existing PivotTable field axis assignments', () => {
     const { wb, calls } = wbWithObjects();
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -644,6 +654,7 @@ describe('attachWorkbookObjectsPanel', () => {
   it('updates row and column field order when editing axes', () => {
     const { wb, calls } = wbWithObjects();
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -673,6 +684,7 @@ describe('attachWorkbookObjectsPanel', () => {
   it('opens an existing PivotTable Field List without the general edit controls', () => {
     const { wb, calls } = wbWithObjects();
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -755,6 +767,7 @@ describe('attachWorkbookObjectsPanel', () => {
   it('takes a field out of the report when its Field List box is unticked', () => {
     const { wb, calls } = wbWithObjects();
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -777,6 +790,7 @@ describe('attachWorkbookObjectsPanel', () => {
   it('opens an existing PivotTable Field List through the shared panel handle', () => {
     const { wb } = wbWithObjects();
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -797,6 +811,7 @@ describe('attachWorkbookObjectsPanel', () => {
   it('edits existing PivotTable value aggregation and number format', () => {
     const { wb, calls, dataSpecs } = wbWithObjects();
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -831,6 +846,7 @@ describe('attachWorkbookObjectsPanel', () => {
   it('edits existing PivotTable filter item visibility list', () => {
     const { wb, calls } = wbWithObjects();
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -865,6 +881,7 @@ describe('attachWorkbookObjectsPanel', () => {
   it('names a cache-backed item by index and falls back to its label without one', () => {
     const { wb, calls } = wbWithObjects();
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -904,6 +921,7 @@ describe('attachWorkbookObjectsPanel', () => {
 
   it('refreshes when locale or workbook changes while open', () => {
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb: emptyWb(),
@@ -928,6 +946,7 @@ describe('attachWorkbookObjectsPanel', () => {
   it('Escape closes the panel and restores focus to the opener', () => {
     host.tabIndex = -1;
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb: emptyWb(),

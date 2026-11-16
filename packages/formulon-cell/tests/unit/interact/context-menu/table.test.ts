@@ -47,14 +47,14 @@ describe('context menu over a table', () => {
 
   it('greys out Delete on a row header that holds the table header row', () => {
     setRange(store, 0, 0, 0, 0);
-    detach = attachContextMenu({ host, store, wb });
+    detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb });
     fireContextMenu(host, 10, 30); // row 0 header
     expect(item('rowDelete')?.disabled).toBe(true);
   });
 
   it('keeps Delete on for a data row header', () => {
     setRange(store, 1, 0, 1, 0);
-    detach = attachContextMenu({ host, store, wb });
+    detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb });
     fireContextMenu(host, 10, 59); // row 1 header
     expect(item('rowDelete')).not.toBeNull();
     expect(item('rowDelete')?.disabled).toBe(false);
@@ -62,7 +62,7 @@ describe('context menu over a table', () => {
 
   it('opens an Insert submenu instead of the flat Insert entry on a table cell', () => {
     setRange(store, 2, 1, 2, 1);
-    detach = attachContextMenu({ host, store, wb });
+    detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb });
     fireContextMenu(host, 120, 90);
     expect(store.getState().selection.active).toMatchObject({ row: 2, col: 1 });
     expect(item('insertTableMenu')).not.toBeNull();
@@ -71,7 +71,7 @@ describe('context menu over a table', () => {
 
   it('keeps the flat Insert entry outside a table', () => {
     setRange(store, 9, 6, 9, 6);
-    detach = attachContextMenu({ host, store, wb });
+    detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb });
     fireContextMenu(host, 120, 260);
     expect(item('insertCells')).not.toBeNull();
     expect(item('insertTableMenu')).toBeNull();

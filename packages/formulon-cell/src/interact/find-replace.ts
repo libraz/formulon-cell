@@ -1,4 +1,3 @@
-import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import {
   applySubstitution,
   displayTextForFindMatch,
@@ -15,7 +14,6 @@ import { addrKey, formatA1Cell } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
-import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { sameAddr } from '../store/direct-format.js';
 import { rangeOfAddr } from '../store/selection-geometry.js';
@@ -37,7 +35,7 @@ export interface FindReplaceDeps {
   strings?: Strings;
   /** Current UI locale. The workbook profile remains the fallback for
    * low-level hosts that do not provide this getter. */
-  getLocale?: () => string;
+  getLocale: () => string;
   /** Activate and hydrate a workbook sheet before selecting a match on it.
    * Return false when the sheet is hidden or blocked by a host policy. */
   onActivateSheet?: (sheet: number) => boolean;
@@ -338,11 +336,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
         ? lookInSelect.value
         : 'values',
     workbook: wb,
-    locale:
-      deps.getLocale?.() ??
-      inputLocaleForWorkbook(wb) ??
-      bundledLocaleForStrings(strings) ??
-      'en-US',
+    locale: deps.getLocale(),
   });
 
   const navigationRestricted = (): boolean => {

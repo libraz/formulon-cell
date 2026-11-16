@@ -75,7 +75,7 @@ describe('Format Cells font effects and Fill Effects', () => {
 
   it('does not offer Outline and Shadow on the Mac either: the app has no such boxes', () => {
     host.dataset.fcPlatform = 'mac';
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open('font');
     for (const key of ['fontOutline', 'fontShadow']) {
       expect(q<HTMLInputElement>(`input[data-fc-check="${key}"]`).closest('label')?.hidden).toBe(
@@ -86,7 +86,7 @@ describe('Format Cells font effects and Fill Effects', () => {
   });
 
   it('hides Outline and Shadow off the Mac', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open('font');
     expect(q<HTMLInputElement>('input[data-fc-check="fontOutline"]').closest('label')?.hidden).toBe(
       true,
@@ -99,7 +99,7 @@ describe('Format Cells font effects and Fill Effects', () => {
 
   it('keeps loaded font effects and a gradient when another property changes', () => {
     seed({ fontOutline: true, fontCondense: true, fillGradient: GRADIENT });
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open('font');
     check('input[data-fc-check="bold"]', true);
     ok();
@@ -113,7 +113,7 @@ describe('Format Cells font effects and Fill Effects', () => {
   });
 
   it('authors a two-colour vertical gradient through Fill Effects', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open('fill');
     click(q('button[data-fc-fill-effects]'));
     setColor('input[data-fc-gradient-color="1"]', '#ffffff');
@@ -138,7 +138,7 @@ describe('Format Cells font effects and Fill Effects', () => {
   });
 
   it('authors a gradient from the centre', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open('fill');
     click(q('button[data-fc-fill-effects]'));
     setColor('input[data-fc-gradient-color="1"]', '#ffffff');
@@ -162,7 +162,7 @@ describe('Format Cells font effects and Fill Effects', () => {
 
   it('opens Fill Effects on a loaded gradient and a solid colour replaces it', () => {
     seed({ fillGradient: GRADIENT });
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open('fill');
     expect(q<HTMLElement>('.fc-fmtdlg__fill-effects').hidden).toBe(false);
     expect(q<HTMLInputElement>('input[data-fc-gradient-color="1"]').value).toBe('#ff0000');
@@ -175,7 +175,7 @@ describe('Format Cells font effects and Fill Effects', () => {
 
   it('conditional-format formats offer neither Fill Effects nor Outline/Shadow and keep a solid fill', () => {
     host.dataset.fcPlatform = 'mac';
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     let applied: Partial<CellFormat> | null = null;
     handle.open('fill', {
       mode: 'dxf',
@@ -198,7 +198,7 @@ describe('Format Cells font effects and Fill Effects', () => {
   });
 
   it('a regular Format Cells open after a conditional-format one offers Fill Effects again', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store });
     handle.open('fill', { mode: 'dxf', onApplyDxf: () => undefined });
     handle.close();
     handle.open('fill');

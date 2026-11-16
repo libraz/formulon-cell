@@ -30,7 +30,7 @@ describe('find-replace match computation', () => {
       }
       return { ...s, data: { ...s.data, cells } };
     });
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open();
     const input = host.querySelector<HTMLInputElement>('.fc-find input[type="text"]');
     if (!input) throw new Error('no input');

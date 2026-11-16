@@ -24,7 +24,7 @@ it.each([
   }));
   const host = document.createElement('div');
   document.body.appendChild(host);
-  const dialog = attachFormatDialog({ host, store });
+  const dialog = attachFormatDialog({ getLocale: () => 'en-US', host, store });
   try {
     dialog.open('font');
     const bold = document.querySelector<HTMLInputElement>('input[data-fc-check="bold"]');

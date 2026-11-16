@@ -60,6 +60,7 @@ describe('attachContextMenu', () => {
       mutators.setCopyRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 16383 });
       mutators.selectRow(store, 1);
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         host,
         store,
         wb,
@@ -106,6 +107,7 @@ describe('attachContextMenu', () => {
 
       mutators.selectRow(store, 3);
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         host,
         store,
         wb,
@@ -157,7 +159,7 @@ describe('attachContextMenu', () => {
     });
 
     it('shows the plain row insert entries outside copy mode', () => {
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
       fireContextMenu(host, 10, 30);
       expect(item('insertCopiedCells')).toBeNull();
       expect(item('rowInsertAbove')).not.toBeNull();
@@ -167,7 +169,7 @@ describe('attachContextMenu', () => {
     it('Insert Above shifts existing rows down', () => {
       seed(store, wb, [{ row: 0, col: 0, value: 'a' }]);
       setRange(store, 0, 0, 0, 0);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
       fireContextMenu(host, 10, 30); // row 0 header
       item('rowInsertAbove')?.click();
       wb.recalc();
@@ -182,7 +184,7 @@ describe('attachContextMenu', () => {
         { row: 1, col: 0, value: 'b' },
       ]);
       setRange(store, 0, 0, 0, 0);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
       fireContextMenu(host, 10, 30);
       item('rowInsertBelow')?.click();
       wb.recalc();
@@ -197,7 +199,7 @@ describe('attachContextMenu', () => {
         { row: 1, col: 0, value: 'b' },
       ]);
       setRange(store, 0, 0, 0, 0);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
       fireContextMenu(host, 10, 30);
       item('rowDelete')?.click();
       wb.recalc();
@@ -206,7 +208,7 @@ describe('attachContextMenu', () => {
 
     it('Hide Row records the row as hidden, Unhide restores it', () => {
       setRange(store, 0, 0, 0, 0);
-      detach = attachContextMenu({ host, store, wb });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb });
       fireContextMenu(host, 10, 30);
       item('rowHide')?.click();
       expect(store.getState().layout.hiddenRows.has(0)).toBe(true);
@@ -221,7 +223,7 @@ describe('attachContextMenu', () => {
 
     it('Unhide is a no-op when no hidden rows are in the selection', () => {
       setRange(store, 0, 0, 0, 0);
-      detach = attachContextMenu({ host, store, wb });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb });
       fireContextMenu(host, 10, 30);
       item('rowUnhide')?.click();
       expect(store.getState().layout.hiddenRows.size).toBe(0);
@@ -229,6 +231,7 @@ describe('attachContextMenu', () => {
     it('built-in Group / Ungroup Row items set and clear the row outline', () => {
       setRange(store, 0, 0, 1, 16383);
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         host,
         store,
         wb,
@@ -264,6 +267,7 @@ describe('attachContextMenu', () => {
 
       mutators.selectCol(store, 3);
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         host,
         store,
         wb,
@@ -333,6 +337,7 @@ describe('attachContextMenu', () => {
       mutators.setCopyRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 });
       mutators.selectCol(store, 1);
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         host,
         store,
         wb,
@@ -373,7 +378,7 @@ describe('attachContextMenu', () => {
     it('Insert Left shifts subsequent cols right', () => {
       seed(store, wb, [{ row: 0, col: 0, value: 'a' }]);
       setRange(store, 0, 0, 0, 0);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
       fireContextMenu(host, 60, 10);
       item('colInsertLeft')?.click();
       wb.recalc();
@@ -387,7 +392,7 @@ describe('attachContextMenu', () => {
         { row: 0, col: 1, value: 'b' },
       ]);
       setRange(store, 0, 0, 0, 0);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
       fireContextMenu(host, 60, 10);
       item('colInsertRight')?.click();
       wb.recalc();
@@ -402,7 +407,7 @@ describe('attachContextMenu', () => {
         { row: 0, col: 1, value: 'b' },
       ]);
       setRange(store, 0, 0, 0, 0);
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, onAfterCommit });
       fireContextMenu(host, 60, 10);
       item('colDelete')?.click();
       wb.recalc();
@@ -411,7 +416,7 @@ describe('attachContextMenu', () => {
 
     it('Hide / Unhide Col toggles layout.hiddenCols', () => {
       setRange(store, 0, 0, 0, 0);
-      detach = attachContextMenu({ host, store, wb });
+      detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb });
       fireContextMenu(host, 60, 10);
       item('colHide')?.click();
       expect(store.getState().layout.hiddenCols.has(0)).toBe(true);
@@ -427,6 +432,7 @@ describe('attachContextMenu', () => {
     it('built-in Group / Ungroup Col items set and clear the column outline', () => {
       setRange(store, 0, 0, 1048575, 1);
       detach = attachContextMenu({
+        getLocale: () => 'en-US',
         host,
         store,
         wb,

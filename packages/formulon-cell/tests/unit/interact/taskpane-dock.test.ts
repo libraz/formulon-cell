@@ -110,6 +110,7 @@ describe('task-pane dock', () => {
       });
       expect(created.ok).toBe(true);
       const objects = attachWorkbookObjectsPanel({
+        getLocale: () => 'en-US',
         store: createSpreadsheetStore(),
         host: sheet.host,
         wb,

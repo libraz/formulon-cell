@@ -19,7 +19,7 @@ const mount = (platform: 'mac' | 'default') => {
   document.body.appendChild(fcHost);
   const store = createSpreadsheetStore();
   setActive(store, 0, 0);
-  return attachFormatDialog({ host, store, strings: ja });
+  return attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: ja });
 };
 
 const q = <T extends HTMLElement>(selector: string): T => {

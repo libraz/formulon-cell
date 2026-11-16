@@ -134,7 +134,7 @@ export interface ContextMenuDeps {
    *  hidden. */
   onDefineName?: () => void;
   /** Locale the Row Height / Column Width dialogs parse numbers with. */
-  getLocale?: () => string;
+  getLocale: () => string;
   /** Returns the structured clipboard snapshot used by the Paste Special
    *  submenu's quick-paste actions. When it returns null those entries are
    *  disabled and only the "Paste Special…" dialog entry stays usable. */
@@ -1231,7 +1231,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     store,
     getStrings: () => strings,
     getWb: () => wb,
-    ...(deps.getLocale ? { getLocale: deps.getLocale } : {}),
+    getLocale: deps.getLocale,
   });
   function run(id: string): void {
     if (!isBuiltinItemId(id)) return;

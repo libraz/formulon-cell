@@ -50,6 +50,7 @@ describe('PivotTable Field dialog', () => {
 
   const openPane = (wb: WorkbookHandle, strings = en, history: History | null = null) => {
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -238,6 +239,7 @@ describe('PivotTable Field dialog', () => {
     const wb = await setup();
     const { createSpreadsheetStore } = await import('../../../src/store/store.js');
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       host,
       wb,
       strings: ja,
@@ -426,6 +428,7 @@ describe('PivotTable Field dialog', () => {
     expect(spec.name).toBe('Summe von Amt');
     expect(wb.setPivotDataField(sheetIndex, 0, 0, { ...spec, numberFormat: '#,##0.0' })).toBe(true);
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,
@@ -473,6 +476,7 @@ describe('PivotTable Field dialog', () => {
     const wb = await loadFixture('ja_c0_rows.xlsx');
     const sheetIndex = wb.getPivotTables()[0]?.sheetIndex ?? 0;
     const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
       store: createSpreadsheetStore(),
       host,
       wb,

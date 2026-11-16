@@ -14,7 +14,6 @@ import {
   subscribeRecentFunctions,
 } from '../commands/function-history.js';
 import { FUNCTION_SIGNATURES } from '../commands/refs.js';
-import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
@@ -38,16 +37,6 @@ import {
 import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton } from './range-picker-control.js';
-
-/** Heuristic locale detector for hosts that supply no `getLocale`. Built-in
- * dictionaries use stable translated titles; custom overlays fall back to
- * English metadata rather than guessing from arbitrary copy. */
-const detectLocaleOrdinal = (s: Strings): 0 | 1 | 2 | 3 => {
-  const locale = bundledLocaleForStrings(s);
-  if (locale) return catalogLocaleOrdinal(locale);
-  // Custom overlays and unknown dictionaries use canonical English names.
-  return 0;
-};
 
 /** Keep the picker-facing type exported from its historic module for hosts
  * that import it from `interact/fx-dialog`. */
@@ -85,7 +74,7 @@ export interface FxDialogDeps {
   /** Read the live recognized function catalog at each open/refresh. */
   getWb?: () => FxWorkbookReader | null;
   /** Current host locale, used for function metadata and descriptions. */
-  getLocale?: () => string;
+  getLocale: () => string;
   /** Called with the assembled formula text (including leading '='). */
   onInsert: (formula: string) => void | boolean;
 }
@@ -113,14 +102,9 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   const { host, onInsert } = deps;
   let strings = deps.strings ?? defaultStrings;
   let t = strings.fxDialog;
-  // Engine metadata and built-in descriptions share one locale: the host's when
-  // supplied, else the one sniffed from the active dictionary.
-  const localeOrdinal = (): 0 | 1 | 2 | 3 => {
-    if (deps.getLocale) return catalogLocaleOrdinal(deps.getLocale());
-    return detectLocaleOrdinal(strings);
-  };
-  const localeTag = (): string =>
-    catalogLocaleTag(deps.getLocale?.() ?? bundledLocaleForStrings(strings) ?? 'en-US');
+  // Engine metadata and built-in descriptions share the host's locale.
+  const localeOrdinal = (): 0 | 1 | 2 | 3 => catalogLocaleOrdinal(deps.getLocale());
+  const localeTag = (): string => catalogLocaleTag(deps.getLocale());
 
   // ── Overlay + panel ─────────────────────────────────────────────────────
   const shell = createDialogShell({

@@ -46,7 +46,7 @@ describe('attachFormatDialog', () => {
         borders: { top: true, right: true, bottom: false, left: false },
       },
     );
-    const handle = attachFormatDialog({ strings: ja, host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'ja-JP', strings: ja, host, store });
     handle.open();
 
     const decimalsInput = document.querySelector<HTMLInputElement>(
@@ -85,7 +85,7 @@ describe('attachFormatDialog', () => {
       { sheet: 0, row: 0, col: 0 },
       { numFmt: { kind: 'currency', decimals: 3, symbol: '€' } },
     );
-    const handle = attachFormatDialog({ strings: ja, host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'ja-JP', strings: ja, host, store });
     handle.open();
 
     const decimalsInput = document.querySelector<HTMLInputElement>(
@@ -103,7 +103,7 @@ describe('attachFormatDialog', () => {
       { sheet: 0, row: 0, col: 0 },
       { numFmt: { kind: 'percent', decimals: 1 } },
     );
-    const handle = attachFormatDialog({ strings: ja, host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'ja-JP', strings: ja, host, store });
     handle.open();
     const decimalsInput = document.querySelector<HTMLInputElement>(
       'input[type="number"][min="0"][max="10"]',
@@ -113,7 +113,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('falls back to general/defaults when active cell has no format', () => {
-    const handle = attachFormatDialog({ strings: ja, host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'ja-JP', strings: ja, host, store });
     handle.open();
     const decimalsInput = document.querySelector<HTMLInputElement>(
       'input[type="number"][min="0"][max="10"]',
@@ -126,7 +126,7 @@ describe('attachFormatDialog', () => {
 
   it('previews the active numeric value instead of a synthetic sample', () => {
     mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value: -1234.5 });
-    const handle = attachFormatDialog({ strings: ja, host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'ja-JP', strings: ja, host, store });
     handle.open();
 
     expect(document.querySelector<HTMLElement>('.fc-fmtdlg__preview-cell')?.textContent).toBe(
@@ -144,7 +144,7 @@ describe('attachFormatDialog', () => {
     [0, '0'],
   ])('previews General value %s with the shared numeric notation', (value, expected) => {
     mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value });
-    const handle = attachFormatDialog({ host, store, strings: en });
+    const handle = attachFormatDialog({ getLocale: () => 'en-US', host, store, strings: en });
     try {
       handle.open();
       expect(document.querySelector('.fc-fmtdlg__preview-cell')?.textContent).toBe(expected);
@@ -163,7 +163,7 @@ describe('attachFormatDialog', () => {
 
     for (const [value, expected] of cases) {
       mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, value);
-      const handle = attachFormatDialog({ strings: ja, host, store });
+      const handle = attachFormatDialog({ getLocale: () => 'ja-JP', strings: ja, host, store });
       handle.open();
       expect(document.querySelector<HTMLElement>('.fc-fmtdlg__preview-cell')?.textContent).toBe(
         expected,
@@ -176,7 +176,13 @@ describe('attachFormatDialog', () => {
     mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value: 7.25 }, '=A1*2');
     const getValue = vi.fn(() => ({ kind: 'number' as const, value: 99 }));
     const wb = { getValue, getTheme: () => null } as unknown as WorkbookHandle;
-    const handle = attachFormatDialog({ strings: ja, host, store, getWb: () => wb });
+    const handle = attachFormatDialog({
+      getLocale: () => 'ja-JP',
+      strings: ja,
+      host,
+      store,
+      getWb: () => wb,
+    });
     handle.open();
 
     expect(document.querySelector<HTMLElement>('.fc-fmtdlg__preview-cell')?.textContent).toBe(
@@ -189,7 +195,13 @@ describe('attachFormatDialog', () => {
   it('falls back to the workbook value when the active cell is not cached', () => {
     const getValue = vi.fn(() => ({ kind: 'number' as const, value: 42.75 }));
     const wb = { getValue, getTheme: () => null } as unknown as WorkbookHandle;
-    const handle = attachFormatDialog({ strings: ja, host, store, getWb: () => wb });
+    const handle = attachFormatDialog({
+      getLocale: () => 'ja-JP',
+      strings: ja,
+      host,
+      store,
+      getWb: () => wb,
+    });
     handle.open();
 
     expect(document.querySelector<HTMLElement>('.fc-fmtdlg__preview-cell')?.textContent).toBe(
@@ -201,7 +213,7 @@ describe('attachFormatDialog', () => {
 
   it('formats the active numeric value as decimals and a selected currency symbol', () => {
     mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value: 1234.5 });
-    const handle = attachFormatDialog({ strings: ja, host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'ja-JP', strings: ja, host, store });
     handle.open();
 
     document.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]')?.click();
@@ -259,7 +271,7 @@ describe('attachFormatDialog', () => {
 
   it('resets preview red coloring when switching a negative style back to minus', () => {
     mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value: -1234.5 });
-    const handle = attachFormatDialog({ strings: ja, host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'ja-JP', strings: ja, host, store });
     handle.open();
     document.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]')?.click();
     const thousands = document.querySelector<HTMLInputElement>('input[data-fc-check="thousands"]');
@@ -287,7 +299,7 @@ describe('attachFormatDialog', () => {
 
   it('number sample shows only the formatted value', () => {
     mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value: 12345 });
-    const handle = attachFormatDialog({ strings: ja, host, store });
+    const handle = attachFormatDialog({ getLocale: () => 'ja-JP', strings: ja, host, store });
     handle.open();
 
     const preview = document.querySelector<HTMLElement>('.fc-fmtdlg__preview') as HTMLElement;

@@ -51,7 +51,7 @@ describe('right-click on the selection border', () => {
     mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
     const wb = await WorkbookHandle.createDefault({ preferStub: true });
     detachPointer = attachPointer(host, store, wb);
-    detachMenu = attachContextMenu({ host, store, wb });
+    detachMenu = attachContextMenu({ getLocale: () => 'en-US', host, store, wb });
   });
 
   afterEach(() => {

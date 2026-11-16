@@ -284,7 +284,7 @@ describe('Replace All', () => {
       return { ...s, data: { ...s.data, cells } };
     });
     const ui = guard(store, area(0, 0, 0, 0), [PASSWORD]);
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ getLocale: () => 'en-US', host, store, wb });
     handle.open('replace');
     const input = (sel: string): HTMLInputElement => host.querySelector(sel) as HTMLInputElement;
     for (const [sel, value] of [

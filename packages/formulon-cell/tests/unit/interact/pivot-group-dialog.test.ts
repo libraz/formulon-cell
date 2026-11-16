@@ -30,7 +30,7 @@ describe('the Grouping dialog of a PivotTable date field', () => {
     store = createSpreadsheetStore();
     store.setState((s) => ({ ...s, data: { ...s.data, sheetIndex: sheet } }));
     history = new History();
-    detach = attachContextMenu({ host, store, wb, strings: ja, history });
+    detach = attachContextMenu({ getLocale: () => 'en-US', host, store, wb, strings: ja, history });
   });
 
   afterEach(() => {

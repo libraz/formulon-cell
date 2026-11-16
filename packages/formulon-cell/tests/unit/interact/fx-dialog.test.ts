@@ -55,6 +55,7 @@ describe('attachFxDialog', () => {
 
   it('mounts a hidden overlay until open() is called', () => {
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: () => {},
@@ -68,6 +69,7 @@ describe('attachFxDialog', () => {
 
   it('renders the function picker step on open without a seed', () => {
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: () => {},
@@ -83,6 +85,7 @@ describe('attachFxDialog', () => {
 
   it('projects and clears the Insert disabled reason across picker and args steps', () => {
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       strings: en,
@@ -112,6 +115,7 @@ describe('attachFxDialog', () => {
 
   it('jumps straight to argument entry when open() is given a known function', () => {
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: () => {},
@@ -129,6 +133,7 @@ describe('attachFxDialog', () => {
   it('leaves Enter on a button or confirming IME text in an argument to its own meaning', () => {
     const inserted: string[] = [];
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: (formula) => {
@@ -153,7 +158,12 @@ describe('attachFxDialog', () => {
   });
 
   it('leaves the Enter that confirms IME text in the search box to the input method', () => {
-    const handle = attachFxDialog({ host, store: createSpreadsheetStore(), onInsert: () => {} });
+    const handle = attachFxDialog({
+      getLocale: () => 'en-US',
+      host,
+      store: createSpreadsheetStore(),
+      onInsert: () => {},
+    });
     handle.open();
     const search = document.querySelector<HTMLInputElement>('.fc-fxdialog__search');
     const args = document.querySelector<HTMLElement>('.fc-fxdialog__args');
@@ -172,6 +182,7 @@ describe('attachFxDialog', () => {
   it('prefills seeded function arguments from the spreadsheet context', () => {
     const inserted: string[] = [];
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       getInitialArguments: (name) => (name === 'SUM' ? ['A1:A5'] : null),
@@ -194,6 +205,7 @@ describe('attachFxDialog', () => {
 
   it('filters the picker list by case-insensitive prefix', () => {
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: () => {},
@@ -213,6 +225,7 @@ describe('attachFxDialog', () => {
 
   it('filters the function picker by category', () => {
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: () => {},
@@ -249,6 +262,7 @@ describe('attachFxDialog', () => {
 
   it('opens the statistical function family when requested', () => {
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: () => {},
@@ -265,11 +279,7 @@ describe('attachFxDialog', () => {
 
   it('records a function after insertion and lists shared recents in MRU order', () => {
     const store = createSpreadsheetStore();
-    const handle = attachFxDialog({
-      host,
-      store,
-      onInsert: () => {},
-    });
+    const handle = attachFxDialog({ getLocale: () => 'en-US', host, store, onInsert: () => {} });
 
     handle.open('VLOOKUP');
     document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
@@ -291,11 +301,7 @@ describe('attachFxDialog', () => {
 
   it('does not record a chosen function when the dialog is canceled before insertion', () => {
     const store = createSpreadsheetStore();
-    const handle = attachFxDialog({
-      host,
-      store,
-      onInsert: () => {},
-    });
+    const handle = attachFxDialog({ getLocale: () => 'en-US', host, store, onInsert: () => {} });
 
     handle.open();
     const lookup = Array.from(document.querySelectorAll<HTMLElement>('.fc-fxdialog__item')).find(
@@ -318,6 +324,7 @@ describe('attachFxDialog', () => {
     host.appendChild(opener);
     const inserted: string[] = [];
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: (formula) => {
@@ -364,6 +371,7 @@ describe('attachFxDialog', () => {
     outside.type = 'button';
     document.body.appendChild(outside);
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: () => {},
@@ -388,6 +396,7 @@ describe('attachFxDialog', () => {
 
   it('does not steal body focus when close is called before open or twice', () => {
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: () => {},
@@ -408,11 +417,7 @@ describe('attachFxDialog', () => {
 
   it('keeps the dialog open and does not record when insertion is rejected', () => {
     const store = createSpreadsheetStore();
-    const handle = attachFxDialog({
-      host,
-      store,
-      onInsert: () => false,
-    });
+    const handle = attachFxDialog({ getLocale: () => 'en-US', host, store, onInsert: () => false });
     handle.open('SUM');
     const argInput = document.querySelector<HTMLInputElement>('.fc-fxdialog__arg-input');
     if (!argInput) throw new Error('expected SUM argument input');
@@ -432,6 +437,7 @@ describe('attachFxDialog', () => {
 
   it('focuses seeded arguments immediately without stealing a later field focus', async () => {
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: () => {},
@@ -453,6 +459,7 @@ describe('attachFxDialog', () => {
   it('keeps the dialog open and does not record when insertion throws', () => {
     const store = createSpreadsheetStore();
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store,
       onInsert: () => {
@@ -471,6 +478,7 @@ describe('attachFxDialog', () => {
 
   it('wires the function search box to the active listbox option', () => {
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: () => {},
@@ -514,6 +522,7 @@ describe('attachFxDialog', () => {
   it('assembles the formula and fires onInsert on confirm', () => {
     const inserted: string[] = [];
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: (f) => {
@@ -539,6 +548,7 @@ describe('attachFxDialog', () => {
   it('assembles multi-argument and zero-argument formulas', () => {
     const inserted: string[] = [];
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: (f) => {
@@ -672,6 +682,7 @@ describe('attachFxDialog', () => {
       IF: undefined,
     };
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store,
       getWb: () => availabilityReader(availability),
@@ -731,6 +742,7 @@ describe('attachFxDialog', () => {
   it('returns an already selected function to the guarded picker after refresh', () => {
     const availability: Record<string, number | undefined> = { SUM: 0 };
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       getWb: () => availabilityReader(availability),
@@ -759,6 +771,7 @@ describe('attachFxDialog', () => {
     let reader = availableReader;
     const store = createSpreadsheetStore();
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store,
       getWb: () => reader,
@@ -784,6 +797,7 @@ describe('attachFxDialog', () => {
     let reader = availabilityReader({ SUM: 0 });
     const store = createSpreadsheetStore();
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store,
       getWb: () => reader,
@@ -808,6 +822,7 @@ describe('attachFxDialog', () => {
 
   it('uses structural arity for exact zero and unbounded progressive arguments', () => {
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       getWb: () => liveFunctionReader(['ACCRINT', 'ZERO']),
@@ -838,6 +853,7 @@ describe('attachFxDialog', () => {
 
   it('adds and removes finite optional arguments within the live arity bounds', () => {
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       getWb: () => ({
@@ -878,6 +894,7 @@ describe('attachFxDialog', () => {
     { name: 'VARFN', minArity: 0, maxArity: null, syntax: 'VARFN(...)' },
   ])('renders $syntax in the function summary', (fn) => {
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       getWb: () => ({
@@ -894,6 +911,7 @@ describe('attachFxDialog', () => {
   it('preserves interior argument blanks while omitting trailing blanks', () => {
     const inserted: string[] = [];
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       getWb: () => liveFunctionReader(['ACCRINT']),
@@ -923,6 +941,7 @@ describe('attachFxDialog', () => {
     const store = createSpreadsheetStore();
     let reader = liveFunctionReader(['ACOS', 'SUM']);
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store,
       getWb: () => reader,
@@ -952,6 +971,7 @@ describe('attachFxDialog', () => {
 
   it('renders Japanese picker and argument labels from the i18n dictionary', () => {
     const handle = attachFxDialog({
+      getLocale: () => 'ja-JP',
       host,
       store: createSpreadsheetStore(),
       strings: ja,
@@ -1014,6 +1034,7 @@ describe('attachFxDialog', () => {
     // in detach(). The delegated handler should fire whether the click hits
     // the item element directly or any of its children (name span / desc span).
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: () => {},
@@ -1045,6 +1066,7 @@ describe('attachFxDialog', () => {
     // after lots of rerenders the click still works exactly once.
     let inserted = 0;
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: () => {
@@ -1073,6 +1095,7 @@ describe('attachFxDialog', () => {
   it('detach removes the overlay and disables further listener firing', () => {
     let inserted = 0;
     const handle = attachFxDialog({
+      getLocale: () => 'en-US',
       host,
       store: createSpreadsheetStore(),
       onInsert: () => {
@@ -1117,7 +1140,7 @@ describe('attachFxDialog grid picking', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const store = createSpreadsheetStore();
-    const handle = attachFxDialog({ host, store, onInsert: () => {} });
+    const handle = attachFxDialog({ getLocale: () => 'en-US', host, store, onInsert: () => {} });
     handle.open('SUM');
     const overlay = document.querySelector<HTMLElement>('.fc-fxdialog');
     const input = document.querySelector<HTMLInputElement>('.fc-fxdialog__arg-input');
