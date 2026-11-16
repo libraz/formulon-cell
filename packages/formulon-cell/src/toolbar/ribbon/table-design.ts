@@ -7,6 +7,7 @@ import {
 } from '../../commands/table-design.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import { focusSheet } from '../../interact/dialog-focus.js';
+import { isInnermostRowItem, pivotRowItemAt } from '../../interact/pivot-detail.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { showMessage } from '../dialogs/prompt.js';
 import { projectDisabledState } from '../menu-a11y.js';
@@ -135,6 +136,32 @@ export const projectTableDesign = (host: HTMLElement, instance: SpreadsheetInsta
     ?.dispatchEvent(new Event('fc-ribbon-control-refresh'));
 };
 
+/** Expand Field and Collapse Field run on a row label. Expand Field on the innermost field and
+ *  Collapse Field on a report's only row field stay greyed, as does every other cell. */
+const projectPivotDetailCommands = (
+  host: HTMLElement,
+  instance: SpreadsheetInstance,
+  inReport: boolean,
+): void => {
+  const active = instance.store.getState().selection.active;
+  const ref = inReport ? pivotRowItemAt(instance.workbook, active) : null;
+  const runs: Record<string, boolean> = {
+    pivotExpandField: !!ref && !isInnermostRowItem(ref),
+    pivotCollapseField: !!ref && !(isInnermostRowItem(ref) && ref.level === 0),
+  };
+  for (const [command, enabled] of Object.entries(runs)) {
+    for (const button of host.querySelectorAll<HTMLButtonElement>(
+      `[data-ribbon-command="${command}"]`,
+    )) {
+      // Re-enable only what this projection greyed; policy and protection own the rest.
+      if (enabled && button.dataset.pivotDetailOff !== 'true') continue;
+      projectDisabledState(button, !enabled, null);
+      if (enabled) delete button.dataset.pivotDetailOff;
+      else button.dataset.pivotDetailOff = 'true';
+    }
+  }
+};
+
 /** Sync the PivotTable toggles under `host` (the Design options and the Analyze Show group) with
  *  the report under the active cell. */
 export const projectPivotDesign = (host: HTMLElement, instance: SpreadsheetInstance): void => {
@@ -156,6 +183,7 @@ export const projectPivotDesign = (host: HTMLElement, instance: SpreadsheetInsta
     const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
     if (button) projectPressedState(button, options?.[key] ?? true);
   }
+  projectPivotDetailCommands(host, instance, pivot !== null);
   host
     .querySelector('[data-ribbon-gallery="pivotQuickStyles"]')
     ?.dispatchEvent(new Event('fc-ribbon-control-refresh'));

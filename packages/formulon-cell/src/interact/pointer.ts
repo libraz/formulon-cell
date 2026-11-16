@@ -32,7 +32,7 @@ import {
 import { movePageBreak, resizePrintArea, setPageSetup } from '../commands/page-setup.js';
 import { pageSetupWrite } from '../commands/page-setup-actions.js';
 import { paginationFor } from '../commands/pagination.js';
-import { pivotTableAtRange } from '../commands/pivot-table.js';
+import { pivotTableAtRange, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
 import { blockedByProtection, deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { layoutAllowed, layoutWrite } from '../commands/row-col-actions.js';
 import {
@@ -63,17 +63,13 @@ import {
   hitTest,
   hitZone,
   layoutForView,
-  type Rect,
+  pointPx,
   rowHeight,
 } from '../render/geometry.js';
-import { ruleWidth } from '../render/grid/chrome-context.js';
 import type { PageBreakHandle, RulerHandle } from '../render/grid/page-view.js';
 import { gridHitState } from '../render/grid.js';
-import {
-  filterButtonRect,
-  pivotFieldButtonRect,
-  pivotFieldButtonSize,
-} from '../render/painters/filter-button.js';
+import { filterButtonRect } from '../render/painters/filter-button.js';
+import { type PivotCellButton, pivotCellButtonAt } from '../render/painters/pivot-cell-buttons.js';
 import { visualZoom } from '../render/painters/text.js';
 import { renderScale } from '../store/render-scale.js';
 import { isRowHidden } from '../store/row-visibility.js';
@@ -103,6 +99,7 @@ import {
   navigationSelectionBoundsFor,
   scrollActiveIntoView,
 } from './navigation-policy.js';
+import { pivotRowItemAt, togglePivotItemDetail } from './pivot-detail.js';
 import { movePivotItem, type PivotItemSlots, pivotItemSlotsAt } from './pivot-item-order.js';
 import { movePivotTable } from './pivot-move.js';
 import {
@@ -279,8 +276,9 @@ export interface PointerDeps {
   history?: History | null;
 }
 
-/** The drop-down button rect of a report caption cell when (x, y) falls on it. */
-function pivotButtonRectAt(
+/** The report button under (x, y) in the cell at (row, col): a caption's drop-down or a row
+ *  label's expand/collapse button, placed as the grid draws it. */
+function pivotButtonAt(
   s: State,
   wb: WorkbookHandle,
   host: HTMLElement,
@@ -288,19 +286,24 @@ function pivotButtonRectAt(
   col: number,
   x: number,
   y: number,
-): Rect | null {
-  if (!pivotStyleLayer(wb, s).buttons.has(`${s.data.sheetIndex}:${row}:${col}`)) return null;
-  const mac = (host.closest?.<HTMLElement>('.fc-host') ?? host).dataset?.fcPlatform === 'mac';
-  const dpr = host.ownerDocument.defaultView?.devicePixelRatio ?? 1;
-  const button = pivotFieldButtonRect(
-    cellRect(layoutForView(s), s.viewport, row, col),
-    pivotFieldButtonSize(mac, visualZoom(s.viewport.zoom)),
-    ruleWidth(dpr),
-    s.ui.rightToLeft === true,
+): PivotCellButton | null {
+  const view = layoutForView(s);
+  return pivotCellButtonAt(
+    pivotStyleLayer(wb, s),
+    s.data.sheetIndex,
+    row,
+    col,
+    cellRect(view, s.viewport, row, col),
+    {
+      mac: (host.closest?.<HTMLElement>('.fc-host') ?? host).dataset?.fcPlatform === 'mac',
+      zoom: visualZoom(s.viewport.zoom),
+      ptPx: pointPx(view, s.viewport),
+      dpr: host.ownerDocument.defaultView?.devicePixelRatio ?? 1,
+      rtl: s.ui.rightToLeft === true,
+    },
+    x,
+    y,
   );
-  return x >= button.x && x < button.x + button.w && y >= button.y && y < button.y + button.h
-    ? button
-    : null;
 }
 
 /** Half-width of the band along the selection border that the Mac desktop
@@ -1084,23 +1087,42 @@ export function attachPointer(
           return;
         }
         const rawAddr = { sheet: s.data.sheetIndex, row: zone.row, col: zone.col };
+        const pivotButton = pivotButtonAt(s, wb, host, zone.row, zone.col, x, y);
         // A report's drop-down button opens its filter panel; the active cell stays.
-        const pivotButton = pivotButtonRectAt(s, wb, host, zone.row, zone.col, x, y);
-        if (pivotButton) {
+        if (pivotButton?.kind === 'field') {
           e.preventDefault();
           const rect = host.getBoundingClientRect();
+          const { rect: button } = pivotButton;
           host.dispatchEvent(
             new CustomEvent('fc:openpivotfilter', {
               bubbles: true,
               detail: {
                 addr: rawAddr,
-                anchor: {
-                  x: rect.left + pivotButton.x,
-                  y: rect.top + pivotButton.y + pivotButton.h,
-                },
+                anchor: { x: rect.left + button.x, y: rect.top + button.y + button.h },
               },
             }),
           );
+          drag = { kind: 'none' };
+          return;
+        }
+        // A row label's expand/collapse button turns its item over; the active cell stays.
+        if (pivotButton?.kind === 'outline') {
+          e.preventDefault();
+          const ref = pivotRowItemAt(wb, rawAddr);
+          if (ref) {
+            togglePivotItemDetail(
+              {
+                wb,
+                history,
+                store,
+                origin: 'editor',
+                commandId: ref.showDetail ? 'pivotCollapse' : 'pivotExpand',
+                onChanged: () => refreshPivotReportsAfterEdit(store, wb),
+              },
+              ref,
+            );
+            onAfterCommit?.();
+          }
           drag = { kind: 'none' };
           return;
         }

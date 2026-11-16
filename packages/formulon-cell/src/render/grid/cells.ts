@@ -41,14 +41,10 @@ import {
   filterButtonRect,
   MAC_PIVOT_BUTTON_LOOK,
   paintFilterButton,
-  pivotFieldButtonRect,
   pivotFieldButtonSize,
 } from '../painters/filter-button.js';
-import {
-  paintPivotCollapseButton,
-  pivotCollapseButtonRect,
-  pivotOutlineIndent,
-} from '../painters/pivot-outline-button.js';
+import { pivotCellButtons } from '../painters/pivot-cell-buttons.js';
+import { paintPivotCollapseButton, pivotOutlineIndent } from '../painters/pivot-outline-button.js';
 import { paintPivotPlaceholder } from '../painters/pivot-placeholder.js';
 import {
   alignedTextAnchor,
@@ -192,6 +188,13 @@ export function paintCells(
   );
   const pivotButtonLook = cellCtx.fontEffects ? MAC_PIVOT_BUTTON_LOOK : FILTER_BUTTON_LOOK;
   const ptPx = pointPx(state.layout, state.viewport);
+  const pivotButtonMetrics = {
+    mac: cellCtx.fontEffects,
+    zoom: visualZoom(state.viewport.zoom),
+    ptPx,
+    dpr: cellCtx.dpr ?? 1,
+    rtl,
+  };
   const visibleBounds = {
     r0: state.viewport.rowStart,
     c0: state.viewport.colStart,
@@ -785,24 +788,26 @@ export function paintCells(
             ?.direction,
         });
       }
-      if (outline?.collapse) {
-        paintPivotCollapseButton(
-          ctx,
-          pivotCollapseButtonRect(bounds, outline.steps, ptPx, rtl),
-          ptPx,
-          cellCtx.dpr ?? 1,
-        );
-      }
-      if (pivotButton && !filterHeader) {
-        const rule = ruleWidth(cellCtx.dpr ?? 1);
-        paintFilterButton(
-          ctx,
-          pivotFieldButtonRect(bounds, pivotButtonSize, rule, rtl),
-          theme,
-          { filtered: pivots.buttonAt(r, c)?.filtered === true },
-          pivotButtonLook,
-          cellCtx.dpr ?? 1,
-        );
+      for (const button of pivotCellButtons(
+        pivots,
+        data.sheetIndex,
+        r,
+        c,
+        bounds,
+        pivotButtonMetrics,
+      )) {
+        if (button.kind === 'outline') {
+          paintPivotCollapseButton(ctx, button.rect, ptPx, cellCtx.dpr ?? 1, button.collapsed);
+        } else if (!filterHeader) {
+          paintFilterButton(
+            ctx,
+            button.rect,
+            theme,
+            { filtered: button.filtered },
+            pivotButtonLook,
+            cellCtx.dpr ?? 1,
+          );
+        }
       }
       if (spark) paintCellSparkline(ctx, bounds, spark, state, cellCtx.wb, sparklineExtents, ptPx);
       if (fmt?.comment || hasThreadedComment) paintCommentMarker(ctx, bounds, rtl);

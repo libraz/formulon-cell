@@ -26,7 +26,7 @@ describe('PivotTable outline geometry (1 pt = 1 px, as at 100% on the Mac)', () 
     expect(2.5 + pivotOutlineIndent(0, 1)).toBe(2.5);
   });
 
-  it('paints a two-tone frame with open corners and a 3 x 1 pt minus bar', () => {
+  const recorder = () => {
     const fills: { color: string; rect: number[] }[] = [];
     let fillStyle: unknown = '';
     const ctx = new Proxy(
@@ -44,6 +44,11 @@ describe('PivotTable outline geometry (1 pt = 1 px, as at 100% on the Mac)', () 
         },
       },
     ) as unknown as CanvasRenderingContext2D;
+    return { ctx, fills };
+  };
+
+  it('paints a two-tone frame with open corners and a 3 x 1 pt minus bar', () => {
+    const { ctx, fills } = recorder();
     paintPivotCollapseButton(ctx, { x: 27, y: 273, w: 7, h: 7 }, 1, 2);
     expect(fills).toEqual([
       { color: 'gradient', rect: [27.5, 273.5, 6, 6] },
@@ -52,6 +57,15 @@ describe('PivotTable outline geometry (1 pt = 1 px, as at 100% on the Mac)', () 
       { color: '#8b9ebf', rect: [27.5, 279.5, 6, 0.5] },
       { color: '#8b9ebf', rect: [33.5, 273.5, 0.5, 6] },
       { color: '#3d4e7c', rect: [29, 276, 3, 1] },
+    ]);
+  });
+
+  it('adds the 1 x 3 pt vertical bar of a plus for a collapsed item', () => {
+    const { ctx, fills } = recorder();
+    paintPivotCollapseButton(ctx, { x: 27, y: 273, w: 7, h: 7 }, 1, 2, true);
+    expect(fills.slice(-2)).toEqual([
+      { color: '#3d4e7c', rect: [29, 276, 3, 1] },
+      { color: '#3d4e7c', rect: [30, 275, 1, 3] },
     ]);
   });
 });

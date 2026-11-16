@@ -21,6 +21,7 @@ import {
   PIVOT_CELL_KIND,
   PIVOT_PLACEHOLDER_COLS,
   PIVOT_PLACEHOLDER_ROWS,
+  type PivotCellExpansion,
 } from './pivot-cell-kind.js';
 import { isFormulonError } from './result.js';
 import { type SpillOccupantSource, spillBlockers, spillOccupancy } from './spill-blockers.js';
@@ -71,6 +72,8 @@ export interface PivotItemDefinition {
   /** Index into the bound cache field's shared items, -1 for a label-only item. */
   readonly cacheIndex: number;
   readonly visible: boolean;
+  /** Whether the item's detail (the items under it) shows; false for a collapsed item. */
+  readonly showDetail: boolean;
 }
 
 /** A pivot field as stored on the report, whichever axis (if any) it sits on. */
@@ -105,6 +108,8 @@ export interface PivotFieldDefinition {
   /** Numeric grouping; a `null` bound follows the field's data. */
   readonly numericGroup: PivotNumericGroupSpec | null;
   readonly items: readonly PivotItemDefinition[];
+  /** Whether every item of the field is expanded. */
+  readonly showDetail: boolean;
 }
 
 /** Numeric grouping of a pivot field into ranges of `interval`; a `null` bound is automatic. */
@@ -211,6 +216,8 @@ interface LayoutCell {
   depth: number;
   fieldName: string;
   numberFormat: string;
+  /** The label's expand/collapse button; `null` for a cell without one. */
+  expansion: PivotCellExpansion | null;
 }
 
 /** A report's layout as an anchor and extent; an extent of 0 spans no cell. */
@@ -243,6 +250,7 @@ function readLayout(handle: unknown, sheet: number, pivotIndex: number): RawPivo
     depth: c.depth,
     fieldName: c.fieldName ?? '',
     numberFormat: c.numberFormat ?? '',
+    expansion: c.expansion,
   }));
   const r = layout.range;
   if (!r) return { top: 0, left: 0, rows: 0, cols: 0, cells };
@@ -275,6 +283,7 @@ function effectiveLayout(
       depth: 0,
       fieldName: '',
       numberFormat: '',
+      expansion: null,
     };
     return { ...layout, rows: 1, cols: 1, cells: [cell] };
   }
@@ -445,6 +454,8 @@ export abstract class WorkbookHandlePivotMethods {
     fieldName: string;
     numberFormat: string;
     pivotIndex: number;
+    /** A label's expand/collapse button; `null` for a cell without one. */
+    expansion: PivotCellExpansion | null;
   }> {
     assertAlive(this);
     if (!this.capabilities.pivotTables) return;
@@ -780,6 +791,7 @@ export abstract class WorkbookHandlePivotMethods {
         label: item.name ?? '',
         cacheIndex: item.cacheIndex ?? -1,
         visible: item.visible,
+        showDetail: item.showDetail,
       }));
       const dateGroup = pivot.getFieldDateGroup(fieldIdx);
       const granularity = dateGroup === null ? null : dateGroupingOf(dateGroup.periods);
@@ -822,6 +834,7 @@ export abstract class WorkbookHandlePivotMethods {
                 end: numericGroup.autoEnd ? null : numericGroup.end,
               },
         items,
+        showDetail: r.showDetail,
       };
     });
   }
@@ -1114,6 +1127,37 @@ export abstract class WorkbookHandlePivotMethods {
     if (!this.capabilities.pivotTableMutate) return false;
     return attempt(false, () => {
       pivotOf(this, sheet, pivotIdx).clearFieldItems(fieldIdx);
+      return true;
+    });
+  }
+
+  /** Expands (`show`) or collapses one item of a row or column field. */
+  setPivotFieldItemShowDetail(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    itemIdx: number,
+    show: boolean,
+  ): boolean {
+    assertAlive(this);
+    if (!this.capabilities.pivotTableMutate) return false;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).updateFieldItem(fieldIdx, itemIdx, { showDetail: show });
+      return true;
+    });
+  }
+
+  /** Expands (`show`) or collapses every item of a row or column field. */
+  setPivotFieldShowDetail(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    show: boolean,
+  ): boolean {
+    assertAlive(this);
+    if (!this.capabilities.pivotTableMutate) return false;
+    return attempt(false, () => {
+      pivotOf(this, sheet, pivotIdx).updateField(fieldIdx, { showDetail: show });
       return true;
     });
   }
@@ -1502,6 +1546,7 @@ function pivotCellEntry(
   fieldName: string;
   numberFormat: string;
   pivotIndex: number;
+  expansion: PivotCellExpansion | null;
 } {
   return {
     addr: { sheet, row: cell.row, col: cell.col },
@@ -1512,6 +1557,7 @@ function pivotCellEntry(
     fieldName: cell.fieldName,
     numberFormat: cell.numberFormat,
     pivotIndex,
+    expansion: cell.expansion,
   };
 }
 

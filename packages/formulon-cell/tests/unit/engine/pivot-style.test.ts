@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
 import { findPivotTableAtCell } from '../../../src/engine/passthrough-sync.js';
-import { PIVOT_CELL_KIND as K } from '../../../src/engine/pivot-cell-kind.js';
+import { PIVOT_CELL_KIND as K, PIVOT_CELL_EXPANSION } from '../../../src/engine/pivot-cell-kind.js';
 import {
   buildPivotStyleLayer,
   builtinPivotStyleElements,
@@ -29,11 +29,18 @@ const RULE = { style: 'thin', color: '#95b3d7' };
 
 const INFO = { showRowHeaders: true, showColHeaders: true, showRowStripes: false };
 
-const cell = (row: number, col: number, kind: number, depth = 0): PivotLayoutCell => ({
+const cell = (
+  row: number,
+  col: number,
+  kind: number,
+  depth = 0,
+  expansion: PivotLayoutCell['expansion'] = null,
+): PivotLayoutCell => ({
   row,
   col,
   kind,
   depth,
+  expansion,
 });
 
 /** s1: rows Region, values Sum of Amt, at A3:B7. */
@@ -51,10 +58,10 @@ const S2_RANGE = { sheet: 0, r0: 2, c0: 0, r1: 10, c1: 1 };
 const S2 = [
   cell(2, 0, K.Header),
   cell(2, 1, K.Header),
-  cell(3, 0, K.RowSubtotal),
+  cell(3, 0, K.RowSubtotal, 0, PIVOT_CELL_EXPANSION.Expanded),
   cell(3, 1, K.RowSubtotal),
   ...[4, 5, 6].flatMap((r) => [cell(r, 0, K.RowLabel, 1), cell(r, 1, K.Data)]),
-  cell(7, 0, K.RowSubtotal),
+  cell(7, 0, K.RowSubtotal, 0, PIVOT_CELL_EXPANSION.Expanded),
   cell(7, 1, K.RowSubtotal),
   ...[8, 9].flatMap((r) => [cell(r, 0, K.RowLabel, 1), cell(r, 1, K.Data)]),
   cell(10, 0, K.GrandTotal),
@@ -115,16 +122,39 @@ describe('PivotStyleLight16', () => {
 describe('pivotRowOutline', () => {
   it('pushes outer items one step in with a collapse button, inner items two', () => {
     const outline = new Map(pivotRowOutline(S2_RANGE, S2).map((l) => [l.row, l.outline] as const));
-    expect(outline.get(3)).toEqual({ steps: 1, collapse: true });
-    expect(outline.get(4)).toEqual({ steps: 2, collapse: false });
-    expect(outline.get(7)).toEqual({ steps: 1, collapse: true });
+    expect(outline.get(3)).toEqual({ steps: 1, collapse: true, collapsed: false });
+    expect(outline.get(4)).toEqual({ steps: 2, collapse: false, collapsed: false });
+    expect(outline.get(7)).toEqual({ steps: 1, collapse: true, collapsed: false });
     expect(outline.has(2)).toBe(false);
     expect(outline.has(10)).toBe(false);
   });
 
+  it('draws the buttons the engine reports, a collapsed item with no rows under it', () => {
+    const at = (c: PivotLayoutCell, expansion: PivotLayoutCell['expansion']) => ({
+      ...c,
+      expansion,
+    });
+    // East collapsed, North expanded over its one product.
+    const cells = [
+      cell(2, 0, K.Header),
+      at(cell(3, 0, K.RowSubtotal), PIVOT_CELL_EXPANSION.Collapsed),
+      at(cell(4, 0, K.RowSubtotal), PIVOT_CELL_EXPANSION.Expanded),
+      at(cell(5, 0, K.RowLabel, 1), null),
+      cell(6, 0, K.GrandTotal),
+    ];
+    const range = { sheet: 0, r0: 2, c0: 0, r1: 6, c1: 1 };
+    const outline = new Map(pivotRowOutline(range, cells).map((l) => [l.row, l.outline] as const));
+    expect(outline.get(3)).toEqual({ steps: 1, collapse: true, collapsed: true });
+    expect(outline.get(4)).toEqual({ steps: 1, collapse: true, collapsed: false });
+    expect(outline.get(5)).toEqual({ steps: 2, collapse: false, collapsed: false });
+    for (const l of pivotRowOutline(range, cells, false)) {
+      expect(l.outline.collapse).toBe(false);
+    }
+  });
+
   it('leaves single-field items at the cell padding', () => {
     for (const l of pivotRowOutline(S1_RANGE, S1)) {
-      expect(l.outline).toEqual({ steps: 0, collapse: false });
+      expect(l.outline).toEqual({ steps: 0, collapse: false, collapsed: false });
     }
   });
 });
@@ -197,11 +227,15 @@ describe('report options in the style layer', () => {
 
   it('draws no collapse buttons with +/- Buttons off, moving the labels left by the button', async () => {
     const wb = await twoRowFieldReport();
-    expect(buildPivotStyleLayer(wb, 0, {}).outlineAt(7, 0)).toEqual({ steps: 1, collapse: true });
+    expect(buildPivotStyleLayer(wb, 0, {}).outlineAt(7, 0)).toEqual({
+      steps: 1,
+      collapse: true,
+      collapsed: false,
+    });
     expect(wb.updatePivotOptions(0, 0, { showDrill: false })).toBe(true);
     const layer = buildPivotStyleLayer(wb, 0, {});
-    expect(layer.outlineAt(7, 0)).toEqual({ steps: 0, collapse: false });
-    expect(layer.outlineAt(8, 0)).toEqual({ steps: 1, collapse: false });
+    expect(layer.outlineAt(7, 0)).toEqual({ steps: 0, collapse: false, collapsed: false });
+    expect(layer.outlineAt(8, 0)).toEqual({ steps: 1, collapse: false, collapsed: false });
     expect([...layer.buttons]).toEqual(['0:6:0']);
     wb.dispose();
   });

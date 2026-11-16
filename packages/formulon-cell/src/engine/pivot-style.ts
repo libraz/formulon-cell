@@ -8,9 +8,11 @@ import type { CellFormat, TablesSlice } from '../store/types.js';
 import { addrKey } from './address.js';
 import {
   isEmptyPivotLayout,
+  PIVOT_CELL_EXPANSION,
   PIVOT_CELL_KIND,
   PIVOT_PLACEHOLDER_COLS,
   PIVOT_PLACEHOLDER_ROWS,
+  type PivotCellExpansion,
 } from './pivot-cell-kind.js';
 import {
   composeStyleElements,
@@ -88,8 +90,10 @@ export interface PivotRowOutline {
   /** Outline steps the label text is pushed in by: its depth, plus one when
    *  the report shows collapse buttons. */
   steps: number;
-  /** The item heads a group of deeper items and carries a collapse button. */
+  /** The item carries an expand/collapse button. */
   collapse: boolean;
+  /** The button shows the item collapsed (+) rather than expanded (-). */
+  collapsed: boolean;
 }
 
 const EMPTY_LAYER: PivotStyleLayer = {
@@ -188,6 +192,8 @@ export interface PivotLayoutCell {
   fieldName?: string;
   /** The cell's text as shown. */
   text?: string;
+  /** The label's expand/collapse button as the engine reports it; `null` for none. */
+  expansion: PivotCellExpansion | null;
 }
 
 /** Report filter rows above a report: each holds a field name and its
@@ -246,20 +252,21 @@ export function pivotRowOutline(
   cells: readonly PivotLayoutCell[],
   drill = true,
 ): { row: number; col: number; outline: PivotRowOutline }[] {
-  const lead = leadCells(cells);
-  const leafDepth = leafDepthOf(cells);
   const labels = cells.filter(
     (c) =>
       c.col === range.c0 &&
       (c.kind === PIVOT_CELL_KIND.RowLabel || c.kind === PIVOT_CELL_KIND.RowSubtotal),
   );
-  const heads = (c: PivotLayoutCell): boolean =>
-    drill && c.depth < leafDepth && !closesGroup(c, lead.get(c.row + 1));
+  const heads = (c: PivotLayoutCell): boolean => drill && c.expansion !== null;
   const gutter = labels.some(heads) ? 1 : 0;
   return labels.map((c) => ({
     row: c.row,
     col: c.col,
-    outline: { steps: c.depth + gutter, collapse: heads(c) },
+    outline: {
+      steps: c.depth + gutter,
+      collapse: heads(c),
+      collapsed: heads(c) && c.expansion === PIVOT_CELL_EXPANSION.Collapsed,
+    },
   }));
 }
 
@@ -390,6 +397,7 @@ export function buildPivotStyleLayer(
       kind: c.kind,
       depth: c.depth,
       fieldName: c.fieldName,
+      expansion: c.expansion,
       text:
         c.value.kind === 'text'
           ? c.value.value

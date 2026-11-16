@@ -1,4 +1,5 @@
 import type { History } from '../commands/history.js';
+import { keepingCollapsedItems } from '../commands/pivot-edit.js';
 import { refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
 import { addrKey } from '../engine/address.js';
 import { PivotAxis, PivotSortOrder } from '../engine/types.js';
@@ -99,9 +100,16 @@ export function movePivotItem(
     slots.pivotIndex,
     () =>
       wb.setPivotFieldSort(slots.sheet, slots.pivotIndex, slots.fieldIdx, PivotSortOrder.Manual) &&
-      wb.clearPivotFieldItems(slots.sheet, slots.pivotIndex, slots.fieldIdx) &&
-      labels.every((label) =>
-        wb.addPivotFieldItem(slots.sheet, slots.pivotIndex, slots.fieldIdx, label, true),
+      keepingCollapsedItems(
+        wb,
+        slots.sheet,
+        slots.pivotIndex,
+        slots.fieldIdx,
+        () =>
+          wb.clearPivotFieldItems(slots.sheet, slots.pivotIndex, slots.fieldIdx) &&
+          labels.every((label) =>
+            wb.addPivotFieldItem(slots.sheet, slots.pivotIndex, slots.fieldIdx, label, true),
+          ),
       ),
   );
   if (!ok) return false;

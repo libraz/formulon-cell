@@ -44,12 +44,14 @@ export const PIVOT_COLLAPSE_LOOK = {
 } as const;
 
 /** Paint the collapse (-) button into `rect`: a gradient face with a two-tone
- *  frame whose corner pixels stay open, and a horizontal minus bar. */
+ *  frame whose corner pixels stay open, and a horizontal minus bar; a collapsed
+ *  item's button adds the vertical bar of a plus. */
 export function paintPivotCollapseButton(
   ctx: CanvasRenderingContext2D,
   rect: Rect,
   ptPx: number,
   dpr = 1,
+  collapsed = false,
 ): void {
   const { x, y, w, h } = rect;
   const px = 1 / rulePx(dpr);
@@ -70,5 +72,6 @@ export function paintPivotCollapseButton(
   const barH = ptPx;
   ctx.fillStyle = look.bar;
   ctx.fillRect(x + (w - barW) / 2, y + (h - barH) / 2, barW, barH);
+  if (collapsed) ctx.fillRect(x + (w - barH) / 2, y + (h - barW) / 2, barH, barW);
   ctx.restore();
 }

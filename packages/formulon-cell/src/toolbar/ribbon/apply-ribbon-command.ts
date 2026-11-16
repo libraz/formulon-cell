@@ -69,6 +69,11 @@ import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import type { FeatureFlags } from '../../extensions/index.js';
 import { openPivotTableDialogFrom } from '../../interact/dialog-entry.js';
 import { openMacPivotMoveDialog } from '../../interact/mac-pivot-move-dialog.js';
+import {
+  collapsePivotField,
+  expandPivotField,
+  pivotRowItemAt,
+} from '../../interact/pivot-detail.js';
 import { togglePivotShowOption } from '../../interact/pivot-options-dialog.js';
 import { refreshAfterPivotEdit } from '../../mount/dynamic-dropdown-defaults/pivot.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
@@ -473,6 +478,24 @@ const applyGenericRibbonCommand = (
         );
       }
       runtime.projectFormatToolbar();
+      runtime.focusSheet();
+      return true;
+    }
+    case 'pivotExpandField':
+    case 'pivotCollapseField': {
+      const ref = pivotRowItemAt(i.workbook, i.store.getState().selection.active);
+      if (ref) {
+        const ctx = {
+          wb: i.workbook,
+          history: i.history,
+          store: i.store,
+          origin: 'ribbon' as const,
+          commandId: id,
+          onChanged: () => refreshAfterPivotEdit(i),
+        };
+        if (id === 'pivotCollapseField') collapsePivotField(ctx, ref);
+        else expandPivotField(ctx, ref);
+      }
       runtime.focusSheet();
       return true;
     }

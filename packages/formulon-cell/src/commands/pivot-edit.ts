@@ -97,6 +97,43 @@ export function writePivotFieldItems(
   fieldIndex: number,
   checklist: readonly { value: string; checked: boolean; cacheIndex?: number }[],
 ): boolean {
+  return keepingCollapsedItems(wb, sheetIndex, pivotIndex, fieldIndex, () =>
+    addPivotFieldItems(wb, sheetIndex, pivotIndex, fieldIndex, checklist),
+  );
+}
+
+/** An item's identity across a rewrite of its field: its cache index, else its label. */
+const itemKey = (item: { label: string; cacheIndex: number }): string =>
+  item.cacheIndex >= 0 ? `#${item.cacheIndex}` : `=${item.label}`;
+
+/** Runs `rewrite`, which clears and re-adds a field's items, then collapses again the items
+ *  that were collapsed before: re-added items come back expanded. */
+export function keepingCollapsedItems(
+  wb: WorkbookHandle,
+  sheetIndex: number,
+  pivotIndex: number,
+  fieldIndex: number,
+  rewrite: () => boolean,
+): boolean {
+  const before = wb.getPivotField(sheetIndex, pivotIndex, fieldIndex)?.items ?? [];
+  const collapsed = new Set(before.filter((i) => !i.showDetail).map(itemKey));
+  if (!rewrite()) return false;
+  if (collapsed.size === 0) return true;
+  const after = wb.getPivotField(sheetIndex, pivotIndex, fieldIndex)?.items ?? [];
+  return after.every(
+    (item, itemIdx) =>
+      !collapsed.has(itemKey(item)) ||
+      wb.setPivotFieldItemShowDetail(sheetIndex, pivotIndex, fieldIndex, itemIdx, false),
+  );
+}
+
+function addPivotFieldItems(
+  wb: WorkbookHandle,
+  sheetIndex: number,
+  pivotIndex: number,
+  fieldIndex: number,
+  checklist: readonly { value: string; checked: boolean; cacheIndex?: number }[],
+): boolean {
   if (!wb.clearPivotFieldItems(sheetIndex, pivotIndex, fieldIndex)) return false;
   return checklist.every((item) => {
     // A cache index states the item exactly, including the blank member;
@@ -297,7 +334,9 @@ export function restorePivotFieldLayout(
         ) &&
         ok;
     }
-    if (!same(now.items, field.items)) {
+    const membership = (items: PivotDefinition['fields'][number]['items']) =>
+      items.map(({ showDetail: _detail, ...item }) => item);
+    if (!same(membership(now.items), membership(field.items))) {
       ok =
         wb.clearPivotFieldItems(sheetIndex, pivotIndex, field.index) &&
         field.items.every((item) =>
@@ -312,6 +351,19 @@ export function restorePivotFieldLayout(
             : wb.addPivotFieldItem(sheetIndex, pivotIndex, field.index, item.label, item.visible),
         ) &&
         ok;
+    }
+    // Re-added items come back expanded, so collapsed ones are collapsed again.
+    const detailNow = wb.getPivotField(sheetIndex, pivotIndex, field.index)?.items ?? [];
+    for (const [itemIdx, item] of field.items.entries()) {
+      if ((detailNow[itemIdx]?.showDetail ?? true) === item.showDetail) continue;
+      ok =
+        wb.setPivotFieldItemShowDetail(
+          sheetIndex,
+          pivotIndex,
+          field.index,
+          itemIdx,
+          item.showDetail,
+        ) && ok;
     }
     if (now.sortOrder !== field.sortOrder || now.sortByField !== field.sortByField) {
       ok =

@@ -156,6 +156,45 @@ describe('PivotTable tabs of the ribbon', () => {
     tb.dispose();
   });
 
+  it('runs Expand Field and Collapse Field on row labels, greyed where they have no rule', () => {
+    const store = sheet.instance.store;
+    const wb = sheet.workbook;
+    for (const [row, product] of ['Product', 'A', 'B', 'B'].entries()) {
+      wb.setText({ sheet: 0, row, col: 2 }, product);
+    }
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
+    createPivotTableAtPlacement(
+      { origin: 'ribbon' as const, commandId: 'test', store, workbook: wb, history: null },
+      { source: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 }, rowField: 'Region', valueField: 'Sales' },
+      { row: 8, col: 4 },
+    );
+    expect(wb.setPivotFieldAxis(0, 0, 2, 0)).toBe(true);
+    // East on row 9 with A and B under it, West on row 12, the grand total on row 14.
+    const button = (command: string) => {
+      const found = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
+      if (!found) throw new Error(`missing ${command}`);
+      return found;
+    };
+    const states = (row: number, col = 4) => {
+      mutators.setActive(store, { sheet: 0, row, col });
+      tb.setActiveTab('pivotAnalyze');
+      return [button('pivotExpandField').disabled, button('pivotCollapseField').disabled];
+    };
+    expect(states(9)).toEqual([false, false]);
+    // The innermost field's Expand Field opens the Show Detail picker, not built yet.
+    expect(states(10)).toEqual([true, false]);
+    expect(states(9, 5)).toEqual([true, true]);
+    expect(states(14)).toEqual([true, true]);
+    expect(states(8)).toEqual([true, true]);
+    const detail = () => wb.getPivotField(0, 0, 0)?.items.map((i) => i.showDetail);
+    states(10);
+    button('pivotCollapseField').click();
+    expect(detail()).toEqual([false, false]);
+    expect(sheet.instance.history.undo()).toBe(true);
+    expect(detail()).toEqual([true, true]);
+    tb.dispose();
+  });
+
   it('refreshes the report from its source through the Analyze tab', () => {
     const store = sheet.instance.store;
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {

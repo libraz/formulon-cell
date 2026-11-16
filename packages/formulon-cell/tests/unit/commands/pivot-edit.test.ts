@@ -62,6 +62,7 @@ const fakeWorkbook = (
       calls.push(['addData', ...args]);
       return failing.has('addData') ? -1 : 0;
     },
+    getPivotField: () => null,
     clearPivotFieldItems: record('clearItems'),
     addPivotFieldItemAt: record('itemAt', opts.byIndex ?? true),
     addPivotFieldItem: record('item'),
