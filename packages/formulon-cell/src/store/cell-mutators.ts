@@ -3,7 +3,7 @@ import type { Addr, CellValue, Range } from '../engine/types.js';
 import { navigationBoundsFor, syncNavigationViewport } from '../interact/navigation-policy.js';
 import { mergeFormatPatch } from './format-merge.js';
 import { addMergeToMaps, removeIntersectingMerges } from './merge-maps.js';
-import { isSingleCell } from './selection-geometry.js';
+import { isSingleCell, normalizeRange, rangeArea } from './selection-geometry.js';
 import type { SpreadsheetStore } from './store.js';
 import type { CellFormat, CustomCellStyle } from './types.js';
 
@@ -144,9 +144,13 @@ export const cellMutators = {
    *  Skips no-op when the range is huge (full-row/column or selectAll) — until
    *  we have row/column-level format storage, painting per-cell entries for
    *  millions of empty cells would OOM. */
-  setRangeFormat(store: SpreadsheetStore, range: Range, patch: Partial<CellFormat> | null): void {
-    const area = (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
-    if (area > MAX_RANGE_FORMAT_CELLS) return;
+  setRangeFormat(
+    store: SpreadsheetStore,
+    rawRange: Range,
+    patch: Partial<CellFormat> | null,
+  ): void {
+    const range = normalizeRange(rawRange);
+    if (rangeArea(range) > MAX_RANGE_FORMAT_CELLS) return;
     store.setState((s) => {
       const formats = new Map(s.format.formats);
       const sheet = range.sheet;
