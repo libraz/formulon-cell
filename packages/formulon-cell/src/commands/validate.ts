@@ -173,6 +173,21 @@ export function listInvalidValidationCells(wb: WorkbookHandle, sheet: number): A
   return out;
 }
 
+/** The circles that survive a re-circle of `sheet` (limited to `range` when
+ *  given): those on other sheets or outside the range. */
+export function circlesOutsideScope(
+  circles: ReadonlySet<string>,
+  sheet: number,
+  range?: Range,
+): Set<string> {
+  const kept = new Set<string>();
+  for (const key of circles) {
+    const addr = parseAddrKey(key);
+    if (addr && (addr.sheet !== sheet || (range && !rangeContainsAddr(range, addr)))) kept.add(key);
+  }
+  return kept;
+}
+
 /** Replace the validation-circle set with formulon's paged invalid-cell list,
  * optionally restricted to a selection. Returns `null` when the native list
  * surface is unavailable. */
@@ -185,7 +200,11 @@ export function circleInvalidValidationDataWithEngine(
   const cells = listInvalidValidationCells(wb, sheet);
   if (!cells) return null;
   const filtered = range ? cells.filter((addr) => rangeContainsAddr(range, addr)) : cells;
-  const keys = new Set(store.getState().errorIndicators.validationCircles);
+  const keys = circlesOutsideScope(
+    store.getState().errorIndicators.validationCircles,
+    sheet,
+    range,
+  );
   const found = new Set<string>();
   for (const addr of filtered) {
     const key = addrKey(addr);

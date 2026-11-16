@@ -19,7 +19,7 @@ import { commitCellInput } from './cell-input-commit.js';
 import { inputLocaleForWorkbook, parseLocalizedNumericInput } from './coerce-input.js';
 import type { History } from './history.js';
 import { formatA1FormulaAsR1C1 } from './refs.js';
-import { cellValueViolatesValidation } from './validate.js';
+import { cellValueViolatesValidation, circlesOutsideScope } from './validate.js';
 
 export function cellValueIsFormulaError(value: CellValue): boolean {
   if (value.kind === 'error') return true;
@@ -344,7 +344,7 @@ export function circleInvalidValidationData(
   resolveRange?: RangeResolver,
 ): number {
   const state = store.getState();
-  const keys = new Set(state.errorIndicators.validationCircles);
+  const keys = circlesOutsideScope(state.errorIndicators.validationCircles, range.sheet, range);
   let marked = 0;
   const candidates: Array<{ key: string; validation: CellValidation }> = [];
   for (const [key, format] of state.format.formats) {
@@ -377,7 +377,7 @@ export function circleInvalidValidationDataInSheet(
   resolveRange?: RangeResolver,
 ): number {
   const state = store.getState();
-  const keys = new Set(state.errorIndicators.validationCircles);
+  const keys = circlesOutsideScope(state.errorIndicators.validationCircles, sheet);
   let marked = 0;
   for (const [key, format] of state.format.formats) {
     if (!format.validation) continue;

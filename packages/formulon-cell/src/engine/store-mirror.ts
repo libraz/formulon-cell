@@ -31,6 +31,7 @@ import {
 } from './synced-format-keys.js';
 import { TableMirror } from './table-mirror.js';
 import type { SheetAxisFormatOverride, SheetFontOverride } from './types.js';
+import { bindValidationCircleStore } from './validation-circle-sync.js';
 import { syncViewStateToEngine } from './view-state-sync.js';
 import { bindWholeSheetFontStore } from './whole-sheet-font-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -154,6 +155,8 @@ export class StoreMirror {
 
   private unsubscribeCalcSettings: (() => void) | null = null;
 
+  private unsubscribeValidationCircles: (() => void) | null = null;
+
   private lastAutoFilterSignature = '';
 
   /** Hidden rows are part of the UI-owned filter result. Track their content
@@ -211,6 +214,8 @@ export class StoreMirror {
     this.unsubscribeWorkbook = null;
     this.unsubscribeCalcSettings?.();
     this.unsubscribeCalcSettings = null;
+    this.unsubscribeValidationCircles?.();
+    this.unsubscribeValidationCircles = null;
     if (this.boundStore) associatePaginationEngine(this.boundStore.getState(), null);
     this.boundStore = store;
     this.rebase();
@@ -224,6 +229,7 @@ export class StoreMirror {
     registerFormatHistoryBridge(store, this.formatHistoryBridge);
     associatePaginationEngine(store.getState(), this.handle);
     this.unsubscribeCalcSettings = bindCalcSettingsStore(this.handle, store);
+    this.unsubscribeValidationCircles = bindValidationCircleStore(this.handle, store);
     this.unsubscribeWorkbook = bindWholeSheetFontStore(this.handle, store, (mapIndex) => {
       remapSyncedFormatKeys(this.handle, mapIndex);
       remapActiveAxisFormatOverrides(this.handle, mapIndex);

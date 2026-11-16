@@ -519,4 +519,37 @@ describe('commands/cell-input-commit', () => {
       expect(wb.getValue(at(1, 2)).kind).toBe('blank');
     });
   });
+
+  describe('validation circles', () => {
+    const RULE = { kind: 'whole', op: 'between', a: 1, b: 10 } as const;
+    const circle = (): void => {
+      wb.attachStore(store);
+      mutators.setValidationCircles(store, new Set([addrKey(addr)]));
+    };
+    const commit = (raw: string) => {
+      const result = commitCellInput({ store, wb, addr, raw, origin: 'editor', typed: true });
+      mutators.refreshActiveSheetCells(store, wb);
+      return result;
+    };
+
+    it('drops the circle when a valid value is committed into the cell', () => {
+      mutators.setCellFormat(store, addr, { validation: RULE });
+      circle();
+
+      const result = commit('5');
+
+      expect(result.status).toBe('applied');
+      expect(store.getState().errorIndicators.validationCircles.size).toBe(0);
+    });
+
+    it('keeps the circle when the committed value still breaks a warning rule', () => {
+      mutators.setCellFormat(store, addr, { validation: { ...RULE, errorStyle: 'warning' } });
+      circle();
+
+      const result = commit('99');
+
+      expect(result).toMatchObject({ status: 'applied', notice: expect.anything() });
+      expect(store.getState().errorIndicators.validationCircles.has(addrKey(addr))).toBe(true);
+    });
+  });
 });

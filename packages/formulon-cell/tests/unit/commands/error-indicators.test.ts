@@ -105,6 +105,28 @@ describe('error indicator commands', () => {
     expect(store.getState().errorIndicators.validationCircles.size).toBe(0);
   });
 
+  it('rebuilds the circles of the range instead of adding to stale ones', () => {
+    const store = createSpreadsheetStore();
+    const rule = { kind: 'whole', op: 'between', a: 1, b: 10 } as const;
+    for (const col of [0, 5]) {
+      mutators.setCellFormat(store, { sheet: 0, row: 0, col }, { validation: rule });
+      mutators.setCell(store, { sheet: 0, row: 0, col }, { kind: 'number', value: 99 });
+    }
+    const left = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 };
+    circleInvalidValidationData(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 5 });
+    expect(store.getState().errorIndicators.validationCircles.size).toBe(2);
+
+    mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value: 5 });
+    circleInvalidValidationData(store, left);
+
+    expect([...store.getState().errorIndicators.validationCircles]).toEqual(['0:0:5']);
+
+    circleInvalidValidationDataInSheet(store, 0);
+    mutators.setCell(store, { sheet: 0, row: 0, col: 5 }, { kind: 'number', value: 6 });
+    circleInvalidValidationDataInSheet(store, 0);
+    expect(store.getState().errorIndicators.validationCircles.size).toBe(0);
+  });
+
   it('marks huge whole-column invalid validation ranges by visiting only validation formats', () => {
     const store = createSpreadsheetStore();
     mutators.setCellFormat(
