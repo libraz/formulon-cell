@@ -632,6 +632,10 @@ export const dataObjectsZh: DataObjectsStrings = {
     quarters: '季度',
     years: '年',
   },
+  pivotShowDetailDialog: {
+    title: '显示详细信息',
+    prompt: '请选择包含要显示的详细信息的字段：',
+  },
   slicer: {
     title: '切片器',
     selectAll: '全选',

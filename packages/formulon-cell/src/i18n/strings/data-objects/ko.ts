@@ -651,6 +651,10 @@ export const dataObjectsKo: DataObjectsStrings = {
     quarters: '분기',
     years: '연',
   },
+  pivotShowDetailDialog: {
+    title: '세부 정보 표시',
+    prompt: '표시할 세부 정보가 포함된 필드를 선택하세요.',
+  },
   slicer: {
     title: '슬라이서',
     selectAll: '모두 선택',

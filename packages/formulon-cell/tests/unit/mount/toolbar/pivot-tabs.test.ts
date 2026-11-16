@@ -181,11 +181,26 @@ describe('PivotTable tabs of the ribbon', () => {
       return [button('pivotExpandField').disabled, button('pivotCollapseField').disabled];
     };
     expect(states(9)).toEqual([false, false]);
-    // The innermost field's Expand Field opens the Show Detail picker, not built yet.
-    expect(states(10)).toEqual([true, false]);
+    // The innermost field's Expand Field opens the Show Detail picker.
+    expect(states(10)).toEqual([false, false]);
+    // Value, grand-total and caption cells grey both.
     expect(states(9, 5)).toEqual([true, true]);
+    expect(states(10, 5)).toEqual([true, true]);
     expect(states(14)).toEqual([true, true]);
+    expect(states(14, 5)).toEqual([true, true]);
     expect(states(8)).toEqual([true, true]);
+    expect(states(8, 5)).toEqual([true, true]);
+    states(10);
+    button('pivotExpandField').click();
+    const picker = document.querySelector<HTMLElement>('.fc-pivotdetail');
+    expect(picker?.getAttribute('aria-label')).toBe('詳細を表示');
+    expect(
+      Array.from(picker?.querySelectorAll('[role="option"]') ?? []).map((o) => o.textContent),
+    ).toEqual(['Sales']);
+    Array.from(picker?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+      .find((b) => b.textContent === 'キャンセル')
+      ?.click();
+    expect(document.querySelector('.fc-pivotdetail')).toBeNull();
     const detail = () => wb.getPivotField(0, 0, 0)?.items.map((i) => i.showDetail);
     states(10);
     button('pivotCollapseField').click();

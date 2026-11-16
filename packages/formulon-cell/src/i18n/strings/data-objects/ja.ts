@@ -653,6 +653,10 @@ export const dataObjectsJa: DataObjectsStrings = {
     quarters: '四半期',
     years: '年',
   },
+  pivotShowDetailDialog: {
+    title: '詳細を表示',
+    prompt: '表示する詳細を含むフィールドを選んでください。',
+  },
   slicer: {
     title: 'スライサー',
     selectAll: 'すべて選択',

@@ -639,6 +639,10 @@ export const dataObjectsTh: DataObjectsStrings = {
     quarters: 'ไตรมาส',
     years: 'ปี',
   },
+  pivotShowDetailDialog: {
+    title: 'แสดงรายละเอียด',
+    prompt: 'เลือกเขตข้อมูลที่มีรายละเอียดที่คุณต้องการแสดง:',
+  },
   slicer: {
     title: 'ตัวแบ่งส่วนข้อมูล',
     selectAll: 'เลือกทั้งหมด',

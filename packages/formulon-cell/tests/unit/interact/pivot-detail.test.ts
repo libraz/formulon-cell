@@ -4,7 +4,10 @@ import {
   pivotFieldFilterModel,
   setPivotFieldItemsChecked,
 } from '../../../src/commands/pivot-filter.js';
+import { PivotAxis } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { ja } from '../../../src/i18n/strings/ja.js';
+import { disposeOverlayPortal } from '../../../src/interact/overlay-portal.js';
 import {
   collapsePivotField,
   expandPivotField,
@@ -12,6 +15,10 @@ import {
   pivotRowItemAt,
   togglePivotItemDetail,
 } from '../../../src/interact/pivot-detail.js';
+import {
+  openPivotShowDetailDialog,
+  pivotShowDetailFields,
+} from '../../../src/interact/pivot-detail-picker.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 import { loadFixture } from '../engine/pivot-excel-parity/fixture.js';
 
@@ -103,5 +110,97 @@ describe('PivotTable expand and collapse', () => {
     if (!inner) throw new Error('no item');
     expect(expandPivotField(ctx, inner)).toBe(false);
     expect(detail(1)?.every(Boolean)).toBe(true);
+  });
+});
+
+describe('the Show Detail picker of an innermost row item', () => {
+  afterEach(() => {
+    disposeOverlayPortal(document.body);
+    document.body.innerHTML = '';
+  });
+
+  const open = async () => {
+    const env = await setup();
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const inner = pivotRowItemAt(env.wb, { sheet: 0, row: 4, col: 0 });
+    if (!inner) throw new Error('no item');
+    return { ...env, host, inner, picker: { ...env.ctx, host, strings: ja } };
+  };
+  const dialog = () => document.querySelector<HTMLElement>('.fc-pivotdetail');
+  const options = () =>
+    Array.from(dialog()?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []);
+  const footerButton = (label: string) => {
+    const found = Array.from(dialog()?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+      (b) => b.textContent === label,
+    );
+    if (!found) throw new Error(`missing ${label}`);
+    return found;
+  };
+  const rowOrder = (wb: WorkbookHandle) => wb.getPivotDefinition(0, 0)?.rowFieldOrder;
+
+  it('lists the fields outside the row area, in field order, with column and filter fields unpickable', async () => {
+    const { wb, inner } = await open();
+    expect(pivotShowDetailFields(wb, inner)).toEqual([
+      { fieldIdx: 2, name: 'Amt', pickable: true },
+      { fieldIdx: 3, name: 'Qty', pickable: true },
+    ]);
+    expect(wb.setPivotFieldAxis(0, 0, 3, PivotAxis.Col)).toBe(true);
+    expect(pivotShowDetailFields(wb, inner)).toEqual([
+      { fieldIdx: 2, name: 'Amt', pickable: true },
+      { fieldIdx: 3, name: 'Qty', pickable: false },
+    ]);
+  });
+
+  it('opens with the prompt and nothing chosen, so OK waits for a choice', async () => {
+    const { picker, inner } = await open();
+    expect(openPivotShowDetailDialog(picker, inner)).toBe(true);
+    expect(dialog()?.getAttribute('aria-label')).toBe('詳細を表示');
+    expect(dialog()?.textContent).toContain('表示する詳細を含むフィールドを選んでください。');
+    expect(options().map((o) => o.textContent)).toEqual(['Amt', 'Qty']);
+    expect(options().map((o) => o.getAttribute('aria-selected'))).toEqual(['false', 'false']);
+    expect(footerButton('OK').disabled).toBe(true);
+    expect(footerButton('キャンセル').disabled).toBe(false);
+    footerButton('OK').click();
+    expect(dialog()).not.toBeNull();
+  });
+
+  it('closes on Cancel and leaves the report and the undo stack alone', async () => {
+    const { wb, history, picker, inner } = await open();
+    openPivotShowDetailDialog(picker, inner);
+    options()[0]?.click();
+    footerButton('キャンセル').click();
+    expect(dialog()).toBeNull();
+    expect(rowOrder(wb)).toEqual([0, 1]);
+    expect(history.undo()).toBe(false);
+  });
+
+  it('adds the chosen field as the next row field under every item, one undo step', async () => {
+    const { wb, history, picker, inner, detail } = await open();
+    openPivotShowDetailDialog(picker, inner);
+    options()[0]?.click();
+    expect(options()[0]?.getAttribute('aria-selected')).toBe('true');
+    expect(footerButton('OK').disabled).toBe(false);
+    footerButton('OK').click();
+    expect(dialog()).toBeNull();
+    expect(rowOrder(wb)).toEqual([0, 1, 2]);
+    expect(wb.getPivotDefinition(0, 0)?.dataFields.length).toBe(2);
+    expect(detail(1)?.every(Boolean)).toBe(true);
+    expect(detail(2)?.every(Boolean)).toBe(true);
+    expect(history.undo()).toBe(true);
+    expect(rowOrder(wb)).toEqual([0, 1]);
+    expect(wb.getPivotField(0, 0, 2)?.axis).not.toBe(PivotAxis.Row);
+    expect(wb.getPivotDefinition(0, 0)?.dataFields.length).toBe(2);
+    expect(history.undo()).toBe(false);
+    expect(history.redo()).toBe(true);
+    expect(rowOrder(wb)).toEqual([0, 1, 2]);
+  });
+
+  it('does not open on an outer item, whose Expand Field needs no picker', async () => {
+    const { wb, picker } = await open();
+    const outer = pivotRowItemAt(wb, { sheet: 0, row: 3, col: 0 });
+    if (!outer) throw new Error('no item');
+    expect(openPivotShowDetailDialog(picker, outer)).toBe(false);
+    expect(dialog()).toBeNull();
   });
 });

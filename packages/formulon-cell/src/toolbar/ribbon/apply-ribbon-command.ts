@@ -72,8 +72,10 @@ import { openMacPivotMoveDialog } from '../../interact/mac-pivot-move-dialog.js'
 import {
   collapsePivotField,
   expandPivotField,
+  isInnermostRowItem,
   pivotRowItemAt,
 } from '../../interact/pivot-detail.js';
+import { openPivotShowDetailDialog } from '../../interact/pivot-detail-picker.js';
 import { pivotGroupTargetAt } from '../../interact/pivot-group.js';
 import { openPivotGroupDialog } from '../../interact/pivot-group-dialog.js';
 import { togglePivotShowOption } from '../../interact/pivot-options-dialog.js';
@@ -479,7 +481,10 @@ const applyGenericRibbonCommand = (
           onChanged: () => refreshAfterPivotEdit(i),
         };
         if (id === 'pivotCollapseField') collapsePivotField(ctx, ref);
-        else expandPivotField(ctx, ref);
+        else if (!isInnermostRowItem(ref)) expandPivotField(ctx, ref);
+        // The picker keeps focus while it is open.
+        else if (openPivotShowDetailDialog({ ...ctx, host: i.host, strings: i.i18n.strings }, ref))
+          return true;
       }
       runtime.focusSheet();
       return true;

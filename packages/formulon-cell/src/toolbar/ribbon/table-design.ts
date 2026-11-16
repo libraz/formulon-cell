@@ -9,6 +9,7 @@ import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import { focusSheet } from '../../interact/dialog-focus.js';
 import { isSubmitEnter } from '../../interact/mac-dialog-keys.js';
 import { isInnermostRowItem, pivotRowItemAt } from '../../interact/pivot-detail.js';
+import { canShowPivotDetail } from '../../interact/pivot-detail-picker.js';
 import { pivotGroupTargetAt } from '../../interact/pivot-group.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { showMessage } from '../dialogs/prompt.js';
@@ -135,9 +136,10 @@ export const projectTableDesign = (host: HTMLElement, instance: SpreadsheetInsta
     ?.dispatchEvent(new Event('fc-ribbon-control-refresh'));
 };
 
-/** Expand Field and Collapse Field run on a row label. Expand Field on the innermost field and
- *  Collapse Field on a report's only row field stay greyed, as does every other cell. Group
- *  Selection runs on an item label of a date or number field. */
+/** Expand Field and Collapse Field run on a row label; every other cell greys both. Expand Field
+ *  on the innermost field opens the Show Detail picker, so it needs a field above it and a field
+ *  to offer; Collapse Field on a report's only row field stays greyed. Group Selection runs on an
+ *  item label of a date or number field. */
 const projectPivotDetailCommands = (
   host: HTMLElement,
   instance: SpreadsheetInstance,
@@ -146,7 +148,8 @@ const projectPivotDetailCommands = (
   const active = instance.store.getState().selection.active;
   const ref = inReport ? pivotRowItemAt(instance.workbook, active) : null;
   const runs: Record<string, boolean> = {
-    pivotExpandField: !!ref && !isInnermostRowItem(ref),
+    pivotExpandField:
+      !!ref && (!isInnermostRowItem(ref) || canShowPivotDetail(instance.workbook, ref)),
     pivotCollapseField: !!ref && !(isInnermostRowItem(ref) && ref.level === 0),
     pivotGroupSelection:
       inReport && (pivotGroupTargetAt(instance.workbook, active)?.values ?? 'other') !== 'other',

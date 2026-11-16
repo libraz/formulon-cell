@@ -639,6 +639,12 @@ export interface DataObjectsStrings {
     quarters: string;
     years: string;
   };
+  /** The Show Detail picker of an innermost PivotTable row item. */
+  pivotShowDetailDialog: {
+    title: string;
+    /** The line above the field list. */
+    prompt: string;
+  };
   slicer: {
     /** Default panel header used when no column is bound yet. */
     title: string;

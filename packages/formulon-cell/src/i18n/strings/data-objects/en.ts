@@ -655,6 +655,10 @@ export const dataObjectsEn: DataObjectsStrings = {
     quarters: 'Quarters',
     years: 'Years',
   },
+  pivotShowDetailDialog: {
+    title: 'Show Detail',
+    prompt: 'Choose the field containing the detail you want to show:',
+  },
   slicer: {
     title: 'Slicer',
     selectAll: 'Select all',

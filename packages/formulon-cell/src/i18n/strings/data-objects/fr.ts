@@ -666,6 +666,10 @@ export const dataObjectsFr: DataObjectsStrings = {
     quarters: 'Trimestres',
     years: 'Années',
   },
+  pivotShowDetailDialog: {
+    title: 'Afficher les détails',
+    prompt: 'Choisissez le champ contenant les détails à afficher\u00a0:',
+  },
   slicer: {
     title: 'Segment',
     selectAll: 'Tout sélectionner',
