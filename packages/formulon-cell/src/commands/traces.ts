@@ -1,10 +1,9 @@
+import { cloneAddr } from '../engine/address.js';
 import { findDependents, findPrecedents } from '../engine/refs-graph.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { sameAddr } from '../store/direct-format.js';
 import { mutators, type SpreadsheetStore, type TraceArrow } from '../store/store.js';
 import type { History } from './history.js';
-
-const cloneAddr = (addr: TraceArrow['from']): TraceArrow['from'] => ({ ...addr });
 
 const cloneTrace = (arrow: TraceArrow): TraceArrow => ({
   kind: arrow.kind,

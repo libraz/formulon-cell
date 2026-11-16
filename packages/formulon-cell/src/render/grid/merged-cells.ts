@@ -1,17 +1,12 @@
-import { addrKey } from '../../engine/address.js';
+import { addrKey, rangeKey } from '../../engine/address.js';
 import type { Addr, Range } from '../../engine/types.js';
+import { borderSideSignature } from '../../format/border-signature.js';
 import type { CellBorderSide, CellFormat, State } from '../../store/store.js';
 
 export const mergeRangeAt = (state: State, addr: Addr): Range | null => {
   const key = addrKey(addr);
   const anchorKey = state.merges.byCell.get(key) ?? key;
   return state.merges.byAnchor.get(anchorKey) ?? null;
-};
-
-const borderSideSignature = (side: CellBorderSide | undefined): string => {
-  if (side === undefined) return 'absent';
-  if (typeof side === 'boolean') return `boolean:${side}`;
-  return `style:${side.style};color:${side.color ?? ''}`;
 };
 
 interface DiagonalSummary {
@@ -37,7 +32,7 @@ export const mergedDiagonalBorders = (
     byMerge = new WeakMap();
     diagonalSummaries.set(formats, byMerge);
   }
-  const coordinates = `${merge.sheet}:${merge.r0}:${merge.c0}:${merge.r1}:${merge.c1}`;
+  const coordinates = rangeKey(merge);
   const cached = byMerge.get(merge);
   if (cached?.coordinates === coordinates) return cached.borders;
 

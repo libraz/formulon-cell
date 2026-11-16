@@ -1,9 +1,10 @@
 /** Selection geometry planning and the cell budget shared by format commands. */
 
-import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { AxisFormatBand } from '../engine/axis-format-sync.js';
 import type { Addr, Range } from '../engine/types.js';
 import {
+  isValidSheetRange,
   rangeContainsAddr,
   rangesIntersect,
   selectionCoversRange,
@@ -15,26 +16,11 @@ import { planAxisSelection } from './axis-selection-plan.js';
 
 export const MAX_MATERIALIZED_FORMAT_CELLS = 100_000;
 
-const validSelectionRange = (range: Range, sheet: number): boolean =>
-  range.sheet === sheet &&
-  Number.isInteger(range.sheet) &&
-  Number.isInteger(range.r0) &&
-  Number.isInteger(range.c0) &&
-  Number.isInteger(range.r1) &&
-  Number.isInteger(range.c1) &&
-  range.sheet >= 0 &&
-  range.r0 >= 0 &&
-  range.c0 >= 0 &&
-  range.r0 <= range.r1 &&
-  range.c0 <= range.c1 &&
-  range.r1 <= MAX_ROW &&
-  range.c1 <= MAX_COL;
-
 export const selectionRanges = (state: State): Range[] | null => {
   const ranges = selectionRangeList(state.selection);
   const primary = ranges[0];
-  if (!primary || !validSelectionRange(primary, primary.sheet)) return null;
-  if (!ranges.every((range) => validSelectionRange(range, primary.sheet))) return null;
+  if (!primary || !isValidSheetRange(primary, primary.sheet)) return null;
+  if (!ranges.every((range) => isValidSheetRange(range, primary.sheet))) return null;
   return ranges.map((range) => ({ ...range }));
 };
 

@@ -806,7 +806,7 @@ function collectEngineComments(
 
 /** Move the cells inside `affected` by `delta` along `axis` and rewrite every
  *  formula on every sheet that references the moved band. */
-export function shiftCells(
+function shiftCells(
   wb: WorkbookHandle,
   affected: Range,
   axis: InsertCellsDirection,

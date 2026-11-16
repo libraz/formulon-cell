@@ -330,7 +330,7 @@ export function listCustomCellStyles(state: {
   return state.format.customCellStyles ?? [];
 }
 
-export function customCellStyleById(
+function customCellStyleById(
   state: { format: { customCellStyles?: readonly CustomCellStyle[] } },
   id: string,
 ): CustomCellStyle | null {
@@ -346,7 +346,7 @@ const DEFAULT_CELL_STYLE_INCLUDE: Required<CellStyleIncludeOptions> = {
   protection: true,
 };
 
-export function filterCellStyleFormat(
+function filterCellStyleFormat(
   format: Partial<CellFormat>,
   include: CellStyleIncludeOptions = DEFAULT_CELL_STYLE_INCLUDE,
 ): Partial<CellFormat> {

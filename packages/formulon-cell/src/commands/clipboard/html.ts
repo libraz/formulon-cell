@@ -8,6 +8,7 @@ import { addrKey } from '../../engine/address.js';
 import type { Range } from '../../engine/types.js';
 import { formatCell } from '../../engine/value.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
+import { safeFontFamily } from '../../format/font-family.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../../store/store.js';
 import { escapeHtml } from '../../text-escape.js';
 import { formatNumber } from '../format.js';
@@ -17,32 +18,6 @@ import { recordFormatChange } from '../slice-history.js';
 import { pasteTSV } from './paste.js';
 import type { ClipboardFormatResolver } from './snapshot.js';
 import { encodeTSV } from './tsv.js';
-
-const splitFontFamily = (family: string): string[] => {
-  const parts: string[] = [];
-  let start = 0;
-  let quote = '';
-  let depth = 0;
-  for (let i = 0; i < family.length; i += 1) {
-    const ch = family[i] ?? '';
-    if (quote) {
-      if (ch === quote && family[i - 1] !== '\\') quote = '';
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-      continue;
-    }
-    if (ch === '(') depth += 1;
-    else if (ch === ')' && depth > 0) depth -= 1;
-    else if (ch === ',' && depth === 0) {
-      parts.push(family.slice(start, i).trim());
-      start = i + 1;
-    }
-  }
-  parts.push(family.slice(start).trim());
-  return parts.filter(Boolean);
-};
 
 /** Keep a family name inside one CSS token before the style attribute is
  * HTML-escaped. This preserves ordinary stacks (`Arial, sans-serif`) while
@@ -54,19 +29,6 @@ const cssString = (value: string): string =>
     .replace(/\r\n?|\n/g, '\\A ')
     .replaceAll('<', '\\3C ')
     .replaceAll('>', '\\3E ')}"`;
-
-const safeFontFamily = (family: string): string =>
-  splitFontFamily(family)
-    .map((part) => {
-      const unquoted =
-        part.length >= 2 &&
-        ((part.startsWith('"') && part.endsWith('"')) ||
-          (part.startsWith("'") && part.endsWith("'")))
-          ? part.slice(1, -1)
-          : part;
-      return /^[a-zA-Z][a-zA-Z0-9-]*$/.test(unquoted) ? unquoted : cssString(unquoted);
-    })
-    .join(', ');
 
 const MAX_HTML_CLIPBOARD_CELLS = 1_000_000;
 
@@ -82,7 +44,7 @@ const styleOf = (fmt: CellFormat | undefined): string => {
   if (fmt.color) parts.push(`color:${fmt.color}`);
   if (fmt.fill) parts.push(`background-color:${fmt.fill}`);
   if (fmt.align) parts.push(`text-align:${fmt.align}`);
-  if (fmt.fontFamily) parts.push(`font-family:${safeFontFamily(fmt.fontFamily)}`);
+  if (fmt.fontFamily) parts.push(`font-family:${safeFontFamily(fmt.fontFamily, cssString)}`);
   if (fmt.fontSize) parts.push(`font-size:${fmt.fontSize}px`);
   return parts.join(';');
 };

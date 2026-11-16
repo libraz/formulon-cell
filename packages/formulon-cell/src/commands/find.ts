@@ -2,6 +2,7 @@ import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { escapeRegExp } from '../text-escape.js';
 import { inputLocaleForWorkbook, writeInput } from './coerce-input.js';
@@ -372,14 +373,7 @@ export function matcherFor(opts: FindOptions): (display: string) => boolean {
 }
 
 const inRanges = (ranges: readonly Range[], addr: Addr): boolean =>
-  ranges.some(
-    (r) =>
-      r.sheet === addr.sheet &&
-      addr.row >= r.r0 &&
-      addr.row <= r.r1 &&
-      addr.col >= r.c0 &&
-      addr.col <= r.c1,
-  );
+  ranges.some((r) => rangeContainsAddr(r, addr));
 
 /** Matches in the order the desktop app lists them: sheets from the active
  *  one, and within each sheet the cells after the active cell first, then

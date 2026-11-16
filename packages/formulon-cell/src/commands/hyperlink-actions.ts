@@ -27,7 +27,7 @@ export const hyperlinkOperation = (removes: boolean): InteractionOperation =>
  * its display text and its ScreenTip live in the cells' format, not their values, so the change
  * is one intent on the cells. `write` records its own undo entry.
  */
-export function hyperlinkWrite<T>(
+function hyperlinkWrite<T>(
   ctx: HyperlinkActionContext,
   cells: readonly Addr[],
   refused: T,

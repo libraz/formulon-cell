@@ -42,7 +42,7 @@ export type AccessibilityFindings = Readonly<
 >;
 
 /** Minimum text contrast before a cell is flagged: WCAG AA for body text. */
-export const MIN_TEXT_CONTRAST = 4.5;
+const MIN_TEXT_CONTRAST = 4.5;
 /** The stronger WCAG AAA ratio, the second suggested colour. */
 const ENHANCED_TEXT_CONTRAST = 7;
 

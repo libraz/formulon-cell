@@ -516,37 +516,24 @@ export function updateSessionIllustration(
         } as SessionIllustration;
         mutators.updateIllustration(store, id, after as SessionIllustrationPatch);
         if (history && !history.isReplaying()) {
+          const restore = (target: SessionIllustration, phase: 'undo' | 'redo'): void => {
+            const current = sessionIllustrationById(store.getState(), id);
+            if (!current) throw new Error(`image ${phase} state missing`);
+            const currentPersisted = persistentImageFromState(current);
+            if (!currentPersisted) throw new Error(`image ${phase} native state missing`);
+            if (!movePersistentImage(wb, currentPersisted, target, store)) {
+              throw new Error(`image ${phase} restore failed`);
+            }
+            mutators.updateIllustration(store, id, {
+              ...target,
+              nativeAnchor:
+                nativeImageAnchor(wb, item.sheet, currentPersisted.nativeObjectId) ??
+                currentPersisted.nativeAnchor,
+            });
+          };
           history.push({
-            undo: () => {
-              const current = sessionIllustrationById(store.getState(), id);
-              if (!current) throw new Error('image undo state missing');
-              const currentPersisted = persistentImageFromState(current);
-              if (!currentPersisted) throw new Error('image undo native state missing');
-              if (!movePersistentImage(wb, currentPersisted, before, store)) {
-                throw new Error('image undo restore failed');
-              }
-              mutators.updateIllustration(store, id, {
-                ...before,
-                nativeAnchor:
-                  nativeImageAnchor(wb, item.sheet, currentPersisted.nativeObjectId) ??
-                  currentPersisted.nativeAnchor,
-              });
-            },
-            redo: () => {
-              const current = sessionIllustrationById(store.getState(), id);
-              if (!current) throw new Error('image redo state missing');
-              const currentPersisted = persistentImageFromState(current);
-              if (!currentPersisted) throw new Error('image redo native state missing');
-              if (!movePersistentImage(wb, currentPersisted, after, store)) {
-                throw new Error('image redo restore failed');
-              }
-              mutators.updateIllustration(store, id, {
-                ...after,
-                nativeAnchor:
-                  nativeImageAnchor(wb, item.sheet, currentPersisted.nativeObjectId) ??
-                  currentPersisted.nativeAnchor,
-              });
-            },
+            undo: () => restore(before, 'undo'),
+            redo: () => restore(after, 'redo'),
           });
         }
         return sessionIllustrationById(store.getState(), id);

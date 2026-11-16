@@ -58,12 +58,12 @@ describe('F9 formula edit boundaries', () => {
 
   it('uses spreadsheet quote doubling for text cell references', () => {
     const cells = new Map([['0:0:0', textCell(quotedText)]]);
-    expect(computeF9Preview('=A1', 'A1', 0, cells).display).toBe(quotedFormulaLiteral);
+    expect(computeF9Preview('A1', 0, cells).display).toBe(quotedFormulaLiteral);
   });
 
   it('uses spreadsheet quote doubling for scalar evaluator results', () => {
     const evaluate = (): EvalResult => textResult(quotedText);
-    expect(computeF9Preview('=1+1', '1+1', 0, new Map(), undefined, evaluate, true)).toEqual({
+    expect(computeF9Preview('1+1', 0, new Map(), undefined, evaluate, true)).toEqual({
       display: quotedFormulaLiteral,
       substitutable: true,
     });
@@ -71,9 +71,10 @@ describe('F9 formula edit boundaries', () => {
 
   it('uses spreadsheet quote doubling for array evaluator results', () => {
     const array: EvalArrayResult = [[{ kind: ValueKind.Text, text: quotedText }]];
-    expect(
-      computeF9Preview('=1+0', '1+0', 0, new Map(), undefined, undefined, true, () => array),
-    ).toEqual({ display: quotedFormulaLiteral, substitutable: true });
+    expect(computeF9Preview('1+0', 0, new Map(), undefined, undefined, true, () => array)).toEqual({
+      display: quotedFormulaLiteral,
+      substitutable: true,
+    });
   });
 
   it('uses spreadsheet quote doubling in reference-substitution fallback expressions', () => {
@@ -82,7 +83,7 @@ describe('F9 formula edit boundaries', () => {
       expect(value).toBe(`${quotedFormulaLiteral}+0`);
       return numberResult(1);
     };
-    expect(computeF9Preview('=A1', 'A1+0', 0, cells, undefined, evaluate, false)).toEqual({
+    expect(computeF9Preview('A1+0', 0, cells, undefined, evaluate, false)).toEqual({
       display: '1',
       substitutable: true,
     });
@@ -93,11 +94,11 @@ describe('F9 formula edit boundaries', () => {
       ['0:0:26', numCell(42)],
       ['0:1:27', numCell(84)],
     ]);
-    expect(computeF9Preview('=AA1', 'AA1', 0, cells)).toEqual({
+    expect(computeF9Preview('AA1', 0, cells)).toEqual({
       display: '42',
       substitutable: true,
     });
-    expect(computeF9Preview('=AB2', 'AB2', 0, cells)).toEqual({
+    expect(computeF9Preview('AB2', 0, cells)).toEqual({
       display: '84',
       substitutable: true,
     });
@@ -114,9 +115,10 @@ describe('F9 formula edit boundaries', () => {
       expect(value).toBe('SUM(1,2,3,4)');
       return numberResult(10);
     };
-    expect(
-      computeF9Preview('=SUM(AA1:AB2)', 'SUM(AA1:AB2)', 0, cells, undefined, evaluate),
-    ).toEqual({ display: '10', substitutable: true });
+    expect(computeF9Preview('SUM(AA1:AB2)', 0, cells, undefined, evaluate)).toEqual({
+      display: '10',
+      substitutable: true,
+    });
   });
 
   it('evaluates the expanded multi-letter range with the real workbook engine', async () => {
@@ -128,13 +130,8 @@ describe('F9 formula edit boundaries', () => {
         ['0:1:26', numCell(3)],
         ['0:1:27', numCell(4)],
       ]);
-      const preview = computeF9Preview(
-        '=SUM(AA1:AB2)',
-        'SUM(AA1:AB2)',
-        0,
-        cells,
-        undefined,
-        (formula) => workbook.evalFormula(formula.startsWith('=') ? formula : `=${formula}`),
+      const preview = computeF9Preview('SUM(AA1:AB2)', 0, cells, undefined, (formula) =>
+        workbook.evalFormula(formula.startsWith('=') ? formula : `=${formula}`),
       );
       expect(preview).toEqual({ display: '10', substitutable: true });
     } finally {
@@ -145,7 +142,7 @@ describe('F9 formula edit boundaries', () => {
   it('resolves an escaped quoted sheet name with a multi-letter column', () => {
     const cells = new Map([['1:0:26', numCell(17)]]);
     const sheetByName = (name: string): number => (name === "O'Brien" ? 1 : -1);
-    expect(computeF9Preview("='O''Brien'!AA1", "'O''Brien'!AA1", 0, cells, sheetByName)).toEqual({
+    expect(computeF9Preview("'O''Brien'!AA1", 0, cells, sheetByName)).toEqual({
       display: '17',
       substitutable: true,
     });

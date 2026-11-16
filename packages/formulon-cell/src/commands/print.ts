@@ -20,6 +20,7 @@ import type { CellValue } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
+import { safeFontFamily } from '../format/font-family.js';
 import { numberFormatPaint } from '../format/number-format.js';
 import { gradientFillCss } from '../render/gradient-fill-css.js';
 import { cellFontFamily } from '../render/painters/text.js';
@@ -112,32 +113,6 @@ export class PrintResourceLimitError extends Error {
   }
 }
 
-const splitFontFamily = (family: string): string[] => {
-  const parts: string[] = [];
-  let start = 0;
-  let quote = '';
-  let depth = 0;
-  for (let i = 0; i < family.length; i += 1) {
-    const ch = family[i] ?? '';
-    if (quote) {
-      if (ch === quote && family[i - 1] !== '\\') quote = '';
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-      continue;
-    }
-    if (ch === '(') depth += 1;
-    else if (ch === ')' && depth > 0) depth -= 1;
-    else if (ch === ',' && depth === 0) {
-      parts.push(family.slice(start, i).trim());
-      start = i + 1;
-    }
-  }
-  parts.push(family.slice(start).trim());
-  return parts.filter(Boolean);
-};
-
 /** Escape a dynamic value for a CSS string. `<` and `>` are escaped even
  * inside quotes because the complete stylesheet is an HTML raw-text node. */
 const cssString = (value: string): string =>
@@ -148,19 +123,6 @@ const cssString = (value: string): string =>
     .replaceAll('&', '\\26 ')
     .replaceAll('<', '\\3C ')
     .replaceAll('>', '\\3E ')}"`;
-
-const safeFontFamily = (family: string): string =>
-  splitFontFamily(family)
-    .map((part) => {
-      const unquoted =
-        part.length >= 2 &&
-        ((part.startsWith('"') && part.endsWith('"')) ||
-          (part.startsWith("'") && part.endsWith("'")))
-          ? part.slice(1, -1)
-          : part;
-      return /^[a-zA-Z][a-zA-Z0-9-]*$/.test(unquoted) ? unquoted : cssString(unquoted);
-    })
-    .join(', ');
 
 const PRINT_FONT_FALLBACK = 'system-ui, -apple-system, "Segoe UI", sans-serif';
 
@@ -311,7 +273,7 @@ function inlineCellStyle(
   }
   if (fmt.fontFamily) {
     parts.push(
-      `font-family:${safeFontFamily(cellFontFamily(fmt.fontFamily, PRINT_FONT_FALLBACK))}`,
+      `font-family:${safeFontFamily(cellFontFamily(fmt.fontFamily, PRINT_FONT_FALLBACK), cssString)}`,
     );
   }
   if (typeof fmt.fontSize === 'number') parts.push(`font-size:${fmt.fontSize * scale}px`);

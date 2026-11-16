@@ -1,4 +1,4 @@
-import { addrKey, parseAddrKey } from '../engine/address.js';
+import { addrKey, cloneAddr, parseAddrKey, uniqueAddrs } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type {
@@ -464,8 +464,6 @@ export function clearComment(
   setComment(store, addr, '', wb, authorization);
 }
 
-const cloneAddr = (addr: Addr): Addr => ({ sheet: addr.sheet, row: addr.row, col: addr.col });
-
 const captureCommentSnapshot = (state: State, addrs: readonly Addr[]): CommentSnapshot =>
   addrs.map((addr) => ({
     addr: cloneAddr(addr),
@@ -488,18 +486,6 @@ const sameCommentSnapshot = (a: CommentSnapshot, b: CommentSnapshot): boolean =>
       entry.visible === other.visible
     );
   });
-
-const uniqueAddrs = (addrs: readonly Addr[]): Addr[] => {
-  const seen = new Set<string>();
-  const unique: Addr[] = [];
-  for (const addr of addrs) {
-    const key = addrKey(addr);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(cloneAddr(addr));
-  }
-  return unique;
-};
 
 const capturePhysicalCommentSnapshot = (
   wb: WorkbookHandle | undefined,

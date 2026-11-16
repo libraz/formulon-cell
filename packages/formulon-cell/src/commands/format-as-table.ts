@@ -56,7 +56,7 @@ export function galleryStyleElements(
 
 /** Built-in table-style hues — one column per swatch in the style gallery,
  *  ordered to mirror the desktop spreadsheet's themed accent columns. */
-export const TABLE_STYLE_COLORS: readonly string[] = [
+const TABLE_STYLE_COLORS: readonly string[] = [
   '#808080',
   '#4472c4',
   '#ed7d31',
@@ -129,7 +129,7 @@ export interface CreateCustomTableStyleOptions {
 }
 
 /** Derive the header / banded-row fills for a `(style, color)` pair. */
-export function tableStyleSwatch(
+function tableStyleSwatch(
   style: TableStyle,
   color: string = DEFAULT_TABLE_COLOR,
 ): TableStyleSwatch {
@@ -302,7 +302,7 @@ export interface StyleGallerySurface {
 }
 
 /** The None entry of the table style gallery: no style. */
-export const TABLE_STYLE_NONE: BuiltinTableStyle = { family: 'light', index: 0, name: '' };
+const TABLE_STYLE_NONE: BuiltinTableStyle = { family: 'light', index: 0, name: '' };
 
 /** The table style gallery's sections in order, shared by the menus and the in-ribbon strip:
  *  Custom first, when there is one, then Light (after None on `surface.none`), Medium and Dark. */
@@ -475,7 +475,7 @@ export const sameStyleName = (a: string, b: string): boolean =>
 
 /** The gallery id a table or PivotTable style name is shown as: the id of the custom style that
  *  label names (any case), else the name itself, which is a built-in name or '' for none. */
-export const galleryStyleIdOf = (customs: readonly CustomTableStyle[], name: string): string =>
+const galleryStyleIdOf = (customs: readonly CustomTableStyle[], name: string): string =>
   customs.find((style) => sameStyleName(style.label, name))?.id ?? name;
 
 /** The table style gallery id the style name `name` is current as. */
@@ -563,17 +563,14 @@ export function pivotTableStyleAssignment(
   );
 }
 
-export function tableVariantFromOptions(input: {
-  banded?: boolean;
-  firstCol?: boolean;
-}): TableVariant {
+function tableVariantFromOptions(input: { banded?: boolean; firstCol?: boolean }): TableVariant {
   if (input.banded && input.firstCol) return 'bandedFirstCol';
   if (input.firstCol) return 'firstCol';
   if (input.banded === false) return 'plain';
   return 'banded';
 }
 
-export function tableVariantOptions(variant: TableVariant): {
+function tableVariantOptions(variant: TableVariant): {
   banded: boolean;
   firstCol: boolean;
 } {
@@ -709,7 +706,7 @@ export function tableStyleOptionsById(
 }
 
 /** The built-in style a new table takes when the workbook names no default table style. */
-export const FALLBACK_TABLE_STYLE = 'TableStyleMedium2';
+const FALLBACK_TABLE_STYLE = 'TableStyleMedium2';
 
 /** The style id a new table takes: the workbook's default table style, else Table Style Medium 2. */
 export function defaultTableStyleId(

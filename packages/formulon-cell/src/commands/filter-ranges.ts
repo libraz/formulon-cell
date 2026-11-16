@@ -14,7 +14,7 @@ type FilterRangeState = Pick<State, 'ui' | 'tables'>;
 
 /** True when `range` is a table's filter: it starts on the table's header row
  *  across its columns and ends inside it (a table filter skips a totals row). */
-export function isTableFilterRange(state: Pick<State, 'tables'>, range: Range): boolean {
+function isTableFilterRange(state: Pick<State, 'tables'>, range: Range): boolean {
   return state.tables.tables.some(
     ({ range: t }) =>
       t.sheet === range.sheet &&

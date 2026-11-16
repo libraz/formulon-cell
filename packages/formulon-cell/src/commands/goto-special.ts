@@ -542,26 +542,6 @@ export function findMatchingRanges(
   }
 }
 
-/** Inclusive bounding rectangle of a non-empty addr list. Throws when the
- *  list is empty — callers should check `matches.length > 0` first. */
-export const boundingRange = (matches: readonly Addr[]): Range => {
-  if (matches.length === 0) {
-    throw new Error('boundingRange: empty match list');
-  }
-  const first = matches[0] as Addr;
-  let r0 = first.row;
-  let r1 = first.row;
-  let c0 = first.col;
-  let c1 = first.col;
-  for (const a of matches) {
-    if (a.row < r0) r0 = a.row;
-    if (a.row > r1) r1 = a.row;
-    if (a.col < c0) c0 = a.col;
-    if (a.col > c1) c1 = a.col;
-  }
-  return { sheet: first.sheet, r0, c0, r1, c1 };
-};
-
 /** Selection made of the given rectangles. The first rectangle is the primary
  *  range and its top-left cell becomes the active cell. */
 export const selectionFromRanges = (ranges: readonly Range[]): SelectionSlice => {

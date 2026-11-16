@@ -4,6 +4,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type DataTableInfo, formulaCallsTable } from '../engine/workbook-handle-data-tables.js';
 import {
   isSingleCell,
+  rangeContainsAddr,
   selectionCoversRange,
   selectionRangeList,
 } from '../store/selection-geometry.js';
@@ -180,18 +181,7 @@ export function dataTableCellAmong(wb: WorkbookHandle, cells: readonly Addr[]): 
   }
   const tables = [...bounds.values()].flatMap((range) => wb.dataTablesInRange(range));
   if (tables.length === 0) return null;
-  return (
-    cells.find((cell) =>
-      tables.some(
-        ({ range }) =>
-          range.sheet === cell.sheet &&
-          cell.row >= range.r0 &&
-          cell.row <= range.r1 &&
-          cell.col >= range.c0 &&
-          cell.col <= range.c1,
-      ),
-    ) ?? null
-  );
+  return cells.find((cell) => tables.some(({ range }) => rangeContainsAddr(range, cell))) ?? null;
 }
 
 /** Refuse a cell shift over `band` that would move any part of a data table —

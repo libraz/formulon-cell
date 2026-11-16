@@ -6,6 +6,7 @@ import {
   phoneticKanaForm,
 } from '../../engine/phonetic-sync.js';
 import { formatCell, formatGeneralScientific } from '../../engine/value.js';
+import { splitFontFamily } from '../../format/font-family.js';
 import { intlFormatterCache } from '../../format/intl-cache.js';
 import { convertKana } from '../../format/kana.js';
 import type { CellFormat } from '../../store/store.js';
@@ -253,32 +254,6 @@ export const textBaselineY = (
   const rise = face ? bottomBaselineRise(face) : null;
   if (rise !== null) return Math.round(bounds.y + bounds.h - rise);
   return Math.round(bounds.y + bounds.h - padY - box.descent);
-};
-
-const splitFontFamily = (family: string): string[] => {
-  const parts: string[] = [];
-  let start = 0;
-  let depth = 0;
-  let quote = '';
-  for (let i = 0; i < family.length; i += 1) {
-    const char = family[i];
-    if (quote) {
-      if (char === quote && family[i - 1] !== '\\') quote = '';
-      continue;
-    }
-    if (char === '"' || char === "'") {
-      quote = char;
-      continue;
-    }
-    if (char === '(') depth += 1;
-    else if (char === ')' && depth > 0) depth -= 1;
-    else if (char === ',' && depth === 0) {
-      parts.push(family.slice(start, i).trim());
-      start = i + 1;
-    }
-  }
-  parts.push(family.slice(start).trim());
-  return parts.filter(Boolean);
 };
 
 const normalizedFontFamily = (family: string): string => {

@@ -2,6 +2,7 @@ import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { borderSideSignature } from '../format/border-signature.js';
 import { sameAddr } from '../store/direct-format.js';
 import {
   isSingleCell,
@@ -211,12 +212,6 @@ const mergeVisualKeys: readonly (keyof CellFormat)[] = [
 ];
 
 type MergeBorderSide = 'top' | 'right' | 'bottom' | 'left' | 'diagonalDown' | 'diagonalUp';
-
-const borderSideSignature = (side: CellBorderSide | undefined): string => {
-  if (side === undefined) return 'absent';
-  if (typeof side === 'boolean') return `boolean:${side}`;
-  return `style:${side.style};color:${side.color ?? ''}`;
-};
 
 const cloneBorderSide = (side: CellBorderSide): CellBorderSide =>
   typeof side === 'object' ? { ...side } : side;

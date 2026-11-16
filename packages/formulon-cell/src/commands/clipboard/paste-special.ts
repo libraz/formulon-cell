@@ -45,6 +45,7 @@ import {
   recordMergesChangeWithEngine,
 } from '../slice-history.js';
 import { applyPatchesAtomic } from './apply-patches-atomic.js';
+import { consumeCutMarquee } from './cut-band-snapshots.js';
 import {
   bandAxisFor,
   logicalRangeFor,
@@ -688,11 +689,6 @@ const selectWritten = (store: SpreadsheetStore, written: Range, band: boolean): 
   } else if (written.r0 !== written.r1 || written.c0 !== written.c1) {
     mutators.extendRangeTo(store, { sheet, row: written.r1, col: written.c1 });
   }
-};
-
-const consumeCutMarquee = (store: SpreadsheetStore): void => {
-  mutators.setCopyRange(store, null);
-  mutators.setCopyRanges(store, null);
 };
 
 /** A paste as a batch result: `range` is the destination it wrote, `applied` the cells whose

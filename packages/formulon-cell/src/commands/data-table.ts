@@ -2,6 +2,7 @@ import type { Addr, Range } from '../engine/types.js';
 import { writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { DataTableDefinition, DataTableInfo } from '../engine/workbook-handle-data-tables.js';
+import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { authorizedWriteOr } from './authorized-write.js';
 import type { History } from './history.js';
@@ -32,15 +33,8 @@ interface DataTableCreateContext extends DataTableCommandContext {
   origin: InteractionOrigin;
 }
 
-const inside = (range: Range, addr: Addr): boolean =>
-  addr.sheet === range.sheet &&
-  addr.row >= range.r0 &&
-  addr.row <= range.r1 &&
-  addr.col >= range.c0 &&
-  addr.col <= range.c1;
-
 /** The result block is the selection minus its first row and first column. */
-export function dataTableDefinition(
+function dataTableDefinition(
   request: DataTableRequest,
 ): DataTableDefinition | DataTableRequestError {
   const { selection, rowInput, colInput } = request;
@@ -48,7 +42,8 @@ export function dataTableDefinition(
   if (!rowInput && !colInput) return 'invalid-input';
   const range = { ...selection, r0: selection.r0 + 1, c0: selection.c0 + 1 };
   for (const input of [rowInput, colInput]) {
-    if (input && (input.sheet !== selection.sheet || inside(range, input))) return 'invalid-input';
+    if (input && (input.sheet !== selection.sheet || rangeContainsAddr(range, input)))
+      return 'invalid-input';
   }
   return { range, rowInput, colInput };
 }

@@ -97,19 +97,19 @@ describe('integration: F9 preview against live cells', () => {
 
   it('resolves an A1 ref against the live cell map', () => {
     const cells = sheet.instance.store.getState().data.cells;
-    const out = computeF9Preview('=A1+B1', 'A1', 0, cells);
+    const out = computeF9Preview('A1', 0, cells);
     expect(out).toEqual({ display: '42', substitutable: true });
   });
 
   it('returns the text rendering of a text-valued ref', () => {
     const cells = sheet.instance.store.getState().data.cells;
-    const out = computeF9Preview('=B1', 'B1', 0, cells);
+    const out = computeF9Preview('B1', 0, cells);
     expect(out).toEqual({ display: '"hello"', substitutable: true });
   });
 
   it('reports unsupported for a sub-expression', () => {
     const cells = sheet.instance.store.getState().data.cells;
-    expect(computeF9Preview('=A1+B1', 'A1+B1', 0, cells)).toEqual({
+    expect(computeF9Preview('A1+B1', 0, cells)).toEqual({
       display: '',
       substitutable: false,
     });
@@ -117,7 +117,7 @@ describe('integration: F9 preview against live cells', () => {
 
   it('reports #REF! when sheet-prefixed and the sheet is unknown', () => {
     const cells = sheet.instance.store.getState().data.cells;
-    const out = computeF9Preview('=Other!A1', 'Other!A1', 0, cells, () => -1);
+    const out = computeF9Preview('Other!A1', 0, cells, () => -1);
     expect(out).toEqual({ display: '#REF!', substitutable: false });
   });
 });

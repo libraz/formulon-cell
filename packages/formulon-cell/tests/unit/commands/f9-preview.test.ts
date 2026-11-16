@@ -62,21 +62,21 @@ describe('renderCellValueForF9', () => {
 
 describe('computeF9Preview', () => {
   it('substitutes a numeric literal verbatim', () => {
-    const r = computeF9Preview('=42 + A1', '42', 0, new Map());
+    const r = computeF9Preview('42', 0, new Map());
     expect(r).toEqual({ display: '42', substitutable: true });
   });
 
   it('substitutes a quoted string literal verbatim', () => {
-    const r = computeF9Preview('=A1 & "x"', '"x"', 0, new Map());
+    const r = computeF9Preview('"x"', 0, new Map());
     expect(r).toEqual({ display: '"x"', substitutable: true });
   });
 
   it('substitutes TRUE / false (case-normalized)', () => {
-    expect(computeF9Preview('=A1', 'true', 0, new Map())).toEqual({
+    expect(computeF9Preview('true', 0, new Map())).toEqual({
       display: 'TRUE',
       substitutable: true,
     });
-    expect(computeF9Preview('=A1', 'FALSE', 0, new Map())).toEqual({
+    expect(computeF9Preview('FALSE', 0, new Map())).toEqual({
       display: 'FALSE',
       substitutable: true,
     });
@@ -85,7 +85,6 @@ describe('computeF9Preview', () => {
   it('canonicalizes the selected expression before evaluation and localizes the inserted literal', () => {
     const evaluated: string[] = [];
     const result = computeF9Preview(
-      '=SUMME(1;2)',
       'SUMME(1;2)',
       0,
       new Map(),
@@ -132,7 +131,7 @@ describe('computeF9Preview', () => {
 
   it('resolves a single-cell ref to its current value', () => {
     const cells = new Map([['0:0:0', numCell(7)]]);
-    expect(computeF9Preview('=A1+1', 'A1', 0, cells)).toEqual({
+    expect(computeF9Preview('A1', 0, cells)).toEqual({
       display: '7',
       substitutable: true,
     });
@@ -140,14 +139,14 @@ describe('computeF9Preview', () => {
 
   it('quotes a text cell when resolving via ref', () => {
     const cells = new Map([['0:1:0', txtCell('hello')]]);
-    expect(computeF9Preview('=A2', 'A2', 0, cells)).toEqual({
+    expect(computeF9Preview('A2', 0, cells)).toEqual({
       display: '"hello"',
       substitutable: true,
     });
   });
 
   it('returns 0 for an unpopulated cell ref (spreadsheet convention: blank → 0)', () => {
-    expect(computeF9Preview('=A1', 'A1', 0, new Map())).toEqual({
+    expect(computeF9Preview('A1', 0, new Map())).toEqual({
       display: '0',
       substitutable: true,
     });
@@ -156,25 +155,25 @@ describe('computeF9Preview', () => {
   it('honours sheetByName for sheet-qualified refs', () => {
     const cells = new Map([['1:0:0', numCell(99)]]);
     const sheetByName = (n: string): number => (n === 'Other' ? 1 : -1);
-    expect(computeF9Preview('=Other!A1', 'Other!A1', 0, cells, sheetByName)).toEqual({
+    expect(computeF9Preview('Other!A1', 0, cells, sheetByName)).toEqual({
       display: '99',
       substitutable: true,
     });
   });
 
   it('returns #REF! when a sheet name does not resolve', () => {
-    expect(computeF9Preview('=Z!A1', 'Z!A1', 0, new Map())).toEqual({
+    expect(computeF9Preview('Z!A1', 0, new Map())).toEqual({
       display: '#REF!',
       substitutable: false,
     });
   });
 
   it('reports unsupported for sub-expressions / function calls', () => {
-    expect(computeF9Preview('=SUM(A1:A3)', 'SUM(A1:A3)', 0, new Map())).toEqual({
+    expect(computeF9Preview('SUM(A1:A3)', 0, new Map())).toEqual({
       display: '',
       substitutable: false,
     });
-    expect(computeF9Preview('=A1+B1', 'A1+B1', 0, new Map())).toEqual({
+    expect(computeF9Preview('A1+B1', 0, new Map())).toEqual({
       display: '',
       substitutable: false,
     });
@@ -185,12 +184,10 @@ describe('computeF9Preview', () => {
       ['0:0:0', numCell(7)],
       ['0:0:1', numCell(5)],
     ]);
-    expect(computeF9Preview('=A1+B1', 'A1+B1', 0, cells, undefined, evalNumber('7+5', 12))).toEqual(
-      {
-        display: '12',
-        substitutable: true,
-      },
-    );
+    expect(computeF9Preview('A1+B1', 0, cells, undefined, evalNumber('7+5', 12))).toEqual({
+      display: '12',
+      substitutable: true,
+    });
   });
 
   it('substitutes sheet-qualified refs before engine-backed F9 evaluation', () => {
@@ -199,9 +196,7 @@ describe('computeF9Preview', () => {
       ['1:0:0', numCell(5)],
     ]);
     const sheetByName = (n: string): number => (n === 'Other' ? 1 : -1);
-    expect(
-      computeF9Preview('=A1+Other!A1', 'A1+Other!A1', 0, cells, sheetByName, evalNumber('7+5', 12)),
-    ).toEqual({
+    expect(computeF9Preview('A1+Other!A1', 0, cells, sheetByName, evalNumber('7+5', 12))).toEqual({
       display: '12',
       substitutable: true,
     });
@@ -209,12 +204,12 @@ describe('computeF9Preview', () => {
 
   it('does not treat digit-suffixed function names as refs during engine-backed evaluation', () => {
     const cells = new Map([['0:0:0', numCell(100)]]);
-    expect(
-      computeF9Preview('=LOG10(A1)', 'LOG10(A1)', 0, cells, undefined, evalNumber('LOG10(100)', 2)),
-    ).toEqual({
-      display: '2',
-      substitutable: true,
-    });
+    expect(computeF9Preview('LOG10(A1)', 0, cells, undefined, evalNumber('LOG10(100)', 2))).toEqual(
+      {
+        display: '2',
+        substitutable: true,
+      },
+    );
   });
 
   it('expands range refs before engine-backed F9 evaluation', () => {
@@ -224,14 +219,7 @@ describe('computeF9Preview', () => {
       ['0:2:0', numCell(3)],
     ]);
     expect(
-      computeF9Preview(
-        '=SUM(A1:A3)',
-        'SUM(A1:A3)',
-        0,
-        cells,
-        undefined,
-        evalNumber('SUM(7,5,3)', 15),
-      ),
+      computeF9Preview('SUM(A1:A3)', 0, cells, undefined, evalNumber('SUM(7,5,3)', 15)),
     ).toEqual({
       display: '15',
       substitutable: true,
@@ -245,14 +233,7 @@ describe('computeF9Preview', () => {
     ]);
     const sheetByName = (n: string): number => (n === 'Other' ? 1 : -1);
     expect(
-      computeF9Preview(
-        '=SUM(Other!A1:B1)',
-        'SUM(Other!A1:B1)',
-        0,
-        cells,
-        sheetByName,
-        evalNumber('SUM(2,4)', 6),
-      ),
+      computeF9Preview('SUM(Other!A1:B1)', 0, cells, sheetByName, evalNumber('SUM(2,4)', 6)),
     ).toEqual({
       display: '6',
       substitutable: true,
@@ -260,23 +241,14 @@ describe('computeF9Preview', () => {
   });
 
   it('keeps oversized ranges unsupported even when an engine evaluator is supplied', () => {
-    expect(
-      computeF9Preview(
-        '=SUM(A1:A10001)',
-        'SUM(A1:A10001)',
-        0,
-        new Map(),
-        undefined,
-        evalNumber('', 0),
-      ),
-    ).toEqual({
+    expect(computeF9Preview('SUM(A1:A10001)', 0, new Map(), undefined, evalNumber('', 0))).toEqual({
       display: '',
       substitutable: false,
     });
   });
 
   it('reports unsupported for an empty selection', () => {
-    expect(computeF9Preview('=1', '   ', 0, new Map())).toEqual({
+    expect(computeF9Preview('   ', 0, new Map())).toEqual({
       display: '',
       substitutable: false,
     });
@@ -285,7 +257,6 @@ describe('computeF9Preview', () => {
   it('renders a multi-cell array result as a spreadsheet array constant', () => {
     expect(
       computeF9Preview(
-        '=SEQUENCE(2,2)',
         'SEQUENCE(2,2)',
         0,
         new Map(),
@@ -303,7 +274,6 @@ describe('computeF9Preview', () => {
   it('quotes text cells inside an array constant', () => {
     expect(
       computeF9Preview(
-        '={"a","b"}',
         '{"a","b"}',
         0,
         new Map(),
@@ -318,7 +288,6 @@ describe('computeF9Preview', () => {
   it('collapses a 1x1 array result to the bare scalar', () => {
     expect(
       computeF9Preview(
-        '=A1',
         'A1+0',
         0,
         new Map(),
@@ -337,7 +306,6 @@ describe('computeF9Preview', () => {
         null;
     expect(
       computeF9Preview(
-        '=A1+B1',
         'A1+B1',
         0,
         new Map([

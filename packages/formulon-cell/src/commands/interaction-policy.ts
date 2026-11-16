@@ -234,18 +234,6 @@ export const appliedBatch = (cells: readonly Addr[], range: Range | null): Chang
   range,
 });
 
-/** Run `write` on `wb` as a batch over `range`: refused when it returns false, else applied with
- *  the cells whose content it changed. */
-export const trackedBatch = (
-  wb: WorkbookHandle,
-  range: Range | null,
-  write: () => boolean,
-  refusal: CellRefusal = { code: 'invalid' },
-): ChangeBatchResult => {
-  const { value, changed } = wb.trackChangedCells(write);
-  return value ? appliedBatch(changed, range) : refusedBatch(refusal);
-};
-
 /** The result of a batch `refusal` refused: nothing written. */
 export const refusedBatch = (refusal: CellRefusal): ChangeBatchResult => ({
   status: 'refused',

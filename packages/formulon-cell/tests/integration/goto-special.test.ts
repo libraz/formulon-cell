@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { boundingRange, findMatchingRanges } from '../../src/commands/goto-special.js';
+import { findMatchingRanges } from '../../src/commands/goto-special.js';
+import { boundingRange } from '../../src/commands/interaction-policy.js';
 import { mutators } from '../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../test-utils/index.js';
 

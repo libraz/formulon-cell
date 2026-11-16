@@ -1,3 +1,4 @@
+import { rangeKey } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -184,8 +185,6 @@ export function recomputeSlicerFilters(store: SpreadsheetStore, workbook: Workbo
   }
   return hiddenCount;
 }
-
-const rangeKey = (r: Range): string => `${r.sheet}:${r.r0}:${r.c0}:${r.r1}:${r.c1}`;
 
 const nextSlicerId = (store: SpreadsheetStore, tableName: string, column: string): string => {
   const base = `slicer-${slug(tableName)}-${slug(column)}`;

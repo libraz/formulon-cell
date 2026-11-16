@@ -6,13 +6,14 @@ import type { RefusedDecision } from './permission-reasons.js';
 // mutation, and the history boundary so all ribbon hosts have the same
 // behavior for disjoint selections.
 
-import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey, uniqueAddrs } from '../engine/address.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import { allowedEditRangeAreas } from '../engine/protection-sync.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { subtractFromRangeValidations } from '../store/range-validations.js';
 import {
+  isValidSheetRange,
   normalizeRange,
   rangesIntersect,
   selectionContainsAddr,
@@ -127,38 +128,9 @@ const cloneValue = <T>(value: T): T => {
   return structuredClone(value);
 };
 
-const cloneAddr = (addr: Addr): Addr => ({ sheet: addr.sheet, row: addr.row, col: addr.col });
-
-const validRange = (range: Range, sheet: number): boolean =>
-  range.sheet === sheet &&
-  Number.isInteger(range.sheet) &&
-  Number.isInteger(range.r0) &&
-  Number.isInteger(range.c0) &&
-  Number.isInteger(range.r1) &&
-  Number.isInteger(range.c1) &&
-  range.sheet >= 0 &&
-  range.r0 >= 0 &&
-  range.c0 >= 0 &&
-  range.r0 <= range.r1 &&
-  range.c0 <= range.c1 &&
-  range.r1 <= MAX_ROW &&
-  range.c1 <= MAX_COL;
-
 const parseNonNegativeAddrKey = (key: string): Addr | null => {
   const addr = parseAddrKey(key);
   return addr && addr.sheet >= 0 && addr.row >= 0 && addr.col >= 0 ? addr : null;
-};
-
-const uniqueAddrs = (addrs: readonly Addr[]): Addr[] => {
-  const seen = new Set<string>();
-  const result: Addr[] = [];
-  for (const addr of addrs) {
-    const key = addrKey(addr);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(cloneAddr(addr));
-  }
-  return result;
 };
 
 const hasComment = (format: CellFormat): boolean =>
@@ -178,7 +150,7 @@ const buildPlan = (
   const primary = state.selection.range;
   if (!primary) return null;
   const ranges = [primary, ...(state.selection.extraRanges ?? [])].map((range) => ({ ...range }));
-  if (!ranges.every((range) => validRange(range, primary.sheet))) return null;
+  if (!ranges.every((range) => isValidSheetRange(range, primary.sheet))) return null;
   const selection = { range: ranges[0] as Range, extraRanges: ranges.slice(1) };
 
   // A selection touching only part of a merge is unsafe to clear. This check

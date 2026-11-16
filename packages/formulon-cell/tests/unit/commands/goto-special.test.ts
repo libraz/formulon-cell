@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  boundingRange,
   findMatchingRanges,
   type GoToSpecialKind,
   type GoToSpecialOptions,
   selectionFromMatches,
   selectionFromRanges,
 } from '../../../src/commands/goto-special.js';
+import { boundingRange } from '../../../src/commands/interaction-policy.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   createSpreadsheetStore,
@@ -353,8 +353,8 @@ describe('boundingRange', () => {
     expect(got).toEqual({ sheet: 0, r0: 1, c0: 0, r1: 4, c1: 5 });
   });
 
-  it('throws on empty input', () => {
-    expect(() => boundingRange([])).toThrow();
+  it('returns null on empty input', () => {
+    expect(boundingRange([])).toBeNull();
   });
 });
 

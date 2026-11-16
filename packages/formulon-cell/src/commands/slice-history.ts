@@ -1,4 +1,4 @@
-import { parseAddrKey } from '../engine/address.js';
+import { parseAddrKey, rangeKey } from '../engine/address.js';
 import {
   type FormatHistoryTrackingSnapshot,
   formatHistoryBridgeFor,
@@ -958,9 +958,6 @@ export function applyMergesSnapshot(store: SpreadsheetStore, snap: MergesSnapsho
     merges: { byAnchor: new Map(snap.byAnchor), byCell: new Map(snap.byCell) },
   }));
 }
-
-const rangeKey = (range: Range): string =>
-  `${range.sheet}:${range.r0}:${range.c0}:${range.r1}:${range.c1}`;
 
 const sameStringMap = (a: Map<string, string>, b: Map<string, string>): boolean =>
   a.size === b.size && [...a].every(([key, value]) => b.get(key) === value);

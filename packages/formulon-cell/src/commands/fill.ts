@@ -934,7 +934,7 @@ const defaultMeasure = (): ((text: string) => number) => {
  */
 export function justifySelection(deps: JustifySelectionDeps): ChangeBatchResult {
   const selected = deps.store.getState().selection.range;
-  return fillBatch(deps.workbook, () => (justifyInto(deps) ? normalizedRange(selected) : null));
+  return fillBatch(deps.workbook, () => (justifyInto(deps) ? normalizeRange(selected) : null));
 }
 
 function justifyInto(deps: JustifySelectionDeps): boolean {
@@ -1087,8 +1087,6 @@ const executeRibbonFlashFill = (
 };
 
 const DATE_SERIES_ACTIONS = new Set(['days', 'weekdays', 'months', 'years']);
-
-const normalizedRange = (selected: Range): Range => normalizeRange(selected);
 
 /** A fill as a batch result: `range` is the rectangle `fill` wrote (null when it wrote nothing),
  *  `applied` the cells whose content changed. */

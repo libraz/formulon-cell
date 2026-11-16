@@ -442,10 +442,7 @@ export function resetCrossSheetSourceDimensions(
   ) {
     return;
   }
-  const defaults = {
-    col: store.getState().layout.defaultColWidth,
-    row: store.getState().layout.defaultRowHeight,
-  };
+  const defaults = layoutDefaults(store);
   const after: SourceDimensionSnapshot = {
     colWidths: new Map(),
     rowHeights: new Map(),
@@ -596,15 +593,17 @@ export function recordSameSheetDimensionRestore(
   ) {
     return;
   }
-  const defaults = {
-    col: store.getState().layout.defaultColWidth,
-    row: store.getState().layout.defaultRowHeight,
-  };
+  const defaults = layoutDefaults(store);
   history.push({
     undo: () => applySameSheetDimensionRestore(store, wb, source, wholeRows, snapshot, defaults),
     redo: () => {},
   });
 }
+
+const layoutDefaults = (store: SpreadsheetStore): { col: number; row: number } => {
+  const { layout } = store.getState();
+  return { col: layout.defaultColWidth, row: layout.defaultRowHeight };
+};
 
 export function consumeCutMarquee(store: SpreadsheetStore): void {
   mutators.setCopyRange(store, null);

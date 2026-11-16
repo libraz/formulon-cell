@@ -109,7 +109,6 @@ function cellValueLiteral(v: CellValue | undefined): string {
  *  sheet name (spreadsheet-side) to its 0-based index — when omitted, sheet-
  *  qualified refs are unresolved. */
 export function computeF9Preview(
-  _formula: string,
   selection: string,
   activeSheet: number,
   cells: ReadonlyMap<string, { value: CellValue; formula: string | null }>,
@@ -310,7 +309,6 @@ export function replaceFormulaSelectionWithF9Preview(
   if (left >= right) return null;
   const selection = formula.slice(left, right);
   const preview = computeF9Preview(
-    formula,
     selection,
     activeSheet,
     cells,

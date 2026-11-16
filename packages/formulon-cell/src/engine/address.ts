@@ -1,6 +1,23 @@
-import type { Addr } from './types.js';
+import type { Addr, Range } from './types.js';
 
 export const addrKey = (a: Addr): string => `${a.sheet}:${a.row}:${a.col}`;
+
+export const rangeKey = (r: Range): string => `${r.sheet}:${r.r0}:${r.c0}:${r.r1}:${r.c1}`;
+
+export const cloneAddr = (a: Addr): Addr => ({ sheet: a.sheet, row: a.row, col: a.col });
+
+/** `addrs` without repeats (first occurrence wins), each cloned. */
+export const uniqueAddrs = (addrs: readonly Addr[]): Addr[] => {
+  const seen = new Set<string>();
+  const unique: Addr[] = [];
+  for (const addr of addrs) {
+    const key = addrKey(addr);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(cloneAddr(addr));
+  }
+  return unique;
+};
 
 /** Inverse of `addrKey`. Returns null unless the key is exactly three
  *  non-empty integer parts. */

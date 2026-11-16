@@ -1,4 +1,4 @@
-import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import { addrKey, colLetter, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { syncAutoFilterToEngine, syncHiddenRowsToEngine } from '../engine/auto-filter-sync.js';
 import {
   createProfileTextSemantics,
@@ -11,7 +11,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isDataTableFormula } from '../engine/workbook-handle-data-tables.js';
 import { excelSerialToDateParts } from '../format/date-serial.js';
 import { type ConditionalCellOverlay, evaluateConditional } from '../render/conditional.js';
-import { sameRange, sameRangeList } from '../store/selection-geometry.js';
+import { rangeContainsRange, sameRange, sameRangeList } from '../store/selection-geometry.js';
 import type {
   FilterColorSpec,
   FilterComparisonOp,
@@ -573,15 +573,7 @@ const hasNonBlankInCol = (
  *  surrounding contiguous non-blank block bounded by blank rows/columns. */
 export function inferAutoFilterRange(state: State, range: Range = state.selection.range): Range {
   // Inside a table the filter belongs to the table, whatever surrounds it.
-  const table = state.tables.tables.find(
-    (t) =>
-      t.showHeader &&
-      t.range.sheet === range.sheet &&
-      range.r0 >= t.range.r0 &&
-      range.r1 <= t.range.r1 &&
-      range.c0 >= t.range.c0 &&
-      range.c1 <= t.range.c1,
-  );
+  const table = state.tables.tables.find((t) => t.showHeader && rangeContainsRange(t.range, range));
   if (table) return { ...table.range };
   if (range.r0 !== range.r1 || range.c0 !== range.c1) return { ...range };
   const sheet = range.sheet;
@@ -1234,17 +1226,6 @@ const filterItemLabel = (state: State, addr: Addr, value: CellValue, locale: str
 
 const FILTER_GROUP_ORDER: Record<FilterItemKind, number> = { number: 0, text: 1, blank: 2 };
 
-const columnName = (column: number): string => {
-  let n = column + 1;
-  let out = '';
-  while (n > 0) {
-    const digit = (n - 1) % 26;
-    out = String.fromCharCode(65 + digit) + out;
-    n = Math.floor((n - 1) / 26);
-  }
-  return out;
-};
-
 const nativeFilterAnchor = (state: State, range: Range): Addr => {
   const columns = Math.min(MAX_COL, Math.max(range.c1 + 8, 64));
   for (let row = 0; row <= Math.min(range.r0 + 1, 64); row += 1) {
@@ -1280,7 +1261,7 @@ const nativeDistinctFilterItems = (
 ): FilterValueItem[] | null => {
   const count = Math.max(0, range.r1 - range.r0);
   if (count === 0) return [];
-  const column = columnName(byCol);
+  const column = colLetter(byCol);
   const first = range.r0 + 2;
   const last = range.r1 + 1;
   const formula = `=SORT(UNIQUE($${column}$${first}:$${column}$${last}))`;

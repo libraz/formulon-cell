@@ -29,7 +29,7 @@ export function normalizeAxisEdit(
   return normalizedCount > 0 ? { at, count: normalizedCount } : null;
 }
 
-export function cloneInsertedFormat(format: CellFormat): CellFormat {
+function cloneInsertedFormat(format: CellFormat): CellFormat {
   const next: CellFormat = { ...format };
   delete next.hyperlink;
   delete next.hyperlinkLocation;

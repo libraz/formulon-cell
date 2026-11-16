@@ -119,7 +119,7 @@ const toggledAxis = (
 ): ChartAxisSpec => ({ ...axis, ...patch });
 
 /** The change `action` makes to `chart`, or null when it does not apply. */
-export const chartElementPatch = (
+const chartElementPatch = (
   chart: SessionChart,
   action: ChartElementAction,
 ): SessionChartPatch | null => {

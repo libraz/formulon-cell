@@ -77,7 +77,6 @@ export function withSelectionFormatOrigin<T>(
 const authorizeSelection = (
   store: SpreadsheetStore,
   ranges: readonly Range[],
-  _cells: readonly Addr[],
   options: SelectionFormatOptions,
 ): boolean => {
   const controller = interactionControllerFor(store);
@@ -104,11 +103,10 @@ const commitSelectionFormatEntries = (
   state: State,
   store: SpreadsheetStore,
   ranges: readonly Range[],
-  cells: readonly Addr[],
   entries: readonly SelectionFormatEntry[],
   options: SelectionFormatOptions,
 ): boolean => {
-  if (!authorizeSelection(store, ranges, cells, options)) return false;
+  if (!authorizeSelection(store, ranges, options)) return false;
   const writable = entries.filter((entry) => isCellFormattable(state, entry.addr));
   if (writable.length === 0) return false;
   store.setState((current) => {
@@ -185,7 +183,7 @@ const applyAxisFormatPatch = (
   if (plan.axisBands.length === 0 || !axisPatchSupported(patch)) return false;
   const sheet = plan.ranges[0]?.sheet;
   if (sheet === undefined || !sheetPermits(state, sheet, 'formatCells')) return false;
-  if (!authorizeSelection(store, plan.ranges, plan.cells, options)) return false;
+  if (!authorizeSelection(store, plan.ranges, options)) return false;
   const controller = interactionControllerFor(store);
   if (controller?.policy?.editable !== undefined) return false;
   const bridge = formatHistoryBridgeFor(store);
@@ -265,7 +263,6 @@ const applyPatchToPlan = (
     state,
     store,
     plan.ranges,
-    plan.cells,
     plan.cells.map((addr) => ({ addr, patch })),
     options,
   );
@@ -306,7 +303,6 @@ export function applySelectionFormatPatchWhere(
     state,
     store,
     plan.ranges,
-    cells,
     cells.map((addr) => ({ addr, patch })),
     options,
   );
@@ -319,7 +315,7 @@ const sparseSelectionPlan = (
 ): { ranges: Range[]; cells: Addr[] } | null => {
   const geometry = sparseSelectionGeometry(state);
   if (!geometry) return null;
-  if (!authorizeSelection(store, geometry.ranges, geometry.cells, options)) return null;
+  if (!authorizeSelection(store, geometry.ranges, options)) return null;
   return geometry;
 };
 
@@ -615,7 +611,7 @@ export function bumpIndent(state: State, store: SpreadsheetStore, delta: 1 | -1)
       patch: { indent: clampIndent(cur + delta) },
     };
   });
-  commitSelectionFormatEntries(state, store, plan.ranges, plan.cells, entries, {});
+  commitSelectionFormatEntries(state, store, plan.ranges, entries, {});
 }
 
 /** Apply an angle (clamped to -90..90) or stacked `'vertical'` text. */
@@ -700,8 +696,7 @@ export function bumpDecimals(state: State, store: SpreadsheetStore, delta: 1 | -
     const nextFmt = bumpedNumFmt(directCellFormat(state, addr)?.numFmt, delta);
     if (nextFmt) entries.push({ addr, patch: { numFmt: nextFmt } });
   }
-  if (entries.length > 0)
-    commitSelectionFormatEntries(state, store, plan.ranges, plan.cells, entries, {});
+  if (entries.length > 0) commitSelectionFormatEntries(state, store, plan.ranges, entries, {});
 }
 
 export function setBorders(state: State, store: SpreadsheetStore, sides: CellBorders): void {
@@ -905,7 +900,7 @@ export function setBorderPreset(
   const { side, thickSide, doubleSide } = borderSidesFor(style, color);
   const entries = borderEntriesForPlan(plan, preset, side, thickSide, doubleSide);
   if (entries.length === 0) return;
-  commitSelectionFormatEntries(state, store, plan.ranges, plan.cells, entries, {});
+  commitSelectionFormatEntries(state, store, plan.ranges, entries, {});
 }
 
 /** Toolbar default: outline if missing, all-borders if outline present, else clear.
@@ -930,7 +925,7 @@ export function cycleBorders(state: State, store: SpreadsheetStore): void {
   });
   if (!hasAny) {
     const entries = borderEntriesForPlan(plan, 'outline', true, true, true);
-    commitSelectionFormatEntries(state, store, plan.ranges, plan.cells, entries, {});
+    commitSelectionFormatEntries(state, store, plan.ranges, entries, {});
     return;
   }
   const allFour = selectionAllHave(
@@ -946,7 +941,7 @@ export function cycleBorders(state: State, store: SpreadsheetStore): void {
         },
       }))
     : borderEntriesForPlan(plan, 'all', true, true, true);
-  commitSelectionFormatEntries(state, store, plan.ranges, plan.cells, entries, {});
+  commitSelectionFormatEntries(state, store, plan.ranges, entries, {});
 }
 
 export function clearFormat(state: State, store: SpreadsheetStore): void {

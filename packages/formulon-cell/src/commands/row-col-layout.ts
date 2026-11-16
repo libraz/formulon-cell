@@ -1,4 +1,4 @@
-import { MAX_COL, MAX_ROW } from '../engine/address.js';
+import { MAX_COL, MAX_ROW, rangeKey } from '../engine/address.js';
 import { syncLayoutToEngine } from '../engine/layout-sync.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -386,7 +386,7 @@ function normalizeAutofitRanges(ranges: readonly Range[], sheet: number): Range[
     if (!coordinates.every(Number.isInteger)) return null;
     const { r0, c0, r1, c1 } = normalizeRange(range);
     if (r0 < 0 || r1 > MAX_ROW || c0 < 0 || c1 > MAX_COL) return null;
-    const key = `${sheet}:${r0}:${c0}:${r1}:${c1}`;
+    const key = rangeKey({ sheet, r0, c0, r1, c1 });
     if (seen.has(key)) continue;
     seen.add(key);
     normalized.push({ sheet, r0, c0, r1, c1 });
