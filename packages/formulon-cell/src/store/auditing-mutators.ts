@@ -5,7 +5,7 @@ import { rangeArea } from './selection-geometry.js';
 import type { SpreadsheetStore } from './store.js';
 import type { TraceArrow } from './types.js';
 
-const MAX_WATCH_RANGE_CELLS = 10_000;
+const MAX_WATCH_CELLS = 10_000;
 
 /** Formula-auditing state: watch window, trace arrows, ignored errors and
  *  invalid-data circles. `addWatchRange` stays in `store.ts` because it
@@ -27,7 +27,7 @@ export const auditingMutators = {
   /** Pin every cell in each range to the Watch Window, preserving row-major
    *  order across ranges while de-duplicating already watched addresses. */
   addWatchRanges(store: SpreadsheetStore, ranges: readonly Range[]): void {
-    if (ranges.some((range) => rangeArea(range) > MAX_WATCH_RANGE_CELLS)) return;
+    if (ranges.some((range) => rangeArea(range) > MAX_WATCH_CELLS)) return;
     store.setState((s) => {
       const seen = new Set(s.watch.watches.map((w) => addrKey(w)));
       const next: Addr[] = [...s.watch.watches];
@@ -39,6 +39,8 @@ export const auditingMutators = {
             if (seen.has(key)) continue;
             seen.add(key);
             next.push({ sheet: range.sheet, row, col });
+            // The cap holds for the whole window, counting watched and overlapping cells once.
+            if (next.length > MAX_WATCH_CELLS) return s;
             changed = true;
           }
         }
