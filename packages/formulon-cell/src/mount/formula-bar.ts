@@ -2,6 +2,7 @@ import { autoCorrectInput, correctTypedEntry } from '../commands/autocorrect.js'
 import {
   type CellInputAlert,
   commitCellInput,
+  inputOperation,
   protectedCellAlert,
 } from '../commands/cell-input-commit.js';
 import { replaceFormulaSelectionWithWorkbookF9 } from '../commands/f9-preview.js';
@@ -44,8 +45,10 @@ import {
 import {
   isNavigationAddrAllowed,
   navigationBoundsFor,
+  navigationPolicyFor,
   navigationSelectionBoundsFor,
   nextTabStop,
+  resolveTabBoundary,
   scrollActiveIntoView,
 } from '../interact/navigation-policy.js';
 import {
@@ -700,6 +703,56 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     advanceAfterCommit(store, advance, isMacPlatform());
   };
 
+  /** Whether the bar owns Tab: false when the active cell cannot be edited from here. */
+  const tabCaptured = (): boolean => {
+    const controller = interactionControllerFor(store);
+    if (controller?.policy?.selection === false || fxInput.readOnly) return false;
+    const state = store.getState();
+    const a = state.selection.active;
+    if (!isCellWritable(state, a)) return false;
+    if (controller?.policy === undefined) return true;
+    return controller.canExecute({
+      operation: inputOperation(fxInput.value),
+      origin: 'editor',
+      effects: [{ kind: 'cells', cells: [a] }],
+    }).allowed;
+  };
+
+  /** Tab / Shift+Tab from the bar: commit any draft and move as the grid's own Tab would. */
+  const tabFromBar = (e: KeyboardEvent): void => {
+    const reverse = e.shiftKey;
+    const hasDraft = fxEditing || externalDraft !== null;
+    const controller = interactionControllerFor(store);
+    const tabRestricted =
+      controller?.policy !== undefined || navigationPolicyFor(store)?.options !== undefined;
+    if (!tabRestricted) {
+      e.preventDefault();
+      if (hasDraft) {
+        commitFx(reverse ? 'left' : 'right');
+      } else {
+        focusSheet(host);
+        advanceAfterCommit(store, reverse ? 'left' : 'right', isMacPlatform());
+      }
+      return;
+    }
+    const next = nextTabStop(store, store.getState().selection.active, reverse);
+    // At the last stop the tab boundary decides, as it does on the grid.
+    const leaves =
+      next === null &&
+      (navigationPolicyFor(store)?.options === undefined ||
+        resolveTabBoundary(host, store) === 'leave');
+    if (!leaves) e.preventDefault();
+    if (hasDraft) {
+      if (!commitFx('none') && fxEditing) return;
+    } else {
+      focusSheet(host);
+    }
+    if (next) {
+      mutators.setActive(store, next);
+      scrollActiveIntoView(store, next);
+    }
+  };
+
   const commitSelection = (): void => {
     commitRejected = false;
     draftHistory.endGroup();
@@ -1327,28 +1380,9 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       e.stopPropagation();
       commitFx('down');
     } else if (e.key === 'Tab') {
+      if (!tabCaptured()) return;
       e.stopPropagation();
-      if (isMacPlatform()) {
-        e.preventDefault();
-        commitFx(e.shiftKey ? 'left' : 'right');
-        return;
-      }
-      const controller = interactionControllerFor(store);
-      const restricted = controller?.policy !== undefined;
-      const selectionDisabled = controller?.policy?.selection === false;
-      if (selectionDisabled) {
-        commitFx('none');
-        return;
-      }
-      const active = store.getState().selection.active;
-      const next = restricted ? nextTabStop(store, active, e.shiftKey) : null;
-      if (restricted && next === null) {
-        commitFx('none');
-        return;
-      }
-      e.preventDefault();
-      commitFx(restricted ? 'none' : e.shiftKey ? 'none' : 'right');
-      if (restricted && next && !fxEditing) mutators.setActive(store, next);
+      tabFromBar(e);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();

@@ -52,7 +52,12 @@ import {
   createFormulaReferenceGesture,
   type FormulaReferenceGesture,
 } from './formula-reference-gesture.js';
-import { navigationPolicyFor, nextTabStop, scrollActiveIntoView } from './navigation-policy.js';
+import {
+  navigationPolicyFor,
+  nextTabStop,
+  resolveTabBoundary,
+  scrollActiveIntoView,
+} from './navigation-policy.js';
 import {
   buildSelectionInputBatch,
   SELECTION_INPUT_LIMIT_MESSAGE,
@@ -749,7 +754,10 @@ export class InlineEditor {
       // browser continue focus traversal. A component must not trap Tab.
       if (tabRestricted && next === null) {
         this.commit('none');
-        if (hasNavigationPolicy && navigation?.options?.tabBoundary !== 'leave') {
+        if (
+          hasNavigationPolicy &&
+          resolveTabBoundary(this.deps.host, this.deps.store) !== 'leave'
+        ) {
           e.preventDefault();
         }
         return;

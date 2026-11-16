@@ -113,6 +113,11 @@ const regionsOf = (host: HTMLElement, focusRibbonTab: () => boolean): Region[] =
   return regions;
 };
 
+/** Whether the spreadsheet shows any region other than the grid, as the F6 ring sees them. */
+export function hasRegionBesidesGrid(host: HTMLElement): boolean {
+  return regionsOf(host, () => false).some((region) => !region.isGrid);
+}
+
 /** Registers the F6 ring on `host`; returns the function that removes it. */
 export function attachRegionCycle(input: RegionCycleInput): () => void {
   const { host } = input;

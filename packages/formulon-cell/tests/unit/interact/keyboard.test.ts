@@ -506,6 +506,7 @@ describe('attachKeyboard', () => {
       mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
       const policy = attachNavigationPolicy(store, () => wb, {
         range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+        tabBoundary: 'stop',
       });
       setup();
 

@@ -29,8 +29,12 @@ interface ViewportNavigation {
     | ((ctx: Pick<EditablePredicateContext, 'addr'>) => boolean);
   /** `'editable'` moves Tab between the cells a policy lets the user edit. */
   readonly tabNavigation?: 'normal' | 'editable';
-  /** At the last Tab stop, `'stop'` (the default) keeps focus in the grid and `'leave'` lets the
-   *  browser move focus on. */
+  /** At the last Tab stop, `'stop'` keeps focus in the grid and `'leave'` lets the browser move
+   *  focus on. The default is `'stop'`, or `'leave'` when the grid is the spreadsheet's only
+   *  region. Without a viewport range or selectable cells Tab has no edge, so in a grid-only
+   *  mount the keyboard leaves through the page's own F6 or browser chrome; give the grid a
+   *  viewport range or selectable cells to let Tab leave at the edge. It applies only while the
+   *  grid handles keys (the `shortcuts` feature). */
   readonly tabBoundary?: 'stop' | 'leave';
 }
 

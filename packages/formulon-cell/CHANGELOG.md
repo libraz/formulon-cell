@@ -76,6 +76,7 @@ versioning is [SemVer](https://semver.org/).
 - Escape in a docked pane leaves the pane open and moves focus to the sheet, on both profiles: the Watch Window, the PivotTable Fields list, and on the Mac the Accessibility and Workbook Links panes and the Formula Builder. Each pane closes from its Close button; Escape used to close the Watch Window and the PivotTable Fields list.
 - Keys pressed in a modal dialog no longer reach key handlers on the host page: every dialog keeps its keys, as Format Cells, Page Setup and six other dialogs already did, and a capture-phase listener still sees them. Nothing is default-prevented on the way.
 - **Breaking:** The sheet's grid, not the mount element, takes keyboard focus and is the sheet's one tab stop: the element passed to `mount` is no longer focusable, and keys reach the grid only when pressed in it. Focus the sheet with `instance.focus()`.
+- Shift+Tab after an edit in the formula bar moves left on the default profile, as on the Mac. An unset `tabBoundary` follows the spreadsheet's shape: `'stop'`, or `'leave'` when the grid is its only region, and the resolved viewport options report it unset.
 
 ### Added
 
@@ -171,6 +172,7 @@ versioning is [SemVer](https://semver.org/).
 - Keys pressed in a modal dialog no longer reach the ribbon's, the backstage's and the title bar's shortcuts: Ctrl+F1 in Go To, Paste Special, Hyperlink, Cell Styles and other dialogs used to collapse the ribbon behind them.
 - Closing a dialog returns focus to the control that opened it, also when that control is outside the sheet, such as a host's backstage card or toolbar button: Page Setup, Go To, Format Cells, Hyperlink, Paste Special, Define Name, Insert Function, Spelling and the other dialogs used to move focus to the sheet after closing.
 - Escape that closes the backstage leaves focus on the File tab instead of dropping it to the page.
+- Tab in the formula bar no longer keeps focus there: with an edit it commits and moves on with focus in the grid, without one it moves on from the grid, and where the bar is read-only the key is left to the browser. A viewer with a fixed viewport, and a bar focused without typing, used to stay in the bar. A grid-only spreadsheet with a viewport range no longer holds Tab at its last cell (or Shift+Tab at its first) unless `tabBoundary: 'stop'` asks for it.
 
 ### Removed
 
@@ -256,6 +258,7 @@ versioning is [SemVer](https://semver.org/).
 - `formatCell(value)` → `sheet.getDisplayText('A1').text` (or `(row, col)`), the text the grid shows, General included; `mutators.setActive` / `setRange` → `instance.selection.set(ref)`; `getPageSetup(state, sheet)` → `workbook.sheet(ref).getPageSetup()`; `createSpreadsheetStore` has no replacement: the instance API reads and changes that state.
 - A host shortcut that acted on keys pressed in an open dialog through a bubble-phase `keydown` listener on `document` or `window` → register it in the capture phase (`addEventListener('keydown', fn, true)`) to keep seeing them.
 - `host.focus()` on the element passed to `mount` → `instance.focus()`; a check that the sheet has focus → `host.querySelector('.fc-host__grid') === document.activeElement`, or `host.contains(document.activeElement)` for anywhere in the spreadsheet.
+- A grid-only spreadsheet that relied on Tab staying in the grid at the viewport edge → `viewport: { …, tabBoundary: 'stop' }`.
 - `findAll(state, opts)` / `replaceAll(...)` → `sheet.findAll({ query, ... })` / `sheet.replaceAll({ query, replacement })`; watch helpers → `instance.watches`.
 - `instance.toolbar` is an `InstanceRibbon` (`activeTab`, `update`, `execute`, `focusActiveTab`, `on('change')`) in place of `ToolbarInstance`: `setActiveTab(tab)` / `setDisplayMode(mode)` / `setFormulaBarVisible(v)` / `setBackstageOpen(open)` → `update({ activeTab, displayMode, formulaBarVisible, backstageOpen })`, the matching `get*()` → the properties of the same name, and `applyCommand(id)` → `execute(id)`.
 - `Spreadsheet.mountToolbar(el, instanceRef, options)` → `await mountToolbar(el, spreadsheet, options)` from `@libraz/formulon-cell/toolbar`; the `Toolbar` it resolves takes `update`, `execute` and `dispose` as `instance.toolbar` does.

@@ -162,7 +162,7 @@ describe('mount/formula-bar — edit lifecycle', () => {
     });
   });
 
-  it('default-platform Shift+Tab commits without moving the active cell', () => {
+  it('default-platform Shift+Tab commits and moves the active cell left', () => {
     mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 1 });
     fxInput.focus();
     fxInput.dispatchEvent(new FocusEvent('focus'));
@@ -179,7 +179,7 @@ describe('mount/formula-bar — edit lifecycle', () => {
     expect(sheet.instance.store.getState().selection.active).toEqual({
       sheet: 0,
       row: 0,
-      col: 1,
+      col: 0,
     });
   });
 

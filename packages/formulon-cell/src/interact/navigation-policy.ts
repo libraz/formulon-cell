@@ -11,6 +11,7 @@ import {
 import { sheetIndexByName } from '../engine/range-resolver.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { hasRegionBesidesGrid } from '../mount/region-cycle.js';
 import { sameAddr } from '../store/direct-format.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import {
@@ -58,7 +59,8 @@ type NavigationOptions = Readonly<{
   rangeInput?: RangeInput;
   selectableInput?: readonly RangeInput[];
   tabNavigation: 'normal' | 'editable';
-  tabBoundary: 'stop' | 'leave';
+  /** Unset until the host chooses; see {@link resolveTabBoundary}. */
+  tabBoundary?: 'stop' | 'leave';
   autoExpand: boolean;
 }>;
 
@@ -217,7 +219,7 @@ function normalizeOptions(
     ...(selectable ? { selectable } : {}),
     ...(list ? { selectableInput: list.map(cloneRangeInput) } : {}),
     tabNavigation: options.tabNavigation ?? 'normal',
-    tabBoundary: options.tabBoundary ?? 'stop',
+    ...(options.tabBoundary ? { tabBoundary: options.tabBoundary } : {}),
     autoExpand: options.autoExpand ?? false,
   });
 }
@@ -312,7 +314,7 @@ function clonePublicOptions(options: NavigationOptions): ViewportOptions {
         ? { selectable: options.selectable }
         : {}),
     tabNavigation: options.tabNavigation,
-    tabBoundary: options.tabBoundary,
+    ...(options.tabBoundary ? { tabBoundary: options.tabBoundary } : {}),
     autoExpand: options.autoExpand,
   };
 }
@@ -603,6 +605,16 @@ export function nextTabStop(store: SpreadsheetStore, addr: Addr, reverse: boolea
     candidate = nextAddressInRange(bound, candidate, reverse);
   }
   return null;
+}
+
+/**
+ * What Tab does at the last stop: the explicit `tabBoundary` when set, otherwise `'leave'` when
+ * the grid is the spreadsheet's only region and `'stop'` when other regions are shown.
+ */
+export function resolveTabBoundary(host: HTMLElement, store: SpreadsheetStore): 'stop' | 'leave' {
+  const explicit = recordFor(store)?.options?.tabBoundary;
+  if (explicit) return explicit;
+  return hasRegionBesidesGrid(host) ? 'stop' : 'leave';
 }
 
 /** A split's top/left pane scrolled back to show `addr` above or left of it. */

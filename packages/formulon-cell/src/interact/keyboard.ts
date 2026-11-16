@@ -25,6 +25,7 @@ import {
   isNavigationAddrAllowed,
   navigationPolicyFor,
   nextTabStop,
+  resolveTabBoundary,
   scrollActiveIntoView,
 } from './navigation-policy.js';
 import {
@@ -528,7 +529,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     if ((restricted || hasNavigationPolicy) && k === 'Tab') {
       target = nextTabStop(store, a, shift);
       if (!target) {
-        if (hasNavigationPolicy && navigationOptions?.tabBoundary !== 'leave') {
+        if (hasNavigationPolicy && resolveTabBoundary(host, store) !== 'leave') {
           e.preventDefault();
         }
         return;
