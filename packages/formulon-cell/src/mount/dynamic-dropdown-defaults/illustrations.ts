@@ -60,6 +60,7 @@ export function createIllustrationDropdownDefaults(
             result.alt,
             { bytes: result.bytes, wb: instance.workbook },
             { origin: 'ribbon', commandId: 'pictureInsert' },
+            strings.sessionIllustrations,
           );
         }
         return;
@@ -107,6 +108,7 @@ export function createIllustrationDropdownDefaults(
         shape,
         instance.history as unknown as Parameters<typeof createRibbonShapeFromSelection>[3],
         { origin: 'ribbon', commandId: 'shapesInsert' },
+        instance.i18n.strings.sessionIllustrations,
       );
     };
 
@@ -120,6 +122,7 @@ export function createIllustrationDropdownDefaults(
         instance.history as unknown as Parameters<typeof createRibbonTextBoxFromSelection>[2],
         { origin: 'ribbon', commandId: 'shapesInsert' },
         instance.workbook,
+        instance.i18n.strings.sessionIllustrations,
       );
     };
 
@@ -250,6 +253,7 @@ export function createIllustrationDropdownDefaults(
             undefined,
             { bytes: dataUrlBytes(dataUrl), wb: instance.workbook },
             { origin: 'ribbon', commandId: 'screenshotInsert' },
+            instance.i18n.strings.sessionIllustrations,
           );
           focusSheet(instance.host);
           return;
@@ -270,6 +274,7 @@ export function createIllustrationDropdownDefaults(
             clip.alt,
             { bytes: dataUrlBytes(clip.src), wb: instance.workbook },
             { origin: 'ribbon', commandId: 'screenshotInsert' },
+            instance.i18n.strings.sessionIllustrations,
           );
           focusSheet(instance.host);
           return;

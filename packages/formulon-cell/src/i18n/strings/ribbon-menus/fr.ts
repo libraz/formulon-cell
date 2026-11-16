@@ -188,6 +188,7 @@ export const ribbonMenusFr: RibbonMenusStrings = {
     shapeDiamond: 'Losange',
     shapeLine: 'Ligne',
     shapeArrow: 'Flèche',
+    shapeTextBox: 'Zone de texte',
     screenshotAvailableWindows: 'Fenêtres disponibles',
     screenshotCurrentView: 'Affichage de la feuille active',
     screenshotScreenClipping: 'Capture d’écran',

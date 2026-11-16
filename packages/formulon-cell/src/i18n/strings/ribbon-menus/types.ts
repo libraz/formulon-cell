@@ -187,6 +187,7 @@ export interface RibbonMenusStrings {
     shapeDiamond: string;
     shapeLine: string;
     shapeArrow: string;
+    shapeTextBox: string;
     screenshotAvailableWindows: string;
     screenshotCurrentView: string;
     screenshotScreenClipping: string;

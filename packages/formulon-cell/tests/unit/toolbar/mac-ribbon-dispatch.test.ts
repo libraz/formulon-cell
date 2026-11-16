@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ignoreCellError } from '../../../src/commands/error-indicators.js';
 import { History } from '../../../src/commands/history.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { en } from '../../../src/i18n/strings.js';
 import { attachNavigationPolicy } from '../../../src/interact/navigation-policy.js';
 import type { SpreadsheetInstance } from '../../../src/mount/types.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
@@ -75,6 +76,7 @@ describe('Mac ribbon command dispatch', () => {
       host: document.createElement('div'),
       workbook,
       cellEditor: { begin, isActive: () => false },
+      i18n: { locale: 'en', strings: en },
     } as unknown as SpreadsheetInstance;
     const deps = {
       inst: instance,
@@ -131,6 +133,7 @@ describe('Mac ribbon command dispatch', () => {
         capabilities: {},
         resolveColorArgb: () => 0xffffffff,
       } as unknown as WorkbookHandle,
+      i18n: { locale: 'en', strings: en },
     } as unknown as SpreadsheetInstance;
     const deps = {
       inst: instance,

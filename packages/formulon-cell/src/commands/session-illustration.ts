@@ -15,9 +15,11 @@ import { cssColorFromArgb } from '../engine/theme-color.js';
 import type { EngineDrawingAnchor, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { EngineShapeInput } from '../engine/workbook-handle-drawing-objects.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
   type DrawingStackEntry,
   type DrawingState,
+  mintDrawingId,
   sheetDrawingStack,
   writeDrawingOrder,
 } from '../store/drawing-order.js';
@@ -47,6 +49,8 @@ export interface CreateSessionShapeOptions {
   /** Outline weight in points; 0 is No Outline. */
   lineWidth?: number;
   opacity?: number;
+  /** The shape's name, saved with it. */
+  name?: string;
   /** Further fields carried on the shape. */
   extra?: Partial<SessionIllustration>;
   authorization?: IllustrationMutationAuthorization;
@@ -56,6 +60,8 @@ export interface CreateSessionImageOptions {
   id?: string;
   src: string;
   alt?: string;
+  /** The picture's name, saved with it; the alt text when unset. */
+  name?: string;
   x?: number;
   y?: number;
   w?: number;
@@ -215,6 +221,7 @@ export function createSessionShape(
         radius: options.radius,
         lineWidth: options.lineWidth,
         opacity: options.opacity,
+        ...(options.name !== undefined ? { name: options.name } : {}),
       };
       recordIllustrationChange(history, store, () => addIllustration(store, item));
       return item;
@@ -239,6 +246,7 @@ export function createSessionImage(
         kind: 'image',
         src: options.src,
         alt: options.alt,
+        ...(options.name !== undefined ? { name: options.name } : {}),
         sheet: range.sheet,
         x: options.x,
         y: options.y,
@@ -280,7 +288,7 @@ export function createSessionImage(
           nativeHeightEmu = placed.heightEmu ?? nativeHeightEmu;
         }
         nativeObjectId = options.wb.insertImage(range.sheet, options.bytes, {
-          name: options.alt ?? '',
+          name: options.name ?? options.alt ?? '',
           description: options.alt ?? '',
           anchor: {
             fromRow: placed?.fromRow ?? range.r0,
@@ -413,6 +421,83 @@ export function createSessionImage(
   );
 }
 
+/** Name templates of the drawing kinds; `{n}` is the drawing's number among its kind. */
+export type IllustrationNameTemplates = Pick<
+  Strings['sessionIllustrations'],
+  | 'pictureName'
+  | 'rectangleName'
+  | 'roundedRectangleName'
+  | 'ovalName'
+  | 'triangleName'
+  | 'diamondName'
+  | 'lineName'
+  | 'arrowName'
+  | 'textBoxName'
+>;
+
+const DEFAULT_NAMES: IllustrationNameTemplates = defaultStrings.sessionIllustrations;
+
+const SHAPE_NAME_TEMPLATE: Record<SessionShapeKind, keyof IllustrationNameTemplates> = {
+  rectangle: 'rectangleName',
+  'rounded-rectangle': 'roundedRectangleName',
+  oval: 'ovalName',
+  triangle: 'triangleName',
+  diamond: 'diamondName',
+  line: 'lineName',
+  arrow: 'arrowName',
+};
+
+type NamedKind = Pick<SessionIllustration, 'kind' | 'shape' | 'textBox' | 'sheet'>;
+
+const nameTemplate = (item: NamedKind, names: IllustrationNameTemplates): string =>
+  item.kind === 'image'
+    ? names.pictureName
+    : item.textBox
+      ? names.textBoxName
+      : names[SHAPE_NAME_TEMPLATE[item.shape ?? 'rectangle']];
+
+/** The numbered name of a drawing that carries none: its position among its kind on its sheet. */
+export const defaultIllustrationName = (
+  illustrations: readonly SessionIllustration[],
+  item: SessionIllustration,
+  names: IllustrationNameTemplates,
+): string => {
+  const sameKind = (entry: SessionIllustration): boolean =>
+    entry.sheet === item.sheet &&
+    entry.kind === item.kind &&
+    entry.shape === item.shape &&
+    !entry.textBox === !item.textBox;
+  const index = illustrations.filter(sameKind).indexOf(item);
+  return nameTemplate(item, names).replace('{n}', String(index + 1));
+};
+
+/** A drawing's name: the one it carries, else its numbered default. */
+export const illustrationName = (
+  illustrations: readonly SessionIllustration[],
+  item: SessionIllustration,
+  names: IllustrationNameTemplates,
+): string => item.name ?? defaultIllustrationName(illustrations, item, names);
+
+/** The name a new drawing takes: one past the highest number its kind's
+ *  template already shows on the sheet. */
+export const newIllustrationName = (
+  illustrations: readonly SessionIllustration[],
+  item: NamedKind,
+  names: IllustrationNameTemplates,
+): string => {
+  const template = nameTemplate(item, names);
+  const [head = '', tail = ''] = template.split('{n}');
+  let highest = 0;
+  for (const entry of illustrations) {
+    if (entry.sheet !== item.sheet) continue;
+    const name = illustrationName(illustrations, entry, names);
+    if (!name.startsWith(head) || !name.endsWith(tail)) continue;
+    const digits = name.slice(head.length, name.length - tail.length);
+    if (/^\d+$/.test(digits)) highest = Math.max(highest, Number(digits));
+  }
+  return template.replace('{n}', String(highest + 1));
+};
+
 /** Select a picture or shape the ribbon inserted, as the spreadsheet does;
  *  the overlay showing it names it. */
 const selectInserted = (
@@ -429,14 +514,24 @@ export function createRibbonShapeFromSelection(
   shape: SessionShapeKind,
   history: History | null = null,
   authorization?: IllustrationMutationAuthorization,
+  names: IllustrationNameTemplates = DEFAULT_NAMES,
 ): SessionIllustration | null {
-  const count = store.getState().illustrations.illustrations.length;
+  const state = store.getState();
+  const count = state.illustrations.illustrations.length;
   const item = createSessionShape(
     store,
     range,
     {
-      id: `ribbon-shape-${range.sheet}-${range.r0}-${range.c0}-${shape}-${count}`,
+      id: mintDrawingId(
+        state,
+        `ribbon-shape-${range.sheet}-${range.r0}-${range.c0}-${shape}-${count}`,
+      ),
       shape,
+      name: newIllustrationName(
+        state.illustrations.illustrations,
+        { kind: 'shape', shape, sheet: range.sheet },
+        names,
+      ),
       x: 300 + (count % 3) * 24,
       y: 88 + (count % 3) * 24,
       w: shape === 'line' || shape === 'arrow' ? 180 : 160,
@@ -466,16 +561,23 @@ export function createRibbonTextBoxFromSelection(
   history: History | null = null,
   authorization?: IllustrationMutationAuthorization,
   wb?: WorkbookHandle,
+  names: IllustrationNameTemplates = DEFAULT_NAMES,
 ): SessionIllustration | null {
-  const count = store.getState().illustrations.illustrations.length;
+  const state = store.getState();
+  const count = state.illustrations.illustrations.length;
   const argb = wb?.resolveColorArgb(TEXT_BOX_FILL) ?? null;
   const fill = argb === null ? '#ffffff' : cssColorFromArgb(argb);
   const item = createSessionShape(
     store,
     range,
     {
-      id: `ribbon-text-box-${range.sheet}-${range.r0}-${range.c0}-${count}`,
+      id: mintDrawingId(state, `ribbon-text-box-${range.sheet}-${range.r0}-${range.c0}-${count}`),
       shape: 'rectangle',
+      name: newIllustrationName(
+        state.illustrations.illustrations,
+        { kind: 'shape', shape: 'rectangle', textBox: true, sheet: range.sheet },
+        names,
+      ),
       x: 300 + (count % 3) * 24,
       y: 88 + (count % 3) * 24,
       w: 160,
@@ -502,15 +604,22 @@ export function createRibbonImageFromSelection(
   alt?: string,
   native?: { bytes?: Uint8Array; wb?: WorkbookHandle },
   authorization?: IllustrationMutationAuthorization,
+  names: IllustrationNameTemplates = DEFAULT_NAMES,
 ): SessionIllustration | null {
-  const count = store.getState().illustrations.illustrations.length;
+  const state = store.getState();
+  const count = state.illustrations.illustrations.length;
   const item = createSessionImage(
     store,
     range,
     {
-      id: `ribbon-image-${range.sheet}-${range.r0}-${range.c0}-${count}`,
+      id: mintDrawingId(state, `ribbon-image-${range.sheet}-${range.r0}-${range.c0}-${count}`),
       src,
       alt: alt ?? src,
+      name: newIllustrationName(
+        state.illustrations.illustrations,
+        { kind: 'image', sheet: range.sheet },
+        names,
+      ),
       x: 300 + (count % 3) * 24,
       y: 88 + (count % 3) * 24,
       w: 240,

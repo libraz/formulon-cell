@@ -186,6 +186,7 @@ export const ribbonMenusEn: RibbonMenusStrings = {
     shapeDiamond: 'Diamond',
     shapeLine: 'Line',
     shapeArrow: 'Arrow',
+    shapeTextBox: 'Text Box',
     screenshotAvailableWindows: 'Available Windows',
     screenshotCurrentView: 'Current Sheet View',
     screenshotScreenClipping: 'Screen Clipping',

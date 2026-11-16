@@ -185,6 +185,7 @@ export const ribbonMenusZh: RibbonMenusStrings = {
     shapeDiamond: '菱形',
     shapeLine: '直线',
     shapeArrow: '箭头',
+    shapeTextBox: '文本框',
     screenshotAvailableWindows: '可用窗口',
     screenshotCurrentView: '当前工作表视图',
     screenshotScreenClipping: '屏幕剪辑',

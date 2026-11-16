@@ -191,6 +191,7 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     shapeDiamond: 'Raute',
     shapeLine: 'Linie',
     shapeArrow: 'Pfeil',
+    shapeTextBox: 'Textfeld',
     screenshotAvailableWindows: 'Verfügbare Fenster',
     screenshotCurrentView: 'Aktuelle Blattansicht',
     screenshotScreenClipping: 'Bildschirmausschnitt',

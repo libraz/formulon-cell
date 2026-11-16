@@ -4,6 +4,7 @@ import {
   canDeleteIllustration,
   canDuplicateIllustration,
   illustrationCopyRefusal,
+  illustrationName,
 } from '../commands/session-illustration.js';
 import {
   DEFAULT_SHAPE_COLOR,
@@ -23,7 +24,12 @@ import {
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { mutators, type SessionIllustration, type SpreadsheetStore } from '../store/store.js';
+import {
+  mutators,
+  type SessionIllustration,
+  type SessionShapeKind,
+  type SpreadsheetStore,
+} from '../store/store.js';
 import { commandRefusalMessage } from '../toolbar/dialogs/command-refusal.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
@@ -100,6 +106,32 @@ export interface WorkbookObjectsPanelHandle {
   bindWorkbook(next: WorkbookHandle): void;
   detach(): void;
 }
+
+const SHAPE_KIND_LABEL: Record<
+  SessionShapeKind,
+  | 'shapeRectangle'
+  | 'shapeRoundedRectangle'
+  | 'shapeOval'
+  | 'shapeTriangle'
+  | 'shapeDiamond'
+  | 'shapeLine'
+  | 'shapeArrow'
+> = {
+  rectangle: 'shapeRectangle',
+  'rounded-rectangle': 'shapeRoundedRectangle',
+  oval: 'shapeOval',
+  triangle: 'shapeTriangle',
+  diamond: 'shapeDiamond',
+  line: 'shapeLine',
+  arrow: 'shapeArrow',
+};
+
+/** The kind of a drawing as the shapes gallery names it. */
+const illustrationKind = (item: SessionIllustration, strings: Strings): string => {
+  if (item.kind === 'image') return strings.ribbon.pictures;
+  if (item.textBox) return strings.ribbonMenu.shapeTextBox;
+  return item.shape ? strings.ribbonMenu[SHAPE_KIND_LABEL[item.shape]] : strings.ribbon.shapes;
+};
 
 export function attachWorkbookObjectsPanel(
   deps: WorkbookObjectsPanelDeps,
@@ -572,14 +604,12 @@ export function attachWorkbookObjectsPanel(
       section.appendChild(heading);
       const list = document.createElement('ul');
       list.className = 'fc-objects__paths';
-      for (const [index, illustration] of illustrations.entries()) {
+      for (const illustration of illustrations) {
         const li = document.createElement('li');
         li.textContent = [
-          illustration.kind === 'image'
-            ? strings.ribbon.pictures
-            : (illustration.shape ?? strings.ribbon.shapes),
+          illustrationName(illustrations, illustration, strings.sessionIllustrations),
+          illustrationKind(illustration, strings),
           `${t.sheet} ${illustration.sheet + 1}`,
-          illustration.id || `${strings.ribbon.illustrations} ${index + 1}`,
         ].join(' · ');
         if (illustration.src) li.title = illustration.src;
         appendIllustrationActions(li, illustration);

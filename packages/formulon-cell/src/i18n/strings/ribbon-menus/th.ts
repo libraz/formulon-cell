@@ -185,6 +185,7 @@ export const ribbonMenusTh: RibbonMenusStrings = {
     shapeDiamond: 'ข้าวหลามตัด',
     shapeLine: 'เส้น',
     shapeArrow: 'ลูกศร',
+    shapeTextBox: 'กล่องข้อความ',
     screenshotAvailableWindows: 'หน้าต่างที่พร้อมใช้งาน',
     screenshotCurrentView: 'มุมมองแผ่นงานปัจจุบัน',
     screenshotScreenClipping: 'การคลิปหน้าจอ',

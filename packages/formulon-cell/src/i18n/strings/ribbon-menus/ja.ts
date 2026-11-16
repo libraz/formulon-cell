@@ -187,6 +187,7 @@ export const ribbonMenusJa: RibbonMenusStrings = {
     shapeDiamond: 'ひし形',
     shapeLine: '線',
     shapeArrow: '矢印',
+    shapeTextBox: 'テキスト ボックス',
     screenshotAvailableWindows: '使用できるウィンドウ',
     screenshotCurrentView: '現在のシート表示',
     screenshotScreenClipping: '画面の領域',

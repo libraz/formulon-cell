@@ -1,5 +1,8 @@
 import type { History } from '../commands/history.js';
-import type { IllustrationMutationAuthorization } from '../commands/session-illustration.js';
+import type {
+  IllustrationMutationAuthorization,
+  IllustrationNameTemplates,
+} from '../commands/session-illustration.js';
 import {
   arrangeSessionIllustration,
   arrangeStackPosition,
@@ -8,6 +11,7 @@ import {
   drawingPanelZIndex,
   duplicateSessionIllustration,
   illustrationCopyRefusal,
+  illustrationName,
   sheetDrawingStack,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
@@ -34,7 +38,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { themeFontFace } from '../engine/workbook-handle-styles.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
-import type { SessionShapeKind, State } from '../store/types.js';
+import type { State } from '../store/types.js';
 import { SVG_NS } from '../svg-namespace.js';
 import { showCommandRefusal } from '../toolbar/dialogs/command-refusal.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -61,72 +65,23 @@ export interface SessionIllustrationsHandle {
   detach(): void;
 }
 
-export interface SessionIllustrationLabels {
+export interface SessionIllustrationLabels extends IllustrationNameTemplates {
   /** How assistive technology names a picture and a shape. */
   picture: string;
   shape: string;
-  /** Name box texts for a selected picture or shape, as Excel names them;
-   *  `{n}` is the object's number among its kind on the sheet. */
-  pictureName: string;
-  rectangleName: string;
-  roundedRectangleName: string;
-  ovalName: string;
-  triangleName: string;
-  diamondName: string;
-  lineName: string;
-  arrowName: string;
-  textBoxName: string;
   /** The object's right-click menu. */
   bringToFront: string;
   sendToBack: string;
 }
 
-const DEFAULT_LABELS: SessionIllustrationLabels = {
-  picture: 'Picture',
-  shape: 'Shape',
-  pictureName: 'Picture {n}',
-  rectangleName: 'Rectangle {n}',
-  roundedRectangleName: 'Rectangle: Rounded Corners {n}',
-  ovalName: 'Oval {n}',
-  triangleName: 'Isosceles Triangle {n}',
-  diamondName: 'Diamond {n}',
-  lineName: 'Straight Connector {n}',
-  arrowName: 'Straight Arrow Connector {n}',
-  textBoxName: 'TextBox {n}',
-  bringToFront: 'Bring to Front',
-  sendToBack: 'Send to Back',
-};
+const DEFAULT_LABELS: SessionIllustrationLabels = defaultStrings.sessionIllustrations;
 
-const SHAPE_NAME_LABEL: Record<SessionShapeKind, keyof SessionIllustrationLabels> = {
-  rectangle: 'rectangleName',
-  'rounded-rectangle': 'roundedRectangleName',
-  oval: 'ovalName',
-  triangle: 'triangleName',
-  diamond: 'diamondName',
-  line: 'lineName',
-  arrow: 'arrowName',
-};
-
-/** Excel's name for a picture or shape, numbered among its kind on the sheet. */
+/** A drawing's name in the name box: the one it carries, else numbered among its kind. */
 const objectName = (
   state: State,
   item: SessionIllustration,
   labels: SessionIllustrationLabels,
-): string => {
-  const sameKind = (entry: SessionIllustration): boolean =>
-    entry.sheet === item.sheet &&
-    entry.kind === item.kind &&
-    entry.shape === item.shape &&
-    !entry.textBox === !item.textBox;
-  const index = state.illustrations.illustrations.filter(sameKind).indexOf(item);
-  const template =
-    item.kind === 'image'
-      ? labels.pictureName
-      : item.textBox
-        ? labels.textBoxName
-        : labels[SHAPE_NAME_LABEL[item.shape ?? 'rectangle']];
-  return template.replace('{n}', String(index + 1));
-};
+): string => illustrationName(state.illustrations.illustrations, item, labels);
 
 const MIN_W = 48;
 const MIN_H = 32;

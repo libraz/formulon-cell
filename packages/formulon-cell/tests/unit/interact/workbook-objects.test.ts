@@ -289,13 +289,31 @@ describe('attachWorkbookObjectsPanel', () => {
           shape: 'arrow',
           sheet: 1,
         },
+        {
+          id: 'shape-native-1-4',
+          kind: 'shape',
+          shape: 'oval',
+          sheet: 1,
+          name: 'Sales Box',
+        },
+        {
+          id: 'ribbon-text-box-0',
+          kind: 'shape',
+          shape: 'rectangle',
+          textBox: true,
+          sheet: 0,
+        },
       ],
     });
     handle.open();
 
     expect(host.textContent).toContain('Illustrations');
-    expect(host.textContent).toContain('Pictures · Sheet 1 · ribbon-image-0');
-    expect(host.textContent).toContain('arrow · Sheet 2 · ribbon-shape-0');
+    // A drawing is listed by its name, or the numbered one the overlay shows, then its kind.
+    expect(host.textContent).toContain('Picture 1 · Pictures · Sheet 1');
+    expect(host.textContent).toContain('Straight Arrow Connector 1 · Arrow · Sheet 2');
+    expect(host.textContent).toContain('Sales Box · Oval · Sheet 2');
+    expect(host.textContent).toContain('TextBox 1 · Text Box · Sheet 1');
+    expect(host.textContent).not.toContain('ribbon-image-0');
     expect(host.textContent).not.toContain('No preserved charts');
     handle.detach();
   });
@@ -484,7 +502,7 @@ describe('attachWorkbookObjectsPanel', () => {
       },
     ];
     for (const listener of listeners) listener();
-    expect(host.textContent).toContain('oval · Sheet 1 · shape-later');
+    expect(host.textContent).toContain('Oval 1 · Oval · Sheet 1');
 
     handle.detach();
     illustrations = [

@@ -131,6 +131,41 @@ describe('attachSessionIllustrations', () => {
     handle.detach();
   });
 
+  it('shows the name a drawing carries over the numbered one', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    mutators.upsertIllustration(store, {
+      id: 'loaded-shape',
+      kind: 'shape',
+      shape: 'oval',
+      sheet: 0,
+      name: 'Sales Box',
+    });
+    mutators.upsertIllustration(store, {
+      id: 'loaded-picture',
+      kind: 'image',
+      sheet: 0,
+      src: 'data:image/png;base64,image',
+      name: 'Logo',
+    });
+    mutators.upsertIllustration(store, { id: 'oval-2', kind: 'shape', shape: 'oval', sheet: 0 });
+
+    const handle = attachSessionIllustrations({ host, store });
+    const overlays = Array.from(host.querySelectorAll<HTMLElement>('.fc-illustration'));
+    expect(overlays.map((overlay) => overlay.getAttribute('aria-label'))).toEqual([
+      'Sales Box',
+      'Logo',
+      'Oval 2',
+    ]);
+    firePointer(overlays[0] as HTMLElement, 'pointerdown');
+    firePointer(window, 'pointerup');
+    expect(store.getState().ui.selectedObject).toEqual({ id: 'loaded-shape', name: 'Sales Box' });
+
+    handle.detach();
+    host.remove();
+  });
+
   it('tracks native anchor offsets and dimensions through zoom and scroll', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

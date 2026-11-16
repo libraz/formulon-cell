@@ -187,6 +187,7 @@ export const ribbonMenusKo: RibbonMenusStrings = {
     shapeDiamond: '마름모',
     shapeLine: '선',
     shapeArrow: '화살표',
+    shapeTextBox: '텍스트 상자',
     screenshotAvailableWindows: '사용 가능한 창',
     screenshotCurrentView: '현재 시트 보기',
     screenshotScreenClipping: '화면 캡처',

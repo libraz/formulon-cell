@@ -68,6 +68,7 @@ const imageFromNative = (
     sheet,
     src: imageBytesToDataUrl(image.bytes, image.format),
     alt: object.description || object.name,
+    ...(object.name ? { name: object.name } : {}),
     ...position,
     nativeObjectId: object.objectId,
     nativeGeometryEditable: object.anchor.kind !== ANCHOR_KIND_ABSOLUTE,
