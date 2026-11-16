@@ -8,7 +8,7 @@ import {
 } from './menu-text.js';
 import { fontFamilyCatalog } from './ribbon/font-family-options.js';
 import { buildMacRibbonModel } from './ribbon/mac/model.js';
-import { buildMacObjectTabs } from './ribbon/mac/object-tabs.js';
+import { buildMacObjectTabs, withMacTabLabel } from './ribbon/mac/object-tabs.js';
 import { buildPivotContextualTabs } from './ribbon/pivot-tabs.js';
 import { buildSparklineDesignTab } from './ribbon/sparkline-tabs.js';
 
@@ -963,7 +963,10 @@ export function buildRibbonModel(
     opts.tabs ?? (opts.profile === 'excel365Mac' ? EXCEL365_MAC_RIBBON_TABS : RIBBON_TABS);
   const tabsById = new Map(profileTabs.map((tab) => [tab.id, tab]));
   const contextualById = new Map([
-    ...contextualTabs.map((tab) => [tab.id, tab] as const),
+    ...contextualTabs.map(
+      (tab) =>
+        [tab.id, opts.profile === 'excel365Mac' ? withMacTabLabel(tab, profileLang) : tab] as const,
+    ),
     ...buildPivotContextualTabs(profileLang, tr.tabs, opts.profile).map(
       (tab) => [tab.id, tab] as const,
     ),

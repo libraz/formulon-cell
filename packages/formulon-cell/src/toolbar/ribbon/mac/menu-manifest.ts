@@ -19,8 +19,6 @@ import { MAC_SHAPE_GALLERY } from './shape-gallery.js';
 export interface MacRibbonMenuItem {
   id: string;
   label: string;
-  /** Japanese wording of a shape gallery row; every other row's wording is generated. */
-  labelJa?: string;
   disabled?: boolean;
   disabledReason?: string;
   icon?: string;

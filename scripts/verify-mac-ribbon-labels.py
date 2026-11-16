@@ -43,6 +43,8 @@ HERE = Path(__file__).resolve().parent
 MAC = HERE.parent / 'packages/formulon-cell/src/toolbar/ribbon/mac'
 DEFAULT_PROBES = '/Users/libraz/Projects/formulon/backup/probes/ribbon-review-2026-11-13/out'
 TAB_IDS = ['home', 'insert', 'draw', 'pageLayout', 'formulas', 'data', 'review', 'view', 'automate']
+# Shared contextual tabs the Mac profile renames by their tab id (object-tabs.ts withMacTabLabel).
+CONTEXTUAL_TAB_IDS = ['shapeFormat']
 
 
 def load_generator():
@@ -216,7 +218,9 @@ class Surface:
         if ns == 'menu':
             return name in self.menu_keys and name in self.ids
         if ns == 'labels':
-            return name in self.label_keys and (name in self.tail or name in self.direct or name in TAB_IDS)
+            return name in self.label_keys and (
+                name in self.tail or name in self.direct or name in TAB_IDS or name in CONTEXTUAL_TAB_IDS
+            )
         return name in self.group_keys and name in self.group_titles
 
 

@@ -271,10 +271,9 @@ const SHAPE_ICONS: Readonly<Record<string, VisualTileIconSlug>> = {
   shapeDiamond: 'shape-diamond',
 };
 
-/** The wording of a gallery's own row: its generated label, or the shape gallery's own pair. */
+/** The wording of a gallery's own row: its generated label, else the row's own label. */
 const ownLabel = (item: MacRibbonMenuItem, lang: Locale): string =>
-  findMacBundleLabel(`gallery:${item.id}`)?.[lang] ??
-  (lang === 'ja' && item.labelJa ? item.labelJa : item.label);
+  findMacBundleLabel(`gallery:${item.id}`)?.[lang] ?? item.label;
 
 const menuItemButton = (
   item: MacRibbonMenuItem,

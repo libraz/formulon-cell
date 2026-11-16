@@ -4,7 +4,7 @@ import type {
   RibbonTabModel,
   ToolbarLang,
 } from '../../ribbon-model.js';
-import { macGroupTitle } from './labels.js';
+import { labels, macGroupTitle } from './labels.js';
 import { MAC_OBJECT_TAB_DISABLED_COMMAND_IDS } from './object-tab-ids.js';
 
 /** Wording of the Mac table and chart tabs: Japanese is measured, other languages read as English. */
@@ -61,6 +61,12 @@ const LABELS = {
   lockAspect: L('縦横比を固定', 'Lock Aspect Ratio'),
   formatPane: L('書式ウィンドウ', 'Format Pane'),
 } as const;
+
+/** A shared contextual tab under the name the Mac draws, where the Mac names it differently. */
+export const withMacTabLabel = (tab: RibbonTabModel, lang: ToolbarLang): RibbonTabModel => {
+  const label = labels[tab.id]?.[lang];
+  return label ? { ...tab, label } : tab;
+};
 
 /** The Excel for Mac table tab and chart tabs, in the groups and order Excel shows them. */
 export const buildMacObjectTabs = (

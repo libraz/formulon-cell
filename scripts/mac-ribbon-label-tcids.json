@@ -2311,6 +2311,14 @@
         "zh": "插入: 0.1.0.3.5"
       }
     },
+    "labels:shapeFormat": {
+      "tcid": 11528,
+      "source": "tbbtn",
+      "name": "TabDrawing",
+      "match": "en+ja",
+      "control": "button",
+      "strip_ellipsis": true
+    },
     "labels:shapeRoundedRectangle": {
       "tcid": 1115,
       "source": "tbbtn",
@@ -4288,6 +4296,678 @@
       "file": "mso40ui.framework/tbtip.strings",
       "key": "3791498120"
     },
+    "gallery:mac.insert.heading.shape.basic": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3028666635"
+    },
+    "gallery:mac.insert.shape.basic.0": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "767112322"
+    },
+    "gallery:mac.insert.shape.basic.1": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "674213787"
+    },
+    "gallery:mac.insert.shapeRectangle": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1425156559"
+    },
+    "gallery:mac.insert.shapeRoundedRectangle": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "270151721"
+    },
+    "gallery:mac.insert.shapeOval": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "61581532"
+    },
+    "gallery:mac.insert.shape.basic.5": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2867374884"
+    },
+    "gallery:mac.insert.shape.basic.6": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "335742600"
+    },
+    "gallery:mac.insert.shape.basic.7": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3053238843"
+    },
+    "gallery:mac.insert.shape.basic.8": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "937291787"
+    },
+    "gallery:mac.insert.shape.basic.9": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3112373062"
+    },
+    "gallery:mac.insert.shape.basic.10": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2436191576"
+    },
+    "gallery:mac.insert.shape.basic.11": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "738461376"
+    },
+    "gallery:mac.insert.shapeTriangle": {
+      "file": "strman_001c.strings",
+      "key": "58"
+    },
+    "gallery:mac.insert.shape.basic.13": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1225943760"
+    },
+    "gallery:mac.insert.shape.basic.14": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1790204740"
+    },
+    "gallery:mac.insert.shape.basic.15": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1820160654"
+    },
+    "gallery:mac.insert.shapeDiamond": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1720205978"
+    },
+    "gallery:mac.insert.shape.basic.17": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2350414954"
+    },
+    "gallery:mac.insert.shape.basic.18": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "409467217"
+    },
+    "gallery:mac.insert.shape.basic.19": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "949551602"
+    },
+    "gallery:mac.insert.shape.basic.20": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3616973628"
+    },
+    "gallery:mac.insert.shape.basic.21": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "857660330"
+    },
+    "gallery:mac.insert.shape.basic.22": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3286296794"
+    },
+    "gallery:mac.insert.shape.basic.23": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2016037355"
+    },
+    "gallery:mac.insert.shape.basic.24": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3868261320"
+    },
+    "gallery:mac.insert.shape.basic.25": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1482544118"
+    },
+    "gallery:mac.insert.shape.basic.26": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3415797350"
+    },
+    "gallery:mac.insert.shape.basic.27": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "251197761"
+    },
+    "gallery:mac.insert.shape.basic.28": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2067373846"
+    },
+    "gallery:mac.insert.shape.basic.29": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3240432903"
+    },
+    "gallery:mac.insert.shape.basic.30": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1272670630"
+    },
+    "gallery:mac.insert.shape.basic.31": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "400557051"
+    },
+    "gallery:mac.insert.shape.basic.32": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "852393697"
+    },
+    "gallery:mac.insert.shape.basic.33": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3246433856"
+    },
+    "gallery:mac.insert.shape.basic.34": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "914620831"
+    },
+    "gallery:mac.insert.heading.shape.lines": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1913780425"
+    },
+    "gallery:mac.insert.shapeLine": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3989660872"
+    },
+    "gallery:mac.insert.shapeArrow": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "684616370"
+    },
+    "gallery:mac.insert.shape.lines.2": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2269058769"
+    },
+    "gallery:mac.insert.shape.lines.3": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3629532127"
+    },
+    "gallery:mac.insert.shape.lines.4": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2966415705"
+    },
+    "gallery:mac.insert.shape.lines.5": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2704309100"
+    },
+    "gallery:mac.insert.shape.lines.6": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1717622217"
+    },
+    "gallery:mac.insert.shape.lines.7": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3010083773"
+    },
+    "gallery:mac.insert.shape.lines.8": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3519777410"
+    },
+    "gallery:mac.insert.shape.lines.9": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "641736498"
+    },
+    "gallery:mac.insert.shape.lines.10": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2020020971"
+    },
+    "gallery:mac.insert.shape.lines.11": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1311385188"
+    },
+    "gallery:mac.insert.shape.lines.12": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2738432662"
+    },
+    "gallery:mac.insert.shape.lines.13": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "861459455"
+    },
+    "gallery:mac.insert.shape.lines.14": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3045830545"
+    },
+    "gallery:mac.insert.shape.lines.15": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3727346855"
+    },
+    "gallery:mac.insert.shape.lines.16": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2401762266"
+    },
+    "gallery:mac.insert.shape.lines.17": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3628293052"
+    },
+    "gallery:mac.insert.shape.lines.18": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1082077260"
+    },
+    "gallery:mac.insert.heading.shape.arrows": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3266736992"
+    },
+    "gallery:mac.insert.shape.arrows.0": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3781874071"
+    },
+    "gallery:mac.insert.shape.arrows.1": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "911344213"
+    },
+    "gallery:mac.insert.shape.arrows.2": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2054035290"
+    },
+    "gallery:mac.insert.shape.arrows.3": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3015382696"
+    },
+    "gallery:mac.insert.shape.arrows.4": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4136990544"
+    },
+    "gallery:mac.insert.shape.arrows.5": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3513615260"
+    },
+    "gallery:mac.insert.shape.arrows.6": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "438325566"
+    },
+    "gallery:mac.insert.shape.arrows.7": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3521563698"
+    },
+    "gallery:mac.insert.shape.arrows.8": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1730909843"
+    },
+    "gallery:mac.insert.shape.arrows.9": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4034727981"
+    },
+    "gallery:mac.insert.shape.arrows.10": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4114951249"
+    },
+    "gallery:mac.insert.shape.arrows.11": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "586344265"
+    },
+    "gallery:mac.insert.shape.arrows.12": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "8637550"
+    },
+    "gallery:mac.insert.shape.arrows.13": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2517891767"
+    },
+    "gallery:mac.insert.shape.arrows.14": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2760262917"
+    },
+    "gallery:mac.insert.shape.arrows.15": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2464416616"
+    },
+    "gallery:mac.insert.shape.arrows.16": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1797522548"
+    },
+    "gallery:mac.insert.shape.arrows.17": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "588304767"
+    },
+    "gallery:mac.insert.shape.arrows.18": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3492135642"
+    },
+    "gallery:mac.insert.shape.arrows.19": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1797329386"
+    },
+    "gallery:mac.insert.shape.arrows.20": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1138100439"
+    },
+    "gallery:mac.insert.shape.arrows.21": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2868511192"
+    },
+    "gallery:mac.insert.shape.arrows.22": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3735618630"
+    },
+    "gallery:mac.insert.shape.arrows.23": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1803916090"
+    },
+    "gallery:mac.insert.shape.arrows.24": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1802240349"
+    },
+    "gallery:mac.insert.shape.arrows.25": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "811137309"
+    },
+    "gallery:mac.insert.shape.arrows.26": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1855226065"
+    },
+    "gallery:mac.insert.heading.shape.callouts": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1752987748"
+    },
+    "gallery:mac.insert.shape.callouts.0": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1977127573"
+    },
+    "gallery:mac.insert.shape.callouts.1": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1780293548"
+    },
+    "gallery:mac.insert.shape.callouts.2": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2999492815"
+    },
+    "gallery:mac.insert.shape.callouts.3": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4100454608"
+    },
+    "gallery:mac.insert.shape.callouts.4": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4141730694"
+    },
+    "gallery:mac.insert.shape.callouts.5": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2804285052"
+    },
+    "gallery:mac.insert.shape.callouts.6": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2804301890"
+    },
+    "gallery:mac.insert.shape.callouts.7": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1845768970"
+    },
+    "gallery:mac.insert.shape.callouts.8": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1845851344"
+    },
+    "gallery:mac.insert.shape.callouts.9": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1845933719"
+    },
+    "gallery:mac.insert.shape.callouts.10": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1833712339"
+    },
+    "gallery:mac.insert.shape.callouts.11": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "132975322"
+    },
+    "gallery:mac.insert.shape.callouts.12": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "133057696"
+    },
+    "gallery:mac.insert.shape.callouts.13": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2485373968"
+    },
+    "gallery:mac.insert.shape.callouts.14": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2485390806"
+    },
+    "gallery:mac.insert.shape.callouts.15": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2485473181"
+    },
+    "gallery:mac.insert.shape.callouts.16": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1944687974"
+    },
+    "gallery:mac.insert.heading.shape.symbols": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "669028024"
+    },
+    "gallery:mac.insert.shape.symbols.0": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "770966839"
+    },
+    "gallery:mac.insert.shape.symbols.1": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3401643285"
+    },
+    "gallery:mac.insert.shape.symbols.2": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3275323980"
+    },
+    "gallery:mac.insert.shape.symbols.3": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3804882798"
+    },
+    "gallery:mac.insert.shape.symbols.4": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3124239928"
+    },
+    "gallery:mac.insert.shape.symbols.5": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1842886756"
+    },
+    "gallery:mac.insert.shape.symbols.6": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2759527158"
+    },
+    "gallery:mac.insert.shape.symbols.7": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2164555255"
+    },
+    "gallery:mac.insert.shape.symbols.8": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3687278078"
+    },
+    "gallery:mac.insert.shape.symbols.9": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1024917292"
+    },
+    "gallery:mac.insert.shape.symbols.10": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3300058795"
+    },
+    "gallery:mac.insert.shape.symbols.11": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2243084014"
+    },
+    "gallery:mac.insert.shape.symbols.12": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2010825483"
+    },
+    "gallery:mac.insert.shape.symbols.13": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3169484585"
+    },
+    "gallery:mac.insert.shape.symbols.14": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "526478056"
+    },
+    "gallery:mac.insert.heading.shape.flowchart": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3282697655"
+    },
+    "gallery:mac.insert.shape.flowchart.0": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2500399967"
+    },
+    "gallery:mac.insert.shape.flowchart.1": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2960424835"
+    },
+    "gallery:mac.insert.shape.flowchart.2": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "934114480"
+    },
+    "gallery:mac.insert.shape.flowchart.3": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4237603384"
+    },
+    "gallery:mac.insert.shape.flowchart.4": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2914091303"
+    },
+    "gallery:mac.insert.shape.flowchart.5": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1646011979"
+    },
+    "gallery:mac.insert.shape.flowchart.6": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1097080488"
+    },
+    "gallery:mac.insert.shape.flowchart.7": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1842653712"
+    },
+    "gallery:mac.insert.shape.flowchart.8": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "211748208"
+    },
+    "gallery:mac.insert.shape.flowchart.9": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3363173793"
+    },
+    "gallery:mac.insert.shape.flowchart.10": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3559469624"
+    },
+    "gallery:mac.insert.shape.flowchart.11": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "691702503"
+    },
+    "gallery:mac.insert.shape.flowchart.12": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1148059697"
+    },
+    "gallery:mac.insert.shape.flowchart.13": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1400713082"
+    },
+    "gallery:mac.insert.shape.flowchart.14": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3161650466"
+    },
+    "gallery:mac.insert.shape.flowchart.15": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3910953752"
+    },
+    "gallery:mac.insert.shape.flowchart.16": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2977500873"
+    },
+    "gallery:mac.insert.shape.flowchart.17": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2420551496"
+    },
+    "gallery:mac.insert.shape.flowchart.18": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1585027542"
+    },
+    "gallery:mac.insert.shape.flowchart.19": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4205475867"
+    },
+    "gallery:mac.insert.shape.flowchart.20": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3705071084"
+    },
+    "gallery:mac.insert.shape.flowchart.21": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4154147969"
+    },
+    "gallery:mac.insert.shape.flowchart.22": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2784559745"
+    },
+    "gallery:mac.insert.shape.flowchart.23": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2181302601"
+    },
+    "gallery:mac.insert.shape.flowchart.24": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1732603629"
+    },
+    "gallery:mac.insert.shape.flowchart.25": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1353714672"
+    },
+    "gallery:mac.insert.shape.flowchart.26": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2113308567"
+    },
+    "gallery:mac.insert.shape.flowchart.27": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3195627790"
+    },
+    "gallery:mac.insert.heading.shape.stars": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3282796868"
+    },
+    "gallery:mac.insert.shape.stars.0": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3876670866"
+    },
+    "gallery:mac.insert.shape.stars.1": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3876753240"
+    },
+    "gallery:mac.insert.shape.stars.2": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3681534880"
+    },
+    "gallery:mac.insert.shape.stars.3": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1835559147"
+    },
+    "gallery:mac.insert.shape.stars.4": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2322002999"
+    },
+    "gallery:mac.insert.shape.stars.5": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3890306543"
+    },
+    "gallery:mac.insert.shape.stars.6": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3681270919"
+    },
+    "gallery:mac.insert.shape.stars.7": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1841650951"
+    },
+    "gallery:mac.insert.shape.stars.8": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2419556935"
+    },
+    "gallery:mac.insert.shape.stars.9": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1237124970"
+    },
+    "gallery:mac.insert.shape.stars.10": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1248290081"
+    },
+    "gallery:mac.insert.shape.stars.11": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1241775242"
+    },
+    "gallery:mac.insert.shape.stars.12": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1521787026"
+    },
+    "gallery:mac.insert.shape.stars.13": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3299850803"
+    },
+    "gallery:mac.insert.shape.stars.14": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1300299495"
+    },
+    "gallery:mac.insert.shape.stars.15": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "690112745"
+    },
+    "gallery:mac.insert.shape.stars.16": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "608249002"
+    },
+    "gallery:mac.insert.shape.stars.17": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3739731437"
+    },
+    "gallery:mac.insert.shape.stars.18": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2036774585"
+    },
+    "gallery:mac.insert.shape.stars.19": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "22841175"
+    },
     "automation:allRowsColumns": {
       "file": "strman_0050.strings",
       "key": "22e"
@@ -6118,6 +6798,7 @@
     "labels:scaleHeight",
     "labels:scaleWidth",
     "labels:screenshot",
+    "labels:shapeFormat",
     "labels:shapeRoundedRectangle",
     "labels:shapeTriangle",
     "labels:shapes",

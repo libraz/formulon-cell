@@ -542,6 +542,52 @@ describe('Mac Excel ribbon profile', () => {
     ]);
   });
 
+  it('words the shape gallery from the desktop bundle in every locale', () => {
+    const headings = (locale: 'en' | 'de') =>
+      Array.from(
+        createMacRibbonMenuFactory(locale)('mac.insert.shapes')?.querySelectorAll(
+          '.fc-tb__menu-heading',
+        ) ?? [],
+      ).map((heading) => heading.textContent);
+    expect(headings('en')).toEqual([
+      'Basic Shapes',
+      'Lines',
+      'Arrows',
+      'Callouts',
+      'Symbols',
+      'Flowchart',
+      'Stars and Banners',
+    ]);
+    expect(headings('de')).toEqual([
+      'Standardformen',
+      'Linien',
+      'Pfeile',
+      'Beschriftungen',
+      'Symbole',
+      'Flussdiagramm',
+      'Sterne und Banner',
+    ]);
+    const row = (locale: 'en' | 'de' | 'fr', id: string) =>
+      createMacRibbonMenuFactory(locale)('mac.insert.shapes')?.querySelector(
+        `[data-ribbon-command="${id}"]`,
+      )?.textContent;
+    expect(row('en', 'mac.insert.shape.callouts.0')).toBe('Rectangular Callout');
+    expect(row('de', 'mac.insert.shape.callouts.0')).toBe('Rechteckige Legende');
+    expect(row('fr', 'mac.insert.shape.basic.5')).toBe('Rectangle\u00a0: avec coin rogné');
+    expect(row('de', 'mac.insert.shapeRectangle')).toBe('Rechteck');
+  });
+
+  it('names the Shape Format tab as the desktop does', () => {
+    const shapeTab = (locale: 'ja' | 'de' | 'ko', profile?: 'excel365Mac') =>
+      buildRibbonModel(locale, { profile, contextualTabs: ['shapeFormat'] }).find(
+        (tab) => tab.id === 'shapeFormat',
+      )?.label;
+    expect(shapeTab('ja', 'excel365Mac')).toBe('図形の書式設定');
+    expect(shapeTab('de', 'excel365Mac')).toBe('Formformat');
+    expect(shapeTab('ko', 'excel365Mac')).toBe('도형 서식');
+    expect(shapeTab('ja')).toBe('図形の書式');
+  });
+
   it('renders the nine Office 365 Mac tabs in order without File or Help', () => {
     const model = buildRibbonModel('en', { profile: 'excel365Mac' });
     expect(model.map((tab) => tab.id)).toEqual(EXCEL365_MAC_RIBBON_TABS);

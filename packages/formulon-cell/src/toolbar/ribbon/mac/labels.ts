@@ -75,6 +75,7 @@ const labelSeeds: Record<string, LegacyLabel> = {
   review: { ja: '校閲', en: 'Review' },
   view: { ja: '表示', en: 'View' },
   automate: { ja: '自動化', en: 'Automate' },
+  shapeFormat: { ja: '図形の書式設定', en: 'Shape Format' },
   sortFilter: { ja: '並べ替えとフィルター', en: 'Sort & Filter' },
   sheetViews: { ja: 'シート ビュー', en: 'Sheet Views' },
   shapeLine: { ja: '直線', en: 'Line' },
