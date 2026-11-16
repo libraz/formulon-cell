@@ -40,7 +40,7 @@ describe('openCellShiftDialog', () => {
       const onSubmit = vi.fn(() => {
         expect(document.querySelector('.fc-cellshift')).toBeNull();
       });
-      host.focus();
+      sheetFocusTarget(host).focus();
 
       openCellShiftDialog({ host, strings: en, kind, onSubmit });
 
@@ -123,7 +123,7 @@ describe('openCellShiftDialog', () => {
   });
 
   it('Escape closes and restores the host that opened the dialog', () => {
-    host.focus();
+    sheetFocusTarget(host).focus();
     openCellShiftDialog({ host, strings: en, kind: 'delete', onSubmit: vi.fn() });
     const ok = document.querySelector<HTMLButtonElement>('.fc-cellshift__button--primary');
 
@@ -163,7 +163,7 @@ describe('openCellShiftDialog', () => {
 
   it('Cancel closes without submitting and restores host focus', () => {
     const onSubmit = vi.fn();
-    host.focus();
+    sheetFocusTarget(host).focus();
     openCellShiftDialog({ host, strings: en, kind: 'insert', onSubmit });
 
     document.querySelector<HTMLButtonElement>('.fc-cellshift__button--secondary')?.click();

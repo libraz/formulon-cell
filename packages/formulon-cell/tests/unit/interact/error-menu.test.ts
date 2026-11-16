@@ -54,7 +54,7 @@ describe('attachErrorMenu', () => {
     const addr = { sheet: 0, row: 1, col: 2 };
     const handle = attachErrorMenu({ host, store, getWb: fakeWb, strings: en });
 
-    host.focus();
+    sheetFocusTarget(host).focus();
     handle.open(addr, 10, 10, 'validation');
     const root = document.querySelector<HTMLElement>('.fc-errmenu');
     const items = document.querySelectorAll<HTMLButtonElement>('.fc-errmenu__item');

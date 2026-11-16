@@ -10,6 +10,7 @@ import {
 } from '../../src/mount/locale-profile.js';
 import { mutators } from '../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../test-utils/index.js';
+import { sheetFocusTarget } from '../test-utils/sheet-focus.js';
 
 describe('integration: locale profile switching', () => {
   let sheet: MountedStubSheet | undefined;
@@ -108,7 +109,9 @@ describe('integration: locale profile switching', () => {
     try {
       sheet = await mountStubSheet({ workbook, locale: 'en', ui: { platform: 'default' } });
       const dispatchKey = (event: KeyboardEventInit): void => {
-        sheet?.host.dispatchEvent(new KeyboardEvent('keydown', { ...event, bubbles: true }));
+        (sheet && sheetFocusTarget(sheet.host))?.dispatchEvent(
+          new KeyboardEvent('keydown', { ...event, bubbles: true }),
+        );
       };
       const numberFormat = () => {
         const state = sheet?.instance.store.getState();
@@ -150,7 +153,9 @@ describe('integration: locale profile switching', () => {
       expect(formulaBar?.value).toBe('=SUMME(1;2)');
       expect(workbook.cellFormula({ sheet: 0, row: 0, col: 0 })).toBe('=SUM(1,2)');
 
-      sheet.host.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true }));
+      (sheet && sheetFocusTarget(sheet.host))?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'F2', bubbles: true }),
+      );
       const inlineEditor = sheet.host.querySelector<HTMLTextAreaElement>('.fc-host__editor');
       expect(inlineEditor?.value).toBe('=SUMME(1;2)');
     } finally {
@@ -196,7 +201,9 @@ describe('integration: locale profile switching', () => {
         );
         expect(formulaBar?.value).toBe('1,5');
 
-        sheet.host.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true }));
+        (sheet && sheetFocusTarget(sheet.host))?.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'F2', bubbles: true }),
+        );
         const inlineEditor = sheet.host.querySelector<HTMLTextAreaElement>('.fc-host__editor');
         expect(inlineEditor?.value).toBe('1,5');
         inlineEditor?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));

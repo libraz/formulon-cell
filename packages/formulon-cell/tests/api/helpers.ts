@@ -51,4 +51,5 @@ export const makeHost = (): HTMLElement => {
 };
 
 /** The element that holds focus when the sheet has it. */
-export const sheetFocusTarget = (host: HTMLElement): HTMLElement => host;
+export const sheetFocusTarget = (host: HTMLElement): HTMLElement =>
+  host.querySelector<HTMLElement>('.fc-host__grid') ?? host;

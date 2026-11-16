@@ -4,6 +4,7 @@ import { WorkbookHandle } from '../../src/engine/workbook-handle.js';
 import { cellRectUnclamped, layoutForView } from '../../src/render/geometry.js';
 import { mutators } from '../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../test-utils/index.js';
+import { sheetFocusTarget } from '../test-utils/sheet-focus.js';
 
 const pointer = (
   target: HTMLElement,
@@ -160,7 +161,9 @@ describe('integration: formula reference pointer routing', () => {
     sheet.workbook.recalc();
     mutators.replaceCells(sheet.instance.store, sheet.workbook.cells(0));
     mutators.setActive(sheet.instance.store, formulaAddr);
-    sheet.host.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true }));
+    sheetFocusTarget(sheet.host).dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'F2', bubbles: true }),
+    );
     const formula = sheet.host.querySelector<HTMLTextAreaElement>('.fc-host__editor');
     const grid = sheet.host.querySelector<HTMLElement>('.fc-host__grid');
     expect(formula).not.toBeNull();

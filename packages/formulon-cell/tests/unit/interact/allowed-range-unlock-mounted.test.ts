@@ -20,6 +20,7 @@ import {
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
+import { addSheetGrid, sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 import { waitFor } from '../mount/toolbar/fixtures.js';
 
 const PASSWORD = 'pw';
@@ -200,6 +201,7 @@ describe('Backspace without an interaction controller', () => {
   it('does not clear a locked cell and asks for a guarded range first', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
+    addSheetGrid(host);
     const store = createSpreadsheetStore();
     const wb = await WorkbookHandle.createDefault({ preferStub: true });
     wb.setNumber(A1, 5);
@@ -217,7 +219,7 @@ describe('Backspace without an interaction controller', () => {
       onPasteSpecial: vi.fn(),
     });
     const press = () =>
-      host.dispatchEvent(
+      sheetFocusTarget(host).dispatchEvent(
         new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }),
       );
     setProtectedSheet(store, 0, true);

@@ -2332,7 +2332,7 @@ describe('attachSessionCharts', () => {
     expect(panel().getAttribute('aria-selected')).toBe('false');
 
     host.tabIndex = -1;
-    host.focus();
+    sheetFocusTarget(host).focus();
     panel().focus();
     expect(panel().classList.contains('fc-chart--selected')).toBe(true);
     const escaped = fireKey(panel(), 'Escape');

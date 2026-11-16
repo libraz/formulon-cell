@@ -115,7 +115,7 @@ describe('attachWatchPanel', () => {
 
   it('open focuses the panel actions and Escape keeps it open with focus on the sheet', async () => {
     const handle = attachWatchPanel({ host, store, getWb: () => wb });
-    host.focus();
+    sheetFocusTarget(host).focus();
     handle.open();
     await new Promise((resolve) => requestAnimationFrame(resolve));
     const root = host.querySelector<HTMLElement>('.fc-watch');
@@ -132,7 +132,7 @@ describe('attachWatchPanel', () => {
 
   it('leaves focus where it went before the first frame after open', async () => {
     const handle = attachWatchPanel({ host, store, getWb: () => wb });
-    host.focus();
+    sheetFocusTarget(host).focus();
     handle.open();
     const addBtn = host.querySelector<HTMLButtonElement>('.fc-watch__btn');
     addBtn?.focus();
@@ -148,7 +148,7 @@ describe('attachWatchPanel', () => {
 
   it('close button closes the panel and restores focus to the opener', async () => {
     const handle = attachWatchPanel({ host, store, getWb: () => wb });
-    host.focus();
+    sheetFocusTarget(host).focus();
     handle.open();
     await new Promise((resolve) => requestAnimationFrame(resolve));
     const root = host.querySelector<HTMLElement>('.fc-watch');

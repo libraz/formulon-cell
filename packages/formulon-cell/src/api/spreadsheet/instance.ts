@@ -34,6 +34,7 @@ import type { I18n } from '../../i18n/public-view.js';
 import type { DeepPartial, Strings } from '../../i18n/strings.js';
 import type { BorderDrawHandle } from '../../interact/border-draw.js';
 import type { ClipboardHandle } from '../../interact/clipboard.js';
+import { focusSheet } from '../../interact/dialog-focus.js';
 import type { FormatPainterHandle } from '../../interact/format-painter.js';
 import type { ViewportOptions } from '../../interact/navigation-policy.js';
 import { shareSpreadsheetInternals, spreadsheetInternals } from '../../mount/internals.js';
@@ -611,6 +612,11 @@ export class SpreadsheetInstance {
       out.push(autofitRowHeight(autofitTarget(state), row, r.c0, r.c1, state.legacy.i18n.locale));
     }
     return out;
+  }
+
+  /** Moves keyboard focus to the sheet's grid. */
+  focus(): void {
+    focusSheet(stateOf(this).legacy.host);
   }
 
   /** Opens the print flow (or the PDF export). */

@@ -17,6 +17,7 @@ import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachClipboard } from '../../../src/interact/clipboard.js';
 import { attachKeyboard } from '../../../src/interact/keyboard.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
+import { addSheetGrid, sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 const addRange = (...args: Parameters<typeof addAllowedEditRange>): string =>
   addAllowedEditRange(...args) as string;
@@ -154,6 +155,7 @@ describe('edit entry points prompt for a guarded range', () => {
   beforeEach(() => {
     host = document.createElement('div');
     document.body.appendChild(host);
+    addSheetGrid(host);
   });
   afterEach(() => {
     document.body.innerHTML = '';
@@ -185,7 +187,7 @@ describe('edit entry points prompt for a guarded range', () => {
       onPasteSpecial: vi.fn(),
     });
     const press = (): void => {
-      host.dispatchEvent(
+      sheetFocusTarget(host).dispatchEvent(
         new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }),
       );
     };

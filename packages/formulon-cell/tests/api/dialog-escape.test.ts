@@ -166,7 +166,7 @@ describe('dialogs', () => {
         if (PANES[platform].includes(id)) continue;
         sheet.selection.set(ACTIVE_CELL[id] ?? 'A1');
         if (id === 'pasteSpecial') sheet.commands.execute('copy');
-        host.focus();
+        sheetFocusTarget(host).focus();
         if (id === 'chartSettings') selectChart(host);
         const before = new Set(shownSurfaces());
         sheet.dialogs.open(id);
@@ -209,7 +209,7 @@ describe('dialogs', () => {
         // Selecting a report cell may show the field list already, so look from before it.
         const before = new Set(shownSurfaces());
         sheet.selection.set(ACTIVE_CELL[id] ?? 'A1');
-        host.focus();
+        sheetFocusTarget(host).focus();
         sheet.dialogs.open(id);
         await Promise.resolve();
         const pane = shownSurfaces().find((el) => !before.has(el));
@@ -295,7 +295,7 @@ describe('dialogs', () => {
         {
           id: 'chartSettings',
           button: () => {
-            host.focus();
+            sheetFocusTarget(host).focus();
             selectChart(host);
             return host.querySelector<HTMLElement>('[data-chart-settings-tab="elements"]');
           },
@@ -363,7 +363,7 @@ describe('dialogs', () => {
           if (PANES[platform].includes(id) || FLOATING[platform].includes(id)) continue;
           sheet.selection.set(ACTIVE_CELL[id] ?? 'A1');
           if (id === 'pasteSpecial') sheet.commands.execute('copy');
-          host.focus();
+          sheetFocusTarget(host).focus();
           const before = new Set(shownSurfaces());
           sheet.dialogs.open(id);
           await Promise.resolve();

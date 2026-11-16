@@ -4,6 +4,7 @@ import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
 import { RIBBON_TABS } from '../../../../src/toolbar/ribbon-model.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
+import { sheetFocusTarget } from '../../../test-utils/sheet-focus.js';
 import { scaledTimeout } from '../../../timeouts.js';
 import { seedNumber, seedText, stubHelpers, waitFor } from './fixtures.js';
 
@@ -108,7 +109,7 @@ describe('Spreadsheet.mountToolbar', () => {
     async (k) => {
       seedItemQty();
       const press = () =>
-        sheet.instance.host.dispatchEvent(
+        sheetFocusTarget(sheet.instance.host).dispatchEvent(
           new KeyboardEvent('keydown', { key: k, ctrlKey: true, bubbles: true, cancelable: true }),
         );
       press();

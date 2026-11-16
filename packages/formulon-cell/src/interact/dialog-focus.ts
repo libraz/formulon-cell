@@ -94,9 +94,24 @@ export function advanceDialogTab(root: HTMLElement, event: KeyboardEvent): boole
   return true;
 }
 
+const GRID_SELECTOR = '.fc-host__grid';
+
+/**
+ * The element that holds focus when the sheet has it: the grid of the mounted
+ * spreadsheet `host`, or `host` itself when it is the grid.
+ */
+export function sheetFocusTarget(host: HTMLElement): HTMLElement {
+  return host.querySelector<HTMLElement>(GRID_SELECTOR) ?? host;
+}
+
+/** Whether the sheet of the mounted spreadsheet `host` has keyboard focus. */
+export function sheetHasFocus(host: HTMLElement): boolean {
+  return host.ownerDocument.activeElement === sheetFocusTarget(host);
+}
+
 /** Moves keyboard focus to the sheet of the mounted spreadsheet `host`. */
 export function focusSheet(host: HTMLElement, options?: FocusOptions): void {
-  host.focus(options);
+  sheetFocusTarget(host).focus(options);
 }
 
 /**
@@ -107,5 +122,5 @@ export function focusSheetAfterDialog(host: HTMLElement): void {
   // A disposed sheet has nowhere to take focus.
   if (!host.isConnected) return;
   focusSheet(host, { preventScroll: true });
-  console.assert(host.ownerDocument.activeElement === host, 'the sheet host did not take focus');
+  console.assert(sheetHasFocus(host), 'the sheet grid did not take focus');
 }

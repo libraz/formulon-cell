@@ -339,7 +339,7 @@ describe('attachQuickAnalysis', () => {
     seed(store, wb, [{ row: 0, col: 0, value: 1 }]);
     setRange(store, 0, 0, 0, 0);
     const handle = attachQuickAnalysis({ host, store, wb, strings: defaultStrings });
-    host.focus();
+    sheetFocusTarget(host).focus();
     handle.open();
     const root = host.querySelector<HTMLElement>('.fc-quick');
     expect(document.activeElement).toBe(root);

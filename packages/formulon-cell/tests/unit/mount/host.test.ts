@@ -26,7 +26,7 @@ describe('mount/host', () => {
       prepareMountHost(host, en as Strings, 'paper');
 
       expect(host.classList.contains('fc-host')).toBe(true);
-      expect(host.getAttribute('tabindex')).toBe('0');
+      expect(host.hasAttribute('tabindex')).toBe(false);
       expect(host.getAttribute('role')).toBe('region');
       expect(host.getAttribute('aria-roledescription')).toBe('spreadsheet');
       expect(host.getAttribute('aria-label')).toBe((en as Strings).a11y.spreadsheet);
@@ -90,7 +90,6 @@ describe('mount/host', () => {
 
       releaseMountHost(host, id);
 
-      expect(host.hasAttribute('tabindex')).toBe(false);
       expect(host.hasAttribute('role')).toBe(false);
       expect(host.hasAttribute('aria-roledescription')).toBe(false);
       expect(host.hasAttribute('aria-label')).toBe(false);

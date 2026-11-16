@@ -2,6 +2,7 @@ import '../../../api/setup-dom.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import { mount } from '../../../../src/index.js';
 import { ribbon } from '../../../../src/toolbar/index.js';
+import { sheetFocusTarget } from '../../../test-utils/sheet-focus.js';
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -62,7 +63,7 @@ describe('ribbon dialogs', () => {
             await settle();
             const active = document.activeElement as HTMLElement | null;
             if (openDialog()) misplaced.push(`${id}: still open`);
-            else if (active !== instance.host) {
+            else if (active !== sheetFocusTarget(instance.host)) {
               misplaced.push(`${id}: ${active?.tagName}.${active?.className}`);
             }
           }

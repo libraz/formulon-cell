@@ -362,7 +362,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     handle.open();
     const newButton = document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button');
     // Pointer activation does not move keyboard focus to buttons in WebKit.
-    host.focus();
+    sheetFocusTarget(host).focus();
     newButton?.click();
     const editor = document.querySelector<HTMLElement>('.fc-namedlg-editor');
     expect(editor?.hidden).toBe(false);

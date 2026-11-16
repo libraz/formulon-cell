@@ -5,6 +5,7 @@ import { attachContextMenu, type ContextMenuHandle } from '../../../src/interact
 import { createObjectMenu } from '../../../src/interact/object-menu.js';
 import { disposeOverlayPortal } from '../../../src/interact/overlay-portal.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 import { newWb } from './context-menu/fixtures.js';
 
 // A menu opened from the keyboard under a resting pointer keeps keyboard focus: an item takes
@@ -33,7 +34,7 @@ describe('menu hover focus follows pointer movement', () => {
       onAfterCommit: () => undefined,
     });
     host.focus();
-    host.dispatchEvent(
+    sheetFocusTarget(host).dispatchEvent(
       new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true }),
     );
     const root = document.querySelector<HTMLElement>('.fc-ctxmenu--managed');

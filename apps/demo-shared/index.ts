@@ -304,10 +304,10 @@ export const installDemoF6Navigation = ({
       return document.activeElement === nameBox;
     },
     () => {
-      const host = getInstance()?.host;
-      if (!isVisibleDemoLandmark(host)) return false;
-      host.focus({ preventScroll: true });
-      return document.activeElement === host;
+      const instance = getInstance();
+      if (!instance || !isVisibleDemoLandmark(instance.host)) return false;
+      instance.focus();
+      return instance.host.contains(document.activeElement);
     },
     () => {
       const status = getStatusBar();

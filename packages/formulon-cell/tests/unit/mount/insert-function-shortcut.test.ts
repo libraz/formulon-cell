@@ -26,7 +26,7 @@ describe('Shift+F3', () => {
         ...(platform === 'mac' ? { ui: { platform: 'mac' as const } } : {}),
       });
       expect(dialog()).toBeNull();
-      sheet.instance.host.dispatchEvent(
+      sheetFocusTarget(sheet.instance.host).dispatchEvent(
         new KeyboardEvent('keydown', {
           key: 'F3',
           shiftKey: true,
@@ -45,7 +45,7 @@ describe('Shift+F3', () => {
         locale: 'en',
         ...(platform === 'mac' ? { ui: { platform: 'mac' as const } } : {}),
       });
-      sheet.instance.host.dispatchEvent(
+      sheetFocusTarget(sheet.instance.host).dispatchEvent(
         new KeyboardEvent('keydown', {
           key: 'F3',
           shiftKey: true,
@@ -75,7 +75,7 @@ describe('Shift+F3', () => {
       // Away from the sheet's edges, so a grid Tab or Shift+Tab would move the active cell.
       mutators.setActive(sheet.instance.store, { sheet: 0, row: 1, col: 1 });
       const host = sheet.instance.host;
-      host.dispatchEvent(
+      sheetFocusTarget(host).dispatchEvent(
         new KeyboardEvent('keydown', {
           key: 'F3',
           shiftKey: true,

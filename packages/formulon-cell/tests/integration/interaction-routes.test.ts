@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { fixedFormPolicy, viewerPolicy } from '../../src/commands/interaction-policy.js';
 import { mutators } from '../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../test-utils/index.js';
+import { sheetFocusTarget } from '../test-utils/sheet-focus.js';
 
 const addr = (row: number, col: number) => ({ sheet: 0, row, col });
 
@@ -24,7 +25,7 @@ const key = (host: HTMLElement, keyName: string, init: KeyboardEventInit = {}): 
     cancelable: true,
     ...init,
   });
-  host.dispatchEvent(event);
+  sheetFocusTarget(host).dispatchEvent(event);
   return event;
 };
 

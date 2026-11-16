@@ -90,7 +90,6 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     // Grid keys are pressed on the sheet: a field, or a bar, pane or button elsewhere in the host, keeps its own.
     if (
       eventTarget instanceof Element &&
-      eventTarget !== host &&
       (!eventTarget.closest('.fc-host__grid') ||
         eventTarget.closest(
           'input, textarea, select, [contenteditable="true"], [contenteditable=""], [contenteditable="plaintext-only"]',

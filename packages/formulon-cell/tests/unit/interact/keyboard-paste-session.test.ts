@@ -8,6 +8,7 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+import { addSheetGrid, sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 const fire = (
   host: HTMLElement,
@@ -20,7 +21,7 @@ const fire = (
     cancelable: true,
     ...init,
   });
-  host.dispatchEvent(event);
+  sheetFocusTarget(host).dispatchEvent(event);
   return event;
 };
 
@@ -47,6 +48,7 @@ describe('keyboard Enter paste sessions', () => {
   beforeEach(async () => {
     host = document.createElement('div');
     document.body.appendChild(host);
+    addSheetGrid(host);
     store = createSpreadsheetStore();
     wb = await WorkbookHandle.createDefault({ preferStub: true });
     readText = vi.fn().mockRejectedValue(new DOMException('Denied', 'NotAllowedError'));

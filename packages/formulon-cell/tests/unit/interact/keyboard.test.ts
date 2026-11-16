@@ -14,6 +14,7 @@ import {
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
 import type { CellFormat } from '../../../src/store/types.js';
+import { addSheetGrid, sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -80,7 +81,7 @@ const fire = (
     cancelable: true,
     ...init,
   });
-  host.dispatchEvent(e);
+  sheetFocusTarget(host).dispatchEvent(e);
   return e;
 };
 
@@ -117,7 +118,7 @@ describe('attachKeyboard', () => {
       setup();
       const input = document.createElement(kind === 'contenteditable' ? 'div' : kind);
       if (kind === 'contenteditable') input.setAttribute('contenteditable', 'true');
-      host.appendChild(input);
+      sheetFocusTarget(host).appendChild(input);
       const before = store.getState().selection;
       for (const key of [')', 'ArrowDown', 'Backspace', 'Enter', 'Tab']) {
         const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
@@ -133,6 +134,7 @@ describe('attachKeyboard', () => {
   beforeEach(async () => {
     host = document.createElement('div');
     document.body.appendChild(host);
+    addSheetGrid(host);
     store = createSpreadsheetStore();
     wb = await newWb();
     onBeginEdit = vi.fn<(seed: string, options?: { mode?: 'edit' | 'point' }) => void>();

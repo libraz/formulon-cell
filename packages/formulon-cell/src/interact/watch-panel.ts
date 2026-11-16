@@ -9,6 +9,7 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { selectionRangeList } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { sheetFocusTarget } from './dialog-focus.js';
 import {
   appendDialogButton,
   bindPaneEscape,
@@ -398,7 +399,10 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   };
 
   const open = (): void => {
-    restoreFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : host;
+    restoreFocusEl =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : sheetFocusTarget(host);
     mutators.setWatchPanelOpen(store, true);
     focusInitial();
   };

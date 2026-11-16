@@ -16,7 +16,6 @@ export function prepareMountHost(
   platform?: ResolvedSpreadsheetPlatform,
 ): string {
   host.classList.add('fc-host');
-  host.setAttribute('tabindex', '0');
   host.setAttribute('role', 'region');
   host.setAttribute('aria-roledescription', 'spreadsheet');
   host.setAttribute('aria-label', strings.a11y.spreadsheet);
@@ -33,7 +32,6 @@ export function releaseMountHost(host: HTMLElement, instanceId: string): void {
   if (host.dataset.fcInstId !== instanceId) return;
   host.replaceChildren();
   host.classList.remove('fc-host');
-  host.removeAttribute('tabindex');
   host.removeAttribute('role');
   host.removeAttribute('aria-roledescription');
   host.removeAttribute('aria-label');

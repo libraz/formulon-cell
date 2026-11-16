@@ -8,6 +8,7 @@ import type { ViewportConfig } from '../../../src/api/spreadsheet/types.js';
 import { isNavigationAddrAllowed } from '../../../src/interact/navigation-policy.js';
 import { mutators } from '../../../src/store/store.js';
 import { createHostElement, installDomStubs, uninstallDomStubs } from '../../test-utils/dom.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 const at = (row: number, col: number) => ({ sheet: 0, row, col });
 
@@ -34,7 +35,7 @@ describe('viewport option', () => {
 
   const tab = (): KeyboardEvent => {
     const e = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
-    host.dispatchEvent(e);
+    sheetFocusTarget(host).dispatchEvent(e);
     return e;
   };
 

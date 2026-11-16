@@ -6,6 +6,7 @@ import { PivotAggregation } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { mount } from '../../../src/index.js';
 import { createHostElement, installDomStubs, uninstallDomStubs } from '../../test-utils/dom.js';
+import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 describe('workbook swap after a PivotTable context menu', () => {
   beforeEach(() => installDomStubs());
@@ -51,7 +52,7 @@ describe('workbook swap after a PivotTable context menu', () => {
       const pivotCell = { sheet: 0, row: 1, col: 3 };
       expect(workbookHandleOf(instance.workbook).pivotCellInfo(pivotCell)).not.toBeNull();
       instance.selection.set('D2');
-      host.dispatchEvent(
+      sheetFocusTarget(host).dispatchEvent(
         new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true }),
       );
       expect(document.querySelector('[data-fc-menu="pivot"]')).not.toBeNull();

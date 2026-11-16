@@ -262,7 +262,7 @@ describe('Spreadsheet feature registry', () => {
     const live = host.querySelector<HTMLElement>('.fc-host__a11y-live');
     expect(grid?.getAttribute('role')).toBe('grid');
     expect(grid?.getAttribute('aria-label')).toBe('Worksheet grid');
-    expect(grid?.tabIndex).toBe(-1);
+    expect(grid?.tabIndex).toBe(0);
     expect(grid?.getAttribute('aria-describedby')).toBe(live?.id);
     expect(grid?.getAttribute('aria-activedescendant')).toBe(`${mirror?.id}-active-cell`);
     expect(grid?.getAttribute('aria-rowcount')).toBe('1048576');

@@ -11,7 +11,7 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { focusMenuItem, handleMenuKeydown, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
-import { focusSheet } from './dialog-focus.js';
+import { focusSheet, sheetFocusTarget } from './dialog-focus.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { placePanel } from './overlay-position.js';
@@ -279,7 +279,9 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
   const api: ErrorMenuHandle = {
     open(addr: Addr, screenX: number, screenY: number, kind: ErrorMenuKind): void {
       restoreFocusEl =
-        document.activeElement instanceof HTMLElement ? document.activeElement : host;
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : sheetFocusTarget(host);
       buildMenu(addr, kind);
       // Pre-position offscreen so we can measure offsetWidth/offsetHeight.
       root.style.display = 'block';

@@ -366,7 +366,7 @@ describe('attachContextMenu', () => {
           };
           detach = attachContextMenu({ strings: ja, host, grid, store, wb, onAfterCommit });
 
-          host.focus();
+          sheetFocusTarget(host).focus();
           const event = new KeyboardEvent('keydown', {
             key,
             shiftKey,
@@ -415,8 +415,8 @@ describe('attachContextMenu', () => {
         grid.getBoundingClientRect = vi.fn(() => rect(10, 30, 600, 400));
         detach = attachContextMenu({ strings: ja, host, grid, store, wb, onAfterCommit });
 
-        host.focus();
-        host.dispatchEvent(
+        sheetFocusTarget(host).focus();
+        sheetFocusTarget(host).dispatchEvent(
           new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true, cancelable: true }),
         );
 
@@ -460,8 +460,8 @@ describe('attachContextMenu', () => {
           grid.getBoundingClientRect = vi.fn(() => rect(50, 40, 600, 400));
           detach = attachContextMenu({ strings: ja, host, grid, store, wb, onAfterCommit });
 
-          host.focus();
-          host.dispatchEvent(
+          sheetFocusTarget(host).focus();
+          sheetFocusTarget(host).dispatchEvent(
             new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true, cancelable: true }),
           );
 
@@ -486,8 +486,8 @@ describe('attachContextMenu', () => {
         grid.getBoundingClientRect = vi.fn(() => rect(50, 40, 0, 0));
         detach = attachContextMenu({ strings: ja, host, grid, store, wb, onAfterCommit });
 
-        host.focus();
-        host.dispatchEvent(
+        sheetFocusTarget(host).focus();
+        sheetFocusTarget(host).dispatchEvent(
           new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true, cancelable: true }),
         );
 
@@ -550,8 +550,8 @@ describe('attachContextMenu', () => {
           grid.getBoundingClientRect = vi.fn(() => rect(50, 40, 600, 400));
           detach = attachContextMenu({ strings: ja, host, grid, store, wb, onAfterCommit });
 
-          host.focus();
-          host.dispatchEvent(
+          sheetFocusTarget(host).focus();
+          sheetFocusTarget(host).dispatchEvent(
             new KeyboardEvent('keydown', {
               key: 'ContextMenu',
               bubbles: true,
@@ -618,8 +618,8 @@ describe('attachContextMenu', () => {
       vi.useFakeTimers();
       try {
         detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit, onFormatDialog });
-        host.focus();
-        host.dispatchEvent(
+        sheetFocusTarget(host).focus();
+        sheetFocusTarget(host).dispatchEvent(
           new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true, cancelable: true }),
         );
         const trigger = document.querySelector<HTMLButtonElement>(
@@ -684,7 +684,7 @@ describe('attachContextMenu', () => {
         wb,
         onFormatDialog: () => shell.open(),
       });
-      host.focus();
+      sheetFocusTarget(host).focus();
       fireContextMenu(host, 200, 70);
 
       item('formatCells')?.click();
@@ -706,7 +706,7 @@ describe('attachContextMenu', () => {
         wb,
         onFormatDialog: () => shell.open(),
       });
-      host.focus();
+      sheetFocusTarget(host).focus();
       fireContextMenu(host, 200, 70);
 
       miniItem('formatCells')?.click();
@@ -750,7 +750,7 @@ describe('attachContextMenu', () => {
           ],
         },
       });
-      host.focus();
+      sheetFocusTarget(host).focus();
       fireContextMenu(host, 200, 70);
       document.querySelector<HTMLButtonElement>('[data-fc-submenu="app.more"]')?.click();
 
@@ -781,7 +781,7 @@ describe('attachContextMenu', () => {
           transform: () => [{ id: 'app.run', label: 'Run', action }],
         },
       });
-      host.focus();
+      sheetFocusTarget(host).focus();
       fireContextMenu(host, 200, 70);
 
       item('app.run')?.click();
@@ -810,7 +810,7 @@ describe('attachContextMenu', () => {
           ],
         },
       });
-      host.focus();
+      sheetFocusTarget(host).focus();
       fireContextMenu(host, 200, 70);
 
       item('app.focusExternal')?.click();
@@ -1152,8 +1152,10 @@ describe('attachContextMenu', () => {
       expect(opens[0]?.kind).toBe('cell');
       expect(opens[0]?.selection).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 3, c1: 3 });
 
-      host.focus();
-      host.dispatchEvent(new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true }));
+      sheetFocusTarget(host).focus();
+      sheetFocusTarget(host).dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true }),
+      );
       expect(opens).toHaveLength(2);
       expect(opens[1]?.event).toBeInstanceOf(KeyboardEvent);
       expect(opens[1]?.cell).toEqual(store.getState().selection.active);
@@ -1170,8 +1172,10 @@ describe('attachContextMenu', () => {
       expect(firstRoot.querySelector('.fc-ctxmenu')).not.toBeNull();
 
       currentRoot = secondRoot;
-      host.focus();
-      host.dispatchEvent(new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true }));
+      sheetFocusTarget(host).focus();
+      sheetFocusTarget(host).dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true }),
+      );
 
       expect(firstRoot.querySelector('.fc-ctxmenu')).toBeNull();
       expect(secondRoot.querySelector('.fc-ctxmenu')).not.toBeNull();
@@ -1313,7 +1317,7 @@ describe('attachContextMenu', () => {
 
     it('Escape hides the menu', () => {
       detach = attachContextMenu({ strings: ja, host, store, wb, onAfterCommit });
-      host.focus();
+      sheetFocusTarget(host).focus();
       fireContextMenu(host, 200, 70);
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
       expect(visibleMenu()).toBeNull();

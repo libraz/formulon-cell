@@ -65,7 +65,7 @@ describe('interact/dialog-shell', () => {
     const ok = document.createElement('button');
     shell.panel.appendChild(ok);
 
-    host.focus();
+    sheetFocusTarget(host).focus();
     shell.open();
     expect(document.activeElement).toBe(ok);
     shell.close();
@@ -82,7 +82,7 @@ describe('interact/dialog-shell', () => {
     const ok = document.createElement('button');
     shell.panel.appendChild(ok);
 
-    host.focus();
+    sheetFocusTarget(host).focus();
     shell.open();
     outside.focus();
     shell.close();
@@ -98,7 +98,7 @@ describe('interact/dialog-shell', () => {
     const second = document.createElement('button');
     shell.panel.append(first, second);
 
-    host.focus();
+    sheetFocusTarget(host).focus();
     shell.open();
     expect(document.activeElement).toBe(first);
     shell.dispose();

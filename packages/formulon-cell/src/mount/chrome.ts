@@ -183,7 +183,7 @@ export function createMountChrome({
   const grid = document.createElement('div');
   grid.className = 'fc-host__grid';
   grid.setAttribute('role', 'grid');
-  grid.tabIndex = -1;
+  grid.tabIndex = 0;
   const canvas = document.createElement('canvas');
   canvas.className = 'fc-host__canvas';
   canvas.setAttribute('aria-hidden', 'true');

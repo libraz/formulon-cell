@@ -523,7 +523,8 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
       const before = tabStops().indexOf(tag);
       expect(pressTab(back)).toBe(true);
       expect(document.querySelector('.fc-namebox-menu')).toBeNull();
-      expect(document.activeElement).toBe(tabStops()[before + (back ? -1 : 1)]);
+      // The name box is the first tab stop in the document, so Shift+Tab has nowhere to go.
+      expect(document.activeElement).toBe(tabStops()[before + (back ? -1 : 1)] ?? tag);
     }
   });
 

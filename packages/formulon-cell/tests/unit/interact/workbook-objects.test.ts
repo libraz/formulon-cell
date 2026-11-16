@@ -933,7 +933,7 @@ describe('attachWorkbookObjectsPanel', () => {
       wb: emptyWb(),
       strings: en,
     });
-    host.focus();
+    sheetFocusTarget(host).focus();
     handle.open();
     const root = host.querySelector<HTMLElement>('.fc-objects');
     expect(document.activeElement).toBe(root);
