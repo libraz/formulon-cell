@@ -35,12 +35,15 @@ import {
   valuesOnlyClipboard,
 } from '../commands/interaction-policy.js';
 import { runAfterAllowedRangeUnlock } from '../commands/protection.js';
+import { sessionIllustrationById, shapeCopyRefusal } from '../commands/session-illustration.js';
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import { formatBoolean, formatCell, formatEditableNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { rangeContainsRange } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import { showCommandRefusal } from '../toolbar/dialogs/command-refusal.js';
 import { type DialogEntry, instanceApiEntry } from './dialog-entry.js';
 import { focusSheet } from './dialog-focus.js';
 import { navigationBoundsFor } from './navigation-policy.js';
@@ -56,6 +59,8 @@ export interface ClipboardDeps {
    *  inline editor. */
   onAfterCommit: () => void;
   onPasteOptions?: (activation: PasteOptionsActivation) => void;
+  /** The strings for the notice a refused copy of the selected object shows. */
+  getStrings?: () => Strings;
 }
 
 export interface ClipboardHandle {
@@ -76,7 +81,7 @@ export interface ClipboardHandle {
  * to emit these events when the grid is the active region.
  */
 export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
-  const { history = null, host, store, wb } = deps;
+  const { history = null, host, store, wb, getStrings = () => defaultStrings } = deps;
   if (history) wb.attachHistory(history);
 
   let snapshot: ClipboardSnapshot | null = null;
@@ -105,6 +110,14 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   const takeDrawing = (mode: 'copy' | 'cut'): string | null => {
     if (policy()?.copy === false) return null;
     if (mode === 'cut' && !policyPermits(policy(), 'object')) return null;
+    const selected = store.getState().ui.selectedObject;
+    const item = selected ? sessionIllustrationById(store.getState(), selected.id) : undefined;
+    const refusal = item ? shapeCopyRefusal(item) : null;
+    if (refusal) {
+      const strings = getStrings();
+      void showCommandRefusal({ host, strings, title: strings.contextMenu[mode], reason: refusal });
+      return null;
+    }
     const text = drawings.take(mode);
     if (text === null) return null;
     clearSnapshot();

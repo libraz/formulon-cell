@@ -283,6 +283,8 @@ export const dataObjectsKo: DataObjectsStrings = {
     objectDelete: '삭제',
     shapeLocked:
       '이 도형은 편집기에서 다시 그릴 수 없으므로 이동만 가능하며 삭제, 복사, 서식 변경은 할 수 없습니다.',
+    shapePaintKept:
+      '이 도형의 채우기 또는 윤곽선은 편집기에서 재현할 수 없는 스타일입니다. 저장된 상태로 유지되므로 해당 부분의 서식을 변경할 수 없으며, 도형을 복사하거나 다른 시트로 이동할 수 없습니다.',
     shapeColor: '도형 색',
     shapeRadius: '모서리 반경',
     shapeLineWidth: '선 너비',

@@ -36,7 +36,8 @@ const dashMenu = (): HTMLElement => {
     <button data-format-submenu="weight"></button>
     <button data-format-submenu="dash"></button>
     <button data-shape-outline-weight="1"></button>
-    <button data-shape-outline-dash="dash"></button>`;
+    <button data-shape-outline-dash="dash"></button>
+    <button data-shape-outline-dash="roundDot"></button>`;
   return menu;
 };
 
@@ -45,7 +46,7 @@ const disabled = (menu: HTMLElement, selector: string): boolean =>
   menu.querySelector<HTMLElement>(selector)?.getAttribute('aria-disabled') === 'true';
 
 describe('shape controls against an engine that saves shapes', () => {
-  it('disables the dash style of a saved shape and keeps the weight', async () => {
+  it('disables the dash styles a saved shape cannot hold and keeps the weight', async () => {
     const sheet = await instance();
     createSessionShape(
       sheet.store,
@@ -64,8 +65,9 @@ describe('shape controls against an engine that saves shapes', () => {
 
     createShapeFormatDropdownDefaults(sheet).updateShapeOutlineMenu(menu);
 
-    expect(disabled(menu, '[data-shape-outline-dash]')).toBe(true);
-    expect(disabled(menu, '[data-format-submenu="dash"]')).toBe(true);
+    expect(disabled(menu, '[data-shape-outline-dash="roundDot"]')).toBe(true);
+    expect(disabled(menu, '[data-shape-outline-dash="dash"]')).toBe(false);
+    expect(disabled(menu, '[data-format-submenu="dash"]')).toBe(false);
     expect(disabled(menu, '[data-shape-outline-weight]')).toBe(false);
     expect(disabled(menu, '[data-format-submenu="weight"]')).toBe(false);
   });

@@ -234,7 +234,9 @@ export function attachWorkbookObjectsPanel(
     const locked = illustration.kind === 'shape' && illustration.nativeLocked === true;
     const reason = locked
       ? strings.workbookObjects.shapeLocked
-      : strings.workbookObjects.compatibilityDetails.images;
+      : illustration.kind === 'shape'
+        ? strings.workbookObjects.shapePaintKept
+        : strings.workbookObjects.compatibilityDetails.images;
     const actions = document.createElement('div');
     actions.className = 'fc-objects__actions fc-objects__illustration-actions';
     const select = createWorkbookObjectsActionButton(strings.workbookObjects.objectSelect);
@@ -287,13 +289,10 @@ export function attachWorkbookObjectsPanel(
     opacity.type = 'range';
     opacity.min = '0';
     opacity.max = '1';
-    // The file holds a fill or none, never a partly transparent one.
+    opacity.step = '0.05';
+    opacity.value = String(illustration.opacity ?? 1);
+    // The file has no corner radius.
     const saved = illustration.nativeObjectId !== undefined;
-    opacity.step = saved ? '1' : '0.05';
-    opacity.value = String(
-      saved ? (illustration.opacity === 0 ? 0 : 1) : (illustration.opacity ?? 1),
-    );
-    // The file has no corner radius either.
     projectDisabledState(radius, saved, null);
     const locked = illustration.nativeLocked === true;
     const actions = document.createElement('div');
@@ -306,17 +305,26 @@ export function attachWorkbookObjectsPanel(
         projectDisabledState(input, true, t.shapeLocked);
       }
     }
+    // A paint the cell cannot state stays as the file holds it.
+    const fillKept = illustration.nativeFillOther === true;
+    const lineKept = illustration.nativeLineOther === true;
+    if (fillKept) {
+      for (const input of [color, opacity]) projectDisabledState(input, true, t.shapePaintKept);
+    }
+    if (lineKept) projectDisabledState(lineWidth, true, t.shapePaintKept);
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       if (locked) return;
       deps.onUpdateSessionIllustration?.(illustration.id, {
-        color: color.value,
+        ...(fillKept ? {} : { color: color.value }),
         // An untouched corner keeps following the shape's size.
         ...(saved || radius.value === initialRadius
           ? {}
           : { radius: clamp(Number(radius.value) || 0, 0, 48) }),
-        lineWidth: clamp(Number(lineWidth.value) || 0, 0, MAX_SHAPE_LINE_WIDTH),
-        opacity: clamp(Number(opacity.value) || 0, 0, 1),
+        ...(lineKept
+          ? {}
+          : { lineWidth: clamp(Number(lineWidth.value) || 0, 0, MAX_SHAPE_LINE_WIDTH) }),
+        ...(fillKept ? {} : { opacity: clamp(Number(opacity.value) || 0, 0, 1) }),
       });
     });
     form.append(

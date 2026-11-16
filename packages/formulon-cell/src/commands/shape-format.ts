@@ -1,3 +1,4 @@
+import { ChartLineDash } from '@libraz/formulon';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type {
   SessionIllustration,
@@ -36,6 +37,13 @@ export const SHAPE_LINE_DASHES: readonly SessionShapeLineDash[] = [
   'longDashDot',
   'longDashDotDot',
 ];
+
+/** The engine dash each style is saved as; a style without one is not saved. */
+export const SAVED_LINE_DASH: Partial<Record<SessionShapeLineDash, ChartLineDash>> = {
+  solid: ChartLineDash.Solid,
+  dash: ChartLineDash.Dash,
+  dashDot: ChartLineDash.DashDot,
+};
 
 /** Each dash style's dash and gap lengths, in multiples of the line width. */
 const DASH_PATTERNS: Record<SessionShapeLineDash, readonly number[]> = {
@@ -138,10 +146,19 @@ export const shapeOutlineDashPatch = (
 export const shapeStyleEditable = (item: SessionIllustration): boolean =>
   item.kind === 'shape' && !item.nativeLocked;
 
-/** Whether the outline dash can be set: the file stores no dash style, so a
- *  shape saved with the workbook has none. */
-export const shapeDashEditable = (item: SessionIllustration): boolean =>
-  shapeStyleEditable(item) && item.nativeObjectId === undefined;
+/** Whether the fill can be restyled: one the cell cannot state stays as the file holds it. */
+export const shapeFillEditable = (item: SessionIllustration): boolean =>
+  shapeStyleEditable(item) && shapeHasFill(item) && !item.nativeFillOther;
+
+/** Whether the outline can be restyled: one the cell cannot state stays as the file holds it. */
+export const shapeOutlineEditable = (item: SessionIllustration): boolean =>
+  shapeStyleEditable(item) && !item.nativeLineOther;
+
+/** Whether the outline can take `dash`: a shape saved with the workbook takes
+ *  only the styles the file stores. */
+export const shapeDashEditable = (item: SessionIllustration, dash: SessionShapeLineDash): boolean =>
+  shapeOutlineEditable(item) &&
+  (item.nativeObjectId === undefined || SAVED_LINE_DASH[dash] !== undefined);
 
 const applyShapePatch = (
   store: SpreadsheetStore,
@@ -166,7 +183,7 @@ export function applySessionShapeFill(
   history: History | null = null,
   wb?: WorkbookHandle,
 ): SessionIllustration | null {
-  if (!shapeHasFill(item)) return null;
+  if (!shapeFillEditable(item)) return null;
   return applyShapePatch(store, item, shapeFillPatch(item, color), 'shapeFill', history, wb);
 }
 
@@ -178,6 +195,7 @@ export function applySessionShapeOutline(
   history: History | null = null,
   wb?: WorkbookHandle,
 ): SessionIllustration | null {
+  if (!shapeOutlineEditable(item)) return null;
   return applyShapePatch(store, item, shapeOutlinePatch(item, color), 'shapeOutline', history, wb);
 }
 
@@ -189,7 +207,7 @@ export function applySessionShapeOutlineWeight(
   history: History | null = null,
   wb?: WorkbookHandle,
 ): SessionIllustration | null {
-  if (!(weight > 0)) return null;
+  if (!(weight > 0) || !shapeOutlineEditable(item)) return null;
   const patch = shapeOutlineWeightPatch(item, weight);
   return applyShapePatch(store, item, patch, 'shapeOutline', history, wb);
 }
@@ -202,7 +220,7 @@ export function applySessionShapeOutlineDash(
   history: History | null = null,
   wb?: WorkbookHandle,
 ): SessionIllustration | null {
-  if (!shapeDashEditable(item)) return null;
+  if (!shapeDashEditable(item, dash)) return null;
   const patch = shapeOutlineDashPatch(item, dash);
   return applyShapePatch(store, item, patch, 'shapeOutline', history, wb);
 }

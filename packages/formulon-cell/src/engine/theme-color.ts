@@ -5,7 +5,7 @@
  */
 
 import type { Color } from '@libraz/formulon';
-import { ColorKind } from '@libraz/formulon';
+import { ColorContext, ColorKind } from '@libraz/formulon';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 const CSS_HEX_COLOR = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
@@ -99,4 +99,67 @@ export const cssOfColorSpec = (
   if (spec === null || spec.kind === ColorKind.None) return undefined;
   const argb = wb?.resolveColorArgb(spec) ?? (spec.kind === ColorKind.Rgb ? spec.argb : null);
   return argb === null ? undefined : cssColorFromArgb(argb);
+};
+
+const hueToChannel = (m1: number, m2: number, hue: number): number => {
+  const h = ((hue % 1) + 1) % 1;
+  if (h < 1 / 6) return m1 + (m2 - m1) * h * 6;
+  if (h < 1 / 2) return m2;
+  if (h < 2 / 3) return m1 + (m2 - m1) * (2 / 3 - h) * 6;
+  return m1;
+};
+
+/** `argb` with a DrawingML `lumMod` / `lumOff` applied in floating-point HSL, each
+ *  channel rounded, as charts and shapes are drawn. The engine reads the pair as a tint
+ *  (`lumOff` = tint, `lumMod` = 1 - tint; or `lumMod` = 1 + tint for a negative one). */
+const luminanceArgb = (argb: number, tint: number): number => {
+  // A tint is stored in 1/100000 units, as the file's lumMod / lumOff are.
+  const nominal = Math.round(tint * 100_000) / 100_000;
+  const [r, g, b] = [16, 8, 0].map((shift) => ((argb >>> shift) & 0xff) / RGB_MAX) as [
+    number,
+    number,
+    number,
+  ];
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const lum = (max + min) / 2;
+  let sat = 0;
+  let hue = 0;
+  if (max !== min) {
+    const span = max - min;
+    sat = lum <= 0.5 ? span / (max + min) : span / (2 - max - min);
+    if (r === max) hue = (g - b) / span;
+    else if (g === max) hue = 2 + (b - r) / span;
+    else hue = 4 + (r - g) / span;
+    hue /= 6;
+  }
+  const mod = nominal > 0 ? 1 - nominal : 1 + nominal;
+  const off = Math.max(nominal, 0);
+  const l = Math.min(1, Math.max(0, lum * mod + off));
+  const m2 = l <= 0.5 ? l * (1 + sat) : l + sat - l * sat;
+  const m1 = 2 * l - m2;
+  const channel = (value: number): number => Math.round(value * RGB_MAX);
+  const [nr, ng, nb] =
+    sat === 0
+      ? [l, l, l]
+      : [
+          hueToChannel(m1, m2, hue + 1 / 3),
+          hueToChannel(m1, m2, hue),
+          hueToChannel(m1, m2, hue - 1 / 3),
+        ];
+  return (0xff000000 | (channel(nr) << 16) | (channel(ng) << 8) | channel(nb)) >>> 0;
+};
+
+/** `color` as a chart or shape paints it: a theme colour's base resolved through the
+ *  workbook theme, its tint applied as DrawingML luminance; any other colour, or one the
+ *  engine cannot resolve, unchanged. */
+export const renderedThemeColor = (
+  wb: Pick<WorkbookHandle, 'resolveColorArgb'>,
+  color: Color,
+): Color => {
+  if (color.kind !== ColorKind.Theme) return color;
+  const base = wb.resolveColorArgb({ ...color, tint: 0 }, ColorContext.Font);
+  if (base === null) return color;
+  const argb = color.tint === 0 ? base : luminanceArgb(base, color.tint);
+  return { ...color, kind: ColorKind.Rgb, argb };
 };

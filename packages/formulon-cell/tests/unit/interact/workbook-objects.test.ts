@@ -404,7 +404,7 @@ describe('attachWorkbookObjectsPanel', () => {
 
     const saved = inputs(rows[0] as HTMLElement);
     expect(saved.radius?.disabled).toBe(true);
-    expect(saved.opacity?.step).toBe('1');
+    expect(saved.opacity?.step).toBe('0.05');
     expect(saved.color?.disabled).toBe(false);
     expect(
       buttons(rows[0] as HTMLElement).every(

@@ -288,6 +288,8 @@ export const dataObjectsFr: DataObjectsStrings = {
     objectDelete: 'Supprimer',
     shapeLocked:
       'L’éditeur ne sait pas redessiner cette forme : elle peut être déplacée, mais pas supprimée, copiée ni remise en forme.',
+    shapePaintKept:
+      'Le remplissage ou le contour de cette forme utilise un style que l’éditeur ne sait pas reproduire. Il est conservé tel qu’enregistré : cette partie ne peut pas être remise en forme, et la forme ne peut être ni copiée ni déplacée vers une autre feuille.',
     shapeColor: 'Couleur de forme',
     shapeRadius: 'Rayon des angles',
     shapeLineWidth: 'Épaisseur de ligne',

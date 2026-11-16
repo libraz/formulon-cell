@@ -290,6 +290,8 @@ export const dataObjectsDe: DataObjectsStrings = {
     objectDelete: 'Löschen',
     shapeLocked:
       'Der Editor kann diese Form nicht neu zeichnen. Sie lässt sich verschieben, aber nicht löschen, kopieren oder umformatieren.',
+    shapePaintKept:
+      'Füllung oder Kontur dieser Form verwendet eine Formatierung, die der Editor nicht wiedergeben kann. Sie bleibt wie gespeichert erhalten; dieser Teil lässt sich nicht umformatieren, und die Form kann weder kopiert noch auf ein anderes Blatt verschoben werden.',
     shapeColor: 'Formfarbe',
     shapeRadius: 'Eckenradius',
     shapeLineWidth: 'Linienbreite',

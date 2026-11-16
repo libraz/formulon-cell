@@ -8,11 +8,13 @@ import type { SheetView } from '../commands/sheet-views.js';
 import type {
   Addr,
   CellValue,
+  Color,
   EngineDrawingAnchor,
   Range,
   SheetAxisFormatOverride,
   SheetFontOverride,
 } from '../engine/types.js';
+import type { EngineShapeInput } from '../engine/workbook-handle-drawing-objects.js';
 import type { DatePeriodKey } from '../i18n/strings/data-objects/types.js';
 import type { CellFormat, CustomCellStyle, RangeValidation } from './types/cell-format.js';
 import type { ConditionalIconRef, ConditionalRule } from './types/conditional-rule.js';
@@ -563,6 +565,12 @@ export type SessionShapeLineDash =
   | 'longDashDot'
   | 'longDashDotDot';
 
+/** A colour as the file stores it, with the CSS colour it renders to. */
+export interface SessionNativeColor {
+  readonly spec: Color;
+  readonly css: string;
+}
+
 /** Illustration overlay. Pictures with a nativeObjectId are stored in the workbook. */
 export interface SessionIllustration {
   nativeObjectId?: number;
@@ -575,7 +583,14 @@ export interface SessionIllustration {
   kind: 'shape' | 'image';
   shape?: SessionShapeKind;
   src?: string;
+  /** A picture's alt text; a shape's description in the file. */
   alt?: string;
+  /** A shape's name in the file; unset takes the engine's default. */
+  name?: string;
+  /** The shape is a text box. */
+  textBox?: boolean;
+  /** The engine spec a copy of a saved shape is inserted from; cleared once inserted. */
+  nativeSource?: EngineShapeInput;
   sheet: number;
   x?: number;
   y?: number;
@@ -585,6 +600,10 @@ export interface SessionIllustration {
   color?: string;
   /** A shape's outline colour. */
   lineColor?: string;
+  /** The file's fill colour, written back as is while the fill still shows its `css`. */
+  nativeFill?: SessionNativeColor;
+  /** The file's outline colour, written back as is while the outline still shows its `css`. */
+  nativeLine?: SessionNativeColor;
   radius?: number;
   /** A shape's outline weight in points; kept while the outline is off. */
   lineWidth?: number;
@@ -599,10 +618,15 @@ export interface SessionIllustration {
   /** A shape's rotation in degrees as the file stores it (may be negative or
    *  360 and over), kept raw so it is written back unchanged; drawn normalised. */
   rotationDeg?: number;
-  /** A loaded shape the overlay can only approximate (unknown preset, gradient
-   *  paint, group): drawn as its bounding box, and only its anchor is
+  /** A loaded shape the overlay can only approximate (unknown preset, line,
+   *  connector, group): drawn as its bounding box, and only its anchor is
    *  written back. */
   nativeLocked?: boolean;
+  /** The file's fill is one the cell cannot state (a shaded colour, gradient,
+   *  pattern or picture); it is never written, so it stays as the file holds it. */
+  nativeFillOther?: boolean;
+  /** The file's outline is one the cell cannot state; only its weight and dash are written. */
+  nativeLineOther?: boolean;
 }
 
 export interface IllustrationsSlice {

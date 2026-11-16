@@ -142,7 +142,7 @@ export function hydrateRestoredImages(
     for (const object of wb.listDrawingObjects(sheet)) {
       const shape = shapes.get(object.objectId);
       if (shape) {
-        const item = shapeFromNative(store, sheet, shape);
+        const item = shapeFromNative(store, sheet, shape, wb);
         if (item) mutators.upsertIllustration(store, named(item));
         continue;
       }

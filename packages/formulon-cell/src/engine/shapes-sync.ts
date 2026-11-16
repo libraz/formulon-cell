@@ -1,7 +1,8 @@
-import type { ChartFill, ChartLine } from '@libraz/formulon';
-import { AnchorEditAs, AnchorKind, DrawingObjectKind } from '@libraz/formulon';
+import type { ChartFill, ChartLine, ChartLineDash, Color } from '@libraz/formulon';
+import { AnchorEditAs, AnchorKind, ColorKind, DrawingObjectKind } from '@libraz/formulon';
 import {
   DEFAULT_SHAPE_COLOR,
+  SAVED_LINE_DASH,
   shapeFillColor,
   shapeHasFill,
   shapeOutlineColor,
@@ -11,7 +12,9 @@ import {
 import { writeDrawingOrder } from '../store/drawing-order.js';
 import type {
   SessionIllustration,
+  SessionNativeColor,
   SessionShapeKind,
+  SessionShapeLineDash,
   SpreadsheetStore,
   State,
 } from '../store/store.js';
@@ -24,7 +27,7 @@ import {
   sessionPosition,
   twoCellAnchorForPixels,
 } from './drawing-geometry.js';
-import { argbFromCssColor, cssColorFromArgb } from './theme-color.js';
+import { argbFromCssColor, cssColorFromArgb, renderedThemeColor } from './theme-color.js';
 import type { EngineDrawingAnchor } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 import type {
@@ -81,9 +84,25 @@ const paintOf = (paint: ChartFill | ChartLine | null): Paint => {
   return paint.color !== null ? 'solid' : 'unset';
 };
 
-/** The solid colour of a paint, as `#rrggbb`; a shape paint reads back as ARGB. */
-const paintColor = (paint: ChartFill | ChartLine | null): string =>
-  cssColorFromArgb(paint?.color?.argb ?? 0);
+/** A paint's colour: as drawn, and as the file stores it. */
+const nativeColor = (
+  wb: Pick<WorkbookHandle, 'resolveColorArgb'>,
+  spec: Color,
+): SessionNativeColor => ({ spec, css: cssColorFromArgb(renderedThemeColor(wb, spec).argb) });
+
+/** The dash style an engine dash reads as; none for one the overlay has no style for. */
+const dashOfSaved = (saved: ChartLineDash): SessionShapeLineDash | undefined =>
+  (Object.keys(SAVED_LINE_DASH) as SessionShapeLineDash[]).find(
+    (dash) => SAVED_LINE_DASH[dash] === saved,
+  );
+
+/** The engine dash `item` is saved with; none for solid or a style the file cannot store. */
+const savedDash = (item: SessionIllustration): ChartLineDash | undefined =>
+  item.lineDash === undefined ? undefined : SAVED_LINE_DASH[item.lineDash];
+
+/** The colour to write for `css`: the file's own while the shape still shows it. */
+const colorInput = (css: string, native: SessionNativeColor | undefined): string | Color =>
+  native !== undefined && native.css === css ? native.spec : css;
 
 const anchorInput = (anchor: EngineDrawingAnchor) => ({
   anchor: placementForAnchor(undefined, anchor),
@@ -92,38 +111,61 @@ const anchorInput = (anchor: EngineDrawingAnchor) => ({
 /** The fill and outline fields that write `item`'s paint. */
 const paintInput = (item: SessionIllustration): Pick<EngineShapeInput, 'fill' | 'line'> => {
   const input: { -readonly [K in 'fill' | 'line']?: EngineShapeInput[K] } = {};
-  if (shapeHasFill(item)) {
+  // A paint the cell cannot state is never written: a colour sent for it replaces it.
+  if (shapeHasFill(item) && !item.nativeFillOther) {
     const color = hexOf(shapeFillColor(item) ?? undefined);
+    const transparencyPct = Math.round((1 - (item.opacity ?? 1)) * 100);
     if (item.opacity === 0 || shapeFillColor(item) === null) input.fill = { none: true };
-    else input.fill = { color: color ?? (hexOf(DEFAULT_SHAPE_COLOR) as string) };
+    else {
+      input.fill = {
+        color: colorInput(color ?? (hexOf(DEFAULT_SHAPE_COLOR) as string), item.nativeFill),
+        ...(transparencyPct > 0 ? { transparencyPct } : {}),
+      };
+    }
   }
   const weight = shapeOutlineWeight(item);
   const outline = hexOf(shapeOutlineColor(item));
-  if (weight === null || outline === null) {
-    input.line = { none: true, widthPt: shapeStoredWeight(item) };
-  } else input.line = { color: outline, widthPt: weight };
+  const dash = savedDash(item);
+  const dashInput = dash === undefined ? {} : { dash };
+  if (item.nativeLineOther) {
+    input.line = { widthPt: shapeStoredWeight(item), ...dashInput };
+  } else if (weight === null || outline === null) {
+    input.line = { none: true, widthPt: shapeStoredWeight(item), ...dashInput };
+  } else {
+    input.line = { color: colorInput(outline, item.nativeLine), widthPt: weight, ...dashInput };
+  }
   return input;
 };
 
 /** Overlay-only settings of a saved shape, reset so the screen shows what the
- *  file holds: the file has no corner radius, dash style or partial opacity
- *  (a partly transparent fill is saved opaque). */
+ *  file holds: the file has no corner radius and only some dash styles. */
 const unsaveable = (item: SessionIllustration): Partial<SessionIllustration> => {
   const reset: Partial<SessionIllustration> = {};
   if (item.nativeLocked) return reset;
   if (item.radius !== undefined) reset.radius = undefined;
-  if (item.lineDash !== undefined) reset.lineDash = undefined;
-  if (item.opacity !== undefined && item.opacity !== 0 && item.opacity !== 1) reset.opacity = 1;
+  if (item.lineDash !== undefined && savedDash(item) === undefined) reset.lineDash = undefined;
   return reset;
+};
+
+/** `next` with a null for each optional member `prev` wrote and `next` leaves
+ *  out, so the engine's merge removes it. */
+const clearDropped = <T extends object>(next: T, prev: T | null | undefined): T => {
+  const cleared: Record<string, null> = {};
+  for (const key of ['dash', 'transparencyPct']) {
+    if (prev && key in prev && !(key in next)) cleared[key] = null;
+  }
+  return { ...next, ...cleared };
 };
 
 /** The overlay for a shape of the file, or null for a hidden one, which stays
  *  untouched in the engine. A shape the overlay cannot draw (unknown preset,
- *  gradient or picture paint, group) becomes a locked bounding box. */
+ *  line, connector, group) becomes a locked bounding box; a fill or outline it
+ *  cannot state is kept as the file holds it. */
 export function shapeFromNative(
   store: SpreadsheetStore,
   sheet: number,
   shape: EngineShape,
+  wb: Pick<WorkbookHandle, 'resolveColorArgb'>,
 ): SessionIllustration | null {
   if (shape.hidden) return null;
   // A custom geometry has no preset name.
@@ -133,9 +175,7 @@ export function shapeFromNative(
     kind === undefined ||
     kind === 'line' ||
     shape.kind === DrawingObjectKind.Connector ||
-    shape.kind === DrawingObjectKind.Group ||
-    paintOf(shape.fill) === 'other' ||
-    paintOf(shape.line) === 'other';
+    shape.kind === DrawingObjectKind.Group;
   const anchor = drawingAnchorOf(shape);
   const item: SessionIllustration = {
     id: `shape-native-${sheet}-${shape.objectId}`,
@@ -147,6 +187,9 @@ export function shapeFromNative(
     nativeAnchor: anchor,
     nativeGeometryEditable: shape.anchor.kind !== ANCHOR_KIND_ABSOLUTE,
     ...(shape.rotationDeg !== 0 ? { rotationDeg: shape.rotationDeg } : {}),
+    ...(shape.name ? { name: shape.name } : {}),
+    ...(shape.description ? { alt: shape.description } : {}),
+    ...(shape.textBox ? { textBox: true } : {}),
   };
   if (locked) {
     return {
@@ -160,12 +203,28 @@ export function shapeFromNative(
   }
   const fill = paintOf(shape.fill);
   const line = paintOf(shape.line);
-  if (fill === 'solid') item.color = paintColor(shape.fill);
-  else if (fill === 'none') item.opacity = 0;
+  const fillColor = shape.fill?.color;
+  const lineColor = shape.line?.color;
+  // A paint the cell cannot state is drawn in the colour the engine reads for it.
+  if ((fill === 'solid' || fill === 'other') && fillColor) {
+    const color = nativeColor(wb, fillColor);
+    item.color = color.css;
+    if (fill === 'solid' && color.spec.kind !== ColorKind.Rgb) item.nativeFill = color;
+    const transparencyPct = shape.fill?.transparencyPct ?? 0;
+    if (transparencyPct > 0) item.opacity = (100 - transparencyPct) / 100;
+  } else if (fill === 'none') item.opacity = 0;
+  if (fill === 'other') item.nativeFillOther = true;
   if (line === 'none') item.lineHidden = true;
-  else if (line === 'solid') item.lineColor = paintColor(shape.line);
+  else if ((line === 'solid' || line === 'other') && lineColor) {
+    const color = nativeColor(wb, lineColor);
+    item.lineColor = color.css;
+    if (line === 'solid' && color.spec.kind !== ColorKind.Rgb) item.nativeLine = color;
+  }
+  if (line === 'other') item.nativeLineOther = true;
   const width = shape.line?.widthPt ?? 0;
   if (width > 0) item.lineWidth = width;
+  const dash = shape.line?.dash == null ? undefined : dashOfSaved(shape.line.dash);
+  if (dash !== undefined && dash !== 'solid') item.lineDash = dash;
   if (shape.text) item.text = shape.text;
   return item;
 }
@@ -183,31 +242,50 @@ const shapeInputOf = (shape: EngineShape): EngineShapeInput | null => {
   ) {
     return null;
   }
-  const lineWidth = shape.line?.widthPt ?? null;
+  // Every member the outline states, so the copy keeps it.
+  const lineStated = {
+    ...(shape.line?.widthPt != null ? { widthPt: shape.line.widthPt } : {}),
+    ...(shape.line?.dash != null ? { dash: shape.line.dash } : {}),
+    ...(shape.line?.transparencyPct != null ? { transparencyPct: shape.line.transparencyPct } : {}),
+  };
   return {
     ...anchorInput(drawingAnchorOf(shape)),
     name: shape.name,
+    ...(shape.description ? { description: shape.description } : {}),
     presetGeometry: shape.presetGeometry,
     rotationDeg: shape.rotationDeg,
     hidden: shape.hidden,
     ...(shape.kind !== DrawingObjectKind.Connector
       ? { text: shape.text, textBox: shape.textBox }
       : {}),
-    ...(fill === 'solid' ? { fill: { color: paintColor(shape.fill) } } : {}),
-    ...(fill === 'none' ? { fill: { none: true } } : {}),
-    ...(line === 'solid'
+    ...(fill === 'solid' && shape.fill?.color
       ? {
-          line: {
-            color: paintColor(shape.line),
-            ...(lineWidth !== null ? { widthPt: lineWidth } : {}),
+          fill: {
+            color: shape.fill.color,
+            ...(shape.fill.transparencyPct != null
+              ? { transparencyPct: shape.fill.transparencyPct }
+              : {}),
           },
         }
       : {}),
-    ...(line === 'none'
-      ? { line: { none: true, ...(lineWidth !== null ? { widthPt: lineWidth } : {}) } }
+    ...(fill === 'none' ? { fill: { none: true } } : {}),
+    ...(line === 'solid' && shape.line?.color
+      ? { line: { color: shape.line.color, ...lineStated } }
       : {}),
+    ...(line === 'none' ? { line: { none: true, ...lineStated } } : {}),
   };
 };
+
+/** Shape `objectId` as the engine holds it, as an insert spec; null when it
+ *  cannot be inserted again without loss. */
+export function captureShapeInput(
+  wb: WorkbookHandle,
+  sheet: number,
+  objectId: number,
+): EngineShapeInput | null {
+  const shape = wb.listShapes(sheet).find((candidate) => candidate.objectId === objectId);
+  return shape ? shapeInputOf(shape) : null;
+}
 
 /** Capture shape `objectId` so a row or column delete that drops it can be
  *  undone. The restorer inserts it again at its slot in the drawing order; null
@@ -217,8 +295,7 @@ export function captureShapeRestore(
   sheet: number,
   objectId: number,
 ): (() => boolean) | null {
-  const shape = wb.listShapes(sheet).find((candidate) => candidate.objectId === objectId);
-  const input = shape ? shapeInputOf(shape) : null;
+  const input = captureShapeInput(wb, sheet, objectId);
   if (!input) return null;
   const index = wb.listDrawingObjects(sheet).findIndex((object) => object.objectId === objectId);
   return () => {
@@ -264,7 +341,12 @@ export class ShapeMirror {
    *  re-inserted from its description (name, text, anchor kind, geometry). */
   private readonly removed = new Map<
     string,
-    { sheet: number; objectId: number; snapshot: Uint8Array | null; input: EngineShapeInput }
+    {
+      sheet: number;
+      objectId: number;
+      snapshot: Uint8Array | null;
+      input: EngineShapeInput | null;
+    }
   >();
 
   /** Adopt `state` as what the engine already carries. */
@@ -327,12 +409,9 @@ export class ShapeMirror {
 
   /** Remove the engine shape of an overlay item, keeping its description. */
   private forget(id: string, sheet: number, objectId: number): void {
-    const shape = this.handle
-      .listShapes(sheet)
-      .find((candidate) => candidate.objectId === objectId);
-    const description = shape ? shapeInputOf(shape) : null;
-    if (description) {
-      const snapshot = this.handle.snapshotDrawing(sheet, objectId);
+    const description = captureShapeInput(this.handle, sheet, objectId);
+    const snapshot = this.handle.snapshotDrawing(sheet, objectId);
+    if (description || snapshot) {
       this.removed.set(id, { sheet, objectId, snapshot, input: description });
     }
     this.handle.removeShape(sheet, objectId);
@@ -349,10 +428,15 @@ export class ShapeMirror {
     const objectId =
       (restored?.snapshot && restored.sheet === item.sheet
         ? wb.restoreDrawing(item.sheet, restored.snapshot)
-        : null) ?? wb.insertShape(item.sheet, restored?.input ?? this.newShape(store, item));
+        : null) ??
+      wb.insertShape(
+        item.sheet,
+        restored?.input ?? item.nativeSource ?? this.newShape(store, item),
+      );
     if (objectId === null) return null;
     this.objectIds.set(item.id, objectId);
-    return this.tie(item.sheet, objectId);
+    const tie = this.tie(item.sheet, objectId);
+    return item.nativeSource ? { ...tie, nativeSource: undefined } : tie;
   }
 
   /** The insert spec of an item the engine does not hold yet. An item that
@@ -362,6 +446,9 @@ export class ShapeMirror {
       presetGeometry: PRST_OF_KIND[item.shape as SessionShapeKind] as string,
       ...paintInput(item),
       ...(item.text && !isLineKind(item.shape) ? { text: item.text } : {}),
+      ...(item.textBox && !isLineKind(item.shape) ? { textBox: true } : {}),
+      ...(item.name ? { name: item.name } : {}),
+      ...(item.alt ? { description: item.alt } : {}),
       ...(item.rotationDeg !== undefined ? { rotationDeg: item.rotationDeg } : {}),
     };
     if (item.nativeAnchor) return { ...spec, ...anchorInput(item.nativeAnchor) };
@@ -408,8 +495,8 @@ export class ShapeMirror {
       const oldPaint = paintInput(old);
       const same = (key: 'fill' | 'line'): boolean =>
         JSON.stringify(paint[key]) === JSON.stringify(oldPaint[key]);
-      if (!same('fill') && paint.fill !== undefined) input.fill = paint.fill;
-      if (!same('line') && paint.line !== undefined) input.line = paint.line;
+      if (!same('fill') && paint.fill) input.fill = clearDropped(paint.fill, oldPaint.fill);
+      if (!same('line') && paint.line) input.line = clearDropped(paint.line, oldPaint.line);
       if (item.shape !== old.shape) {
         input.presetGeometry = PRST_OF_KIND[item.shape as SessionShapeKind];
       }

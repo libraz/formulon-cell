@@ -119,7 +119,7 @@ describe('a shape loaded with a rotation', () => {
     const shape = wb.listShapes(0)[0];
     if (!shape) throw new Error('no shape');
 
-    expect(shapeFromNative(store, 0, { ...shape, rotationDeg: -90 })?.rotationDeg).toBe(-90);
+    expect(shapeFromNative(store, 0, { ...shape, rotationDeg: -90 }, wb)?.rotationDeg).toBe(-90);
   });
 
   it('leaves the stored rotation alone when the shape moves', async () => {

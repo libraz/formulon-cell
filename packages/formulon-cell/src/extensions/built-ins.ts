@@ -281,6 +281,7 @@ export const illustrations = (): Extension =>
         store: ctx.store,
         history: ctx.history,
         getWb: () => ctx.workbook,
+        getStrings: () => ctx.i18n.strings,
         labels: ctx.i18n.strings.sessionIllustrations,
       });
       return {
@@ -624,6 +625,7 @@ export const clipboard = (): Extension =>
           store: ctx.store,
           wb,
           onAfterCommit: () => refreshCells(ctx),
+          getStrings: () => ctx.i18n.strings,
         });
       let handle = attach(ctx.workbook);
       return {

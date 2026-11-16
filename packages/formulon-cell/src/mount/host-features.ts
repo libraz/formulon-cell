@@ -834,6 +834,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           store: input.store,
           history: input.history,
           getWb: input.wb,
+          getStrings: input.strings,
           labels: strings.sessionIllustrations,
         });
         const illustrationHandle = input.wrapHandle(s.sessionIllustrations, () =>

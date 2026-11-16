@@ -279,6 +279,7 @@ export interface DataObjectsStrings {
     objectDuplicate: string;
     objectDelete: string;
     shapeLocked: string;
+    shapePaintKept: string;
     shapeColor: string;
     shapeRadius: string;
     shapeLineWidth: string;

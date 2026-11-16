@@ -7,6 +7,7 @@ import {
   clearSessionIllustration,
   drawingPanelZIndex,
   duplicateSessionIllustration,
+  shapeCopyRefusal,
   sheetDrawingStack,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
@@ -31,9 +32,11 @@ import { DEFAULT_ILLUSTRATION_FRAME } from '../engine/shapes-sync.js';
 import { argbFromCssColor, cssColorFromArgb } from '../engine/theme-color.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { themeFontFace } from '../engine/workbook-handle-styles.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import type { SessionShapeKind, State } from '../store/types.js';
 import { SVG_NS } from '../svg-namespace.js';
+import { showCommandRefusal } from '../toolbar/dialogs/command-refusal.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { focusSheet } from './dialog-focus.js';
 import {
@@ -335,8 +338,16 @@ export function attachSessionIllustrations(deps: {
   history?: History | null;
   labels?: Partial<SessionIllustrationLabels>;
   getWb?: () => WorkbookHandle | null;
+  /** The strings for the notice a refused duplicate shows. */
+  getStrings?: () => Strings;
 }): SessionIllustrationsHandle {
-  const { host, store, history = null, getWb = (): WorkbookHandle | null => null } = deps;
+  const {
+    host,
+    store,
+    history = null,
+    getWb = (): WorkbookHandle | null => null,
+    getStrings = () => defaultStrings,
+  } = deps;
   let labels: SessionIllustrationLabels = { ...DEFAULT_LABELS, ...deps.labels };
   const root = document.createElement('div');
   root.className = 'fc-illustrations';
@@ -554,6 +565,13 @@ export function attachSessionIllustrations(deps: {
     if (!isEditable(item)) return;
     if (isDuplicateShortcut(event)) {
       event.preventDefault();
+      const refusal = shapeCopyRefusal(item);
+      if (refusal) {
+        const strings = getStrings();
+        const title = strings.workbookObjects.objectDuplicate;
+        void showCommandRefusal({ host, strings, title, reason: refusal });
+        return;
+      }
       const copy = duplicateSessionIllustration(
         store,
         item.id,

@@ -285,6 +285,8 @@ export const dataObjectsJa: DataObjectsStrings = {
     objectDelete: '削除',
     shapeLocked:
       'この図形はエディターで再描画できないため、移動のみ可能で、削除・コピー・書式変更はできません。',
+    shapePaintKept:
+      'この図形の塗りつぶしまたは枠線は、エディターで再現できないスタイルです。保存されたまま保持されるため、その部分の書式は変更できず、図形のコピーや別のシートへの移動もできません。',
     shapeColor: '図形の色',
     shapeRadius: '角丸半径',
     shapeLineWidth: '線の太さ',

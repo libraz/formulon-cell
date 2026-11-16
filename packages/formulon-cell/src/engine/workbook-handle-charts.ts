@@ -19,8 +19,9 @@ import type {
   Color,
   SheetRect,
 } from '@libraz/formulon';
-import { ColorContext, ColorKind } from '@libraz/formulon';
+import { ColorKind } from '@libraz/formulon';
 import { attemptWrite, orFallback } from './result.js';
+import { renderedThemeColor } from './theme-color.js';
 import type { EngineCapabilities } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 import { assertAlive, internals } from './workbook-handle-internals.js';
@@ -58,19 +59,15 @@ function renderThemeColors<T>(value: T, render: (color: Color) => Color): T {
 
 export abstract class WorkbookHandleChartsMethods {
   declare readonly capabilities: EngineCapabilities;
+  declare resolveColorArgb: WorkbookHandle['resolveColorArgb'];
 
   /** Typed view of the chart `objectId`, theme colours rendered to RGB; null on failure. */
   getChart(sheet: number, objectId: number): EngineChartInfo | null {
     assertAlive(this);
     if (!this.capabilities.charts) return null;
-    const wb = internals(this).wb;
     const info = orFallback(null, () => chartOf(this, sheet, objectId).getProperties());
     if (!info) return null;
-    return renderThemeColors(info, (color) => ({
-      ...color,
-      kind: ColorKind.Rgb,
-      argb: wb.resolveColor(color, ColorContext.Font).argb,
-    }));
+    return renderThemeColors(info, (color) => renderedThemeColor(this, color));
   }
 
   /** The chart's series resolved against the current cell values. */

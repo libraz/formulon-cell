@@ -283,6 +283,8 @@ export const dataObjectsEn: DataObjectsStrings = {
     objectDelete: 'Delete',
     shapeLocked:
       'This shape cannot be redrawn by the editor, so it can be moved but not deleted, copied or restyled.',
+    shapePaintKept:
+      "This shape's fill or outline uses a style the editor cannot reproduce. It is kept as saved, so that part cannot be restyled, and the shape cannot be copied or moved to another sheet.",
     shapeColor: 'Shape color',
     shapeRadius: 'Corner radius',
     shapeLineWidth: 'Line width',

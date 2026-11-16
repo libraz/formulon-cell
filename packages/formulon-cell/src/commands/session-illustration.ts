@@ -10,8 +10,10 @@ import {
   nativeImageAnchor,
   persistentImageFromState,
 } from '../engine/images-sync.js';
+import { captureShapeInput } from '../engine/shapes-sync.js';
 import type { EngineDrawingAnchor, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type { EngineShapeInput } from '../engine/workbook-handle-drawing-objects.js';
 import {
   type DrawingStackEntry,
   type DrawingState,
@@ -91,8 +93,23 @@ const isGeometryLockedPicture = (item: SessionIllustration): boolean =>
 export const canDeleteIllustration = (item: SessionIllustration): boolean =>
   !isGeometryLockedPicture(item) && !item.nativeLocked;
 
-/** Whether the illustration can be copied; the same objects can be deleted. */
-export const canDuplicateIllustration = canDeleteIllustration;
+/** Whether a shape can be inserted afresh: a paint the cell cannot state would be rewritten. */
+export const canReinsertIllustration = (item: SessionIllustration): boolean =>
+  !item.nativeFillOther && !item.nativeLineOther;
+
+/** Whether the illustration can be copied: one that can be deleted and inserted afresh. */
+export const canDuplicateIllustration = (item: SessionIllustration): boolean =>
+  canDeleteIllustration(item) && canReinsertIllustration(item);
+
+/** Why a shape cannot be copied, for the notice a refused copy shows; null when it can be, or
+ *  when it is not a shape. */
+export const shapeCopyRefusal = (
+  item: SessionIllustration,
+): 'shape-locked' | 'shape-paint-kept' | null => {
+  if (item.kind !== 'shape') return null;
+  if (item.nativeLocked) return 'shape-locked';
+  return canReinsertIllustration(item) ? null : 'shape-paint-kept';
+};
 
 /** The illustrations with the drawing order, which a history step restores together. */
 const captureDrawings = (state: State) => ({
@@ -545,6 +562,10 @@ export function updateSessionIllustration(
   const item = sessionIllustrationById(store.getState(), id);
   if (!item) return null;
   if (isGeometryLockedPicture(item)) return null;
+  // Another sheet takes the shape as a new insert.
+  if (patch.sheet !== undefined && patch.sheet !== item.sheet && !canReinsertIllustration(item)) {
+    return null;
+  }
   return objectWrite(
     illustrationEntry(store, history, authorization, 'pictureUpdate'),
     item.sheet,
@@ -650,6 +671,8 @@ export interface IllustrationClip {
   readonly item: SessionIllustration;
   /** The drawing of a picture saved with the workbook. */
   readonly drawing: Uint8Array | null;
+  /** A shape saved with the workbook, as the engine holds it. */
+  readonly shape: EngineShapeInput | null;
 }
 
 /** Copy a picture or shape for a later {@link pasteSessionIllustration}; null
@@ -662,9 +685,15 @@ export function copySessionIllustration(
   const item = sessionIllustrationById(store.getState(), id);
   if (!item || !canDuplicateIllustration(item)) return null;
   const persisted = persistentImageFromState(item);
-  if (!persisted) return { item: { ...item }, drawing: null };
+  if (!persisted) {
+    const shape =
+      wb && item.kind === 'shape' && item.nativeObjectId !== undefined
+        ? captureShapeInput(wb, item.sheet, item.nativeObjectId)
+        : null;
+    return { item: { ...item }, drawing: null, shape };
+  }
   const drawing = wb?.snapshotDrawing(item.sheet, persisted.nativeObjectId) ?? null;
-  return drawing ? { item: { ...item }, drawing } : null;
+  return drawing ? { item: { ...item }, drawing, shape: null } : null;
 }
 
 /**
@@ -728,6 +757,14 @@ const placeIllustrationCopy = (
           nativeObjectId: undefined,
           nativeAnchor: undefined,
           nativeGeometryEditable: undefined,
+          ...(source.shape && item.nativeAnchor
+            ? {
+                nativeSource: {
+                  ...source.shape,
+                  anchor: placementForPixels(store, item.nativeAnchor, to),
+                },
+              }
+            : {}),
         }
       : {}),
   };

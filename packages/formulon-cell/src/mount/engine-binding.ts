@@ -399,6 +399,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         wb,
         onAfterCommit: refreshCells,
         onPasteOptions: pasteOptions.show,
+        getStrings: () => strings,
       })
     : null;
   const pasteSpecialDialog =
