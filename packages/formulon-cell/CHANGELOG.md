@@ -123,6 +123,7 @@ versioning is [SemVer](https://semver.org/).
 - Show Comments on the Mac Review tab toggles a docked Comments pane and is drawn pressed while the pane is open. The pane lists only comments on cells the host lets the user navigate to, as the comment list does.
 - A new cell note on the Mac opens at the desktop's default size (104 x 76 pt) beside its cell, flips up at the last row and left at the last column, uses 10 pt Yu Gothic UI, scales with the zoom, and commits to its own cell when you click away.
 - The Mac column panel sorts and filters by color: the sort side's By color pop-up puts the rows with the picked fill, font colour or conditional formatting icon first and ends with Custom Sort..., which opens the Sort dialog on the column; the filter's By color pop-up lists the fills, font colours and icons the column shows (empty when it shows none) and filters by the one picked. No Fill and Automatic pick the cells without a fill or font colour of their own. Colour and icon sort levels and filters are saved to .xlsx and read back.
+- `Workbook.engineVersion` reports the version of the calc engine the workbook runs on.
 
 ### Fixed
 
@@ -241,6 +242,7 @@ versioning is [SemVer](https://semver.org/).
 - `presets.standard()` → `ui: { profile: 'standard' }`; reading a profile's switches → `resolveSpreadsheetUiOptions({ profile: 'standard' }).features` from `/extensions`.
 - `WorkbookHandle.createDefault({ preferStub: true })` / `loadBytes(bytes)` → `Workbook.createDefault({ engine: 'stub' })` / `Workbook.load(bytes)`; `onFallback` is gone, as the engine never falls back. Cell and sheet methods → `workbook.sheet(ref)` members.
 - `handle.setCalcMode(mode)` / `setIterative(enabled, maxIterations, maxChange)` → `workbook.setCalcMode(mode)` / `updateIterative({ enabled, maxIterations, maxChange })`.
+- `handle.version` → `workbook.engineVersion`.
 - `importCSV(state, wb, text, anchor)` → `instance.importCsv(text, { at: 'A1' })`; `exportCSV(state)` → `sheet.exportCsv({ range: instance.selection.get().range })`.
 - `instance.applyChanges(changes)` → `instance.applyChanges(changes, { history: 'reset' })`: the options argument is required, and `{ history: 'reset' }` is what leaving it out meant.
 - `instance.applyChanges([{ addr: { sheet: 0, row: 0, col: 0 }, input: '1' }])` → `instance.applyChanges([{ sheet: 0, at: 'A1', input: '1' }], { history: 'reset' })`; `{ addr, value: { kind: 'number', value: 42 } }` → `{ at, value: { kind: ValueKind.Number, number: 42 } }` with `ValueKind` from `@libraz/formulon`; `origin: 'my-import'` → `origin: 'host:my-import'`. On the result, `status === 'rejected'` → `'refused'`, `rejected` → `rejections`, `status === 'noop'` → `applied.length === 0`, and a `code` of `'unsupported'` → `'effectTooLarge'`.

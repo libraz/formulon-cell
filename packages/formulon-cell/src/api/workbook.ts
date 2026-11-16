@@ -313,6 +313,11 @@ export class Workbook {
     return isUsingStub(stateOf(this).handle.engineModule()) ? 'stub' : 'wasm';
   }
 
+  /** The version of the calc engine the workbook runs on, as the engine reports it; the stub engine reports `'stub'`. */
+  get engineVersion(): string {
+    return stateOf(this).handle.version;
+  }
+
   /** True once `dispose()` has run. */
   get disposed(): boolean {
     return (workbookStates.get(this) as WorkbookState).life.disposed;

@@ -31,6 +31,14 @@ describe('workbook root', () => {
     expect(wb.disposed).toBe(false);
   });
 
+  it('reports the version of the engine it runs on', async () => {
+    const wb = await createWorkbook();
+    expect(wb.engineVersion).toMatch(/^\d+\.\d+\.\d+/);
+    const stub = await Workbook.createDefault({ engine: 'stub' });
+    open.push(stub);
+    expect(stub.engineVersion).toBe('stub');
+  });
+
   it('returns one facade per sheet, whichever key reaches it', async () => {
     const wb = await createWorkbook();
     const first = wb.sheet(0);
