@@ -117,3 +117,35 @@ describe('pivot occupancy', () => {
     wb.dispose();
   });
 });
+
+describe('pivot cell info for numeric labels', () => {
+  it('reports only data cells as values, not numeric labels or totals', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    const rows = [
+      ['Year', 'Sales'],
+      [2023, 10],
+      [2024, 20],
+    ];
+    for (const [r, row] of rows.entries()) {
+      for (const [c, value] of row.entries()) {
+        const addr = { sheet: 0, row: r, col: c };
+        if (typeof value === 'number') wb.setNumber(addr, value);
+        else wb.setText(addr, value);
+      }
+    }
+    createPivotTableFromRange(wb, {
+      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 },
+      destination: { sheet: 0, row: 7, col: 0 },
+      rowField: 'Year',
+      valueField: 'Sales',
+    });
+    const label = wb.pivotCellInfo({ sheet: 0, row: 8, col: 0 });
+    expect(label?.isValue).toBe(false);
+    const value = wb.pivotCellInfo({ sheet: 0, row: 8, col: 1 });
+    expect(value?.isValue).toBe(true);
+    const grand = wb.pivotCellInfo({ sheet: 0, row: 10, col: 1 });
+    expect(grand?.kind).toBe(6);
+    expect(grand?.isValue).toBe(false);
+    wb.dispose();
+  });
+});

@@ -431,7 +431,7 @@ export abstract class WorkbookHandlePivotMethods {
         fieldName,
         fieldIndex: mutable && fieldName ? cacheFieldIndex(this, cacheId, fieldName) : -1,
         cacheId,
-        isValue: kind === PIVOT_CELL_KIND.Data || cell?.value.kind === 'number',
+        isValue: kind === PIVOT_CELL_KIND.Data,
       };
     }
     return null;

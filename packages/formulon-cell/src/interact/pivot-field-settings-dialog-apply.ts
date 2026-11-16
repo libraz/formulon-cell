@@ -12,6 +12,7 @@ import {
   replacePivotDataFields,
   restorePivotFieldLayout,
 } from '../commands/pivot-edit.js';
+import { PIVOT_CELL_KIND } from '../engine/pivot-cell-kind.js';
 import type { Addr } from '../engine/types.js';
 import {
   PivotAggregation,
@@ -331,7 +332,14 @@ function pivotFieldForCell(
   definition: PivotDefinition,
   info: PivotCellInfo,
 ): { kind: 'value'; dataFieldIndex: number } | { kind: 'field'; fieldIndex: number } | null {
-  if (info.isValue) {
+  const isTotal =
+    info.kind === PIVOT_CELL_KIND.GrandTotal ||
+    info.kind === PIVOT_CELL_KIND.RowSubtotal ||
+    info.kind === PIVOT_CELL_KIND.ColSubtotal;
+  // A total's value cell carries its data field's caption; its label (the "Grand Total" caption) none.
+  const isTotalValue =
+    isTotal && definition.dataFields.some((spec) => spec.name === info.fieldName);
+  if (info.isValue || isTotalValue) {
     // A value cell carries its data field's caption; a source index is a fallback.
     const byName = definition.dataFields.findIndex((spec) => spec.name === info.fieldName);
     const bySource = definition.dataFields.findIndex(
