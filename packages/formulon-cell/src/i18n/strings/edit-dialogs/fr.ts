@@ -95,6 +95,8 @@ export const editDialogsFr: EditDialogsStrings = {
     shiftUp: 'Décaler les cellules vers le haut',
     entireRow: 'Ligne entière',
     entireColumn: 'Colonne entière',
+    ok: 'OK',
+    cancel: 'Annuler',
   },
   insertCopiedCellsDialog: {
     title: 'Insérer les cellules copiées',

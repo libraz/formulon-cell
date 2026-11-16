@@ -21,6 +21,7 @@ import {
   createDialogShell,
   deferInitialFocus,
 } from './dialog-shell.js';
+import { isImeKey } from './mac-dialog-keys.js';
 import {
   clampNavigationAddr,
   clampNavigationRange,
@@ -518,7 +519,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   // Enter on any control inside the modal commits — matches the spreadsheet
   // convention. Escape and backdrop dismissals are handled by the shell.
   shell.on(shell.overlay, 'keydown', (e) => {
-    if ((e as KeyboardEvent).key !== 'Enter') return;
+    if ((e as KeyboardEvent).key !== 'Enter' || isImeKey(e as KeyboardEvent)) return;
     // Buttons keep their own click behavior.
     if ((e.target as HTMLElement).closest('button')) return;
     e.preventDefault();

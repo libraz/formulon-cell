@@ -22,6 +22,8 @@ import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
 import { SheetVisibility } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
+import { returnFocus } from '../interact/dialog-shell.js';
+import { isSubmitEnter } from '../interact/mac-dialog-keys.js';
 import { onOutsidePress } from '../interact/outside-press.js';
 import { placePanel } from '../interact/overlay-position.js';
 import { SHEET_TAB_COLOR_CHOICES, sheetTabColorChoiceLabel } from '../sheet-tab-colors.js';
@@ -229,7 +231,8 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     sheetMenu.hidden = true;
     sheetMenu.replaceChildren();
     sheetMenuRestoreFocus = null;
-    if (target?.isConnected) target.focus();
+    if (target)
+      returnFocus(target, sheetMenu, sheetTabs.closest<HTMLElement>('.fc-host') ?? sheetTabs);
   };
 
   const refreshAfterSheetChange = (): void => {
@@ -291,7 +294,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     };
 
     renameInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
+      if (isSubmitEnter(e)) {
         e.preventDefault();
         finish(true);
       } else if (e.key === 'Escape') {

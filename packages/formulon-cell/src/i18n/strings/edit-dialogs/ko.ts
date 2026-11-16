@@ -93,6 +93,8 @@ export const editDialogsKo: EditDialogsStrings = {
     shiftUp: '셀을 위로 밀기',
     entireRow: '행 전체',
     entireColumn: '열 전체',
+    ok: '확인',
+    cancel: '취소',
   },
   insertCopiedCellsDialog: {
     title: '복사한 셀 삽입',

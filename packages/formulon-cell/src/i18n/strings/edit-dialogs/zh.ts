@@ -93,6 +93,8 @@ export const editDialogsZh: EditDialogsStrings = {
     shiftUp: '下方单元格上移',
     entireRow: '整行',
     entireColumn: '整列',
+    ok: '确定',
+    cancel: '取消',
   },
   insertCopiedCellsDialog: {
     title: '插入复制的单元格',

@@ -7,6 +7,7 @@ import {
 } from '../../commands/table-design.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import { focusSheet } from '../../interact/dialog-focus.js';
+import { isSubmitEnter } from '../../interact/mac-dialog-keys.js';
 import { isInnermostRowItem, pivotRowItemAt } from '../../interact/pivot-detail.js';
 import { pivotGroupTargetAt } from '../../interact/pivot-group.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
@@ -73,7 +74,7 @@ export const createTableNameInput = (
 
   input.addEventListener('change', commit);
   input.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
+    if (isSubmitEnter(event)) {
       event.preventDefault();
       commit();
       const sheetHost = ctx.getInst()?.host;

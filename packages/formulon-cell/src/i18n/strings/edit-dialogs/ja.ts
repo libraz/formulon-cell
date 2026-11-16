@@ -95,6 +95,8 @@ export const editDialogsJa: EditDialogsStrings = {
     shiftUp: '上方向にシフト',
     entireRow: '行全体',
     entireColumn: '列全体',
+    ok: 'OK',
+    cancel: 'キャンセル',
   },
   insertCopiedCellsDialog: {
     title: 'コピーしたセルを挿入',

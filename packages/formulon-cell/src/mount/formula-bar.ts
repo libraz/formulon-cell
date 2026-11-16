@@ -50,6 +50,7 @@ import {
   createFormulaReferenceGesture,
   type FormulaReferenceGesture,
 } from '../interact/formula-reference-gesture.js';
+import { isImeKey } from '../interact/mac-dialog-keys.js';
 import {
   isNavigationAddrAllowed,
   navigationBoundsFor,
@@ -1261,7 +1262,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
 
   const onFxKey = (e: KeyboardEvent): void => {
     if (detached) return;
-    if (composing || e.isComposing || e.key === 'Process') return;
+    if (composing || isImeKey(e) || e.key === 'Process') return;
     if (externalDraftClosed()) {
       if (e.key === 'Escape') {
         e.preventDefault();

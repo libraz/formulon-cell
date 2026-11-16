@@ -262,8 +262,8 @@ export function openPivotFieldFilter(
         strings: strings.pivotTableDialog,
         fieldName: model.label,
         condition: { kind, value: current?.kind === kind ? current.value : '' },
-        okLabel: strings.pageSetup.ok,
-        cancelLabel: strings.pageSetup.cancel,
+        okLabel: strings.pivotTableDialog.ok,
+        cancelLabel: strings.pivotTableDialog.cancel,
         dataFields: model.dataFields,
         ...(picked === ALL_DATES_IN_PERIOD
           ? {

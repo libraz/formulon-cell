@@ -5,6 +5,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { gridHitState } from '../render/grid.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { returnFocus } from './dialog-shell.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 
@@ -66,6 +67,7 @@ export function attachTableTotals(deps: TableTotalsDeps): TableTotalsHandle {
 
   const close = (shouldRestoreFocus = false): void => {
     if (!popover) return;
+    const popoverEl = popover;
     popover.remove();
     popover = null;
     detachOutside?.();
@@ -73,7 +75,8 @@ export function attachTableTotals(deps: TableTotalsDeps): TableTotalsHandle {
     document.removeEventListener('keydown', onDocKey, true);
     const target = restoreFocus;
     restoreFocus = null;
-    if (shouldRestoreFocus) target?.focus({ preventScroll: true });
+    if (shouldRestoreFocus)
+      returnFocus(target, popoverEl, grid.closest<HTMLElement>('.fc-host') ?? grid);
   };
   const onDocKey = (e: KeyboardEvent): void => {
     if (e.key !== 'Escape') return;

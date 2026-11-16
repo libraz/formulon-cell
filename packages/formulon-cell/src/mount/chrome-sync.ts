@@ -25,6 +25,7 @@ import { type SpreadsheetEmitter, selectionEquals } from '../events.js';
 import { formatNumber } from '../format/number-format.js';
 import type { Strings } from '../i18n/strings.js';
 import { focusSheet } from '../interact/dialog-focus.js';
+import { isSubmitEnter } from '../interact/mac-dialog-keys.js';
 import { scrollActiveIntoView } from '../interact/navigation-policy.js';
 import { onOutsidePress } from '../interact/outside-press.js';
 import { overlayPortalFor } from '../interact/overlay-portal.js';
@@ -783,7 +784,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       e.preventDefault();
       e.stopPropagation();
       openNameMenu();
-    } else if (e.key === 'Enter') {
+    } else if (isSubmitEnter(e)) {
       e.preventDefault();
       e.stopPropagation();
       const raw = tag.value;

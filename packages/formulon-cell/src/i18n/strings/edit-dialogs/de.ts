@@ -95,6 +95,8 @@ export const editDialogsDe: EditDialogsStrings = {
     shiftUp: 'Zellen nach oben verschieben',
     entireRow: 'Ganze Zeile',
     entireColumn: 'Ganze Spalte',
+    ok: 'OK',
+    cancel: 'Abbrechen',
   },
   insertCopiedCellsDialog: {
     title: 'Kopierte Zellen einfügen',

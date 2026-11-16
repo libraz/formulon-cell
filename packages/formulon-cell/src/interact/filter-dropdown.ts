@@ -46,6 +46,7 @@ import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { markSurface, openerOf, returnFocus } from './dialog-shell.js';
+import { isImeKey } from './mac-dialog-keys.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { placePanel } from './overlay-position.js';
@@ -144,7 +145,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     if (e.key === 'Escape') {
       e.preventDefault();
       close();
-    } else if (e.key === 'Enter' && root?.contains(e.target as Node)) {
+    } else if (e.key === 'Enter' && !isImeKey(e) && root?.contains(e.target as Node)) {
       e.preventDefault();
       applyActiveFilter();
     }

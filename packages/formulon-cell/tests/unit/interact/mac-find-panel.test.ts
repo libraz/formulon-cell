@@ -113,6 +113,21 @@ describe('the Mac find panel', () => {
     expect(m.panel()?.hidden).toBe(false);
   });
 
+  it('ignores the IME-confirm Return whose isComposing is false', async () => {
+    const m = await mount('mac', SHEET);
+    m.handle.open();
+    m.type('a');
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      keyCode: 229,
+      bubbles: true,
+      cancelable: true,
+    });
+    m.input().dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(m.active()).toEqual({ sheet: 0, row: 0, col: 0 });
+  });
+
   it('steps back with the previous arrow and forward with the next arrow', async () => {
     const m = await mount('mac', SHEET);
     m.handle.open();

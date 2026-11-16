@@ -37,6 +37,7 @@ import {
   focusAndSelectInput,
   showDialogError,
 } from './dialog-shell.js';
+import { isImeKey } from './mac-dialog-keys.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { attachRangePickerButton } from './range-picker-control.js';
@@ -1051,7 +1052,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
 
   const onClose = (): void => api.close();
   const onOverlayKey = (e: KeyboardEvent): void => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !isImeKey(e)) {
       // Enter inside an input submits the form when mutation is enabled;
       // otherwise it's an alias for Close (legacy behaviour).
       if (mayMutate()) {

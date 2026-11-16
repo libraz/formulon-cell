@@ -12,6 +12,7 @@ import {
   deferInitialFocus,
   focusAndSelectInput,
 } from './dialog-shell.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 import type { PivotCommitContext } from './pivot-field-settings-dialog-apply.js';
 
 /** The report options the dialog edits. */
@@ -605,7 +606,7 @@ export const showPivotOptionsDialog = (
     shell.on(cancel, 'click', () => finish(null));
     shell.on(ok, 'click', () => finish({ name: name.value, ...readControls(body, opts) }));
     shell.on(name, 'keydown', (event) => {
-      if ((event as KeyboardEvent).key !== 'Enter') return;
+      if (!isSubmitEnter(event as KeyboardEvent)) return;
       event.preventDefault();
       ok.click();
     });

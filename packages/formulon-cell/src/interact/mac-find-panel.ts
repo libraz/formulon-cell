@@ -1,6 +1,7 @@
 import type { MacFindPanelStrings } from '../i18n/strings/mac/find-replace.js';
 import { createInteractionButton } from './chip-button.js';
 import { markSurface, openerOf, returnFocus } from './dialog-shell.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 import { openPopupMenu } from './popup-menu.js';
 
 export type FindScope = 'sheet' | 'workbook';
@@ -170,7 +171,7 @@ export const createMacFindPanel = (deps: MacFindPanelDeps): MacFindPanel => {
   };
   // Return and Shift+Return both find the next match; Previous is the ‹ button only.
   const onInputKey = (e: KeyboardEvent): void => {
-    if (e.key !== 'Enter' || e.isComposing) return;
+    if (!isSubmitEnter(e)) return;
     e.preventDefault();
     runStep('next');
   };

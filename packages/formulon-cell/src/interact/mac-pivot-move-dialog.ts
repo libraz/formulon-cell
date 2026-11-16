@@ -3,7 +3,12 @@ import { pivotReportRange } from '../commands/pivot-actions.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
+import {
+  appendDialogActions,
+  appendDialogFrame,
+  createDialogShell,
+  deferInitialFocus,
+} from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
 import { movePivotTable } from './pivot-move.js';
 import { createRangePickFormatter } from './range-pick-format.js';
@@ -181,7 +186,7 @@ function attachPivotMoveDialog(instance: SpreadsheetInstance): PivotMoveDialogHa
       delete status.dataset.state;
       status.textContent = '';
       shell.open();
-      queueMicrotask(() => {
+      deferInitialFocus(shell.overlay, () => {
         location.focus();
         location.select();
       });

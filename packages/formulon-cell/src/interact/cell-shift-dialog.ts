@@ -112,8 +112,8 @@ export function openCellShiftDialog(deps: CellShiftDialogDeps): void {
   const footer = ownerDocument.createElement('div');
   footer.className = 'fc-cellshift__footer';
   const { cancelBtn, okBtn } = appendDialogActions(footer, {
-    cancelLabel: strings.hyperlinkDialog.cancel,
-    okLabel: strings.hyperlinkDialog.ok,
+    cancelLabel: t.cancel,
+    okLabel: t.ok,
     buttonBaseClass: 'fc-cellshift__button',
     buttonPrimaryClass: 'fc-cellshift__button--primary',
     buttonSecondaryClass: 'fc-cellshift__button--secondary',

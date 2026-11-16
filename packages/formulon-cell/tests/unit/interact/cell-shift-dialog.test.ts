@@ -99,6 +99,18 @@ describe('openCellShiftDialog', () => {
     expect(onSubmit).toHaveBeenCalledExactlyOnceWith('rows');
   });
 
+  it('takes its button labels from its own strings, not the hyperlink dialog', () => {
+    const strings = {
+      ...en,
+      cellShiftDialog: { ...en.cellShiftDialog, ok: 'Shift', cancel: 'Back' },
+      hyperlinkDialog: { ...en.hyperlinkDialog, ok: 'Link', cancel: 'Skip' },
+    };
+    openCellShiftDialog({ host, strings, kind: 'insert', onSubmit: vi.fn() });
+    const dialog = document.querySelector<HTMLElement>('.fc-cellshift');
+    expect(dialog?.querySelector('.fc-cellshift__button--primary')?.textContent).toBe('Shift');
+    expect(dialog?.querySelector('.fc-cellshift__button--secondary')?.textContent).toBe('Back');
+  });
+
   it('wraps Tab from OK to the checked radio, then Shift+Tab back to OK', () => {
     openCellShiftDialog({ host, strings: en, kind: 'insert', onSubmit: vi.fn() });
     const dialog = document.querySelector<HTMLElement>('.fc-cellshift');

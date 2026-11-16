@@ -7,6 +7,7 @@
 import { findNext } from '../../commands/find.js';
 import { openCommentDialogFrom } from '../../interact/dialog-entry.js';
 import { onDocumentShortcut } from '../../interact/dialog-shell.js';
+import { isSubmitEnter } from '../../interact/mac-dialog-keys.js';
 import { onOutsidePress } from '../../interact/outside-press.js';
 import { overlayPortalFor } from '../../interact/overlay-portal.js';
 import type { SpreadsheetInstance } from '../../mount.js';
@@ -264,7 +265,7 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
   };
 
   titleSearchInput?.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter') return;
+    if (!isSubmitEnter(event)) return;
     event.preventDefault();
     runTitleSearch();
   });

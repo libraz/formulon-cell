@@ -348,6 +348,32 @@ describe('attachValidationList', () => {
     handle.detach();
   });
 
+  it('Escape hands focus to the sheet when the opener left the document', () => {
+    grid.tabIndex = 0;
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.focus();
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { validation: { kind: 'list', source: ['only'] } },
+    );
+    gridHitState(grid).validationChevron = {
+      rect: { x: 10, y: 10, w: 12, h: 12 },
+      cell: { x: -30, y: 10, w: 40, h: 12 },
+      row: 0,
+      col: 0,
+    };
+    const handle = attachValidationList({ grid, store, wb, onAfterCommit });
+    firePointerInChevron(grid, 10, 10);
+    expect(popover()).not.toBeNull();
+    opener.remove();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(popover()).toBeNull();
+    expect(document.activeElement).toBe(grid);
+    handle.detach();
+  });
+
   it('Escape restores focus to the grid opener', () => {
     grid.tabIndex = 0;
     grid.focus();

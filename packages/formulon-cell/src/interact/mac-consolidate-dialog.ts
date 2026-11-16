@@ -17,6 +17,7 @@ import {
   createDialogButton,
   createDialogShell,
   createDialogStatus,
+  deferInitialFocus,
 } from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createRangePickFormatter } from './range-pick-format.js';
@@ -287,7 +288,7 @@ function attachConsolidateDialog(instance: SpreadsheetInstance): ConsolidateDial
       defaults();
       status.clear();
       shell.open();
-      queueMicrotask(() => sourceInput.focus());
+      deferInitialFocus(shell.overlay, () => sourceInput.focus());
     },
     close,
     detach(): void {

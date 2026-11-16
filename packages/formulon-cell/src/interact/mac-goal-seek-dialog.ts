@@ -20,6 +20,7 @@ import {
   appendDialogFrame,
   createDialogShell,
   createDialogStatus,
+  deferInitialFocus,
 } from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createRangePickFormatter } from './range-pick-format.js';
@@ -302,7 +303,7 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
       currentDefaults();
       clearStatus();
       shell.open();
-      queueMicrotask(() => formulaInput.focus());
+      deferInitialFocus(shell.overlay, () => formulaInput.focus());
     },
     close,
     detach(): void {

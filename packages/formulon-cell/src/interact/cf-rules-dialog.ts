@@ -20,6 +20,7 @@ import {
   createDialogButton,
   createDialogShell,
 } from './dialog-shell.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
@@ -726,7 +727,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   });
   shell.on(appliesToInput, 'change', commitAppliesTo);
   shell.on(appliesToInput, 'keydown', ((e: KeyboardEvent) => {
-    if (e.key !== 'Enter') return;
+    if (!isSubmitEnter(e)) return;
     e.preventDefault();
     e.stopPropagation();
     commitAppliesTo();

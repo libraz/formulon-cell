@@ -22,6 +22,7 @@ import {
   focusAndSelectInput,
 } from './dialog-shell.js';
 import { attachFormatDialog, type FormatDialogHandle } from './format-dialog.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 import { pivotShowAsNeedsBaseField, pivotShowAsNeedsBaseItem } from './pivot-field-settings.js';
 
 /** Opens Format Cells on `current` and calls `apply` with the chosen code
@@ -590,8 +591,7 @@ export const showPivotFieldSettingsDialog = (
       finish(collect());
     });
     shell.on(shell.overlay, 'keydown', (event) => {
-      const key = (event as KeyboardEvent).key;
-      if (key !== 'Enter' || (event.target as Element | null)?.closest('button, select')) return;
+      if (!isSubmitEnter(event as KeyboardEvent)) return;
       event.preventDefault();
       ok.click();
     });

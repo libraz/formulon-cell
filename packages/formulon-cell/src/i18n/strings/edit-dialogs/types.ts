@@ -99,6 +99,8 @@ export interface EditDialogsStrings {
     shiftUp: string;
     entireRow: string;
     entireColumn: string;
+    ok: string;
+    cancel: string;
   };
   insertCopiedCellsDialog: {
     title: string;

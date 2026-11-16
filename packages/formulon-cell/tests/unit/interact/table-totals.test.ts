@@ -93,6 +93,18 @@ describe('table totals function picker', () => {
     ).toEqual(['sum']);
   });
 
+  it('Escape hands focus to the sheet when the opener left the document', () => {
+    grid.tabIndex = 0;
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.focus();
+    expect(handle.openForActiveCell()).toBe(true);
+    opener.remove();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.querySelector('.fc-table-totals')).toBeNull();
+    expect(document.activeElement).toBe(grid);
+  });
+
   it('opens from a click on the chevron', () => {
     const rect = grid.getBoundingClientRect();
     grid.dispatchEvent(

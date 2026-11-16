@@ -118,6 +118,27 @@ describe('attachWheel', () => {
     expect(store.getState().viewport.rowStart).toBe(2);
   });
 
+  it('a reversed gesture does not inherit the previous remainder', () => {
+    const rh = store.getState().layout.defaultRowHeight;
+    fire(grid, { deltaY: 10, deltaMode: 1 });
+    expect(store.getState().viewport.rowStart).toBe(10);
+    // Three quarters of a row down, then two half-row nudges back up.
+    fire(grid, { deltaY: Math.floor(rh * 0.75) });
+    fire(grid, { deltaY: -Math.ceil(rh / 2) });
+    fire(grid, { deltaY: -Math.ceil(rh / 2) });
+    expect(store.getState().viewport.rowStart).toBe(9);
+  });
+
+  it('a delta-mode change drops the remainder of the other unit', () => {
+    const rh = store.getState().layout.defaultRowHeight;
+    fire(grid, { deltaY: Math.floor(rh * 0.75) });
+    fire(grid, { deltaY: 1, deltaMode: 1 });
+    expect(store.getState().viewport.rowStart).toBe(1);
+    // Had the 0.75 row survived, this quarter row would complete another row.
+    fire(grid, { deltaY: Math.ceil(rh * 0.5) });
+    expect(store.getState().viewport.rowStart).toBe(1);
+  });
+
   it('clamps at the top — negative deltaY past zero stays at rowStart 0', () => {
     fire(grid, { deltaY: -1000 });
     expect(store.getState().viewport.rowStart).toBe(0);

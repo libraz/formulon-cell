@@ -13,6 +13,7 @@ import {
   appendDialogFrame,
   createDialogShell,
   createDialogStatus,
+  deferInitialFocus,
 } from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createRangePickFormatter } from './range-pick-format.js';
@@ -156,7 +157,7 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
       colField.input.value = '';
       status.clear();
       shell.open();
-      queueMicrotask(() => rowField.input.focus());
+      deferInitialFocus(shell.overlay, () => rowField.input.focus());
     },
     close,
     detach(): void {

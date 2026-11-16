@@ -63,6 +63,7 @@ import {
   createFormulaReferenceGesture,
   type FormulaReferenceGesture,
 } from './formula-reference-gesture.js';
+import { isImeKey } from './mac-dialog-keys.js';
 import {
   navigationPolicyFor,
   nextTabStop,
@@ -623,7 +624,7 @@ export class InlineEditor {
   };
 
   private readonly onKey = (e: KeyboardEvent): void => {
-    if (this.composing || e.isComposing || e.key === 'Process') {
+    if (this.composing || isImeKey(e) || e.key === 'Process') {
       return;
     }
     if (this.handleDraftHistoryKey(e)) return;

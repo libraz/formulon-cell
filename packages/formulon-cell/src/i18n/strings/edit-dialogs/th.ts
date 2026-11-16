@@ -93,6 +93,8 @@ export const editDialogsTh: EditDialogsStrings = {
     shiftUp: 'เลื่อนเซลล์ขึ้น',
     entireRow: 'ทั้งแถว',
     entireColumn: 'ทั้งคอลัมน์',
+    ok: 'ตกลง',
+    cancel: 'ยกเลิก',
   },
   insertCopiedCellsDialog: {
     title: 'แทรกเซลล์ที่คัดลอก',

@@ -93,6 +93,8 @@ export const editDialogsEn: EditDialogsStrings = {
     shiftUp: 'Shift cells up',
     entireRow: 'Entire row',
     entireColumn: 'Entire column',
+    ok: 'OK',
+    cancel: 'Cancel',
   },
   insertCopiedCellsDialog: {
     title: 'Insert Copied Cells',

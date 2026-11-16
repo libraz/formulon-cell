@@ -63,6 +63,9 @@ function frozenRegionAt(
 const MAC_ROWS_PER_LINE = 0.7;
 const MAC_COLS_PER_LINE = 0.15;
 
+/** Idle time after which the next wheel event starts a new gesture. */
+const WHEEL_GESTURE_GAP_MS = 250;
+
 const DOM_DELTA_LINE = 1;
 const DOM_DELTA_PAGE = 2;
 
@@ -87,6 +90,10 @@ export function attachWheel(deps: WheelDeps): () => void {
 
   let accY = 0;
   let accX = 0;
+  let lastStamp = Number.NEGATIVE_INFINITY;
+  let lastMode = 0;
+  let lastSignY = 0;
+  let lastSignX = 0;
 
   const onWheel = (e: WheelEvent): void => {
     if (e.ctrlKey || e.metaKey) {
@@ -127,6 +134,18 @@ export function attachWheel(deps: WheelDeps): () => void {
     const colRate = mac ? MAC_COLS_PER_LINE : 1;
     const dx = frozen.blockX ? 0 : (e.shiftKey ? e.deltaY : e.deltaX) * unitX * dirX * colRate;
     const dy = e.shiftKey || frozen.blockY ? 0 : e.deltaY * unitY * rowRate;
+    // A pause, a unit change or a reversal ends the gesture; its partial row is not carried over.
+    if (e.timeStamp - lastStamp > WHEEL_GESTURE_GAP_MS || e.deltaMode !== lastMode) {
+      accY = 0;
+      accX = 0;
+    }
+    lastStamp = e.timeStamp;
+    lastMode = e.deltaMode;
+    // A rounded Mac step can leave a remainder against the direction, so compare the deltas.
+    if (dy * lastSignY < 0) accY = 0;
+    if (dx * lastSignX < 0) accX = 0;
+    if (dy !== 0) lastSignY = Math.sign(dy);
+    if (dx !== 0) lastSignX = Math.sign(dx);
     accY += dy;
     accX += dx;
     const dRow = mac ? -Math.round(-accY / rh) : Math.trunc(accY / rh);

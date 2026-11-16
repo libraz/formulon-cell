@@ -11,6 +11,7 @@ import type { History } from '../commands/history.js';
 import { setPageSetup } from '../commands/page-setup.js';
 import type { PageBandHit } from '../render/grid/page-view.js';
 import { getPageSetup, type PageSetup, type SpreadsheetStore } from '../store/store.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 
 export interface PageBandEditorDeps {
   /** Element the bands are painted in — the editor is positioned inside it. */
@@ -80,7 +81,7 @@ export function attachPageBandEditor(deps: PageBandEditorDeps): PageBandEditorHa
     field.style.height = `${detail.rect.h}px`;
     field.style.textAlign = detail.slot;
     field.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
+      if (isSubmitEnter(e)) {
         e.preventDefault();
         close(true);
         grid.focus();

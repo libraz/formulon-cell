@@ -20,6 +20,7 @@ import {
   appendDialogFrame,
   createDialogShell,
   createDialogStatus,
+  deferInitialFocus,
 } from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
 
@@ -259,7 +260,7 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
       defaults();
       status.clear();
       shell.open();
-      queueMicrotask(() => groupBySelect.focus());
+      deferInitialFocus(shell.overlay, () => groupBySelect.focus());
     },
     close,
     detach(): void {

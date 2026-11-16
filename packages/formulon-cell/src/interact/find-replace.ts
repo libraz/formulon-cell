@@ -24,6 +24,7 @@ import { createDialogSelect, type DialogSelectOption } from '../toolbar/dialogs/
 import { showMessage } from '../toolbar/dialogs/prompt.js';
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createDialogButton, markSurface, openerOf, returnFocus } from './dialog-shell.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createMacFindPanel, type MacFindPanel } from './mac-find-panel.js';
 import { isNavigationAddrAllowed, navigationPolicyFor } from './navigation-policy.js';
 import { openPopupMenu } from './popup-menu.js';
@@ -641,14 +642,14 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   };
 
   const onFindKey = (e: KeyboardEvent): void => {
-    if (e.key === 'Enter') {
+    if (isSubmitEnter(e)) {
       e.preventDefault();
       step(e.shiftKey ? 'prev' : 'next');
     }
   };
 
   const onReplaceKey = (e: KeyboardEvent): void => {
-    if (e.key === 'Enter') {
+    if (isSubmitEnter(e)) {
       e.preventDefault();
       doReplace();
     }

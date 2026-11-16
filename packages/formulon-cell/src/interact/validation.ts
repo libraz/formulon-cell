@@ -18,7 +18,7 @@ import { validationAt } from '../store/range-validations.js';
 import { renderScale } from '../store/render-scale.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { pickFromListValues } from './autocomplete.js';
-import { appendDialogButton, createDialogShell } from './dialog-shell.js';
+import { appendDialogButton, createDialogShell, returnFocus } from './dialog-shell.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 
@@ -99,6 +99,7 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
 
   const close = (shouldRestoreFocus = false): void => {
     if (!popover) return;
+    const popoverEl = popover;
     popover.remove();
     popover = null;
     detachOutside?.();
@@ -107,11 +108,7 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
     const opener = restoreFocus;
     restoreFocus = null;
     if (!shouldRestoreFocus) return;
-    // A menu that opened the list is gone by now; the sheet takes the keyboard back.
-    const focusTarget = opener?.isConnected
-      ? opener
-      : (grid.closest<HTMLElement>('.fc-host') ?? grid);
-    focusTarget.focus({ preventScroll: true });
+    returnFocus(opener, popoverEl, grid.closest<HTMLElement>('.fc-host') ?? grid);
   };
 
   const onDocKey = (e: KeyboardEvent): void => {

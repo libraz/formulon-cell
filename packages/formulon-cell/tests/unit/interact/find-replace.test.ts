@@ -297,6 +297,18 @@ describe('attachFindReplace', () => {
     handle.detach();
   });
 
+  it('ignores the IME-confirm Enter in the Find and Replace fields', () => {
+    seed(store, wb, [{ row: 1, col: 0, value: 'apple' }]);
+    const handle = attachFindReplace({ host, store, wb });
+    handle.open();
+    const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
+    setInputValue(findInput, 'apple');
+    const e = fireKey(findInput, 'Enter', { keyCode: 229 });
+    expect(e.defaultPrevented).toBe(false);
+    expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 0 });
+    handle.detach();
+  });
+
   describe('Show Auto-Highlight', () => {
     const findApple = () => {
       seed(store, wb, [
