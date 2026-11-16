@@ -78,6 +78,25 @@ describe('showTextToColumnsDialog', () => {
     });
   });
 
+  it('takes a single character in the Other delimiter field', async () => {
+    const promise = showTextToColumnsDialog({
+      strings,
+      initialDelimiters: [],
+      previewRows: ['a|b'],
+    });
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
+    const other = dialog?.querySelector<HTMLInputElement>('[data-dialog-field="delimiter-other"]');
+    expect(other?.maxLength).toBe(1);
+    if (other) other.value = '|';
+    other?.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(dialog?.querySelector('pre')?.textContent).toBe('a | b');
+    dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    await expect(promise).resolves.toEqual({
+      delimiters: ['|'],
+      collapseConsecutiveDelimiters: false,
+    });
+  });
+
   it('requires at least one delimiter', async () => {
     const promise = showTextToColumnsDialog({
       strings,

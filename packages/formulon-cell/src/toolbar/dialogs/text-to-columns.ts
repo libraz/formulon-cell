@@ -125,7 +125,7 @@ interface DelimiterControls {
 const buildDelimiterControls = (
   strings: TextToColumnsDialogStrings,
   initial: ReadonlySet<string>,
-  config: { gridLabel: string; otherLabel: string; otherMaxLength: number },
+  config: { gridLabel: string; otherLabel: string },
 ): DelimiterControls => {
   const specs = delimiterSpecs(strings);
   const grid = document.createElement('div');
@@ -154,7 +154,7 @@ const buildDelimiterControls = (
   const otherInput = document.createElement('input');
   otherInput.type = 'text';
   otherInput.className = 'fc-tb__dlg__input';
-  otherInput.maxLength = config.otherMaxLength;
+  otherInput.maxLength = 1;
   otherInput.dataset.dialogField = 'delimiter-other';
   const customInitial = [...initial].find(
     (delimiter) => !specs.some((spec) => spec.value === delimiter),
@@ -255,7 +255,6 @@ const showTextToColumnsWizard = (
     } = buildDelimiterControls(strings, initial, {
       gridLabel: wizard.delimiters,
       otherLabel: wizard.other,
-      otherMaxLength: 1,
     });
     const qualifierLabel = document.createElement('label');
     qualifierLabel.className = 'fc-textcols__qualifier';
@@ -554,7 +553,6 @@ const showTextToColumnsSinglePage = (
     } = buildDelimiterControls(strings, initial, {
       gridLabel: strings.delimiters,
       otherLabel: strings.other,
-      otherMaxLength: 8,
     });
     delimiterFieldset.append(delimiterGrid, collapseLabel);
     shell.body.appendChild(delimiterFieldset);
