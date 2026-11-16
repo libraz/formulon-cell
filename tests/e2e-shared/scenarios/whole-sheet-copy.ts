@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
+import { expectSystemClipboardText } from '../pages/system-clipboard.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 export async function runWholeSheetCopy(page: Page, platform: 'default' | 'mac'): Promise<void> {
@@ -33,7 +34,7 @@ export async function runWholeSheetCopy(page: Page, platform: 'default' | 'mac')
       ranges: [{ firstRow: 0, firstCol: 0, lastRow: 1048575, lastCol: 16383 }],
     });
   await sheet.shortcut('c');
-  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('2\t=D5*3');
+  await expectSystemClipboardText(page, '2\t=D5*3');
 
   await sheet.chooseSheet('Target');
   await sheet.goTo('A1');

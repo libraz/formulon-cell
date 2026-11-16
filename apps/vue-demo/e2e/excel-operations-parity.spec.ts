@@ -16,8 +16,6 @@ import {
 import { SYSTEM_CLIPBOARD } from '../../../tests/e2e-shared/tags.js';
 import { test } from '../../../tests/e2e-shared/test.js';
 
-test.skip(({ browserName }) => browserName === 'webkit', 'WebKit denies clipboard reads');
-
 test('Excel parity: merged row edits, formatted copy, undo and redo', {
   tag: SYSTEM_CLIPBOARD,
 }, async ({ page }) => {

@@ -2,8 +2,6 @@ import { runWholeSheetCopy } from '../../../tests/e2e-shared/scenarios/whole-she
 import { SYSTEM_CLIPBOARD } from '../../../tests/e2e-shared/tags.js';
 import { test } from '../../../tests/e2e-shared/test.js';
 
-test.skip(({ browserName }) => browserName === 'webkit', 'WebKit denies clipboard reads');
-
 for (const platform of ['default', 'mac'] as const) {
   test(`whole-sheet copy preserves positions and undo: ${platform}`, {
     tag: SYSTEM_CLIPBOARD,

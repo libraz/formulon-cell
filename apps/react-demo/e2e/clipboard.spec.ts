@@ -9,9 +9,8 @@ import { test } from '../../../tests/e2e-shared/test.js';
 // Paste routes through `navigator.clipboard.readText()` because the host is a
 // non-editable div that never receives a native paste event. WebKit rejects
 // that read with `NotAllowedError` and ignores the `clipboard-read` permission
-// Playwright grants (cf. the permission override in `playwright.shared.ts`), so
-// the paste half of these round-trips cannot run there.
-test.skip(({ browserName }) => browserName === 'webkit', 'WebKit denies clipboard reads');
+// Playwright grants, so paste there falls back to the workbook's own copy: an
+// in-workbook round-trip runs, a paste of external clipboard text cannot.
 
 test('C01 (react-demo): Mod+C/V round-trips a cell value', { tag: SYSTEM_CLIPBOARD }, async ({
   page,
@@ -30,6 +29,7 @@ test('C02 (react-demo): Mod+X clears the source after paste', { tag: SYSTEM_CLIP
 // document.execCommand) actually writes into the sheet.
 test('C05 (react-demo): ribbon Paste click writes the clipboard text into the selection', {
   tag: SYSTEM_CLIPBOARD,
-}, async ({ page }) => {
+}, async ({ page, browserName }) => {
+  test.skip(browserName === 'webkit', 'WebKit denies the clipboard read an external paste needs');
   await runRibbonPasteUndoScenario(page);
 });

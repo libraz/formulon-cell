@@ -4,6 +4,7 @@ import { expect } from '@playwright/test';
 import type { E2eProbes } from '../../../apps/demo-shared/e2e-probes.js';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/api/spreadsheet/instance.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
+import { expectSystemClipboardText } from '../pages/system-clipboard.js';
 
 type InstanceWindow = Window & { __fcInst?: SpreadsheetInstance; __fcProbes?: E2eProbes };
 
@@ -39,10 +40,6 @@ const seedCellValue = (page: Page, row: number, col: number, value: string | num
 const selectCell = (page: Page, ref: string) =>
   page.evaluate((target) => (window as InstanceWindow).__fcInst?.selection.set(target), ref);
 
-/** Waits until the system clipboard holds `text`, so a paste never races the async copy. */
-const expectClipboardText = (page: Page, text: string) =>
-  expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(text);
-
 /** C01 — internal copy/paste round-trip via Mod+C/V keyboard shortcuts.
  *  Canvas content isn't queryable, so we re-select each cell and read the
  *  formula bar to confirm the value landed. */
@@ -56,7 +53,7 @@ export async function runCopyPasteScenario(page: Page): Promise<void> {
   // Step back to A1, copy.
   await page.keyboard.press('ArrowUp');
   await sp.shortcut('c');
-  await expectClipboardText(page, 'alpha');
+  await expectSystemClipboardText(page, 'alpha');
 
   // Navigate to A3 and paste. Active cell after paste is the paste anchor.
   await page.keyboard.press('ArrowDown');
@@ -77,7 +74,7 @@ export async function runCutPasteScenario(page: Page): Promise<void> {
   await sp.typeIntoActiveCell('beta');
   await page.keyboard.press('ArrowUp');
   await sp.shortcut('x');
-  await expectClipboardText(page, 'beta');
+  await expectSystemClipboardText(page, 'beta');
 
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
