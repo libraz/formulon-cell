@@ -157,6 +157,7 @@ const stubHandle = () => {
     spreadsheetProfileId: () => null,
     calcSettings: () => null,
     canonicalizeLocalizedFormula: (formula: string) => formula,
+    validateValue: () => null,
   } as unknown as WorkbookHandle & {
     setBlank: ReturnType<typeof vi.fn>;
     setFormula: ReturnType<typeof vi.fn>;
