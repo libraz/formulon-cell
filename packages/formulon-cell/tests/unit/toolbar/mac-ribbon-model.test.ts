@@ -1197,7 +1197,7 @@ describe('Mac Excel ribbon profile', () => {
       expect(macRibbonLabelForCommand('mac.formulas.reset.version', 'ja')).toBe('バージョン');
       expect(items('mac.formulas.defineName')).toEqual([
         ['mac.formulas.defineName.define', 'Define Name...', false],
-        ['mac.formulas.defineName.apply', 'Apply...', true],
+        ['mac.formulas.defineName.apply', 'Apply Names...', true],
       ]);
       expect(items('mac.formulas.useInFormula')).toEqual([
         ['mac.formulas.useInFormula.paste', 'Paste Names...', false],
@@ -1231,7 +1231,7 @@ describe('Mac Excel ribbon profile', () => {
           expect(macRibbonLabelForCommand(id, locale)).not.toBe(id);
         }
       }
-      expect(macRibbonLabelForCommand('mac.formulas.defineName.apply', 'ja')).toBe('引用...');
+      expect(macRibbonLabelForCommand('mac.formulas.defineName.apply', 'ja')).toBe('名前の引用...');
     });
 
     it('leaves Ignore Error out of the Error Checking menu', () => {
@@ -1374,7 +1374,7 @@ describe('Mac Excel ribbon profile', () => {
         ['mac.insert.sparkline.winLoss', 'Win/Loss', false],
       ]);
       expect(items('mac.insert.textBox')).toEqual([
-        ['mac.insert.textBox.horizontal', 'Horizontal Text Box', false],
+        ['mac.insert.textBox.horizontal', 'Draw Horizontal Text Box', false],
         // The file the engine writes holds no vertical text.
         ['mac.insert.textBox.vertical', 'Vertical Text Box', true],
       ]);

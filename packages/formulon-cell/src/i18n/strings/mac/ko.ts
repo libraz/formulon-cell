@@ -29,6 +29,7 @@ import { macPivotOptionsKo } from './pivot-options.js';
 import { macPivotTableDialogFrom, macPivotTableDialogKo } from './pivot-table-dialog.js';
 import { macProtectSheetFrom, macProtectSheetKo } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom, macRemoveDuplicatesKo } from './remove-duplicates.js';
+import { macRibbonMenuItemsKo } from './ribbon-menu-items.js';
 import { macRibbonReasonsKo } from './ribbon-reasons.js';
 import { macSheetTabMenuKo } from './sheet-tab-menu.js';
 import { macSheetViewsKo } from './sheet-views.js';
@@ -315,6 +316,7 @@ export const macKo: MacStrings = {
   accessibilityPane: macAccessibilityPaneKo,
   commentsPane: macCommentsPaneKo,
   ribbonReasons: macRibbonReasonsKo,
+  ribbonMenuItems: macRibbonMenuItemsKo,
   cfRulesDialog: {
     ...{
       ...macCfRulesDialogFrom(cellFormatKo.cfRulesDialog, {

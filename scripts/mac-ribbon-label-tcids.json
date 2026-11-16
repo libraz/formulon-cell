@@ -4288,6 +4288,496 @@
       },
       "control": "menu-item"
     },
+    "menu:mac.page.theme.enableUpdates": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4214972229",
+      "control": "menu-item"
+    },
+    "menu:mac.page.theme.browse": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "715535857",
+      "control": "menu-item"
+    },
+    "menu:mac.page.theme.save": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2785427434",
+      "control": "menu-item"
+    },
+    "menu:mac.view.pageLayout": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3496646375",
+      "control": "menu-item",
+      "verified": {
+        "en": "View: 0.1.0.1.2",
+        "ja": "表示: 0.1.0.1.2",
+        "de": "Ansicht: 0.1.0.1.2",
+        "fr": "Affichage: 0.1.0.1.2",
+        "ko": "보기: 0.1.0.1.2",
+        "th": "มุมมอง: 0.1.0.1.2",
+        "zh": "视图: 0.1.0.1.2"
+      }
+    },
+    "menu:mac.review.previousComment": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1077217711",
+      "control": "menu-item",
+      "verified": {
+        "en": "Review: 0.1.0.4.2",
+        "ja": "校閲: 0.1.0.4.2",
+        "de": "Überprüfen: 0.1.0.4.2",
+        "fr": "Révision: 0.1.0.4.2",
+        "ko": "검토: 0.1.0.4.2",
+        "th": "รีวิว: 0.1.0.4.2",
+        "zh": "审阅: 0.1.0.4.2"
+      }
+    },
+    "menu:mac.review.nextComment": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "353086950",
+      "control": "menu-item",
+      "verified": {
+        "en": "Review: 0.1.0.4.3",
+        "ja": "校閲: 0.1.0.4.3",
+        "de": "Überprüfen: 0.1.0.4.3",
+        "fr": "Révision: 0.1.0.4.3",
+        "ko": "검토: 0.1.0.4.3",
+        "th": "รีวิว: 0.1.0.4.3",
+        "zh": "审阅: 0.1.0.4.3"
+      }
+    },
+    "menu:mac.review.accessibility.check": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "490800247",
+      "control": "menu-item"
+    },
+    "menu:mac.review.accessibility.altText": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2488960717",
+      "control": "menu-item"
+    },
+    "menu:mac.review.accessibility.formatTable": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3057210449",
+      "control": "menu-item"
+    },
+    "menu:mac.review.accessibility.unmerge": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1362919507",
+      "control": "menu-item"
+    },
+    "menu:mac.review.accessibility.help": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1417549540",
+      "control": "menu-item"
+    },
+    "menu:mac.review.hideInk.hide": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4234850718",
+      "control": "menu-item"
+    },
+    "menu:mac.review.hideInk.deleteSheet": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1364026954",
+      "control": "menu-item"
+    },
+    "menu:mac.review.hideInk.deleteWorkbook": {
+      "file": "mso99.framework/mso_intl.bundle/strman_ad0f.strings",
+      "key": "d00b36c3",
+      "control": "menu-item"
+    },
+    "menu:mac.automate.newScript.editor": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3510764165",
+      "control": "menu-item"
+    },
+    "menu:mac.automate.newScript.recording": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3283240667",
+      "control": "menu-item"
+    },
+    "menu:mac.automate.showScripts.recent": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1138966514",
+      "control": "menu-item"
+    },
+    "menu:mac.automate.showScripts.workbook": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2574105185",
+      "control": "menu-item"
+    },
+    "menu:mac.automate.showScripts.samples": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "291377595",
+      "control": "menu-item"
+    },
+    "menu:mac.formulas.removeArrows.all": {
+      "file": "mso40ui.framework/tbbtn2.strings",
+      "key": "218265469",
+      "control": "menu-item",
+      "verified": {
+        "en": "Formulas: 0.1.0.3.2 > 0.0",
+        "ja": "数式: 0.1.0.3.2 > 0.0",
+        "de": "Formeln: 0.1.0.3.2 > 0.0",
+        "fr": "Formules: 0.1.0.3.2 > 0.0",
+        "ko": "수식: 0.1.0.3.2 > 0.0",
+        "th": "สูตร: 0.1.0.3.2 > 0.0",
+        "zh": "公式: 0.1.0.3.2 > 0.0"
+      }
+    },
+    "menu:mac.formulas.reset.clear": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3477859011",
+      "control": "menu-item"
+    },
+    "menu:mac.formulas.reset.runtime": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "821792488",
+      "control": "menu-item"
+    },
+    "menu:mac.formulas.reset.versionStable": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "4125914554",
+      "control": "menu-item"
+    },
+    "menu:mac.formulas.reset.versionLatest": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "358147370",
+      "control": "menu-item"
+    },
+    "menu:mac.formulas.reset.versionLearnMore": {
+      "file": "copilotuisharedprovider_mac_Localizable.strings",
+      "key": "828",
+      "control": "menu-item"
+    },
+    "menu:mac.formulas.defineName.define": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2954981232",
+      "control": "menu-item",
+      "verified": {
+        "en": "Formulas: 0.1.0.2.1 > 0.0",
+        "ja": "数式: 0.1.0.2.1 > 0.0",
+        "de": "Formeln: 0.1.0.2.1 > 0.0",
+        "fr": "Formules: 0.1.0.2.1 > 0.0",
+        "ko": "수식: 0.1.0.2.1 > 0.0",
+        "th": "สูตร: 0.1.0.2.1 > 0.0",
+        "zh": "公式: 0.1.0.2.1 > 0.0"
+      }
+    },
+    "menu:mac.formulas.defineName.apply": {
+      "file": "mso40ui.framework/tbbtn2.strings",
+      "key": "501689857",
+      "control": "menu-item",
+      "verified": {
+        "en": "Formulas: 0.1.0.2.1 > 0.1",
+        "ja": "数式: 0.1.0.2.1 > 0.1",
+        "de": "Formeln: 0.1.0.2.1 > 0.1",
+        "fr": "Formules: 0.1.0.2.1 > 0.1",
+        "ko": "수식: 0.1.0.2.1 > 0.1",
+        "th": "สูตร: 0.1.0.2.1 > 0.1",
+        "zh": "公式: 0.1.0.2.1 > 0.1"
+      }
+    },
+    "menu:mac.draw.eraser.stroke": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2322774691",
+      "control": "menu-item",
+      "verified": {
+        "en": "Draw: 0.1.0.0.1 > 0.0",
+        "ja": "描画: 0.1.0.0.1 > 0.0",
+        "de": "Zeichnen: 0.1.0.0.1 > 0.0",
+        "fr": "Dessin: 0.1.0.0.1 > 0.0",
+        "ko": "그리기: 0.1.0.0.1 > 0.0",
+        "th": "วาด: 0.1.0.0.1 > 0.0",
+        "zh": "绘图: 0.1.0.0.1 > 0.0"
+      }
+    },
+    "menu:mac.draw.eraser.small": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1527863448",
+      "control": "menu-item",
+      "verified": {
+        "en": "Draw: 0.1.0.0.1 > 0.1",
+        "ja": "描画: 0.1.0.0.1 > 0.1",
+        "de": "Zeichnen: 0.1.0.0.1 > 0.1",
+        "fr": "Dessin: 0.1.0.0.1 > 0.1",
+        "ko": "그리기: 0.1.0.0.1 > 0.1",
+        "th": "วาด: 0.1.0.0.1 > 0.1",
+        "zh": "绘图: 0.1.0.0.1 > 0.1"
+      }
+    },
+    "menu:mac.draw.eraser.medium": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3244458525",
+      "control": "menu-item",
+      "verified": {
+        "en": "Draw: 0.1.0.0.1 > 0.2",
+        "ja": "描画: 0.1.0.0.1 > 0.2",
+        "de": "Zeichnen: 0.1.0.0.1 > 0.2",
+        "fr": "Dessin: 0.1.0.0.1 > 0.2",
+        "ko": "그리기: 0.1.0.0.1 > 0.2",
+        "th": "วาด: 0.1.0.0.1 > 0.2",
+        "zh": "绘图: 0.1.0.0.1 > 0.2"
+      }
+    },
+    "menu:mac.draw.eraser.segment": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2264661739",
+      "control": "menu-item",
+      "verified": {
+        "en": "Draw: 0.1.0.0.1 > 0.3",
+        "ja": "描画: 0.1.0.0.1 > 0.3",
+        "de": "Zeichnen: 0.1.0.0.1 > 0.3",
+        "fr": "Dessin: 0.1.0.0.1 > 0.3",
+        "ko": "그리기: 0.1.0.0.1 > 0.3",
+        "th": "วาด: 0.1.0.0.1 > 0.3",
+        "zh": "绘图: 0.1.0.0.1 > 0.3"
+      }
+    },
+    "menu:mac.draw.add.pen": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1079150029",
+      "control": "menu-item"
+    },
+    "menu:mac.draw.add.highlighter": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1641883625",
+      "control": "menu-item"
+    },
+    "menu:mac.draw.add.pencil": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1440810283",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.forms.new": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2055947105",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.forms.preview": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2658446583",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.forms.edit": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3490808977",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.forms.send": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1124451039",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.pictureFromData.file": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1843518261",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.pictureFromData.clipboard": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2524080728",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.photo.browser": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "491263119",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.photo.file": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "94981204",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.photo.stock": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3082975233",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.photo.online": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1856965318",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.threeDModel.device": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "291623926",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.threeDModel.stock": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "452308072",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.smartArt.list": {
+      "file": "mso40ui.framework/tbbar.strings",
+      "key": "1805",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.smartArt.process": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "568778787",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.smartArt.cycle": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2719702047",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.smartArt.hierarchy": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2227630050",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.smartArt.relationship": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "3473570905",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.smartArt.matrix": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1470592665",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.smartArt.pyramid": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1281527872",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.smartArt.picture": {
+      "file": "Chart.framework/strman_2021.strings",
+      "key": "485",
+      "control": "menu-item"
+    },
+    "menu:mac.insert.screenshot.clipping": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2048773175",
+      "control": "menu-item",
+      "verified": {
+        "en": "Insert: 0.1.0.3.5 > 0.2",
+        "ja": "挿入: 0.1.0.3.5 > 0.2",
+        "de": "Einfügen: 0.1.0.3.5 > 0.2",
+        "fr": "Insérer: 0.1.0.3.5 > 0.2",
+        "ko": "삽입: 0.1.0.3.5 > 0.2",
+        "th": "แทรก: 0.1.0.3.5 > 0.2",
+        "zh": "插入: 0.1.0.3.5 > 0.2"
+      }
+    },
+    "menu:mac.insert.sparkline.line": {
+      "file": "mso40ui.framework/tbbtn2.strings",
+      "key": "2609631872",
+      "control": "menu-item",
+      "verified": {
+        "en": "Insert: 0.1.0.6.0 > 0.0",
+        "ja": "挿入: 0.1.0.6.0 > 0.0",
+        "de": "Einfügen: 0.1.0.6.0 > 0.0",
+        "fr": "Insérer: 0.1.0.6.0 > 0.0",
+        "ko": "삽입: 0.1.0.6.0 > 0.0",
+        "th": "แทรก: 0.1.0.6.0 > 0.0",
+        "zh": "插入: 0.1.0.6.0 > 0.0"
+      }
+    },
+    "menu:mac.insert.sparkline.column": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "1616408785",
+      "control": "menu-item",
+      "verified": {
+        "en": "Insert: 0.1.0.6.0 > 0.1",
+        "ja": "挿入: 0.1.0.6.0 > 0.1",
+        "de": "Einfügen: 0.1.0.6.0 > 0.1",
+        "fr": "Insérer: 0.1.0.6.0 > 0.1",
+        "ko": "삽입: 0.1.0.6.0 > 0.1",
+        "th": "แทรก: 0.1.0.6.0 > 0.1",
+        "zh": "插入: 0.1.0.6.0 > 0.1"
+      }
+    },
+    "menu:mac.insert.sparkline.winLoss": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "2988792087",
+      "control": "menu-item",
+      "verified": {
+        "en": "Insert: 0.1.0.6.0 > 0.2",
+        "ja": "挿入: 0.1.0.6.0 > 0.2",
+        "de": "Einfügen: 0.1.0.6.0 > 0.2",
+        "fr": "Insérer: 0.1.0.6.0 > 0.2",
+        "ko": "삽입: 0.1.0.6.0 > 0.2",
+        "th": "แทรก: 0.1.0.6.0 > 0.2",
+        "zh": "插入: 0.1.0.6.0 > 0.2"
+      }
+    },
+    "menu:mac.insert.textBox.horizontal": {
+      "file": "mso40ui.framework/tbbtn2.strings",
+      "key": "2028854631",
+      "control": "menu-item",
+      "verified": {
+        "ja": "挿入: 0.1.0.10.0 > 0.0",
+        "ko": "삽입: 0.1.0.10.0 > 0.0",
+        "zh": "插入: 0.1.0.10.0 > 0.0"
+      }
+    },
+    "menu:mac.insert.textBox.vertical": {
+      "file": "mso40ui.framework/tbbtn2.strings",
+      "key": "1473184163",
+      "control": "menu-item",
+      "verified": {
+        "ja": "挿入: 0.1.0.10.0 > 0.1",
+        "ko": "삽입: 0.1.0.10.0 > 0.1",
+        "zh": "插入: 0.1.0.10.0 > 0.1"
+      }
+    },
+    "menu:mac.insert.equation.insert": {
+      "file": "Chart.framework/strman_2021.strings",
+      "key": "288",
+      "control": "menu-item"
+    },
+    "menu:mac.page.margins.wide": {
+      "file": "mso40ui.framework/tbbtn.strings",
+      "key": "225671466",
+      "control": "menu-item"
+    },
+    "menu:mac.page.margins.narrow": {
+      "file": "mso99.framework/mso_intl.bundle/strman_0cda.strings",
+      "key": "bc",
+      "control": "menu-item"
+    },
+    "menu:mac.page.orientation.portrait": {
+      "file": "Chart.framework/strman_2047.strings",
+      "key": "be",
+      "control": "menu-item"
+    },
+    "menu:mac.page.orientation.landscape": {
+      "file": "Chart.framework/strman_2047.strings",
+      "key": "bd",
+      "control": "menu-item"
+    },
+    "menu:mac.page.size.a4": {
+      "file": "Chart.framework/strman_2047.strings",
+      "key": "c5",
+      "control": "menu-item"
+    },
+    "menu:mac.page.size.a3": {
+      "file": "Chart.framework/strman_2047.strings",
+      "key": "c4",
+      "control": "menu-item"
+    },
+    "menu:mac.page.printArea.add": {
+      "file": "strman_0014.strings",
+      "key": "12f",
+      "control": "menu-item"
+    },
+    "menu:mac.view.freeze.panes": {
+      "file": "strman_000c.strings",
+      "key": "1ea",
+      "control": "menu-item",
+      "verified": {
+        "en": "View: 0.1.0.4.2 > 0.0",
+        "ja": "表示: 0.1.0.4.2 > 0.0",
+        "de": "Ansicht: 0.1.0.4.2 > 0.0",
+        "fr": "Affichage: 0.1.0.4.2 > 0.0",
+        "ko": "보기: 0.1.0.4.2 > 0.0",
+        "th": "มุมมอง: 0.1.0.4.2 > 0.0",
+        "zh": "视图: 0.1.0.4.2 > 0.0"
+      }
+    },
     "gallery:mac.insert.recommendedChart.none": {
       "file": "strman_008a.strings",
       "key": "391"
@@ -5695,9 +6185,9 @@
       "reason": "runtime substitution with no ribbon string source"
     },
     "menu:mac.data.validation.clearRules": {
-      "status": "unresolved",
+      "status": "no-bundle-entry",
       "tcid": null,
-      "reason": "no node with matching ja label"
+      "reason": "no app string; worded in the i18n dictionaries (mac.ribbonMenuItems)"
     },
     "menu:mac.draw.eraser": {
       "status": "no-consumer",
@@ -5706,26 +6196,24 @@
       "reason": "nothing in the label set resolves this key"
     },
     "menu:mac.draw.highlighter": {
-      "status": "no-consumer",
-      "tcid": 27643,
-      "name": "InkToolboxAddHighlighter",
-      "reason": "nothing in the label set resolves this key"
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no app string; worded in the i18n dictionaries (mac.ribbonMenuItems)"
     },
     "menu:mac.draw.penBlack": {
-      "status": "unresolved",
+      "status": "no-bundle-entry",
       "tcid": null,
-      "reason": "no node with matching ja label"
+      "reason": "no app string; worded in the i18n dictionaries (mac.ribbonMenuItems)"
     },
     "menu:mac.draw.penRed": {
-      "status": "unresolved",
+      "status": "no-bundle-entry",
       "tcid": null,
-      "reason": "no node with matching ja label"
+      "reason": "no app string; worded in the i18n dictionaries (mac.ribbonMenuItems)"
     },
     "menu:mac.draw.pencil": {
-      "status": "no-consumer",
-      "tcid": 27642,
-      "name": "InkToolboxAddPencil",
-      "reason": "nothing in the label set resolves this key"
+      "status": "no-bundle-entry",
+      "tcid": null,
+      "reason": "no app string; worded in the i18n dictionaries (mac.ribbonMenuItems)"
     },
     "menu:mac.draw.toggle": {
       "status": "no-consumer",
@@ -5737,12 +6225,6 @@
       "status": "unresolved",
       "tcid": null,
       "reason": "no node with matching ja label"
-    },
-    "menu:mac.formulas.removeArrows.all": {
-      "status": "drawn-disagrees",
-      "tcid": 11946,
-      "name": "FlyoutAnchorRemoveArrows",
-      "reason": "tbbtn of TCID 11946 disagrees with the drawn label: ja at AX 数式: 0.1.0.3.2 > 0.0 (the menu item; the ribbon button 0.1.0.3.2 draws the same): drawn 'トレース矢印の削除', bundle '矢印の削除'. 453 tbbtn2 matches all 7 locales."
     },
     "menu:mac.insert.chartArea": {
       "status": "unresolved",
@@ -5823,55 +6305,25 @@
       "tcid": null,
       "reason": "no node with matching ja label"
     },
-    "menu:mac.page.margins.narrow": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
     "menu:mac.page.margins.normal": {
       "status": "unresolved",
       "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "menu:mac.page.margins.wide": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "menu:mac.page.orientation.landscape": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "menu:mac.page.orientation.portrait": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "menu:mac.page.printArea.add": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "menu:mac.page.size.a3": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
-    },
-    "menu:mac.page.size.a4": {
-      "status": "unresolved",
-      "tcid": null,
-      "reason": "no node with matching ja label"
+      "reason": "no drawn reading and the bundle sources compete: tbbtn 1358281168 reads de Standard / ko 표준 / zh 正常, tbbtn 3744556174 reads fr Normale, strman_200e 0 reads zh 常规"
     },
     "menu:mac.page.size.legal": {
       "status": "unresolved",
       "tcid": null,
-      "reason": "no node with matching ja label"
+      "reason": "no drawn reading and the bundle sources compete: strman_1043 65 reads fr Legal US / zh 法律, tbtip 2651707158 reads fr Légal / zh 合法"
     },
     "menu:mac.page.size.letter": {
       "status": "unresolved",
       "tcid": null,
-      "reason": "no node with matching ja label"
+      "reason": "no drawn reading and the bundle sources compete: strman_2047 d1 reads de US Letter, strman_1043 66 reads de Brief / zh 信函, tbbar 133 reads de Buchstabe / th จดหมาย"
+    },
+    "menu:mac.review.editNote": {
+      "status": "unresolved",
+      "tcid": null,
+      "reason": "no drawn reading and the bundle sources compete: tbbtn 3592117176 reads th แก้ไขโน้ต / zh 编辑注释, strman_0066 fa reads th แก้ไขบันทึกย่อ with a trailing space"
     },
     "menu:mac.view.formulaBar": {
       "status": "no-consumer",
@@ -5879,10 +6331,10 @@
       "name": "FormulaBar",
       "reason": "nothing in the label set resolves this key"
     },
-    "menu:mac.view.freeze.panes": {
+    "menu:mac.view.freeze.off": {
       "status": "unresolved",
       "tcid": null,
-      "reason": "the menu item draws ja 'ウィンドウ枠の固定' and de 'Fenster fixieren', which no tbbtn, tbbtn2 or tbfriendly string carries (FreezePanes 443 reads 'ウインドウ枠の固定' / 'Bereiche einfrieren'); the hand-written labels are the drawn ones"
+      "reason": "no drawn reading and the bundle sources compete: tbbtn 4046577531 reads ko 창 고정 해제 / th เลิกตรึงบานหน้าต่าง, strman_0017 182 reads th ยกเลิกตรึงแนว"
     },
     "menu:mac.view.gridlines": {
       "status": "no-consumer",
@@ -7181,6 +7633,11 @@
     "labels:zoom",
     "labels:zoom100",
     "labels:zoomSelection",
+    "menu:mac.automate.newScript.editor",
+    "menu:mac.automate.newScript.recording",
+    "menu:mac.automate.showScripts.recent",
+    "menu:mac.automate.showScripts.samples",
+    "menu:mac.automate.showScripts.workbook",
     "menu:mac.autosum.AVERAGE",
     "menu:mac.autosum.MIN",
     "menu:mac.autosum.SUM",
@@ -7190,6 +7647,13 @@
     "menu:mac.data.validation.circleInvalid",
     "menu:mac.data.validation.clearCircles",
     "menu:mac.data.validation.settings",
+    "menu:mac.draw.add.highlighter",
+    "menu:mac.draw.add.pen",
+    "menu:mac.draw.add.pencil",
+    "menu:mac.draw.eraser.medium",
+    "menu:mac.draw.eraser.segment",
+    "menu:mac.draw.eraser.small",
+    "menu:mac.draw.eraser.stroke",
     "menu:mac.formulas.calc.auto",
     "menu:mac.formulas.calc.autoNoTable",
     "menu:mac.formulas.calc.compatVersion",
@@ -7198,13 +7662,48 @@
     "menu:mac.formulas.calc.manual",
     "menu:mac.formulas.category.all",
     "menu:mac.formulas.category.recent",
+    "menu:mac.formulas.defineName.apply",
+    "menu:mac.formulas.defineName.define",
     "menu:mac.formulas.errorCheck.circular",
     "menu:mac.formulas.errorCheck.run",
     "menu:mac.formulas.errorCheck.trace",
+    "menu:mac.formulas.removeArrows.all",
     "menu:mac.formulas.removeArrows.dependents",
     "menu:mac.formulas.removeArrows.precedents",
+    "menu:mac.formulas.reset.clear",
+    "menu:mac.formulas.reset.runtime",
     "menu:mac.formulas.reset.version",
+    "menu:mac.formulas.reset.versionLatest",
+    "menu:mac.formulas.reset.versionLearnMore",
+    "menu:mac.formulas.reset.versionStable",
     "menu:mac.formulas.useInFormula.paste",
+    "menu:mac.insert.equation.insert",
+    "menu:mac.insert.forms.edit",
+    "menu:mac.insert.forms.new",
+    "menu:mac.insert.forms.preview",
+    "menu:mac.insert.forms.send",
+    "menu:mac.insert.photo.browser",
+    "menu:mac.insert.photo.file",
+    "menu:mac.insert.photo.online",
+    "menu:mac.insert.photo.stock",
+    "menu:mac.insert.pictureFromData.clipboard",
+    "menu:mac.insert.pictureFromData.file",
+    "menu:mac.insert.screenshot.clipping",
+    "menu:mac.insert.smartArt.cycle",
+    "menu:mac.insert.smartArt.hierarchy",
+    "menu:mac.insert.smartArt.list",
+    "menu:mac.insert.smartArt.matrix",
+    "menu:mac.insert.smartArt.picture",
+    "menu:mac.insert.smartArt.process",
+    "menu:mac.insert.smartArt.pyramid",
+    "menu:mac.insert.smartArt.relationship",
+    "menu:mac.insert.sparkline.column",
+    "menu:mac.insert.sparkline.line",
+    "menu:mac.insert.sparkline.winLoss",
+    "menu:mac.insert.textBox.horizontal",
+    "menu:mac.insert.textBox.vertical",
+    "menu:mac.insert.threeDModel.device",
+    "menu:mac.insert.threeDModel.stock",
     "menu:mac.page.break.insert",
     "menu:mac.page.break.remove",
     "menu:mac.page.break.reset",
@@ -7213,13 +7712,33 @@
     "menu:mac.page.font.gray",
     "menu:mac.page.font.office",
     "menu:mac.page.margins.custom",
+    "menu:mac.page.margins.narrow",
+    "menu:mac.page.margins.wide",
+    "menu:mac.page.orientation.landscape",
+    "menu:mac.page.orientation.portrait",
+    "menu:mac.page.printArea.add",
     "menu:mac.page.printArea.clear",
     "menu:mac.page.printArea.set",
+    "menu:mac.page.size.a3",
+    "menu:mac.page.size.a4",
+    "menu:mac.page.theme.browse",
+    "menu:mac.page.theme.enableUpdates",
     "menu:mac.page.theme.gray",
     "menu:mac.page.theme.office",
+    "menu:mac.page.theme.save",
+    "menu:mac.review.accessibility.altText",
+    "menu:mac.review.accessibility.check",
+    "menu:mac.review.accessibility.formatTable",
+    "menu:mac.review.accessibility.help",
+    "menu:mac.review.accessibility.unmerge",
     "menu:mac.review.convertNotes",
+    "menu:mac.review.hideInk.deleteSheet",
+    "menu:mac.review.hideInk.deleteWorkbook",
+    "menu:mac.review.hideInk.hide",
     "menu:mac.review.newNote",
+    "menu:mac.review.nextComment",
     "menu:mac.review.nextNote",
+    "menu:mac.review.previousComment",
     "menu:mac.review.previousNote",
     "menu:mac.review.showHideNote",
     "menu:mac.review.showNotes",
@@ -7227,6 +7746,8 @@
     "menu:mac.view.cellFocus.color",
     "menu:mac.view.cellFocus.focusCell",
     "menu:mac.view.freeze.firstColumn",
-    "menu:mac.view.freeze.firstRow"
+    "menu:mac.view.freeze.firstRow",
+    "menu:mac.view.freeze.panes",
+    "menu:mac.view.pageLayout"
   ]
 }

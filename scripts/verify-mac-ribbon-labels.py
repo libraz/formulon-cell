@@ -7,8 +7,9 @@ The node of a key is fixed from OUR model, never from the label text:
     commands in them. Group G, command P of tab T is the AX node 0.1.0.G.P in the tab's dump.
   - menu-manifest.ts gives the items of a menu command; the I-th item is the I-th item of the menu
     the dump opened from that command's node.
-  - a command id resolves to a label key the way labels.ts does: a menu label seed of that id, else
-    the label seed of the id's last segment; a tab id resolves to the label seed of that name.
+  - a command id resolves to a label key the way labels.ts does: a menu label of that id (bundle,
+    dictionary or seed), else the label of the id's last segment; a tab id resolves to the label of
+    that name.
 
 A place is used in a locale only when that locale's dump has the structure the model has (same
 number of chunks in the tab, same number of controls in the chunk, same number of items in the
@@ -192,7 +193,8 @@ class Surface:
     def __init__(self):
         labels = (MAC / 'labels.ts').read_text(encoding='utf-8')
         self.label_keys = set(seed_keys(labels, 'labelSeeds')) | set(list_keys(labels, 'BUNDLE_LABEL_KEYS'))
-        self.menu_keys = set(seed_keys(labels, 'menuLabelSeeds')) | set(list_keys(labels, 'BUNDLE_MENU_KEYS'))
+        self.menu_keys = (set(seed_keys(labels, 'menuLabelSeeds')) | set(list_keys(labels, 'BUNDLE_MENU_KEYS'))
+                          | set(seed_keys(labels, 'DICTIONARY_MENU_KEYS')))
         self.group_keys = set(seed_keys(labels, 'groupSeeds')) | set(list_keys(labels, 'BUNDLE_GROUP_KEYS'))
         self.model = read_model()
         self.menus = read_menus()

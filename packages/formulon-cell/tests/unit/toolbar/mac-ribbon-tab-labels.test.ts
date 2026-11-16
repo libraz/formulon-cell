@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { buildRibbonModel } from '../../../src/toolbar/ribbon-model.js';
 
+/** The app reports these zero-width spaces between the words of some names. */
+const ZWSP = String.fromCodePoint(0x200b);
+
 // Control names the Japanese Mac app reports on each tab (AX), in order.
 const labelsOf = (tabId: string): string[] =>
   (buildRibbonModel('ja', { profile: 'excel365Mac' }).find((tab) => tab.id === tabId)?.groups ?? [])
@@ -68,8 +71,8 @@ describe('Mac ribbon control names', () => {
       '変更内容を表示',
       '新しいコメント',
       '削除',
-      '前のコメント',
-      '次のコメント',
+      `前の${ZWSP}${ZWSP}コメント`,
+      `次の${ZWSP}${ZWSP}コメント`,
       'コメントの表示',
       'メモ',
       'シートの保護',

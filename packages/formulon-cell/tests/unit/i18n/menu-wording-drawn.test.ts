@@ -3,6 +3,9 @@ import { ko } from '../../../src/i18n/strings/ko.js';
 import { zh } from '../../../src/i18n/strings/zh.js';
 import { macRibbonLabelForCommand } from '../../../src/toolbar/ribbon/mac/labels.js';
 
+/** The ribbon draws these zero-width spaces between the words of some labels. */
+const ZWSP = String.fromCodePoint(0x200b);
+
 describe('menu wording', () => {
   it.each([
     ['zh Orientation clockwise', zh.ribbonMenu.orientationAngleClockwise, '顺时针斜排'],
@@ -21,6 +24,51 @@ describe('menu wording', () => {
       'ko Remove Arrows',
       macRibbonLabelForCommand('mac.formulas.removeArrows.all', 'ko'),
       '연결선 제거',
+    ],
+    [
+      'en Apply Names',
+      macRibbonLabelForCommand('mac.formulas.defineName.apply', 'en'),
+      'Apply Names...',
+    ],
+    [
+      'ja Apply Names',
+      macRibbonLabelForCommand('mac.formulas.defineName.apply', 'ja'),
+      '名前の引用...',
+    ],
+    [
+      'de Apply Names',
+      macRibbonLabelForCommand('mac.formulas.defineName.apply', 'de'),
+      'Namen übernehmen...',
+    ],
+    [
+      'ja Horizontal Text Box',
+      macRibbonLabelForCommand('mac.insert.textBox.horizontal', 'ja'),
+      '横書きテキスト ボックスの描画',
+    ],
+    [
+      'ko Horizontal Text Box',
+      macRibbonLabelForCommand('mac.insert.textBox.horizontal', 'ko'),
+      '가로 텍스트 상자 그리기',
+    ],
+    [
+      'zh Horizontal Text Box',
+      macRibbonLabelForCommand('mac.insert.textBox.horizontal', 'zh'),
+      '绘制横排文本框',
+    ],
+    [
+      'ja Vertical Text Box',
+      macRibbonLabelForCommand('mac.insert.textBox.vertical', 'ja'),
+      '縦書きテキスト ボックス',
+    ],
+    [
+      'ja Next Comment',
+      macRibbonLabelForCommand('mac.review.nextComment', 'ja'),
+      `次の${ZWSP}${ZWSP}コメント`,
+    ],
+    [
+      'ja Previous Comment',
+      macRibbonLabelForCommand('mac.review.previousComment', 'ja'),
+      `前の${ZWSP}${ZWSP}コメント`,
     ],
   ])('reads %s as the desktop draws it', (_, ours, drawn) => {
     expect(ours).toBe(drawn);
