@@ -5,6 +5,7 @@ import type {
   ReadingOrder,
   VerticalAlign,
 } from '@libraz/formulon';
+import { FontScheme } from '@libraz/formulon';
 import type {
   CellBorderSide,
   CellBorders,
@@ -145,6 +146,8 @@ const GRADIENT_PATH = 1;
 /** Built-in numFmt id for "General" — every engine reserves 0 for this. */
 const BUILTIN_NUM_FMT_GENERAL = 0;
 
+export const FONT_SCHEME_BY_NAME = { minor: FontScheme.Minor, major: FontScheme.Major } as const;
+
 /** The workbook body font a cell format inherits; `size` is in points. */
 export type WorkbookDefaultFont = Pick<FontRecord, 'name' | 'scheme'> & { size: number };
 
@@ -165,7 +168,11 @@ export function fontRecordFromFormat(
     // A theme link belongs to the typeface, so it carries only while the cell
     // is still on the workbook's body font. Naming a family picks a literal
     // font, which is what unlinks it — bolding or resizing does not.
-    scheme: name === workbookDefault?.name ? workbookDefault.scheme : undefined,
+    scheme: fmt.fontScheme
+      ? FONT_SCHEME_BY_NAME[fmt.fontScheme]
+      : name === workbookDefault?.name
+        ? workbookDefault.scheme
+        : undefined,
     // A format that says nothing about bold leaves the `<b>` element out. For
     // a cell font that reads the same as "not bold"; for a differential font
     // it is the difference between "leave it alone" and "switch it off".
@@ -492,6 +499,7 @@ export function buildXfRecord(
   const hasNumberFormat = Object.hasOwn(fmt, 'numFmt');
   const hasFont = [
     'fontFamily',
+    'fontScheme',
     'fontSize',
     'bold',
     'italic',
@@ -576,7 +584,11 @@ export function fontRecordToFormat(
     isThemeScheme(rec.scheme) &&
     isThemeScheme(workbookDefault?.scheme) &&
     rec.scheme === workbookDefault?.scheme;
-  if (rec.name !== defaultName && !sameThemeBodyFont) out.fontFamily = rec.name;
+  if (rec.name !== defaultName && !sameThemeBodyFont) {
+    out.fontFamily = rec.name;
+    if (rec.scheme === FontScheme.Minor) out.fontScheme = 'minor';
+    else if (rec.scheme === FontScheme.Major) out.fontScheme = 'major';
+  }
   // Compare in native units before converting. A default 12 pt font must be
   // stripped even though its paint value is 16 CSS px.
   const size = rec.sizePt ?? defaultSize;

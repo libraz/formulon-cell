@@ -196,6 +196,8 @@ export interface CellFormat {
   fillGradient?: CellGradientFill;
   /** Override theme font family for this cell. */
   fontFamily?: string;
+  /** Theme font set the family follows; absent means a literal face. */
+  fontScheme?: 'major' | 'minor';
   /** Font size in CSS pixels. */
   fontSize?: number;
   /** Hyperlink URL. When set, the cell paints text underlined+blue and

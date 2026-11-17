@@ -24,6 +24,7 @@ export const CELL_STYLE_GROUP_FIELDS: Record<CellStyleFormatGroup, readonly (key
       'fontVertAlign',
       'color',
       'fontFamily',
+      'fontScheme',
       'fontSize',
       'fontOutline',
       'fontShadow',

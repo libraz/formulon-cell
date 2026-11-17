@@ -151,6 +151,7 @@ const axisSafeFormatKeys = new Set<keyof CellFormat>([
   'fontCondense',
   'fontExtend',
   'fontFamily',
+  'fontScheme',
   'fontSize',
   'locked',
   'formulaHidden',
@@ -973,6 +974,7 @@ const visualFormatKeys: readonly (keyof CellFormat)[] = [
   'fontCondense',
   'fontExtend',
   'fontFamily',
+  'fontScheme',
   'fontSize',
 ];
 

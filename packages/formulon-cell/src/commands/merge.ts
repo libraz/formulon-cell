@@ -209,6 +209,7 @@ const mergeVisualKeys: readonly (keyof CellFormat)[] = [
   'fontCondense',
   'fontExtend',
   'fontFamily',
+  'fontScheme',
   'fontSize',
 ];
 

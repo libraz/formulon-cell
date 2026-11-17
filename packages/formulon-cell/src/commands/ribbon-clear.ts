@@ -106,6 +106,7 @@ const visualFormatKeys: readonly (keyof CellFormat)[] = [
   'fontCondense',
   'fontExtend',
   'fontFamily',
+  'fontScheme',
   'fontSize',
 ];
 

@@ -378,6 +378,7 @@ function filterCellStyleFormat(
     copy('fontVertAlign');
     copy('color');
     copy('fontFamily');
+    copy('fontScheme');
     copy('fontSize');
     copy('fontOutline');
     copy('fontShadow');

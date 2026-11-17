@@ -27,6 +27,10 @@ export function mergeFormatPatch(
   patch: Partial<CellFormat>,
 ): CellFormat {
   const next: CellFormat = { ...(base ?? {}), ...patch };
+  // Naming a face without a theme link makes it literal.
+  if (Object.hasOwn(patch, 'fontFamily') && !Object.hasOwn(patch, 'fontScheme')) {
+    delete next.fontScheme;
+  }
   if (patch.borders) next.borders = { ...(base?.borders ?? {}), ...patch.borders };
   return withFillReplacement(next, patch);
 }

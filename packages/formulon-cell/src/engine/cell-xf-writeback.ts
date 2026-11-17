@@ -11,6 +11,7 @@ import {
   borderRecordFromFormat,
   buildXfRecord,
   cssColorToArgb,
+  FONT_SCHEME_BY_NAME,
   fillRecordFromFormat,
   fontRecordFromFormat,
   numFmtToFormatCode,
@@ -167,7 +168,11 @@ const preserveRawFontForAxisEdit = (
   if (familyChanged) {
     const name = effectiveFormat.fontFamily;
     if (name !== undefined) font.name = name;
-    font.scheme = name === workbookDefaultFont?.name ? workbookDefaultFont?.scheme : undefined;
+    font.scheme = effectiveFormat.fontScheme
+      ? FONT_SCHEME_BY_NAME[effectiveFormat.fontScheme]
+      : name === workbookDefaultFont?.name
+        ? workbookDefaultFont?.scheme
+        : undefined;
   }
   if (sizeChanged && effectiveFormat.fontSize !== undefined) {
     font.sizePt = fontCssPxToPoints(effectiveFormat.fontSize);
@@ -277,8 +282,11 @@ export function patchXfIndexFromBase(
     if (has('fontFamily')) {
       const defaultFont = wb.workbookDefaultFont;
       font.name = patch.fontFamily ?? defaultFont?.name ?? font.name;
-      font.scheme =
-        font.name === wb.workbookDefaultFont?.name ? wb.workbookDefaultFont?.scheme : undefined;
+      font.scheme = patch.fontScheme
+        ? FONT_SCHEME_BY_NAME[patch.fontScheme]
+        : font.name === wb.workbookDefaultFont?.name
+          ? wb.workbookDefaultFont?.scheme
+          : undefined;
     }
     if (has('fontSize')) {
       const size = patch.fontSize;
