@@ -11,6 +11,7 @@ import type {
   PersonInput,
   PhoneticAlignment,
   PhoneticType,
+  PicturePatch,
   PictureProperties,
   Sheet,
   ThreadedComment,
@@ -62,6 +63,7 @@ type EngineImageInfo = ImageInfo;
 export type EngineImage = PictureProperties;
 type EngineImageInsertOptions = DrawingPlacementInput;
 type EngineDrawingAnchorPatch = DrawingAnchorPatch;
+export type EnginePicturePatch = PicturePatch;
 
 declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandleAnnotationsMethods {}
@@ -378,6 +380,17 @@ export abstract class WorkbookHandleAnnotationsMethods {
       ws(this, sheet)
         .drawing(objectId)
         .update({ anchor: { ...placement } }),
+    );
+  }
+
+  /** Rotate or flip a picture, keeping its object id and anchor. */
+  updatePicture(sheet: number, objectId: number, patch: EnginePicturePatch): boolean {
+    assertAlive(this);
+    if (!this.capabilities.images) return false;
+    return attemptWrite(() =>
+      ws(this, sheet)
+        .picture(objectId)
+        .update({ ...patch }),
     );
   }
 

@@ -179,6 +179,35 @@ describe.skipIf(!canLoadWasm())('formulon 0.13 annotation and image round-trip',
     }
   });
 
+  it('updates a picture rotation and flips and keeps them through save/load', async () => {
+    const first = await WorkbookHandle.createDefault();
+    try {
+      const id = first.insertImage(0, PNG, { anchor: { fromRow: 1, fromCol: 1 } }) ?? 0;
+      expect(first.updatePicture(0, id, { rotationDeg: -90, flipH: true })).toBe(true);
+      expect(first.getImage(0, id)).toMatchObject({ rotationDeg: -90, flipH: true, flipV: false });
+      const reloaded = await WorkbookHandle.loadBytes(first.save());
+      try {
+        expect(reloaded.getImage(0, id)).toMatchObject({
+          rotationDeg: -90,
+          flipH: true,
+          flipV: false,
+        });
+        expect(reloaded.updatePicture(0, id, { rotationDeg: 400, flipH: false, flipV: true })).toBe(
+          true,
+        );
+        expect(reloaded.getImage(0, id)).toMatchObject({
+          rotationDeg: 400,
+          flipH: false,
+          flipV: true,
+        });
+      } finally {
+        reloaded.dispose();
+      }
+    } finally {
+      first.dispose();
+    }
+  });
+
   it('preserves the original annotation when notes and threads share a cell', async () => {
     const first = await WorkbookHandle.createDefault();
     try {

@@ -419,6 +419,9 @@ export const drawingClipPath = (
 /** A stored rotation as it is displayed: normalised into [0, 360). */
 export const displayRotation = (rotationDeg: number): number => ((rotationDeg % 360) + 360) % 360;
 
+/** The rotation a flip leaves behind, on either axis: (360 - r) mod 360. */
+export const flippedRotation = (rotationDeg = 0): number => displayRotation(-rotationDeg);
+
 /** (x, y) turned by `deg` degrees clockwise on screen about the origin. */
 export const rotatePoint = (x: number, y: number, deg: number): [number, number] => {
   const t = (deg * Math.PI) / 180;
