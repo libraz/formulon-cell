@@ -77,6 +77,13 @@ export interface ChartLineSpec {
   readonly dash?: SessionShapeLineDash;
 }
 
+/** The paint of the chart area or the plot area as the file states it; an unset member is the
+ *  default, and `'none'` is a stated No Fill or No Line. */
+export interface ChartAreaSpec {
+  readonly fill?: ChartFillSpec | 'none';
+  readonly line?: ChartLineSpec | 'none';
+}
+
 export interface ChartMarkerSpec {
   readonly visible?: boolean;
   /** Excel's marker symbols; a picture marker is read from a workbook and cannot be written. */
@@ -200,6 +207,10 @@ export interface ChartSpec {
   readonly varyColors?: boolean;
   readonly xAxis?: ChartAxisSpec;
   readonly yAxis?: ChartAxisSpec;
+  /** The chart area's paint; unset draws the chart style's own: a filled area with a grey outline. */
+  readonly chartArea?: ChartAreaSpec;
+  /** The plot area's paint; unset draws none. */
+  readonly plotArea?: ChartAreaSpec;
 }
 
 /** How a resolved point is drawn: a value, a break in the line, or skipped with the line joined across it. */
@@ -273,6 +284,7 @@ export type ChartPrimitiveTag =
 
 export type ChartPrimitiveRole =
   | 'background'
+  | 'plot-area'
   | 'title'
   | 'axis'
   | 'axis-tick'

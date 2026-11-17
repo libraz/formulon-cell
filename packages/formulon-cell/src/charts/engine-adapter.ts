@@ -18,6 +18,7 @@
  */
 
 import type {
+  ChartAreaPaint,
   ChartAxis,
   ChartAxisPatch,
   ChartFill,
@@ -65,6 +66,7 @@ import { dashStyleOf, engineDashOf } from '../engine/line-style.js';
 import { argbFromCssColor, cssColorFromArgb } from '../engine/theme-color.js';
 import { autoSeriesColor } from './series-colors.js';
 import type {
+  ChartAreaSpec,
   ChartAxisSpec,
   ChartData,
   ChartDataLabelsSpec,
@@ -410,6 +412,38 @@ const readLine = (line: ChartLine | null): ChartLineSpec | undefined =>
         width: line.widthPt ?? undefined,
         dash: line.dash === null ? undefined : dashStyleOf(line.dash),
       });
+
+/** `#rrggbb` of a paint colour as drawn, a theme colour included. */
+const cssOfResolved = (color: DrawingColor | null): string | undefined => {
+  const argb = color === null ? undefined : (color.resolved?.argb ?? cssArgbOfRgb(color));
+  return argb === undefined ? undefined : cssColorFromArgb(argb);
+};
+
+const cssArgbOfRgb = (color: DrawingColor): number | undefined =>
+  color.base.kind === ColorKind.Rgb ? color.base.argb : undefined;
+
+const readAreaFill = (fill: ChartFill | null): ChartAreaSpec['fill'] => {
+  if (fill === null) return undefined;
+  if (fill.none) return 'none';
+  return defined<ChartFillSpec>({
+    color: cssOfResolved(fill.color),
+    transparency: fill.transparencyPct ?? fill.color?.resolvedTransparencyPct ?? undefined,
+  });
+};
+
+const readAreaLine = (line: ChartLine | null): ChartAreaSpec['line'] => {
+  if (line === null) return undefined;
+  if (line.none) return 'none';
+  return defined<ChartLineSpec>({
+    color: cssOfResolved(line.color),
+    transparency: line.transparencyPct ?? line.color?.resolvedTransparencyPct ?? undefined,
+    width: line.widthPt ?? undefined,
+    dash: line.dash === null ? undefined : dashStyleOf(line.dash),
+  });
+};
+
+const readArea = (paint: ChartAreaPaint): ChartAreaSpec | undefined =>
+  defined<ChartAreaSpec>({ fill: readAreaFill(paint.fill), line: readAreaLine(paint.line) });
 
 const readMarker = (marker: ChartMarker | null): ChartMarkerSpec | undefined => {
   if (marker === null) return undefined;
@@ -1306,6 +1340,17 @@ export const CHART_SPEC_FIELDS: { readonly [K in keyof ChartSpec]-?: ChartFieldM
   },
   xAxis: { kinds: AXIS_KINDS, read: (context) => readAxis(context, 'x'), write: writeAxis('x') },
   yAxis: { kinds: AXIS_KINDS, read: (context) => readAxis(context, 'y'), write: writeAxis('y') },
+  // Read only: nothing edits the paint of the areas, so no edit writes it.
+  chartArea: {
+    kinds: ALL_KINDS,
+    read: (context) => readArea(context.info.chartArea),
+    write: () => undefined,
+  },
+  plotArea: {
+    kinds: ALL_KINDS,
+    read: (context) => readArea(context.info.plotArea),
+    write: () => undefined,
+  },
 };
 
 const FIELD_KEYS = Object.keys(CHART_SPEC_FIELDS) as (keyof ChartSpec)[];

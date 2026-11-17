@@ -147,6 +147,7 @@ versioning is [SemVer](https://semver.org/).
 - Lines keep their arrowheads and every preset dash style: Insert Arrow saves a straight connector with a triangle at its end, line ends (triangle, stealth, diamond, oval, open arrow, with their sizes) load, draw, save and copy, and all Dashes entries round-trip as written in shapes and chart lines.
 - A rounded rectangle's corner loads, saves and copies as the file states it, in proportion to the shorter side, so it scales with the shape on resize and zoom. Only a rounded rectangle takes a corner; a plain rectangle always draws square.
 - A shape's text direction loads, saves and copies as the file states it, and vertical, rotated and East Asian vertical text draws in that direction.
+- A chart draws the chart-area and plot-area fill and outline its file states, theme colours included; where the file states none, the chart area keeps a 1 pt grey outline and the plot area stays clear, as the spreadsheet draws them.
 
 ### Fixed
 

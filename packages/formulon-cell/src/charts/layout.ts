@@ -18,6 +18,7 @@ import {
 import { formatChartValue } from './format.js';
 import { addLegend, legendLabels, legendPreferredWidth } from './legend.js';
 import { finite } from './numeric.js';
+import { plotAreaPrimitives } from './plot-area.js';
 import {
   axisDomain,
   categoryNumericLogBase,
@@ -490,6 +491,7 @@ export function layoutChart(input: ChartLayoutInput): ChartScene {
     width: Math.max(1, width - left - right),
     height: Math.max(1, height - top - bottom),
   };
+  elements.push(...plotAreaPrimitives(spec, plot));
   const allocatedRightLabelGutter = highYLabels
     ? Math.max(0, Math.min(rightLabelGutter, right - rightLegendReserve))
     : 0;

@@ -2572,9 +2572,9 @@ describe('attachSessionCharts', () => {
     );
     const area = css.slice(css.indexOf('.fc-chart {'));
     const rule = area.slice(0, area.indexOf('}'));
-    expect(rule).toMatch(/background: var\(--fc-bg,/);
-    expect(rule).toContain(
-      'border: var(--fc-chart-area-line-width) solid var(--fc-chart-area-line);',
+    expect(rule).toContain('background: var(--fc-chart-area-fill, var(--fc-bg, Canvas));');
+    expect(rule.replace(/\s+/g, ' ')).toContain(
+      'border: var(--fc-chart-area-line-width) var(--fc-chart-area-line-style, solid) var(--fc-chart-area-line);',
     );
     handle.detach();
   });

@@ -3,8 +3,14 @@ import { chartDataFromEngine, chartPreviewOverrides } from '../charts/engine-ada
 import { formatChartValue } from '../charts/format.js';
 import { chartTitleText, layoutChart, layoutUnsupportedChart } from '../charts/layout.js';
 import { accentsFromTheme } from '../charts/series-colors.js';
-import { DEFAULT_CHART_AREA_LINE } from '../charts/styles.js';
-import type { ChartData, ChartKind, ChartPrimitive, ChartScene } from '../charts/types.js';
+import { chartAreaFill, chartAreaLine } from '../charts/styles.js';
+import type {
+  ChartAreaSpec,
+  ChartData,
+  ChartKind,
+  ChartPrimitive,
+  ChartScene,
+} from '../charts/types.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { objectChangeAllowed } from '../commands/object-actions.js';
@@ -164,6 +170,31 @@ const SETTINGS_TAB_LABELS: Pick<
   elementsTab: chartSettingsDefaults.elementsTab,
   stylesTab: chartSettingsDefaults.stylesTab,
   filtersTab: chartSettingsDefaults.filtersTab,
+};
+
+/** `color` at `opacity`, as a CSS colour. */
+const withOpacity = (color: string, opacity: number | undefined): string =>
+  opacity === undefined || opacity >= 1
+    ? color
+    : `color-mix(in srgb, ${color} ${Math.round(opacity * 100)}%, transparent)`;
+
+/** Set the chart area's fill and outline on `panel`: the file's, or the chart style's own. */
+const applyChartAreaPaint = (panel: HTMLElement, chart: { chartArea?: ChartAreaSpec }): void => {
+  const fill = chartAreaFill(chart.chartArea);
+  if (fill === null) panel.style.setProperty('--fc-chart-area-fill', 'transparent');
+  else if (fill) {
+    panel.style.setProperty('--fc-chart-area-fill', withOpacity(fill.color, fill.opacity));
+  }
+  const line = chartAreaLine(chart.chartArea);
+  panel.style.setProperty('--fc-chart-area-line-width', `${line?.widthPt ?? 0}pt`);
+  panel.style.setProperty(
+    '--fc-chart-area-line',
+    line ? withOpacity(line.color, line.opacity) : 'transparent',
+  );
+  const dash = line?.dash;
+  const style =
+    dash === undefined || dash === 'solid' ? 'solid' : /dot|Dot/.test(dash) ? 'dotted' : 'dashed';
+  panel.style.setProperty('--fc-chart-area-line-style', style);
 };
 
 const isDrawable = (chart: SessionChart): chart is SessionChartSettingsShape =>
@@ -777,8 +808,7 @@ export function attachSessionCharts(deps: {
       panel.style.height = `${position.h}px`;
       panel.style.clipPath = drawingClipPath(store, chart.nativeAnchor, position);
       panel.style.zIndex = zIndex(chart.id);
-      panel.style.setProperty('--fc-chart-area-line', DEFAULT_CHART_AREA_LINE.color);
-      panel.style.setProperty('--fc-chart-area-line-width', `${DEFAULT_CHART_AREA_LINE.widthPt}pt`);
+      applyChartAreaPaint(panel, chart);
       panel.classList.toggle('fc-chart--selected', chart.id === selectedId);
       panel.classList.toggle('fc-chart--fixed', !placeable);
       panel.addEventListener('focus', () => {

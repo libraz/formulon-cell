@@ -367,10 +367,18 @@ const caseFor = (row: Row): RoundTripCase => {
   return { kind, range: kind === 'scatter' ? SCATTER_RANGE : CATEGORY_RANGE, spec, context };
 };
 
+/** `spec` without the area paint the engine writes into a new chart, which the created spec does not carry. */
+const withoutAreaPaint = (spec: ChartSpec | null): ChartSpec | null => {
+  if (!spec) return spec;
+  const { chartArea: _chartArea, plotArea: _plotArea, ...rest } = spec;
+  return rest;
+};
+
 /** `spec` with its series styles in id order. Styles are looked up by id, and the
  *  engine lists a filtered series after the visible ones. */
-const byId = (spec: ChartSpec | null): ChartSpec | null =>
-  spec?.seriesStyles
+const byId = (input: ChartSpec | null): ChartSpec | null => {
+  const spec = withoutAreaPaint(input);
+  return spec?.seriesStyles
     ? {
         ...spec,
         seriesStyles: [...spec.seriesStyles].sort((a, b) =>
@@ -378,6 +386,7 @@ const byId = (spec: ChartSpec | null): ChartSpec | null =>
         ),
       }
     : spec;
+};
 
 /** The single chart of sheet 0 after a save and reload, as a `ChartSpec`. */
 const reloaded = async (

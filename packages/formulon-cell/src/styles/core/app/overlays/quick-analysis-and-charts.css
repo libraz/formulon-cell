@@ -164,12 +164,13 @@
   .fc-chart {
     position: absolute;
     box-sizing: border-box;
-    /* The chart area is document content: unfilled, it shows the sheet's background as an
-       unfilled cell does; its outline comes from the chart's paint. */
-    background: var(--fc-bg, Canvas);
+    /* The chart area is document content: its fill and outline come from the chart's paint; one
+       that states no fill takes the surface. */
+    background: var(--fc-chart-area-fill, var(--fc-bg, Canvas));
     /* Excel draws chart text in a mid grey over the chart area. */
     color: color-mix(in srgb, var(--fc-fg, CanvasText) 65%, var(--fc-bg, Canvas));
-    border: var(--fc-chart-area-line-width) solid var(--fc-chart-area-line);
+    border: var(--fc-chart-area-line-width) var(--fc-chart-area-line-style, solid)
+      var(--fc-chart-area-line);
     font-family: var(--fc-font-ui, system-ui);
     pointer-events: auto;
     cursor: default;

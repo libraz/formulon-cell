@@ -393,6 +393,8 @@ describe('CHART_SPEC_FIELDS', () => {
       varyColors: all,
       xAxis: ['column', 'bar', 'line', 'area', 'scatter'],
       yAxis: ['column', 'bar', 'line', 'area', 'scatter'],
+      chartArea: all,
+      plotArea: all,
     });
   });
 

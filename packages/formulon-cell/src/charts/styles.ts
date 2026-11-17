@@ -2,6 +2,7 @@ import { shapeDashStroke } from '../commands/shape-format.js';
 import { clamp } from './numeric.js';
 import { DEFAULT_THEME_ACCENTS } from './series-colors.js';
 import type {
+  ChartAreaSpec,
   ChartFillSpec,
   ChartLineSpec,
   ChartMarkerSpec,
@@ -117,6 +118,31 @@ export const resolveChartStyle = (
 
 /** Excel's chart-area outline where the file states none. */
 export const DEFAULT_CHART_AREA_LINE = { color: '#898989', widthPt: 1 } as const;
+
+/** The chart area's outline as the file states it, over the default. A stated No Line is null. */
+export const chartAreaLine = (
+  area: ChartAreaSpec | undefined,
+): { color: string; widthPt: number; opacity?: number; dash?: ChartLineSpec['dash'] } | null => {
+  if (area?.line === 'none') return null;
+  const opacity = lineOpacity(area?.line);
+  return {
+    color: area?.line?.color ?? DEFAULT_CHART_AREA_LINE.color,
+    widthPt:
+      lineWidth(area?.line, DEFAULT_CHART_AREA_LINE.widthPt) ?? DEFAULT_CHART_AREA_LINE.widthPt,
+    ...(opacity === undefined ? {} : { opacity }),
+    ...(area?.line?.dash === undefined ? {} : { dash: area.line.dash }),
+  };
+};
+
+/** The chart area's fill as the file states it: undefined when it states none of its own (the
+ *  chart is filled with the surface), null for a stated No Fill. */
+export const chartAreaFill = (
+  area: ChartAreaSpec | undefined,
+): { color: string; opacity: number } | null | undefined => {
+  if (area?.fill === 'none') return null;
+  if (area?.fill?.color === undefined) return undefined;
+  return { color: area.fill.color, opacity: fillOpacity(area.fill, 1) ?? 1 };
+};
 
 export const fillColor = (fill: ChartFillSpec | undefined, fallback: string): string =>
   fill?.color ?? fallback;
