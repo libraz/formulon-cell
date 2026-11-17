@@ -1,5 +1,11 @@
 import type { ChartFill, ChartLine } from '@libraz/formulon';
-import { AnchorEditAs, AnchorKind, ChartLineDash, ColorKind } from '@libraz/formulon';
+import {
+  AnchorEditAs,
+  AnchorKind,
+  ChartLineDash,
+  ColorKind,
+  DrawingObjectKind,
+} from '@libraz/formulon';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDrawingClipboard } from '../../../src/commands/clipboard/drawing.js';
 import { History } from '../../../src/commands/history.js';
@@ -25,6 +31,7 @@ import {
   shapeDashEditable,
 } from '../../../src/commands/shape-format.js';
 import { deleteRows, insertRows } from '../../../src/commands/structure.js';
+import { drawingAnchorOf } from '../../../src/engine/drawing-geometry.js';
 import { hydrateImagesFromEngine } from '../../../src/engine/images-sync.js';
 import { captureShapeRestore, shapeFromNative } from '../../../src/engine/shapes-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -38,6 +45,7 @@ import {
   type SessionIllustration,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+import { zipEntries, zipStored, zipText } from './zip-entries.js';
 
 const open: WorkbookHandle[] = [];
 afterEach(() => {
@@ -244,12 +252,8 @@ describe('shapes saved with the workbook', () => {
     expect(arrow?.nativeObjectId).toBeUndefined();
 
     const reopened = await saved(wb);
-    // A loaded line has no known direction, so it comes back as a locked box.
-    expect(shapesOf(reopened.store).map((item) => item.shape)).toEqual([
-      ...kinds.slice(0, 5),
-      'rectangle',
-    ]);
-    expect(shapesOf(reopened.store).at(-1)?.nativeLocked).toBe(true);
+    expect(shapesOf(reopened.store).map((item) => item.shape)).toEqual(kinds);
+    expect(shapesOf(reopened.store).at(-1)?.nativeLocked).not.toBe(true);
   });
 
   it('restyles a shape: fill, no fill, outline colour and weight', async () => {
@@ -689,7 +693,7 @@ describe('loaded shapes the overlay cannot draw', () => {
     expect(captureShapeRestore(handle, 0, shape.objectId)).toBeNull();
   });
 
-  it('treats a loaded line as a locked box, since its direction is unknown', async () => {
+  it('loads a saved line with its direction', async () => {
     const { store } = await session((wb) => {
       insertShape(wb, 0, {
         prst: 'straightConnector1',
@@ -703,9 +707,84 @@ describe('loaded shapes the overlay cannot draw', () => {
         lineRgb: 0x00ff00,
         lineWidthEmu: 19050,
       });
+      const [line] = wb.listShapes(0);
+      if (line) wb.updateShape(0, line.objectId, { flipH: true });
     });
 
+    expect(only(store)).toMatchObject({ shape: 'line', flipH: true });
+    expect(only(store).nativeLocked).not.toBe(true);
+  });
+
+  it('keeps a bent connector and a group drawn as locked boxes', async () => {
+    const { wb, store } = await session((engine) => {
+      insertShape(engine, 0, {
+        prst: 'bentConnector3',
+        anchorKind: AnchorKind.TwoCell,
+        editAs: AnchorEditAs.TwoCell,
+        fromRow: 3,
+        fromCol: 1,
+        toRow: 6,
+        toCol: 4,
+      });
+    });
     expect(only(store)).toMatchObject({ nativeLocked: true, shape: 'rectangle' });
+
+    const shape = wb.listShapes(0)[0];
+    if (!shape) throw new Error('no shape');
+    const group = { ...shape, presetGeometry: 'rect', kind: DrawingObjectKind.Group };
+    expect(shapeFromNative(store, 0, group, wb)).toMatchObject({ nativeLocked: true });
+  });
+
+  /** A saved workbook with shapes 2 and 3 and a straight connector (4) glued at the ends `glue` names. */
+  const gluedConnector = async (glue: 'both' | 'start') => {
+    const source = await WorkbookHandle.createDefault();
+    open.push(source);
+    const frame = { kind: AnchorKind.TwoCell, editAs: AnchorEditAs.TwoCell, fromCol: 1, toCol: 3 };
+    source.insertShape(0, { presetGeometry: 'rect', anchor: { ...frame, fromRow: 2, toRow: 4 } });
+    source.insertShape(0, { presetGeometry: 'rect', anchor: { ...frame, fromRow: 14, toRow: 16 } });
+    source.insertShape(0, {
+      presetGeometry: 'straightConnector1',
+      anchor: { ...frame, fromRow: 4, toRow: 14 },
+    });
+    const entries = zipEntries(source.save());
+    const path = [...entries.keys()].find((name) => /^xl\/drawings\/drawing\d+\.xml$/.test(name));
+    if (!path) throw new Error('no drawing part');
+    const ends = `<a:stCxn id="2" idx="2"/>${glue === 'both' ? '<a:endCxn id="3" idx="0"/>' : ''}`;
+    const xml = zipText(entries, path).replace(
+      '<xdr:cNvCxnSpPr/>',
+      `<xdr:cNvCxnSpPr>${ends}</xdr:cNvCxnSpPr>`,
+    );
+    entries.set(path, new TextEncoder().encode(xml));
+    return session(undefined, zipStored(entries));
+  };
+
+  it.each(['both', 'start'] as const)(
+    'follows a connector the engine re-routes when a shape glued to it moves (%s end glued)',
+    async (glue) => {
+      const { wb, store, history } = await gluedConnector(glue);
+      const connector = wb.listShapes(0).find((shape) => shape.objectId === 4);
+      expect(connector?.startConnection).toMatchObject({ objectId: 2 });
+      const before = sessionIllustrationById(store.getState(), 'shape-native-0-4')?.nativeAnchor;
+
+      updateSessionIllustration(store, 'shape-native-0-2', { x: 400, y: 300 }, history, wb);
+
+      const live = wb.listShapes(0).find((shape) => shape.objectId === 4);
+      const item = sessionIllustrationById(store.getState(), 'shape-native-0-4');
+      expect(live && drawingAnchorOf(live)).not.toEqual(before);
+      expect(item?.nativeAnchor).toEqual(live && drawingAnchorOf(live));
+    },
+  );
+
+  it('flips a loaded glued line, which the engine then unglues', async () => {
+    const { wb, store, history } = await gluedConnector('both');
+    const line = sessionIllustrationById(store.getState(), 'shape-native-0-4');
+    if (!line) throw new Error('no line');
+
+    expect(applySessionDrawingFlip(store, line, 'horizontal', history, wb)).not.toBeNull();
+
+    const live = wb.listShapes(0).find((shape) => shape.objectId === 4);
+    expect(live).toMatchObject({ flipH: true, startConnection: null, endConnection: null });
+    expect(sessionIllustrationById(store.getState(), 'shape-native-0-4')?.flipH).toBe(true);
   });
 
   it('cannot be deleted, so there is no undo to get wrong', async () => {

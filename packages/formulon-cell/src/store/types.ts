@@ -625,7 +625,7 @@ export interface SessionIllustration {
   flipH?: true;
   /** Flipped vertically in its own frame, before the rotation. */
   flipV?: true;
-  /** A loaded shape the overlay can only approximate (unknown preset, line,
+  /** A loaded shape the overlay can only approximate (unknown preset, bent
    *  connector, group): drawn as its bounding box, and only its anchor is
    *  written back. */
   nativeLocked?: boolean;

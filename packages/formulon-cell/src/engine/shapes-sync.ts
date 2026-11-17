@@ -180,7 +180,7 @@ const clearDropped = <T extends object>(next: T, prev: T | null | undefined): T 
 
 /** The overlay for a shape of the file, or null for a hidden one, which stays
  *  untouched in the engine. A shape the overlay cannot draw (unknown preset,
- *  line, connector, group) becomes a locked bounding box; a fill or outline it
+ *  bent connector, group) becomes a locked bounding box; a fill or outline it
  *  cannot state is kept as the file holds it. */
 export function shapeFromNative(
   store: SpreadsheetStore,
@@ -191,11 +191,10 @@ export function shapeFromNative(
   if (shape.hidden) return null;
   // A custom geometry has no preset name.
   const kind = shape.presetGeometry === null ? undefined : KIND_OF_PRST.get(shape.presetGeometry);
-  // The engine reports no flip, so a loaded line's direction is unknown.
+  // A straight line keeps its direction in its flips; other connectors and groups are not drawn.
   const locked =
     kind === undefined ||
-    kind === 'line' ||
-    shape.kind === DrawingObjectKind.Connector ||
+    (shape.kind === DrawingObjectKind.Connector && kind !== 'line') ||
     shape.kind === DrawingObjectKind.Group;
   const anchor = drawingAnchorOf(shape);
   const item: SessionIllustration = {
