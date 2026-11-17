@@ -254,7 +254,6 @@ export const ribbonMenusKo: RibbonMenusStrings = {
     shapeDashLongDashDotDot: '긴 파선-점선-점선',
     arrangeRequiresObject: '정렬할 개체를 선택하세요.',
     arrangeNativeUnsupported: '엔진에서 그림 겹치기 순서를 저장할 수 없습니다.',
-    shapeArrowNotSaved: '화살표는 통합 문서에 저장되지 않습니다.',
     splitNotSaved: '이 통합 문서에는 창 나누기를 저장할 수 없습니다.',
     arrangeAtFront: '선택한 개체가 이미 맨 앞에 있습니다.',
     arrangeAtBack: '선택한 개체가 이미 맨 뒤에 있습니다.',

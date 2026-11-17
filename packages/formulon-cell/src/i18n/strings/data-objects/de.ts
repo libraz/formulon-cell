@@ -383,7 +383,7 @@ export const dataObjectsDe: DataObjectsStrings = {
       images:
         'Wenn die Engine Bilder unterstützt, können neu eingefügte Bilder bearbeitet und in XLSX gespeichert werden. Geladene Bilder sind schreibgeschützt; das native Neuanordnen von Bildern ist nicht verfügbar.',
       shapes:
-        'Rechtecke, abgerundete Rechtecke, Ovale, Dreiecke, Rauten und Linien werden in XLSX gespeichert. Pfeile, Strichstile und teilweise Transparenz lassen sich nicht speichern; diese Optionen sind für gespeicherte Formen nicht verfügbar. Geladene Formen, die der Editor nicht zeichnen kann, erscheinen als gestrichelte Umrisse.',
+        'Rechtecke, abgerundete Rechtecke, Ovale, Dreiecke, Rauten und Linien werden in XLSX gespeichert. Linienpfeile, Strichstile und Transparenz werden mitgespeichert. Geladene Formen, die der Editor nicht zeichnen kann, erscheinen als gestrichelte Umrisse.',
       sparklines:
         'Sparkline-Gruppen werden aus XLSX geladen und mit Farben, Markierungen, Achsen und weiteren Gruppeneinstellungen bearbeitet und gespeichert.',
       slicers:

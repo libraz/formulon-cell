@@ -223,10 +223,6 @@ const contextualDisabledReason = (instance: SpreadsheetInstance, id: string): st
     if (state.protection.protectedSheets.size > 0) return MAC_CONTEXT_LABELS.themeProtected[lang];
     if (instance.workbook.getTheme()?.source === 2) return MAC_CONTEXT_LABELS.themeUnreadable[lang];
   }
-  // The file stores no line end, so an engine that saves shapes cannot keep an arrow.
-  if (id === 'mac.insert.shapeArrow' && instance.workbook?.capabilities?.shapes) {
-    return strings.shapeArrowNotSaved;
-  }
   if (isThreadedCommentCommand(id)) {
     if (!instance.workbook?.capabilities?.threadedComments)
       return MAC_CONTEXT_LABELS.threadedCommentsUnavailable[lang];

@@ -252,7 +252,6 @@ export const ribbonMenusTh: RibbonMenusStrings = {
     shapeDashLongDashDotDot: 'เส้นประยาวจุดจุด',
     arrangeRequiresObject: 'เลือกวัตถุที่จะจัดเรียง',
     arrangeNativeUnsupported: 'กลไกไม่สามารถบันทึกลำดับการซ้อนกันของรูปภาพได้',
-    shapeArrowNotSaved: 'ไม่สามารถบันทึกลูกศรลงในเวิร์กบุ๊กได้',
     splitNotSaved: 'ไม่สามารถบันทึกบานหน้าต่างแยกลงในเวิร์กบุ๊กนี้ได้',
     arrangeAtFront: 'วัตถุที่เลือกอยู่ด้านหน้าอยู่แล้ว',
     arrangeAtBack: 'วัตถุที่เลือกอยู่ด้านหลังอยู่แล้ว',

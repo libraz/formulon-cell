@@ -259,7 +259,6 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     shapeDashLongDashDotDot: 'Langer Strich-Punkt-Punkt',
     arrangeRequiresObject: 'Wählen Sie ein anzuordnendes Objekt aus.',
     arrangeNativeUnsupported: 'Die Engine kann die Stapelreihenfolge von Bildern nicht speichern.',
-    shapeArrowNotSaved: 'Pfeile werden nicht in der Arbeitsmappe gespeichert.',
     splitNotSaved:
       'Geteilte Fensterbereiche können in dieser Arbeitsmappe nicht gespeichert werden.',
     arrangeAtFront: 'Das ausgewählte Objekt befindet sich bereits im Vordergrund.',

@@ -96,7 +96,6 @@ describe('toolbar/ribbon menu primitives', () => {
       updateShapeRotateMenu: vi.fn(),
       applyShapeChangeAction: vi.fn(),
       updateShapeChangeMenu: vi.fn(),
-      updateShapesInsertMenu: vi.fn(),
       applyUiTheme: vi.fn(),
       applyWorkbookTheme: vi.fn(),
       focusSheet: vi.fn(),

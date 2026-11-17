@@ -376,7 +376,7 @@ export const dataObjectsEn: DataObjectsStrings = {
       images:
         'When the engine supports images, newly inserted pictures can be edited and saved in XLSX. Loaded pictures are read-only; native picture reordering is unavailable.',
       shapes:
-        'Rectangles, rounded rectangles, ovals, triangles, diamonds and lines are saved in XLSX. Arrows, dash styles and partial transparency cannot be saved, so those controls are unavailable for saved shapes. Loaded shapes the editor cannot draw appear as dashed outlines.',
+        'Rectangles, rounded rectangles, ovals, triangles, diamonds and lines are saved in XLSX. Outline arrows, dash styles and transparency are saved with them. Loaded shapes the editor cannot draw appear as dashed outlines.',
       sparklines:
         'Sparkline groups are loaded from XLSX, then edited and saved with their colours, markers, axes and other group settings.',
       slicers:

@@ -32,12 +32,13 @@ import {
   viewportZoom,
 } from '../engine/drawing-geometry.js';
 import { fontPointsToCssPx } from '../engine/font-units.js';
+import { lineEndsOf } from '../engine/line-style.js';
 import { DEFAULT_ILLUSTRATION_FRAME } from '../engine/shapes-sync.js';
 import { argbFromCssColor, cssColorFromArgb } from '../engine/theme-color.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { minorThemeFontFace } from '../engine/workbook-handle-styles.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
+import type { SessionIllustration, SessionLineEnd, SpreadsheetStore } from '../store/store.js';
 import type { State } from '../store/types.js';
 import { SVG_NS } from '../svg-namespace.js';
 import { showCommandRefusal } from '../toolbar/dialogs/command-refusal.js';
@@ -124,6 +125,93 @@ const appendSvg = <K extends keyof SVGElementTagNameMap>(
 /** CSS pixels per point. */
 const PX_PER_PT = 96 / 72;
 
+/** Width and length of a line end, in multiples of the line width (at least 2 px). */
+const END_SIZE_FACTOR = { small: 2, medium: 3, large: 5 } as const;
+
+/** Draw one decorated end at `tip`, where the line runs towards it along the unit vector `dir`.
+ *  Returns how far the line is cut short so it does not show through the decoration. */
+const drawLineEnd = (
+  svg: SVGElement,
+  end: SessionLineEnd,
+  tip: [number, number],
+  dir: [number, number],
+  lineWidth: number,
+  outline: string,
+): number => {
+  const unit = Math.max(lineWidth, 2);
+  const length = END_SIZE_FACTOR[end.length ?? 'medium'] * unit;
+  const span = END_SIZE_FACTOR[end.width ?? 'medium'] * unit;
+  const [dx, dy] = dir;
+  const at = (back: number, side: number): string =>
+    `${tip[0] - dx * back - dy * side},${tip[1] - dy * back + dx * side}`;
+  const filled = { fill: outline, stroke: 'none' };
+  switch (end.type) {
+    case 'triangle':
+      appendSvg(svg, 'polygon', {
+        points: `${at(0, 0)} ${at(length, span / 2)} ${at(length, -span / 2)}`,
+        ...filled,
+      });
+      return length;
+    case 'stealth':
+      appendSvg(svg, 'polygon', {
+        points: `${at(0, 0)} ${at(length, span / 2)} ${at(length * 0.65, 0)} ${at(length, -span / 2)}`,
+        ...filled,
+      });
+      return length * 0.65;
+    case 'diamond':
+      appendSvg(svg, 'polygon', {
+        points: `${at(-length / 2, 0)} ${at(0, span / 2)} ${at(length / 2, 0)} ${at(0, -span / 2)}`,
+        ...filled,
+      });
+      return length / 2;
+    case 'oval':
+      appendSvg(svg, 'ellipse', {
+        cx: tip[0],
+        cy: tip[1],
+        rx: length / 2,
+        ry: span / 2,
+        transform: `rotate(${(Math.atan2(dy, dx) * 180) / Math.PI} ${tip[0]} ${tip[1]})`,
+        ...filled,
+      });
+      return length / 2;
+    case 'arrow':
+      appendSvg(svg, 'polyline', {
+        points: `${at(length, span / 2)} ${at(0, 0)} ${at(length, -span / 2)}`,
+        fill: 'none',
+        stroke: outline,
+        'stroke-width': lineWidth,
+        'stroke-linejoin': 'miter',
+      });
+      return 0;
+  }
+};
+
+/** A line from the top-left corner of its box to the bottom-right, as the file stores it,
+ *  with the decorations at its ends. */
+const drawLine = (
+  svg: SVGElement,
+  item: SessionIllustration,
+  w: number,
+  h: number,
+  width: number,
+  outline: string | null,
+  stroke: Record<string, string | number>,
+): void => {
+  const length = Math.hypot(w, h) || 1;
+  const dir: [number, number] = [w / length, h / length];
+  const ends = lineEndsOf(item);
+  let [x1, y1, x2, y2] = [0, 0, w, h];
+  if (outline && ends.head) {
+    const cut = drawLineEnd(svg, ends.head, [0, 0], [-dir[0], -dir[1]], width, outline);
+    [x1, y1] = [dir[0] * cut, dir[1] * cut];
+  }
+  if (outline && ends.tail) {
+    const cut = drawLineEnd(svg, ends.tail, [w, h], dir, width, outline);
+    [x2, y2] = [w - dir[0] * cut, h - dir[1] * cut];
+  }
+  appendSvg(svg, 'line', { x1, y1, x2, y2, ...stroke });
+};
+
 /** Draw the shape filling a `w` x `h` box, its outline centred on the edge the
  *  way the spreadsheet draws it. */
 const drawShape = (svg: SVGSVGElement, item: SessionIllustration, w: number, h: number): void => {
@@ -149,20 +237,7 @@ const drawGeometry = (svg: SVGElement, item: SessionIllustration, w: number, h: 
     'stroke-linecap': dash.linecap,
   };
   if (item.shape === 'line' || item.shape === 'arrow') {
-    // An arrowhead three line widths long ends the line at its tip.
-    const head = item.shape === 'arrow' ? Math.max(6, width * 3) : 0;
-    const length = Math.hypot(w, h) || 1;
-    const [ux, uy] = [w / length, h / length];
-    // A line runs from the top-left corner of its box to the bottom-right, as the file stores it.
-    const [bx, by] = [w - ux * head, h - uy * head];
-    appendSvg(svg, 'line', { x1: 0, y1: 0, x2: bx, y2: by, ...stroke });
-    if (head > 0 && outline) {
-      const [px, py] = [-uy * (head / 2), ux * (head / 2)];
-      appendSvg(svg, 'polygon', {
-        points: `${w},${h} ${bx + px},${by + py} ${bx - px},${by - py}`,
-        fill: outline,
-      });
-    }
+    drawLine(svg, item, w, h, width, outline, stroke);
     return;
   }
   const paint = {

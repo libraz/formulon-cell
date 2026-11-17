@@ -82,7 +82,7 @@ export const createShapeFormatMenuFactories = (
   ribbonMenuText: ToolbarMenuText,
 ): ShapeFormatMenuFactories => {
   const t = ribbonMenuText;
-  const DASH_LABELS: Record<SessionShapeLineDash, string> = {
+  const DASH_LABELS: Record<(typeof SHAPE_LINE_DASHES)[number], string> = {
     solid: t.shapeDashSolid,
     roundDot: t.shapeDashRoundDot,
     squareDot: t.shapeDashSquareDot,

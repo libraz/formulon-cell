@@ -564,7 +564,23 @@ export type SessionShapeLineDash =
   | 'dashDot'
   | 'longDash'
   | 'longDashDot'
-  | 'longDashDotDot';
+  | 'longDashDotDot'
+  | 'dot'
+  | 'sysDashDot'
+  | 'sysDashDotDot';
+
+/** The decoration at one end of a line. */
+export type SessionLineEndType = 'triangle' | 'stealth' | 'diamond' | 'oval' | 'arrow';
+
+/** A line end's width or length; an unstated size is medium. */
+export type SessionLineEndSize = 'small' | 'medium' | 'large';
+
+/** One decorated end of a line. */
+export interface SessionLineEnd {
+  readonly type: SessionLineEndType;
+  readonly width?: SessionLineEndSize;
+  readonly length?: SessionLineEndSize;
+}
 
 /** A colour as the file stores it, with the CSS colour it renders to. */
 export interface SessionNativeColor {
@@ -613,6 +629,10 @@ export interface SessionIllustration {
   lineHidden?: boolean;
   /** A shape's outline dash style; unset is solid. */
   lineDash?: SessionShapeLineDash;
+  /** The decoration at a line's start, and at its end. An arrow is a line with a
+   *  triangle at the end; the kind stands for that pair when neither is stated. */
+  headEnd?: SessionLineEnd;
+  tailEnd?: SessionLineEnd;
   /** A shape's fill opacity, opaque when unset; 0 is No Fill. */
   opacity?: number;
   /** A shape's text, lines joined with `\n`. */

@@ -381,7 +381,7 @@ export const dataObjectsFr: DataObjectsStrings = {
       images:
         'Lorsque le moteur prend en charge les images, les images nouvellement insérées peuvent être modifiées et enregistrées dans XLSX. Les images chargées sont en lecture seule ; le réordonnancement natif des images n’est pas disponible.',
       shapes:
-        'Les rectangles, rectangles arrondis, ovales, triangles, losanges et lignes sont enregistrés dans XLSX. Les flèches, les styles de tirets et la transparence partielle ne peuvent pas l’être ; ces options sont donc indisponibles pour les formes enregistrées. Les formes chargées que l’éditeur ne sait pas dessiner apparaissent en contour pointillé.',
+        'Les rectangles, rectangles arrondis, ovales, triangles, losanges et lignes sont enregistrés dans XLSX. Les flèches de contour, les styles de tirets et la transparence sont enregistrés avec elles. Les formes chargées que l’éditeur ne sait pas dessiner apparaissent en contour pointillé.',
       sparklines:
         'Les groupes de graphiques sparkline sont chargés depuis XLSX, puis modifiés et enregistrés avec leurs couleurs, marqueurs, axes et autres réglages de groupe.',
       slicers:

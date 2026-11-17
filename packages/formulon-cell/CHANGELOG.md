@@ -144,6 +144,7 @@ versioning is [SemVer](https://semver.org/).
 - `Workbook.engineVersion` reports the version of the calc engine the workbook runs on.
 - Ctrl+Alt+F9 and Ctrl+Alt+Shift+F9 recalculate every formula, including ones the engine does not hold dirty, such as the cached values a file opens on; F9 and Shift+F9 still recalculate only what changed. The Mac profile has no such key, as in the Mac app.
 - Shapes and pictures flip and turn: the Rotate menu offers Flip Vertical and Flip Horizontal after the quarter turns, Picture Format has the Rotate menu, and a flip mirrors the rotation as the spreadsheet does. Flips and raw rotations load, save and copy as the file states them, a picture fixed on the sheet can still turn and flip, and `Picture.update` takes `rotationDeg`, `flipH` and `flipV`. A loaded straight line or straight connector is editable rather than a locked box, and a connector glued to a shape follows it when the shape moves.
+- Lines keep their arrowheads and every preset dash style: Insert Arrow saves a straight connector with a triangle at its end, line ends (triangle, stealth, diamond, oval, open arrow, with their sizes) load, draw, save and copy, and all Dashes entries round-trip as written in shapes and chart lines.
 
 ### Fixed
 

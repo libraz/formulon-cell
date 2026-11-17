@@ -1,8 +1,7 @@
-import type { ChartFill, ChartLine, ChartLineDash, DrawingColor } from '@libraz/formulon';
+import type { ChartFill, ChartLine, DrawingColor } from '@libraz/formulon';
 import { AnchorEditAs, AnchorKind, ColorKind, DrawingObjectKind } from '@libraz/formulon';
 import {
   DEFAULT_SHAPE_COLOR,
-  SAVED_LINE_DASH,
   shapeFillColor,
   shapeHasFill,
   shapeOutlineColor,
@@ -12,9 +11,9 @@ import {
 import { writeDrawingOrder } from '../store/drawing-order.js';
 import type {
   SessionIllustration,
+  SessionLineEnd,
   SessionNativeColor,
   SessionShapeKind,
-  SessionShapeLineDash,
   SpreadsheetStore,
   State,
 } from '../store/store.js';
@@ -27,6 +26,7 @@ import {
   sessionPosition,
   twoCellAnchorForPixels,
 } from './drawing-geometry.js';
+import { dashStyleOf, engineDashOf, engineLineEnd, lineEndOf, lineEndsOf } from './line-style.js';
 import { argbFromCssColor, cssColorFromArgb, renderedThemeColor } from './theme-color.js';
 import type { EngineDrawingAnchor } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -42,8 +42,8 @@ export const DEFAULT_ILLUSTRATION_FRAME = { x: 300, y: 88, w: 160, h: 96 } as co
 /** Outline of a shape the overlay can only approximate. */
 const LOCKED_OUTLINE_COLOR = '#7f7f7f';
 
-/** The preset geometry each saved shape kind is written as. An arrow has no
- *  entry: the engine cannot express a line end. */
+/** The preset geometry each saved shape kind is written as. An arrow is a
+ *  connector with a triangle at its end. */
 const PRST_OF_KIND: Partial<Record<SessionShapeKind, string>> = {
   rectangle: 'rect',
   'rounded-rectangle': 'roundRect',
@@ -51,6 +51,7 @@ const PRST_OF_KIND: Partial<Record<SessionShapeKind, string>> = {
   triangle: 'triangle',
   diamond: 'diamond',
   line: 'line',
+  arrow: 'straightConnector1',
 };
 
 const KIND_OF_PRST = new Map<string, SessionShapeKind>([
@@ -59,6 +60,13 @@ const KIND_OF_PRST = new Map<string, SessionShapeKind>([
   ),
   ['straightConnector1', 'line'],
 ]);
+
+/** A straight line with a triangle at its end and nothing at its start is the arrow. */
+const isArrowEnds = (head: SessionLineEnd | undefined, tail: SessionLineEnd | undefined): boolean =>
+  head === undefined &&
+  tail?.type === 'triangle' &&
+  tail.width === undefined &&
+  tail.length === undefined;
 
 /** Whether the engine can store `item`. */
 const shapeIsSaved = (item: SessionIllustration): boolean =>
@@ -108,16 +116,6 @@ const keepsNativeColor = (color: DrawingColor): boolean =>
 const drawnTransparencyPct = (paint: ChartFill | null): number =>
   paint?.color?.resolvedTransparencyPct ?? paint?.transparencyPct ?? 0;
 
-/** The dash style an engine dash reads as; none for one the overlay has no style for. */
-const dashOfSaved = (saved: ChartLineDash): SessionShapeLineDash | undefined =>
-  (Object.keys(SAVED_LINE_DASH) as SessionShapeLineDash[]).find(
-    (dash) => SAVED_LINE_DASH[dash] === saved,
-  );
-
-/** The engine dash `item` is saved with; none for solid or a style the file cannot store. */
-const savedDash = (item: SessionIllustration): ChartLineDash | undefined =>
-  item.lineDash === undefined ? undefined : SAVED_LINE_DASH[item.lineDash];
-
 /** The colour to write for `css`: the file's own while the shape still shows it. */
 const colorInput = (
   css: string,
@@ -146,8 +144,12 @@ const paintInput = (item: SessionIllustration): Pick<EngineShapeInput, 'fill' | 
   }
   const weight = shapeOutlineWeight(item);
   const outline = hexOf(shapeOutlineColor(item));
-  const dash = savedDash(item);
-  const dashInput = dash === undefined ? {} : { dash };
+  const ends = lineEndsOf(item);
+  const dashInput = {
+    ...(item.lineDash === undefined ? {} : { dash: engineDashOf(item.lineDash) }),
+    ...(ends.head ? { headEnd: engineLineEnd(ends.head) } : {}),
+    ...(ends.tail ? { tailEnd: engineLineEnd(ends.tail) } : {}),
+  };
   if (item.nativeLineOther) {
     input.line = { widthPt: shapeStoredWeight(item), ...dashInput };
   } else if (weight === null || outline === null) {
@@ -159,12 +161,11 @@ const paintInput = (item: SessionIllustration): Pick<EngineShapeInput, 'fill' | 
 };
 
 /** Overlay-only settings of a saved shape, reset so the screen shows what the
- *  file holds: the file has no corner radius and only some dash styles. */
+ *  file holds: the file has no corner radius. */
 const unsaveable = (item: SessionIllustration): Partial<SessionIllustration> => {
   const reset: Partial<SessionIllustration> = {};
   if (item.nativeLocked) return reset;
   if (item.radius !== undefined) reset.radius = undefined;
-  if (item.lineDash !== undefined && savedDash(item) === undefined) reset.lineDash = undefined;
   return reset;
 };
 
@@ -172,7 +173,7 @@ const unsaveable = (item: SessionIllustration): Partial<SessionIllustration> => 
  *  out, so the engine's merge removes it. */
 const clearDropped = <T extends object>(next: T, prev: T | null | undefined): T => {
   const cleared: Record<string, null> = {};
-  for (const key of ['dash', 'transparencyPct']) {
+  for (const key of ['dash', 'transparencyPct', 'headEnd', 'tailEnd']) {
     if (prev && key in prev && !(key in next)) cleared[key] = null;
   }
   return { ...next, ...cleared };
@@ -245,8 +246,17 @@ export function shapeFromNative(
   if (line === 'other') item.nativeLineOther = true;
   const width = shape.line?.widthPt ?? 0;
   if (width > 0) item.lineWidth = width;
-  const dash = shape.line?.dash == null ? undefined : dashOfSaved(shape.line.dash);
+  const dash = shape.line?.dash == null ? undefined : dashStyleOf(shape.line.dash);
   if (dash !== undefined && dash !== 'solid') item.lineDash = dash;
+  if (item.shape === 'line') {
+    const head = lineEndOf(shape.line?.headEnd ?? null);
+    const tail = lineEndOf(shape.line?.tailEnd ?? null);
+    if (isArrowEnds(head, tail)) item.shape = 'arrow';
+    else {
+      if (head) item.headEnd = head;
+      if (tail) item.tailEnd = tail;
+    }
+  }
   if (shape.text) item.text = shape.text;
   return item;
 }
@@ -268,6 +278,8 @@ const shapeInputOf = (shape: EngineShape): EngineShapeInput | null => {
   const lineStated = {
     ...(shape.line?.widthPt != null ? { widthPt: shape.line.widthPt } : {}),
     ...(shape.line?.dash != null ? { dash: shape.line.dash } : {}),
+    ...(shape.line?.headEnd ? { headEnd: shape.line.headEnd } : {}),
+    ...(shape.line?.tailEnd ? { tailEnd: shape.line.tailEnd } : {}),
     ...(shape.line?.transparencyPct != null ? { transparencyPct: shape.line.transparencyPct } : {}),
   };
   return {

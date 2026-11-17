@@ -73,8 +73,6 @@ export interface DynamicDropdownsCtx {
   updateShapeOutlineMenu: (menu: HTMLElement) => void;
   updateShapeRotateMenu: (menu: HTMLElement) => void;
   updateShapeChangeMenu: (menu: HTMLElement) => void;
-  /** Optional so hosts built before it keep working; the menu then stays as built. */
-  updateShapesInsertMenu?: (menu: HTMLElement) => void;
   updatePageBreaksMenu: (menu: HTMLElement) => void;
   updatePrintAreaMenu: (menu: HTMLElement) => void;
   updateProtectMenu: (menu: HTMLElement) => void;
@@ -364,7 +362,6 @@ export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
   'menu-shape-outline': 'updateShapeOutlineMenu',
   'menu-shape-rotate': 'updateShapeRotateMenu',
   'menu-shape-change': 'updateShapeChangeMenu',
-  'menu-shapes-insert': 'updateShapesInsertMenu',
   'menu-pivot-subtotals': 'updatePivotLayoutMenu',
   'menu-pivot-grand-totals': 'updatePivotLayoutMenu',
   'menu-pivot-report-layout': 'updatePivotLayoutMenu',

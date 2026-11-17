@@ -1,4 +1,3 @@
-import { ChartLineDash } from '@libraz/formulon';
 import { displayRotation, flippedRotation } from '../engine/drawing-geometry.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type {
@@ -30,7 +29,7 @@ export const MAX_SHAPE_LINE_WIDTH = 1584;
 export const SHAPE_LINE_WEIGHTS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.5, 2.25, 3, 4.5, 6];
 
 /** The Dashes entries of Shape Outline, in menu order. */
-export const SHAPE_LINE_DASHES: readonly SessionShapeLineDash[] = [
+export const SHAPE_LINE_DASHES = [
   'solid',
   'roundDot',
   'squareDot',
@@ -39,14 +38,7 @@ export const SHAPE_LINE_DASHES: readonly SessionShapeLineDash[] = [
   'longDash',
   'longDashDot',
   'longDashDotDot',
-];
-
-/** The engine dash each style is saved as; a style without one is not saved. */
-export const SAVED_LINE_DASH: Partial<Record<SessionShapeLineDash, ChartLineDash>> = {
-  solid: ChartLineDash.Solid,
-  dash: ChartLineDash.Dash,
-  dashDot: ChartLineDash.DashDot,
-};
+] as const satisfies readonly SessionShapeLineDash[];
 
 /** Each dash style's dash and gap lengths, in multiples of the line width. */
 const DASH_PATTERNS: Record<SessionShapeLineDash, readonly number[]> = {
@@ -58,6 +50,9 @@ const DASH_PATTERNS: Record<SessionShapeLineDash, readonly number[]> = {
   longDash: [8, 3],
   longDashDot: [8, 3, 1, 3],
   longDashDotDot: [8, 3, 1, 3, 1, 3],
+  dot: [1, 3],
+  sysDashDot: [3, 1, 1, 1],
+  sysDashDotDot: [3, 1, 1, 1, 1, 1],
 };
 
 /** The SVG stroke of `dash` at `width` pixels: its dash array (none for solid)
@@ -157,12 +152,6 @@ export const shapeFillEditable = (item: SessionIllustration): boolean =>
 export const shapeOutlineEditable = (item: SessionIllustration): boolean =>
   shapeStyleEditable(item) && !item.nativeLineOther;
 
-/** Whether the outline can take `dash`: a shape saved with the workbook takes
- *  only the styles the file stores. */
-export const shapeDashEditable = (item: SessionIllustration, dash: SessionShapeLineDash): boolean =>
-  shapeOutlineEditable(item) &&
-  (item.nativeObjectId === undefined || SAVED_LINE_DASH[dash] !== undefined);
-
 /** Whether Change Shape can make `item` a `kind`: lines and arrows are left out either way. */
 export const shapeKindChangeable = (item: SessionIllustration, kind: SessionShapeKind): boolean =>
   shapeStyleEditable(item) && shapeHasFill(item) && kind !== 'line' && kind !== 'arrow';
@@ -227,7 +216,7 @@ export function applySessionShapeOutlineDash(
   history: History | null = null,
   wb?: WorkbookHandle,
 ): SessionIllustration | null {
-  if (!shapeDashEditable(item, dash)) return null;
+  if (!shapeOutlineEditable(item)) return null;
   const patch = shapeOutlineDashPatch(item, dash);
   return applyShapePatch(store, item, patch, 'shapeOutline', history, wb);
 }

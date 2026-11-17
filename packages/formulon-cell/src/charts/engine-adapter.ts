@@ -50,7 +50,6 @@ import {
   ChartBarDirection,
   ChartDomain,
   ChartLegendPosition,
-  ChartLineDash,
   ChartMarkerSymbol,
   ChartPlotType,
   ChartTickLabelPosition,
@@ -62,6 +61,7 @@ import {
   ChartSeriesDirection as EngineChartSeriesDirection,
 } from '@libraz/formulon';
 import { sameJsonValue } from '../commands/prepared-change.js';
+import { dashStyleOf, engineDashOf } from '../engine/line-style.js';
 import { argbFromCssColor, cssColorFromArgb } from '../engine/theme-color.js';
 import { autoSeriesColor } from './series-colors.js';
 import type {
@@ -260,24 +260,6 @@ const LEGEND_TO_ENGINE: Readonly<
   left: ChartLegendPosition.Left,
 };
 
-// The file stores four dash styles; the longer and squarer variants share the nearest one.
-const DASH_TO_ENGINE: Readonly<Record<NonNullable<ChartLineSpec['dash']>, ChartLineDash>> = {
-  solid: ChartLineDash.Solid,
-  dash: ChartLineDash.Dash,
-  longDash: ChartLineDash.Dash,
-  roundDot: ChartLineDash.Dot,
-  squareDot: ChartLineDash.Dot,
-  dashDot: ChartLineDash.DashDot,
-  longDashDot: ChartLineDash.DashDot,
-  longDashDotDot: ChartLineDash.DashDot,
-};
-const DASH_FROM_ENGINE: ReadonlyMap<ChartLineDash, NonNullable<ChartLineSpec['dash']>> = new Map([
-  [ChartLineDash.Solid, 'solid'],
-  [ChartLineDash.Dash, 'dash'],
-  [ChartLineDash.Dot, 'roundDot'],
-  [ChartLineDash.DashDot, 'dashDot'],
-]);
-
 const SHAPE_TO_ENGINE: Readonly<Record<NonNullable<ChartMarkerSpec['shape']>, ChartMarkerSymbol>> =
   {
     circle: ChartMarkerSymbol.Circle,
@@ -426,7 +408,7 @@ const readLine = (line: ChartLine | null): ChartLineSpec | undefined =>
         color: cssOfPaint(line.color),
         transparency: line.transparencyPct ?? undefined,
         width: line.widthPt ?? undefined,
-        dash: line.dash === null ? undefined : DASH_FROM_ENGINE.get(line.dash),
+        dash: line.dash === null ? undefined : dashStyleOf(line.dash),
       });
 
 const readMarker = (marker: ChartMarker | null): ChartMarkerSpec | undefined => {
@@ -749,7 +731,7 @@ const linePatch = (
   const patch: Mutable<ChartLinePatch> = { ...fillPatch(before, after) };
   if (before?.width !== after?.width) patch.widthPt = after?.width ?? null;
   if (before?.dash !== after?.dash) {
-    patch.dash = after?.dash === undefined ? null : DASH_TO_ENGINE[after.dash];
+    patch.dash = after?.dash === undefined ? null : engineDashOf(after.dash);
   }
   return Object.keys(patch).length > 0 ? patch : undefined;
 };

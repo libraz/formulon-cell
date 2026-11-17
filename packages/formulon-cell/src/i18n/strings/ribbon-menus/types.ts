@@ -254,7 +254,6 @@ export interface RibbonMenusStrings {
     shapeDashLongDashDotDot: string;
     arrangeRequiresObject: string;
     arrangeNativeUnsupported: string;
-    shapeArrowNotSaved: string;
     /** Why Split is unavailable on an engine that cannot save split panes. */
     splitNotSaved: string;
     arrangeAtFront: string;

@@ -1,3 +1,4 @@
+import { ChartLineEndType } from '@libraz/formulon';
 import { afterEach, describe, expect, it } from 'vitest';
 import { History } from '../../../../src/commands/history.js';
 import {
@@ -60,7 +61,7 @@ const disabled = (menu: HTMLElement, selector: string): boolean =>
   menu.querySelector<HTMLElement>(selector)?.getAttribute('aria-disabled') === 'true';
 
 describe('shape controls against an engine that saves shapes', () => {
-  it('disables the dash styles a saved shape cannot hold and keeps the weight', async () => {
+  it('keeps every dash style and the weight enabled for a saved shape', async () => {
     const sheet = await instance();
     createSessionShape(
       sheet.store,
@@ -79,47 +80,39 @@ describe('shape controls against an engine that saves shapes', () => {
 
     createShapeFormatDropdownDefaults(sheet).updateShapeOutlineMenu(menu);
 
-    expect(disabled(menu, '[data-shape-outline-dash="roundDot"]')).toBe(true);
+    expect(disabled(menu, '[data-shape-outline-dash="roundDot"]')).toBe(false);
     expect(disabled(menu, '[data-shape-outline-dash="dash"]')).toBe(false);
     expect(disabled(menu, '[data-format-submenu="dash"]')).toBe(false);
     expect(disabled(menu, '[data-shape-outline-weight]')).toBe(false);
     expect(disabled(menu, '[data-format-submenu="weight"]')).toBe(false);
   });
 
-  it('disables the arrow entry in the standard and the Mac ribbon', async () => {
+  it('keeps the arrow entry enabled in the standard and the Mac ribbon', async () => {
     const sheet = await instance();
-    const menu = document.createElement('div');
-    menu.innerHTML =
-      '<button data-shape-insert="arrow"></button><button data-shape-insert="oval"></button>';
-    createIllustrationDropdownDefaults(sheet).updateShapesInsertMenu?.(menu);
-    expect(disabled(menu, '[data-shape-insert="arrow"]')).toBe(true);
-    expect(disabled(menu, '[data-shape-insert="oval"]')).toBe(false);
-
     const host = document.createElement('div');
     host.innerHTML =
       '<button data-ribbon-command="mac.insert.shapeArrow"></button><button data-ribbon-command="mac.insert.shapeOval"></button>';
     projectMacRibbonState(host, sheet);
-    expect(disabled(host, '[data-ribbon-command="mac.insert.shapeArrow"]')).toBe(true);
-    expect(
-      host.querySelector('[data-ribbon-command="mac.insert.shapeArrow"]')?.getAttribute('title'),
-    ).toContain(en.ribbonMenu.shapeArrowNotSaved);
+    expect(disabled(host, '[data-ribbon-command="mac.insert.shapeArrow"]')).toBe(false);
     expect(disabled(host, '[data-ribbon-command="mac.insert.shapeOval"]')).toBe(false);
   });
 
-  it('explains instead of inserting an arrow, which cannot be saved', async () => {
+  it('inserts an arrow as a connector with a triangle at its end, and reloads it as one', async () => {
     const sheet = await instance();
 
     createIllustrationDropdownDefaults(sheet).insertShapeFromRibbon('arrow');
 
-    expect(sheet.workbook.listShapes(0)).toEqual([]);
-    expect(sheet.store.getState().illustrations.illustrations).toEqual([]);
-    await Promise.resolve();
-    expect(document.body.textContent).toContain(
-      en.workbookObjects.compatibilityDetails.shapes.slice(0, 40),
-    );
-
-    createIllustrationDropdownDefaults(sheet).insertShapeFromRibbon('oval');
-    expect(sheet.workbook.listShapes(0)).toHaveLength(1);
+    const [shape] = sheet.workbook.listShapes(0);
+    expect(shape).toMatchObject({
+      presetGeometry: 'straightConnector1',
+      line: { tailEnd: { type: ChartLineEndType.Triangle } },
+    });
+    const reopened = await WorkbookHandle.loadBytes(sheet.workbook.save());
+    open.push(reopened);
+    const loaded = createSpreadsheetStore();
+    hydrateImagesFromEngine(reopened, loaded, 0);
+    expect(loaded.getState().illustrations.illustrations[0]).toMatchObject({ shape: 'arrow' });
+    expect(loaded.getState().illustrations.illustrations[0]?.nativeLocked).not.toBe(true);
   });
 
   it('saves a text box with the white fill and grey outline of a new one', async () => {

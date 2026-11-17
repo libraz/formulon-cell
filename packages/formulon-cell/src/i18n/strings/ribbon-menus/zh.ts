@@ -252,7 +252,6 @@ export const ribbonMenusZh: RibbonMenusStrings = {
     shapeDashLongDashDotDot: '长划线-点-点',
     arrangeRequiresObject: '请选择要排列的对象。',
     arrangeNativeUnsupported: '引擎无法保存图片的堆叠顺序。',
-    shapeArrowNotSaved: '箭头无法保存到工作簿。',
     splitNotSaved: '无法将拆分窗格保存到此工作簿。',
     arrangeAtFront: '所选对象已经位于最前面。',
     arrangeAtBack: '所选对象已经位于最后面。',

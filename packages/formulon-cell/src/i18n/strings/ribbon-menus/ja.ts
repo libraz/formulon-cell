@@ -254,7 +254,6 @@ export const ribbonMenusJa: RibbonMenusStrings = {
     shapeDashLongDashDotDot: '長二点鎖線',
     arrangeRequiresObject: '整列するオブジェクトを選択してください。',
     arrangeNativeUnsupported: 'エンジンが画像の重なり順の保存に対応していません。',
-    shapeArrowNotSaved: '矢印はブックに保存できません。',
     splitNotSaved: 'このブックにはウィンドウの分割を保存できません。',
     arrangeAtFront: '選択したオブジェクトは既に最前面にあります。',
     arrangeAtBack: '選択したオブジェクトは既に最背面にあります。',

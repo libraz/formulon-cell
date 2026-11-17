@@ -113,7 +113,6 @@ describe('default dynamic dropdown AutoSum', () => {
       'insertPictureFromRibbon',
       'insertShapeFromRibbon',
       'insertTextBoxFromRibbon',
-      'updateShapesInsertMenu',
       'insertScreenshotFromRibbon',
     ] as const;
     const illustrationKeySet = new Set<string>(illustrationKeys);

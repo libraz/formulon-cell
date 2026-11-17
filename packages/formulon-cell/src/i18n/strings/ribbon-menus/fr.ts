@@ -256,7 +256,6 @@ export const ribbonMenusFr: RibbonMenusStrings = {
     shapeDashLongDashDotDot: 'Tiret long-point-point',
     arrangeRequiresObject: 'Sélectionnez un objet à organiser.',
     arrangeNativeUnsupported: 'Le moteur ne peut pas enregistrer l’ordre d’empilement des images.',
-    shapeArrowNotSaved: 'Les flèches ne sont pas enregistrées dans le classeur.',
     splitNotSaved: 'Les volets fractionnés ne peuvent pas être enregistrés dans ce classeur.',
     arrangeAtFront: 'L’objet sélectionné est déjà au premier plan.',
     arrangeAtBack: 'L’objet sélectionné est déjà à l’arrière-plan.',

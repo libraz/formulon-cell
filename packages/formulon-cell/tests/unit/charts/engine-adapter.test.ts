@@ -879,7 +879,7 @@ describe('chartSpecFromEngine', () => {
         null: [null, undefined],
         Solid: [ChartLineDash.Solid, 'solid'],
         Dash: [ChartLineDash.Dash, 'dash'],
-        Dot: [ChartLineDash.Dot, 'roundDot'],
+        Dot: [ChartLineDash.Dot, 'dot'],
         DashDot: [ChartLineDash.DashDot, 'dashDot'],
         Other: [ChartLineDash.Other, undefined],
       } as const;
@@ -1973,6 +1973,35 @@ describe('chartSpecOps', () => {
       expect(ops(chartInfo('line'), spec(before), spec(after))).toEqual(expected);
     },
   );
+
+  // Each dash style is a preset dash of the file, in both directions.
+  it.each([
+    ['solid', ChartLineDash.Solid],
+    ['roundDot', ChartLineDash.SysDot],
+    ['squareDot', ChartLineDash.SysDash],
+    ['dash', ChartLineDash.Dash],
+    ['dashDot', ChartLineDash.DashDot],
+    ['longDash', ChartLineDash.LgDash],
+    ['longDashDot', ChartLineDash.LgDashDot],
+    ['longDashDotDot', ChartLineDash.LgDashDotDot],
+    ['dot', ChartLineDash.Dot],
+    ['sysDashDot', ChartLineDash.SysDashDot],
+    ['sysDashDotDot', ChartLineDash.SysDashDotDot],
+  ] as const)('reads and writes the %s dash as its preset dash', (dash, stored) => {
+    const series = [
+      seriesInfo(0, { fill: fillInfo(0xffed7d31, 10), line: lineInfo({ dash: stored }) }),
+    ];
+    expect(read(chartInfo('area', {}, { series })).seriesStyles?.[0]?.line?.dash).toBe(dash);
+
+    const spec = (line: ChartLineSpec): ChartSpec => ({
+      kind: 'line',
+      seriesStyles: [{ seriesId: 'series-1', line }],
+    });
+    const from: ChartLineSpec = dash === 'dash' ? { dash: 'dot' } : { dash: 'dash' };
+    expect(ops(chartInfo('line'), spec(from), spec({ dash }))).toEqual([
+      { op: 'setChartSeries', plot: 0, seriesIdx: 1, patch: { line: { dash: stored } } },
+    ]);
+  });
 
   it('writes series fill transparency and removes point formatting', () => {
     const info = chartInfo('bar');

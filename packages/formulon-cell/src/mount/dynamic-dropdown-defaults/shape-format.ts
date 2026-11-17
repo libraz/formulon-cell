@@ -11,7 +11,6 @@ import {
   applySessionShapeOutlineWeight,
   applySessionShapeRotation,
   SHAPE_LINE_DASHES,
-  shapeDashEditable,
   shapeFillColor,
   shapeFillEditable,
   shapeKindChangeable,
@@ -186,17 +185,6 @@ export function createShapeFormatDropdownDefaults(
       );
       const dash = item && weight !== null ? shapeOutlineDash(item) : null;
       projectRadioPanel(menu, 'shapeOutlineDash', dash, !editable);
-      // A saved shape takes only the dash styles the file stores.
-      if (item && editable) {
-        for (const button of menu.querySelectorAll<HTMLButtonElement>(
-          '[data-shape-outline-dash]',
-        )) {
-          const dash = button.dataset.shapeOutlineDash ?? '';
-          if (!isLineDash(dash) || !shapeDashEditable(item, dash)) {
-            setMenuControlDisabled(button, true);
-          }
-        }
-      }
     },
     applyShapeRotateAction(value) {
       const item = selectedDrawing();

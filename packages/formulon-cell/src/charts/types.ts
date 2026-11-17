@@ -71,9 +71,8 @@ export interface ChartLineSpec {
   /** Line width in points (0–72); 0 suppresses a series line. */
   readonly width?: number;
   /**
-   * Dash style, in the vocabulary of a shape outline. Defaults to `'solid'`. A workbook stores
-   * only solid, dash, dot and dash-dot: long dashes read back as `'dash'`, square dots as
-   * `'roundDot'`, and the long dash-dot forms as `'dashDot'`.
+   * Dash style, in the vocabulary of a shape outline. Defaults to `'solid'`. Each style is a
+   * preset dash of the file, so it reads back as written; a custom dash reads as unset.
    */
   readonly dash?: SessionShapeLineDash;
 }

@@ -4,6 +4,7 @@ import {
   AnchorKind,
   ChartBarDirection,
   ChartLineDash,
+  ChartLineEndType,
   ChartPlotType,
   ColorKind,
   DrawingObjectKind,
@@ -29,8 +30,6 @@ import {
   applySessionShapeOutlineDash,
   applySessionShapeOutlineWeight,
   applySessionShapeRotation,
-  SHAPE_LINE_DASHES,
-  shapeDashEditable,
 } from '../../../src/commands/shape-format.js';
 import { deleteRows, insertRows } from '../../../src/commands/structure.js';
 import { drawingAnchorOf } from '../../../src/engine/drawing-geometry.js';
@@ -228,7 +227,7 @@ describe('shapes saved with the workbook', () => {
     });
   });
 
-  it('saves every shape kind except the arrow, which has no line end to store', async () => {
+  it('saves every shape kind, an arrow as a connector with a triangle at its end', async () => {
     const { wb, store } = await session();
     const kinds = [
       'rectangle',
@@ -257,13 +256,19 @@ describe('shapes saved with the workbook', () => {
       'triangle',
       'diamond',
       'line',
+      'straightConnector1',
     ]);
-    const arrow = sessionIllustrationById(store.getState(), 'arrow');
-    expect(arrow?.nativeObjectId).toBeUndefined();
+    const arrow = wb.listShapes(0).at(-1);
+    expect(arrow?.line?.tailEnd).toMatchObject({ type: ChartLineEndType.Triangle });
+    expect(arrow?.line?.headEnd ?? null).toBeNull();
+    expect(sessionIllustrationById(store.getState(), 'arrow')?.nativeObjectId).toBe(
+      arrow?.objectId,
+    );
 
     const reopened = await saved(wb);
-    expect(shapesOf(reopened.store).map((item) => item.shape)).toEqual(kinds);
+    expect(shapesOf(reopened.store).map((item) => item.shape)).toEqual([...kinds, 'arrow']);
     expect(shapesOf(reopened.store).at(-1)?.nativeLocked).not.toBe(true);
+    expect(shapesOf(reopened.store).at(-1)?.tailEnd).toBeUndefined();
   });
 
   it('restyles a shape: fill, no fill, outline colour and weight', async () => {
@@ -316,26 +321,17 @@ describe('shapes saved with the workbook', () => {
     });
   });
 
-  it('resets radius and a dash style the file cannot hold', async () => {
+  it('resets a radius the file cannot hold, and keeps a dash style it can', async () => {
     const { wb, store, history } = await session();
     oval(store);
 
     updateSessionIllustration(store, 's1', { radius: 12, lineDash: 'longDash' }, history, wb);
 
-    expect(only(store)).toMatchObject({ radius: undefined, lineDash: undefined });
+    expect(only(store)).toMatchObject({ radius: undefined, lineDash: 'longDash' });
     expect(listShapes(wb, 0)[0]?.fillKind).toBe(ShapePaint.Solid);
     updateSessionIllustration(store, 's1', { opacity: 0 }, history, wb);
     expect(only(store).opacity).toBe(0);
     expect(listShapes(wb, 0)[0]?.fillKind).toBe(ShapePaint.None);
-  });
-
-  it('refuses a dash style the file cannot hold', async () => {
-    const { wb, store, history } = await session();
-    oval(store);
-    const before = only(store);
-
-    expect(applySessionShapeOutlineDash(store, before, 'roundDot', history, wb)).toBeNull();
-    expect(only(store).lineDash).toBeUndefined();
   });
 
   it('moves and resizes a shape through its anchor', async () => {
@@ -1110,15 +1106,42 @@ describe('dash styles of saved shapes', () => {
     ]);
   });
 
-  it('enables exactly the storable dashes for a saved shape', async () => {
-    const { store } = await session();
+  it.each([
+    ['solid', ChartLineDash.Solid],
+    ['roundDot', ChartLineDash.SysDot],
+    ['squareDot', ChartLineDash.SysDash],
+    ['dash', ChartLineDash.Dash],
+    ['dashDot', ChartLineDash.DashDot],
+    ['longDash', ChartLineDash.LgDash],
+    ['longDashDot', ChartLineDash.LgDashDot],
+    ['longDashDotDot', ChartLineDash.LgDashDotDot],
+  ] as const)('writes the %s dash as its preset dash and reads it back', async (dash, stored) => {
+    const { wb, store, history } = await session();
     oval(store);
+    // A solid outline stores no dash, so start from another.
+    if (dash === 'solid') applySessionShapeOutlineDash(store, only(store), 'dash', history, wb);
 
-    expect(SHAPE_LINE_DASHES.filter((dash) => shapeDashEditable(only(store), dash))).toEqual([
-      'solid',
-      'dash',
-      'dashDot',
-    ]);
+    expect(applySessionShapeOutlineDash(store, only(store), dash, history, wb)).not.toBeNull();
+
+    expect(wb.listShapes(0)[0]?.line?.dash ?? ChartLineDash.Solid).toBe(stored);
+    expect(only((await saved(wb)).store).lineDash).toBe(dash === 'solid' ? undefined : dash);
+  });
+
+  it.each([
+    ['dot', ChartLineDash.Dot],
+    ['sysDashDot', ChartLineDash.SysDashDot],
+    ['sysDashDotDot', ChartLineDash.SysDashDotDot],
+  ] as const)('reads a loaded %s dash and writes it back unchanged', async (dash, stored) => {
+    const { wb, store, history } = await session((engine) => {
+      insertShape(engine, 0, { prst: 'rect', fromRow: 2, fromCol: 1, toRow: 5, toCol: 4 });
+      const [first] = engine.listShapes(0);
+      if (first)
+        engine.updateShape(0, first.objectId, { line: { color: '#ff0000', dash: stored } });
+    });
+
+    expect(only(store).lineDash).toBe(dash);
+    applySessionShapeOutline(store, only(store), '#0000ff', history, wb);
+    expect(wb.listShapes(0)[0]?.line?.dash).toBe(stored);
   });
 });
 

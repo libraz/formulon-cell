@@ -254,7 +254,6 @@ export const ribbonMenusEn: RibbonMenusStrings = {
     shapeDashLongDashDotDot: 'Long Dash Dot Dot',
     arrangeRequiresObject: 'Select an object to arrange.',
     arrangeNativeUnsupported: 'The engine cannot save picture stacking order.',
-    shapeArrowNotSaved: 'Arrows are not saved with the workbook.',
     splitNotSaved: 'Split panes cannot be saved with this workbook.',
     arrangeAtFront: 'The selected object is already at the front.',
     arrangeAtBack: 'The selected object is already at the back.',

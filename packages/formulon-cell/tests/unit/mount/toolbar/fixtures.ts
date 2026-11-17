@@ -227,7 +227,6 @@ export const dynamicDropdownNoopOverrides = (): Partial<DynamicDropdownsCtx> => 
   updateShapeRotateMenu: vi.fn(),
   applyShapeChangeAction: vi.fn(),
   updateShapeChangeMenu: vi.fn(),
-  updateShapesInsertMenu: vi.fn(),
   applyUiTheme: vi.fn(),
   applySortMenuAction: vi.fn(),
   applyFindSelectAction: vi.fn(),
