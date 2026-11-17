@@ -1,4 +1,4 @@
-import type { CellXfInput } from '@libraz/formulon';
+import { type CellXfInput, FontScheme } from '@libraz/formulon';
 import type { CellStyleFormatGroup } from '../commands/cell-style-catalog.js';
 import { CELL_STYLE_GROUP_FIELDS, cellStyleGroupMatches } from '../commands/cell-style-groups.js';
 import { withFillReplacement } from '../store/format-merge.js';
@@ -57,11 +57,22 @@ function buildXfForFormat(
   fmt: CellFormat,
   sheetFontPatch?: SheetFontPatch,
   workbookDefaultFont?: WorkbookDefaultFont | null,
+  sourceFontIndex?: number,
 ): XfDraft | null {
   const effectiveFormat = formatWithSheetFontPatch(fmt, sheetFontPatch);
   const defaultFont =
     workbookDefaultFont === undefined ? wb.workbookDefaultFont : workbookDefaultFont;
-  const fontIndex = wb.addFontRecord(fontRecordFromFormat(effectiveFormat, defaultFont));
+  const fontRecord = fontRecordFromFormat(effectiveFormat, defaultFont);
+  // Only a face change unlinks a font from the theme; the same face keeps its link.
+  const sourceFont = sourceFontIndex === undefined ? undefined : wb.getFontRecord(sourceFontIndex);
+  if (
+    sourceFont &&
+    sourceFont.name === fontRecord.name &&
+    (sourceFont.scheme === FontScheme.Minor || sourceFont.scheme === FontScheme.Major)
+  ) {
+    fontRecord.scheme = sourceFont.scheme;
+  }
+  const fontIndex = wb.addFontRecord(fontRecord);
   if (fontIndex < 0) return null;
   const fillIndex = wb.addFillRecord(fillRecordFromFormat(fmt));
   if (fillIndex < 0) return null;
@@ -388,7 +399,14 @@ export function resolveXfForFormat(
 ): { readonly xfIndex: number; readonly cacheable: boolean } {
   const effectiveFormat = formatWithSheetFontPatch(fmt, sheetFontPatch);
   const workbookDefaultFont = wb.workbookDefaultFont;
-  const record = buildXfForFormat(wb, fmt, sheetFontPatch, workbookDefaultFont);
+  const currentRaw = currentXfIndex === null ? null : (wb.getCellXf(currentXfIndex) ?? null);
+  const record = buildXfForFormat(
+    wb,
+    fmt,
+    sheetFontPatch,
+    workbookDefaultFont,
+    currentRaw?.fontIndex,
+  );
   if (!record) return { xfIndex: -1, cacheable: false };
   const namedKey = fmt.cellStyle ?? 'normal';
   const namedXf = namedStyleXfs.get(namedKey);
@@ -396,7 +414,6 @@ export function resolveXfForFormat(
     fmt.cellStyle === undefined ? styleXfIds.get('normal') : styleXfIds.get(fmt.cellStyle);
   if (strict && mappedXfId !== undefined && !namedXf) return { xfIndex: -1, cacheable: false };
 
-  const currentRaw = currentXfIndex === null ? null : (wb.getCellXf(currentXfIndex) ?? null);
   const currentProjection = currentRaw
     ? cellFormatFromXfWithStatus(wb, currentRaw, workbookDefaultFont, null)
     : null;
