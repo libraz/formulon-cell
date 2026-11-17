@@ -280,6 +280,15 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       input.addSheet();
       return;
     }
+    // Full calculation (Ctrl+Alt+F9, and Ctrl+Alt+Shift+F9 which also rebuilds dependencies):
+    // every formula, whether or not it is dirty. The Mac app lists no such key.
+    if (!macPlatform && e.ctrlKey && e.altKey && !e.metaKey && e.key === 'F9') {
+      e.preventDefault();
+      currentWb.recalcFull();
+      mutators.refreshActiveSheetCells(input.store, currentWb);
+      input.invalidate();
+      return;
+    }
     if (matchesRibbonShortcut(e, 'recalcNow') || matchesRibbonShortcut(e, 'recalcSheet')) {
       e.preventDefault();
       currentWb.recalc();

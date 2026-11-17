@@ -29,6 +29,7 @@ interface Setup {
   store: ReturnType<typeof createSpreadsheetStore>;
   wb: WorkbookHandle;
   recalc: ReturnType<typeof vi.fn>;
+  recalcFull: ReturnType<typeof vi.fn>;
   cells: ReturnType<typeof vi.fn>;
   getWb: ReturnType<typeof vi.fn>;
   invalidate: ReturnType<typeof vi.fn>;
@@ -55,6 +56,7 @@ function makeSetup(
   const addSheet = vi.fn();
   const createTable = vi.fn();
   const recalc = vi.fn();
+  const recalcFull = vi.fn();
   const cells = vi.fn().mockReturnValue([]);
   const invalidate = vi.fn();
   const setNumber = vi.fn();
@@ -65,6 +67,7 @@ function makeSetup(
     ({
       capabilities: {},
       recalc,
+      recalcFull,
       withEngineSyncMuted: <T>(fn: () => T): T => fn(),
       subscribe: () => () => {},
       setSheetShowFormulas: () => true,
@@ -121,6 +124,7 @@ function makeSetup(
     store,
     wb,
     recalc,
+    recalcFull,
     cells,
     getWb,
     invalidate,
@@ -159,6 +163,29 @@ describe('mount/host-shortcuts', () => {
     expect(s.cells).toHaveBeenCalled();
     expect(s.invalidate).toHaveBeenCalledTimes(1);
     expect(e.defaultPrevented).toBe(true);
+  });
+
+  it('Ctrl+Alt+F9 recalculates every formula, not only the dirty ones', () => {
+    const e = key({ key: 'F9', ctrlKey: true, altKey: true });
+    s.handler(e);
+    expect(s.recalcFull).toHaveBeenCalledTimes(1);
+    expect(s.recalc).not.toHaveBeenCalled();
+    expect(s.cells).toHaveBeenCalled();
+    expect(s.invalidate).toHaveBeenCalledTimes(1);
+    expect(e.defaultPrevented).toBe(true);
+  });
+
+  it('Ctrl+Alt+Shift+F9 also recalculates every formula', () => {
+    const e = key({ key: 'F9', ctrlKey: true, altKey: true, shiftKey: true });
+    s.handler(e);
+    expect(s.recalcFull).toHaveBeenCalledTimes(1);
+    expect(s.recalc).not.toHaveBeenCalled();
+  });
+
+  it('leaves Ctrl+Alt+F9 alone on the Mac profile, whose app lists no full-calculation key', () => {
+    s.host.dataset.fcPlatform = 'mac';
+    s.handler(key({ key: 'F9', ctrlKey: true, altKey: true }));
+    expect(s.recalcFull).not.toHaveBeenCalled();
   });
 
   it('Shift+F11 delegates sheet insertion to the sheet-tabs controller', () => {

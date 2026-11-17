@@ -749,7 +749,7 @@ export class WorkbookHandle {
       this.pendingRecalc = false;
       return;
     }
-    this.runRecalc(false);
+    this.runRecalc(false, false);
   }
 
   canUndo(): boolean {
@@ -787,14 +787,20 @@ export class WorkbookHandle {
   /** Calculate Now (F9). The engine's pass computes data tables itself
    *  except under Automatic Except for Data Tables, where F9 asks for them. */
   recalc(): void {
-    this.runRecalc(true);
+    this.runRecalc(true, false);
   }
 
-  private runRecalc(withDataTables: boolean): void {
+  /** Calculate Full (Ctrl+Alt+F9): every formula, whether or not the engine holds it dirty. */
+  recalcFull(): void {
+    this.runRecalc(true, true);
+  }
+
+  private runRecalc(withDataTables: boolean, full: boolean): void {
     this.assertAlive();
     // A full pass covers whatever a batch had queued up.
     this.pendingRecalc = false;
-    this.wb.recalc();
+    if (full) this.wb.recalcFull();
+    else this.wb.recalc();
     if (
       withDataTables &&
       this.capabilities.dataTables &&

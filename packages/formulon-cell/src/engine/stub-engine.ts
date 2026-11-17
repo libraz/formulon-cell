@@ -273,6 +273,11 @@ class StubWorkbook {
     return this.sheet(this.sheets.length - 1);
   }
 
+  /** Every formula is recomputed on each pass, so a full recalculation is the same pass. */
+  recalcFull(): void {
+    this.recalc();
+  }
+
   recalc(): void {
     // Iterate up to depth-of-chain times so that A→B→C reaches a stable fixed
     // point in one call. The cap is generous; real workloads shouldn't need
