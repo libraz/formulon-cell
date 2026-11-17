@@ -442,7 +442,7 @@ describe('split panes from the Mac desktop app', () => {
     const wb = await WorkbookHandle.createDefault({ platform: 'mac', locale: 'ja' });
     wb.setSheetZoom(0, 200);
     wb.setSheetSplit(0, 7020, 4880);
-    const reloaded = await WorkbookHandle.loadBytes(wb.save());
+    const reloaded = await WorkbookHandle.loadBytes(wb.save(), { platform: 'mac', locale: 'ja' });
     reloaded.geometryPlatform = 'mac';
     const store = createSpreadsheetStore();
     store.setState((s) => ({

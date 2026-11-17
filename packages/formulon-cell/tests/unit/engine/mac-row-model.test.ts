@@ -58,7 +58,8 @@ describe('macDefaultRowPt', () => {
 describe('getSheetDefaultLayoutPx on a loaded book', () => {
   it('recomputes the default row from the Normal font on Mac only', async () => {
     const created = await WorkbookHandle.createDefault({ locale: 'ja' });
-    const loaded = await WorkbookHandle.loadBytes(created.save());
+    // A file carries no profile; the host states it on load.
+    const loaded = await WorkbookHandle.loadBytes(created.save(), { locale: 'ja' });
     created.dispose();
     try {
       // The Windows book states 18.75 pt; Mac Excel shows 游ゴシック 11 rows at 18 pt.
