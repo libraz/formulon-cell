@@ -392,10 +392,11 @@ describe('WorkbookHandle PivotTable projection', () => {
       }),
     ).toBe(0);
     expect(dataSpec).toMatchObject({
-      name: '',
       numberFormat: '#,##0.00',
       showAs: 3,
     });
+    // No name lets the engine name the field; an empty one would be an empty caption.
+    expect(dataSpec).not.toHaveProperty('name');
     expect(dataSpec).not.toHaveProperty('showValuesAs');
   });
 });
