@@ -93,7 +93,8 @@ const illustrationAuthorization = (
   origin: IllustrationMutationAuthorization['origin'] = 'contextMenu',
 ): IllustrationMutationAuthorization => ({ origin, commandId });
 
-const renderedPosition = (
+/** Where `item` is drawn, in grid pixels under the current view. */
+export const renderedPosition = (
   store: SpreadsheetStore,
   item: SessionIllustration,
 ): { x: number; y: number; w: number; h: number } =>

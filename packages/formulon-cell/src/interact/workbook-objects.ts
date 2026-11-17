@@ -7,6 +7,7 @@ import {
   illustrationName,
 } from '../commands/session-illustration.js';
 import {
+  cornerAdjForRadius,
   DEFAULT_SHAPE_COLOR,
   DEFAULT_SHAPE_LINE_WIDTH,
   MAX_SHAPE_LINE_WIDTH,
@@ -42,6 +43,7 @@ import {
 import { createPivotNumberFormatPicker } from './pivot-field-settings-dialog.js';
 import { openPivotFieldSettingsAt } from './pivot-field-settings-dialog-apply.js';
 import { openPivotOptions } from './pivot-options-dialog.js';
+import { renderedPosition } from './session-illustrations.js';
 import { compatibilityLabelKey } from './spreadsheet-compatibility-report.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
 import { createWorkbookObjectsActionButton, pivotEditField } from './workbook-objects-dom.js';
@@ -301,11 +303,10 @@ export function attachWorkbookObjectsPanel(
     radius.className = 'fc-objects__input';
     radius.type = 'number';
     radius.min = '0';
-    radius.max = '48';
     radius.step = '1';
-    radius.value = String(
-      Math.round(shapeCornerRadius(illustration, illustration.w ?? 160, illustration.h ?? 96)),
-    );
+    const frame = renderedPosition(deps.store, illustration);
+    radius.max = String(Math.floor(Math.min(frame.w, frame.h) / 2));
+    radius.value = String(Math.round(shapeCornerRadius(illustration, frame.w, frame.h)));
     const initialRadius = radius.value;
     const lineWidth = document.createElement('input');
     lineWidth.className = 'fc-objects__input';
@@ -321,9 +322,9 @@ export function attachWorkbookObjectsPanel(
     opacity.max = '1';
     opacity.step = '0.05';
     opacity.value = String(illustration.opacity ?? 1);
-    // The file has no corner radius.
-    const saved = illustration.nativeObjectId !== undefined;
-    projectDisabledState(radius, saved, null);
+    // Only a rounded rectangle has a corner.
+    const cornerless = illustration.shape !== 'rounded-rectangle';
+    projectDisabledState(radius, cornerless, null);
     const locked = illustration.nativeLocked === true;
     const actions = document.createElement('div');
     actions.className = 'fc-objects__actions';
@@ -348,9 +349,9 @@ export function attachWorkbookObjectsPanel(
       deps.onUpdateSessionIllustration?.(illustration.id, {
         ...(fillKept ? {} : { color: color.value }),
         // An untouched corner keeps following the shape's size.
-        ...(saved || radius.value === initialRadius
+        ...(cornerless || radius.value === initialRadius
           ? {}
-          : { radius: clamp(Number(radius.value) || 0, 0, 48) }),
+          : { cornerAdj: cornerAdjForRadius(Number(radius.value) || 0, frame.w, frame.h) }),
         ...(lineKept
           ? {}
           : { lineWidth: clamp(Number(lineWidth.value) || 0, 0, MAX_SHAPE_LINE_WIDTH) }),

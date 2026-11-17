@@ -69,10 +69,23 @@ export const shapeDashStroke = (
 export const shapeHasFill = (item: SessionIllustration): boolean =>
   item.kind === 'shape' && item.shape !== 'line' && item.shape !== 'arrow';
 
-/** The corner radius of a `w` x `h` rectangle, in pixels: a rounded
- *  rectangle's corner is a sixth of its shorter side. */
+/** Corner guide units: the whole shorter side, the default corner and the largest corner. */
+const CORNER_ADJ_UNIT = 100000;
+const DEFAULT_CORNER_ADJ = 16667;
+const MAX_CORNER_ADJ = 50000;
+
+/** The corner radius of a `w` x `h` shape, in pixels: only a rounded rectangle has one. */
 export const shapeCornerRadius = (item: SessionIllustration, w: number, h: number): number =>
-  item.radius ?? (item.shape === 'rounded-rectangle' ? Math.min(w, h) / 6 : 0);
+  item.shape === 'rounded-rectangle'
+    ? ((item.cornerAdj ?? DEFAULT_CORNER_ADJ) / CORNER_ADJ_UNIT) * Math.min(w, h)
+    : 0;
+
+/** The corner guide that draws a radius of `px` pixels on a `w` x `h` shape, kept within the preset's range. */
+export const cornerAdjForRadius = (px: number, w: number, h: number): number =>
+  Math.min(
+    MAX_CORNER_ADJ,
+    Math.max(0, Math.round((px / Math.max(1, Math.min(w, h))) * CORNER_ADJ_UNIT)),
+  );
 
 /** The fill colour of a shape, or null for No Fill. */
 export const shapeFillColor = (item: SessionIllustration): string | null =>

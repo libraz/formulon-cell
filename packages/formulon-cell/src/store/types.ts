@@ -622,7 +622,9 @@ export interface SessionIllustration {
   nativeFill?: SessionNativeColor;
   /** The file's outline colour, written back as is while the outline still shows its `css`. */
   nativeLine?: SessionNativeColor;
-  radius?: number;
+  /** A rounded rectangle's corner in 1/100000 of its shorter side, the file's own unit; unset draws
+   *  the preset's default. Only a rounded rectangle has one. */
+  cornerAdj?: number;
   /** A shape's outline weight in points; kept while the outline is off. */
   lineWidth?: number;
   /** The shape has No Outline; its weight stays in `lineWidth`. */

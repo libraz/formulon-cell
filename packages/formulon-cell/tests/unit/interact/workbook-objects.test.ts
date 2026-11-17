@@ -333,7 +333,7 @@ describe('attachWorkbookObjectsPanel', () => {
           shape: 'rounded-rectangle',
           sheet: 0,
           color: '#0f6cbd',
-          radius: 8,
+          cornerAdj: 8333,
           lineWidth: 4,
           opacity: 0.25,
         },
@@ -368,7 +368,7 @@ describe('attachWorkbookObjectsPanel', () => {
 
     expect(onUpdateSessionIllustration).toHaveBeenCalledWith('shape-a', {
       color: '#ff0000',
-      radius: 18,
+      cornerAdj: 18750,
       lineWidth: 7,
       opacity: 0.45,
     });
@@ -393,6 +393,14 @@ describe('attachWorkbookObjectsPanel', () => {
         nativeObjectId: 5,
         nativeGeometryEditable: true,
         nativeLocked: true,
+      },
+      {
+        id: 'saved-rect',
+        kind: 'shape',
+        shape: 'rectangle',
+        sheet: 0,
+        nativeObjectId: 6,
+        nativeGeometryEditable: true,
       },
     ];
     const handle = attachWorkbookObjectsPanel({
@@ -421,7 +429,9 @@ describe('attachWorkbookObjectsPanel', () => {
       );
 
     const saved = inputs(rows[0] as HTMLElement);
-    expect(saved.radius?.disabled).toBe(true);
+    expect(saved.radius?.disabled).toBe(false);
+    expect(inputs(rows[1] as HTMLElement).radius?.disabled).toBe(true);
+    expect(inputs(rows[2] as HTMLElement).radius?.disabled).toBe(true);
     expect(saved.opacity?.step).toBe('0.05');
     expect(saved.color?.disabled).toBe(false);
     expect(

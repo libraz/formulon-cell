@@ -321,13 +321,13 @@ describe('shapes saved with the workbook', () => {
     });
   });
 
-  it('resets a radius the file cannot hold, and keeps a dash style it can', async () => {
+  it('resets a corner the file cannot hold, and keeps a dash style it can', async () => {
     const { wb, store, history } = await session();
     oval(store);
 
-    updateSessionIllustration(store, 's1', { radius: 12, lineDash: 'longDash' }, history, wb);
+    updateSessionIllustration(store, 's1', { cornerAdj: 12000, lineDash: 'longDash' }, history, wb);
 
-    expect(only(store)).toMatchObject({ radius: undefined, lineDash: 'longDash' });
+    expect(only(store)).toMatchObject({ cornerAdj: undefined, lineDash: 'longDash' });
     expect(listShapes(wb, 0)[0]?.fillKind).toBe(ShapePaint.Solid);
     updateSessionIllustration(store, 's1', { opacity: 0 }, history, wb);
     expect(only(store).opacity).toBe(0);

@@ -48,7 +48,7 @@ export interface CreateSessionShapeOptions {
   w?: number;
   h?: number;
   color?: string;
-  radius?: number;
+  cornerAdj?: number;
   /** Outline weight in points; 0 is No Outline. */
   lineWidth?: number;
   opacity?: number;
@@ -221,7 +221,7 @@ export function createSessionShape(
         w: options.w,
         h: options.h,
         color: options.color,
-        radius: options.radius,
+        cornerAdj: options.cornerAdj,
         lineWidth: options.lineWidth,
         opacity: options.opacity,
         ...(options.name !== undefined ? { name: options.name } : {}),

@@ -160,12 +160,17 @@ const paintInput = (item: SessionIllustration): Pick<EngineShapeInput, 'fill' | 
   return input;
 };
 
+/** The guide of a rounded rectangle that holds its corner. */
+const CORNER_GUIDE = 'adj';
+
+const isRounded = (item: SessionIllustration): boolean => item.shape === 'rounded-rectangle';
+
 /** Overlay-only settings of a saved shape, reset so the screen shows what the
- *  file holds: the file has no corner radius. */
+ *  file holds: only a rounded rectangle has a corner. */
 const unsaveable = (item: SessionIllustration): Partial<SessionIllustration> => {
   const reset: Partial<SessionIllustration> = {};
   if (item.nativeLocked) return reset;
-  if (item.radius !== undefined) reset.radius = undefined;
+  if (item.cornerAdj !== undefined && !isRounded(item)) reset.cornerAdj = undefined;
   return reset;
 };
 
@@ -257,6 +262,10 @@ export function shapeFromNative(
       if (tail) item.tailEnd = tail;
     }
   }
+  const corner = shape.adjustValues[CORNER_GUIDE];
+  if (item.shape === 'rounded-rectangle' && corner !== undefined) {
+    item.cornerAdj = corner;
+  }
   if (shape.text) item.text = shape.text;
   return item;
 }
@@ -290,6 +299,9 @@ const shapeInputOf = (shape: EngineShape): EngineShapeInput | null => {
     rotationDeg: shape.rotationDeg,
     ...(shape.flipH ? { flipH: true } : {}),
     ...(shape.flipV ? { flipV: true } : {}),
+    ...(Object.keys(shape.adjustValues).length > 0
+      ? { adjustValues: { ...shape.adjustValues } }
+      : {}),
     hidden: shape.hidden,
     ...(shape.kind !== DrawingObjectKind.Connector
       ? { text: shape.text, textBox: shape.textBox }
@@ -521,6 +533,9 @@ export class ShapeMirror {
       ...(item.flipH ? { flipH: true } : {}),
       ...(item.flipV ? { flipV: true } : {}),
     };
+    if (isRounded(item) && item.cornerAdj !== undefined) {
+      spec.adjustValues = { [CORNER_GUIDE]: item.cornerAdj };
+    }
     if (item.nativeAnchor) return { ...spec, ...anchorInput(item.nativeAnchor) };
     const frame = {
       x: item.x ?? DEFAULT_ILLUSTRATION_FRAME.x,
@@ -574,6 +589,10 @@ export class ShapeMirror {
       if (item.rotationDeg !== old.rotationDeg) input.rotationDeg = item.rotationDeg ?? 0;
       if (item.flipH !== old.flipH) input.flipH = item.flipH === true;
       if (item.flipV !== old.flipV) input.flipV = item.flipV === true;
+      if (isRounded(item) && (item.shape !== old.shape || item.cornerAdj !== old.cornerAdj)) {
+        if (item.cornerAdj !== undefined) input.adjustValues = { [CORNER_GUIDE]: item.cornerAdj };
+        else if (item.shape === old.shape) input.adjustValues = { [CORNER_GUIDE]: null };
+      }
     }
     if (Object.keys(input).length === 0) return null;
     if (this.handle.updateShape(item.sheet, objectId, input)) {

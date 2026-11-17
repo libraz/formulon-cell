@@ -525,7 +525,7 @@ describe('mount/engine-binding — workbook replacement clears session objects',
     createSessionShape(
       sheet.instance.store,
       { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-      { id: 'shape-a', shape: 'rounded-rectangle', color: '#0f6cbd', radius: 12 },
+      { id: 'shape-a', shape: 'rounded-rectangle', color: '#0f6cbd', cornerAdj: 12000 },
       sheet.instance.history,
     );
     expect(sheet.instance.store.getState().illustrations.illustrations).toHaveLength(1);
