@@ -6,9 +6,12 @@ import {
   sessionPosition,
 } from '../engine/drawing-geometry.js';
 import {
+  hasPictureAnchorChange,
+  hasPictureTransform,
   movePersistentImage,
   nativeImageAnchor,
   persistentImageFromState,
+  transformPersistentImage,
 } from '../engine/images-sync.js';
 import { captureShapeInput } from '../engine/shapes-sync.js';
 import { cssColorFromArgb } from '../engine/theme-color.js';
@@ -711,6 +714,19 @@ export function clearSessionIllustration(
   );
 }
 
+/** The transform keys of `item`, each named so an absent flip reads as cleared. */
+const transformOf = (
+  item: SessionIllustration,
+): Pick<SessionIllustration, 'rotationDeg' | 'flipH' | 'flipV'> => ({
+  rotationDeg: item.rotationDeg,
+  flipH: item.flipH,
+  flipV: item.flipV,
+});
+
+/** Whether the picture or shape can turn and flip: a shape drawn only as its bounding box cannot. */
+export const canTransformIllustration = (item: SessionIllustration): boolean =>
+  (item.kind === 'shape' || item.kind === 'image') && !item.nativeLocked;
+
 export function updateSessionIllustration(
   store: SpreadsheetStore,
   id: string,
@@ -721,7 +737,10 @@ export function updateSessionIllustration(
 ): SessionIllustration | null {
   const item = sessionIllustrationById(store.getState(), id);
   if (!item) return null;
-  if (isGeometryLockedPicture(item)) return null;
+  // A picture fixed in place can still turn and flip, but not move.
+  const moves = hasPictureAnchorChange(patch);
+  const turns = hasPictureTransform(patch);
+  if (isGeometryLockedPicture(item) && moves) return null;
   // Another sheet takes the shape as a new insert.
   if (patch.sheet !== undefined && patch.sheet !== item.sheet && !canReinsertIllustration(item)) {
     return null;
@@ -734,7 +753,12 @@ export function updateSessionIllustration(
       const persisted = persistentImageFromState(item);
       if (persisted && wb) {
         const before = { ...item } as SessionIllustration;
-        if (!movePersistentImage(wb, persisted, patch, store)) return item;
+        // The transform applies first, then the anchor resolves against it.
+        if (turns && !transformPersistentImage(wb, persisted, patch)) return item;
+        if (moves && !movePersistentImage(wb, persisted, patch, store)) {
+          if (turns) transformPersistentImage(wb, persisted, transformOf(before));
+          return item;
+        }
         const after = {
           ...item,
           ...patch,
@@ -748,11 +772,15 @@ export function updateSessionIllustration(
             if (!current) throw new Error(`image ${phase} state missing`);
             const currentPersisted = persistentImageFromState(current);
             if (!currentPersisted) throw new Error(`image ${phase} native state missing`);
-            if (!movePersistentImage(wb, currentPersisted, target, store)) {
+            if (turns && !transformPersistentImage(wb, currentPersisted, transformOf(target))) {
+              throw new Error(`image ${phase} restore failed`);
+            }
+            if (moves && !movePersistentImage(wb, currentPersisted, target, store)) {
               throw new Error(`image ${phase} restore failed`);
             }
             mutators.updateIllustration(store, id, {
               ...target,
+              ...(turns ? transformOf(target) : {}),
               nativeAnchor:
                 nativeImageAnchor(wb, item.sheet, currentPersisted.nativeObjectId) ??
                 currentPersisted.nativeAnchor,

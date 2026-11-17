@@ -75,6 +75,7 @@ function internals(handle: unknown): WorkbookHandleInternals {
 
 export abstract class WorkbookHandleAnnotationsMethods {
   declare readonly capabilities: EngineCapabilities;
+  declare refreshDrawings: (sheet: number) => void;
 
   /** Read the cell's OOXML phonetic guide, if the current engine exposes it. */
   getCellPhonetic(sheet: number, row: number, col: number): string | null {
@@ -376,22 +377,26 @@ export abstract class WorkbookHandleAnnotationsMethods {
   setDrawingAnchor(sheet: number, objectId: number, placement: EngineDrawingAnchorPatch): boolean {
     assertAlive(this);
     if (!this.capabilities.drawings) return false;
-    return attemptWrite(() =>
+    const written = attemptWrite(() =>
       ws(this, sheet)
         .drawing(objectId)
         .update({ anchor: { ...placement } }),
     );
+    if (written) this.refreshDrawings(sheet);
+    return written;
   }
 
   /** Rotate or flip a picture, keeping its object id and anchor. */
   updatePicture(sheet: number, objectId: number, patch: EnginePicturePatch): boolean {
     assertAlive(this);
     if (!this.capabilities.images) return false;
-    return attemptWrite(() =>
+    const written = attemptWrite(() =>
       ws(this, sheet)
         .picture(objectId)
         .update({ ...patch }),
     );
+    if (written) this.refreshDrawings(sheet);
+    return written;
   }
 
   /** Move the object to `index` of `listDrawingObjects` (0 is the back). */

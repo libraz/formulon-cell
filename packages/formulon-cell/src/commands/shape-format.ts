@@ -9,6 +9,7 @@ import type {
 } from '../store/store.js';
 import type { History } from './history.js';
 import {
+  canTransformIllustration,
   type SessionIllustrationPatch,
   updateSessionIllustration,
 } from './session-illustration.js';
@@ -231,7 +232,22 @@ export function applySessionShapeOutlineDash(
   return applyShapePatch(store, item, patch, 'shapeOutline', history, wb);
 }
 
-/** Rotate Right 90° (90) or Rotate Left 90° (-90): one undo step. */
+/** A turn or flip of a shape or picture, which a drawn-only shape refuses. */
+const applyTransformPatch = (
+  store: SpreadsheetStore,
+  item: SessionIllustration,
+  patch: SessionIllustrationPatch,
+  history: History | null,
+  wb?: WorkbookHandle,
+): SessionIllustration | null =>
+  canTransformIllustration(item)
+    ? updateSessionIllustration(store, item.id, patch, history, wb, {
+        origin: 'ribbon',
+        commandId: 'shapeRotate',
+      })
+    : null;
+
+/** Rotate Right 90° (90) or Rotate Left 90° (-90) of a shape or picture: one undo step. */
 export function applySessionShapeRotation(
   store: SpreadsheetStore,
   item: SessionIllustration,
@@ -240,10 +256,10 @@ export function applySessionShapeRotation(
   wb?: WorkbookHandle,
 ): SessionIllustration | null {
   const rotationDeg = displayRotation((item.rotationDeg ?? 0) + stepDeg);
-  return applyShapePatch(store, item, { rotationDeg }, 'shapeRotate', history, wb);
+  return applyTransformPatch(store, item, { rotationDeg }, history, wb);
 }
 
-/** Flip Horizontal or Flip Vertical: toggles the flag and mirrors the rotation; one undo step. */
+/** Flip Horizontal or Flip Vertical of a shape or picture: toggles the flag and mirrors the rotation; one undo step. */
 export function applySessionDrawingFlip(
   store: SpreadsheetStore,
   item: SessionIllustration,
@@ -256,7 +272,7 @@ export function applySessionDrawingFlip(
     [key]: item[key] ? undefined : true,
     rotationDeg: flippedRotation(item.rotationDeg),
   };
-  return applyShapePatch(store, item, patch, 'shapeRotate', history, wb);
+  return applyTransformPatch(store, item, patch, history, wb);
 }
 
 /** Change Shape: a new kind with the same paint, text and frame; one undo step. */

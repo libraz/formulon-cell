@@ -905,7 +905,12 @@ export function buildRibbonModel(
       ]),
       contextual: true,
     },
-    { ...tab('pictureFormat', [objectArrange()]), contextual: true },
+    {
+      ...tab('pictureFormat', [
+        objectArrange([cmd('shapeRotate', tr.rotate, tr.rotate, 'rotateRight', 'wide')]),
+      ]),
+      contextual: true,
+    },
     {
       ...tab('tableDesign', [
         group(tr.tableProperties, [

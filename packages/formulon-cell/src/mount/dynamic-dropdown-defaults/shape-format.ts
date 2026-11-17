@@ -1,4 +1,7 @@
-import { selectedSessionIllustration } from '../../commands/session-illustration.js';
+import {
+  canTransformIllustration,
+  selectedSessionIllustration,
+} from '../../commands/session-illustration.js';
 import {
   applySessionDrawingFlip,
   applySessionShapeFill,
@@ -16,7 +19,6 @@ import {
   shapeOutlineDash,
   shapeOutlineEditable,
   shapeOutlineWeight,
-  shapeStyleEditable,
 } from '../../commands/shape-format.js';
 import {
   normalizeHex,
@@ -113,6 +115,9 @@ export function createShapeFormatDropdownDefaults(
     return item?.kind === 'shape' ? item : null;
   };
 
+  const selectedDrawing = (): SessionIllustration | null =>
+    selectedSessionIllustration(instance.store.getState());
+
   const syncTheme = (menu: HTMLElement): void =>
     syncColorPaletteTheme(menu, themeColorColumns(instance.workbook.getTheme()?.colors));
 
@@ -194,7 +199,7 @@ export function createShapeFormatDropdownDefaults(
       }
     },
     applyShapeRotateAction(value) {
-      const item = selectedShape();
+      const item = selectedDrawing();
       if (!item) return;
       const axis = FLIP_AXIS[value];
       if (axis) {
@@ -206,8 +211,8 @@ export function createShapeFormatDropdownDefaults(
       applySessionShapeRotation(instance.store, item, step, instance.history, instance.workbook);
     },
     updateShapeRotateMenu(menu) {
-      const item = selectedShape();
-      const editable = item !== null && shapeStyleEditable(item);
+      const item = selectedDrawing();
+      const editable = item !== null && canTransformIllustration(item);
       for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-shape-rotate]')) {
         setMenuControlDisabled(button, !editable);
       }

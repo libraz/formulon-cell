@@ -257,6 +257,27 @@ describe('shape and picture tabs of the ribbon', () => {
     tb.dispose();
   });
 
+  it('turns and flips the selected picture from the Picture Format Rotate button', () => {
+    selectStorePicture(sheet.instance.store);
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    tb.setActiveTab('pictureFormat');
+
+    command('shapeRotate').click();
+    pick(tb, '[data-shape-rotate="right"]');
+    expect(current('picture-test').rotationDeg).toBe(90);
+    command('shapeRotate').click();
+    pick(tb, '[data-shape-rotate="flip-horizontal"]');
+    expect(current('picture-test')).toMatchObject({ flipH: true, rotationDeg: 270 });
+
+    sheet.instance.history.undo();
+    expect(current('picture-test').flipH).toBeUndefined();
+    expect(current('picture-test').rotationDeg).toBe(90);
+    tb.dispose();
+  });
+
   it('follows the selection from one kind of object to another', () => {
     selectStorePicture(sheet.instance.store);
     selectStoreChart(sheet.instance.store);

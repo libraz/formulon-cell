@@ -142,6 +142,7 @@ versioning is [SemVer](https://semver.org/).
 - A new cell note on the Mac opens at the desktop's default size (104 x 76 pt) beside its cell, flips up at the last row and left at the last column, uses 10 pt Yu Gothic UI, scales with the zoom, and commits to its own cell when you click away.
 - The Mac column panel sorts and filters by color: the sort side's By color pop-up puts the rows with the picked fill, font colour or conditional formatting icon first and ends with Custom Sort..., which opens the Sort dialog on the column; the filter's By color pop-up lists the fills, font colours and icons the column shows (empty when it shows none) and filters by the one picked. No Fill and Automatic pick the cells without a fill or font colour of their own. Colour and icon sort levels and filters are saved to .xlsx and read back.
 - `Workbook.engineVersion` reports the version of the calc engine the workbook runs on.
+- Shapes and pictures flip and turn: the Rotate menu offers Flip Vertical and Flip Horizontal after the quarter turns, Picture Format has the Rotate menu, and a flip mirrors the rotation as the spreadsheet does. Flips and raw rotations load, save and copy as the file states them, a picture fixed on the sheet can still turn and flip, and `Picture.update` takes `rotationDeg`, `flipH` and `flipV`. A loaded straight line or straight connector is editable rather than a locked box, and a connector glued to a shape follows it when the shape moves.
 
 ### Fixed
 

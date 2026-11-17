@@ -8,14 +8,22 @@ import type { WorkbookHandle } from './workbook-handle.js';
  *  change, so a save carries them. */
 export class DrawingObjectMirror {
   constructor(handle: WorkbookHandle) {
-    this.mirrors = [new ShapeMirror(handle), new SparklineMirror(handle), new SlicerMirror(handle)];
+    this.shapes = new ShapeMirror(handle);
+    this.mirrors = [this.shapes, new SparklineMirror(handle), new SlicerMirror(handle)];
   }
+
+  private readonly shapes: ShapeMirror;
 
   private readonly mirrors: readonly (ShapeMirror | SparklineMirror | SlicerMirror)[];
 
   /** Adopt `state` as what the engine already carries. */
   rebase(state: State | null): void {
     for (const mirror of this.mirrors) mirror.rebase(state);
+  }
+
+  /** Re-read `sheet`'s shapes at the next sync. */
+  touch(sheet: number): void {
+    this.shapes.touch(sheet);
   }
 
   /** Returns true when a write tied the store to the engine, which notified it again. */

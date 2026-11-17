@@ -70,6 +70,9 @@ const imageFromNative = (
     alt: object.description || object.name,
     ...(object.name ? { name: object.name } : {}),
     ...position,
+    ...(image.rotationDeg !== 0 ? { rotationDeg: image.rotationDeg } : {}),
+    ...(image.flipH ? { flipH: true as const } : {}),
+    ...(image.flipV ? { flipV: true as const } : {}),
     nativeObjectId: object.objectId,
     nativeGeometryEditable: object.anchor.kind !== ANCHOR_KIND_ABSOLUTE,
     imageBytes: Uint8Array.from(image.bytes),
@@ -225,4 +228,30 @@ export function movePersistentImage(
     ? placementForAnchor(store, patch.nativeAnchor)
     : placementForPixels(store, item.nativeAnchor, patch);
   return wb.setDrawingAnchor(item.sheet, item.nativeObjectId, placement);
+}
+
+/** The keys of an illustration patch that turn or flip a picture rather than move it. */
+export const PICTURE_TRANSFORM_KEYS = ['rotationDeg', 'flipH', 'flipV'] as const;
+
+/** Whether `patch` states any transform key. */
+export const hasPictureTransform = (patch: object): boolean =>
+  PICTURE_TRANSFORM_KEYS.some((key) => key in patch);
+
+/** Whether `patch` states anything but transform keys, which needs the picture's anchor to be editable. */
+export const hasPictureAnchorChange = (patch: object): boolean =>
+  Object.keys(patch).some((key) => !(PICTURE_TRANSFORM_KEYS as readonly string[]).includes(key));
+
+/** Turn or flip one picture in place; the anchor is untouched, so a picture fixed
+ *  on the sheet takes it too. Only the transform keys `patch` states are written. */
+export function transformPersistentImage(
+  wb: WorkbookHandle,
+  item: PersistedSessionImage,
+  patch: Partial<Pick<SessionIllustration, 'rotationDeg' | 'flipH' | 'flipV'>>,
+): boolean {
+  if (!item.nativeObjectId) return false;
+  return wb.updatePicture(item.sheet, item.nativeObjectId, {
+    ...('rotationDeg' in patch ? { rotationDeg: patch.rotationDeg ?? 0 } : {}),
+    ...('flipH' in patch ? { flipH: patch.flipH === true } : {}),
+    ...('flipV' in patch ? { flipV: patch.flipV === true } : {}),
+  });
 }

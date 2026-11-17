@@ -267,6 +267,8 @@ const appendImage = (panel: HTMLElement, item: SessionIllustration): void => {
   img.alt = item.alt ?? '';
   img.draggable = false;
   img.style.cssText = 'display:block;width:100%;height:100%;object-fit:contain;';
+  if (item.flipH || item.flipV)
+    img.style.transform = `scale(${item.flipH ? -1 : 1}, ${item.flipV ? -1 : 1})`;
   panel.appendChild(img);
 };
 

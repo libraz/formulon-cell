@@ -311,23 +311,6 @@ export function captureShapeInput(
   return shape ? shapeInputOf(shape) : null;
 }
 
-/** Capture shape `objectId` so a row or column delete that drops it can be
- *  undone. The restorer inserts it again at its slot in the drawing order; null
- *  when it cannot be restored without loss. */
-export function captureShapeRestore(
-  wb: WorkbookHandle,
-  sheet: number,
-  objectId: number,
-): (() => boolean) | null {
-  const input = captureShapeInput(wb, sheet, objectId);
-  if (!input) return null;
-  const index = wb.listDrawingObjects(sheet).findIndex((object) => object.objectId === objectId);
-  return () => {
-    const restored = wb.insertShape(sheet, input);
-    return restored !== null && (index < 0 || wb.setDrawingZOrder(sheet, restored, index));
-  };
-}
-
 /** Capture the anchors of `sheet`'s shapes ahead of a row or column delete,
  *  which collapses the shapes it does not remove. The restorer puts the
  *  survivors back where they were once the delete is undone. */
@@ -387,13 +370,22 @@ export class ShapeMirror {
     }
   }
 
+  /** Mark `sheet`'s shapes for a re-read at the next sync: an edit to a picture or chart can
+   *  move a connector. */
+  touch(sheet: number): void {
+    this.touched.add(sheet);
+  }
+
   sync(store: SpreadsheetStore): void {
     const slice = store.getState().illustrations;
-    if (slice === this.last) return;
+    if (slice === this.last && this.touched.size === 0) return;
     const previous = this.last?.illustrations ?? [];
     this.last = slice;
     const wb = this.handle;
-    if (!wb.capabilities.shapes) return;
+    if (!wb.capabilities.shapes) {
+      this.touched.clear();
+      return;
+    }
     const before = new Map(previous.map((item) => [item.id, item] as const));
     const after = new Set(slice.illustrations.map((item) => item.id));
     for (const item of previous) {

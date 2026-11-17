@@ -347,6 +347,15 @@ export class StoreMirror {
     if (store) mutators.refreshActiveSheetCells(store, this.handle);
   }
 
+  /** After an engine edit to a picture or chart, re-read the sheet's shapes: the engine may have
+   *  moved a connector. Nothing happens while hydration is muted or no store is attached. */
+  refreshDrawings(sheet: number): void {
+    const store = this.boundStore;
+    if (!store || this.storeSyncMuted > 0) return;
+    this.drawingObjects.touch(sheet);
+    this.drawingObjects.sync(store);
+  }
+
   withMuted<T>(fn: () => T): T {
     this.storeSyncMuted += 1;
     try {

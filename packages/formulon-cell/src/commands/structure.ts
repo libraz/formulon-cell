@@ -21,7 +21,7 @@ import {
 } from '../engine/format-history-bridge.js';
 import { hydrateImagesFromEngine, hydrateRestoredImages } from '../engine/images-sync.js';
 import { hydrateProtectedRangesFromEngine } from '../engine/protection-sync.js';
-import { captureShapeAnchors, captureShapeRestore } from '../engine/shapes-sync.js';
+import { captureShapeAnchors } from '../engine/shapes-sync.js';
 import {
   captureSlicerAnchors,
   captureSlicerRestore,
@@ -744,9 +744,7 @@ function applyAxisShiftViaEngine(
         deletedDrawings.push(snapshot);
         continue;
       }
-      const restore =
-        captureShapeRestore(wb, sheet, object.objectId) ??
-        captureSlicerRestore(wb, sheet, object.objectId);
+      const restore = captureSlicerRestore(wb, sheet, object.objectId);
       if (restore === null) return false;
       deletedObjects.push(restore);
     }

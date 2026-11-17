@@ -146,3 +146,36 @@ describe('a shape loaded with a rotation', () => {
     expect(zipText(again, path)).toMatch(/<a:xfrm[^>]*rot="-5400000"/);
   });
 });
+
+describe('a picture loaded with a rotation and a flip', () => {
+  it('is drawn turned and mirrored', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    cleanup.push(() => wb.dispose());
+    const png = Uint8Array.from(
+      atob(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      ),
+      (char) => char.charCodeAt(0),
+    );
+    const id = wb.insertImage(0, png, {
+      anchor: { fromRow: 2, fromCol: 1, widthEmu: 952500, heightEmu: 952500 },
+    });
+    wb.updatePicture(0, id ?? 0, { rotationDeg: 330, flipH: true });
+    const store = createSpreadsheetStore();
+    hydrateImagesFromEngine(wb, store, 0);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    cleanup.push(() => host.remove());
+    const handle = attachSessionIllustrations({
+      host,
+      store,
+      history: new History(),
+      getWb: () => wb,
+    });
+    cleanup.push(() => handle.detach());
+
+    const panel = host.querySelector<HTMLElement>('.fc-illustration');
+    expect(panel?.style.transform).toBe('rotate(330deg)');
+    expect(panel?.querySelector('img')?.style.transform).toBe('scale(-1, 1)');
+  });
+});

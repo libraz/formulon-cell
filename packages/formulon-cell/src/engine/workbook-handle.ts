@@ -469,6 +469,11 @@ export class WorkbookHandle {
     this.storeMirror.detach(expectedStore);
   }
 
+  /** Re-read `sheet`'s shapes into the attached store after an edit that can move them. */
+  refreshDrawings(sheet: number): void {
+    this.storeMirror.refreshDrawings(sheet);
+  }
+
   /** Runs hydration without turning imported filter XML or print settings
    * into a UI-authored replacement. The store subscription still records the
    * new baseline. */

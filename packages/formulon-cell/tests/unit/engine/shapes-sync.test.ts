@@ -2,7 +2,9 @@ import type { ChartFill, ChartLine } from '@libraz/formulon';
 import {
   AnchorEditAs,
   AnchorKind,
+  ChartBarDirection,
   ChartLineDash,
+  ChartPlotType,
   ColorKind,
   DrawingObjectKind,
 } from '@libraz/formulon';
@@ -33,7 +35,7 @@ import {
 import { deleteRows, insertRows } from '../../../src/commands/structure.js';
 import { drawingAnchorOf } from '../../../src/engine/drawing-geometry.js';
 import { hydrateImagesFromEngine } from '../../../src/engine/images-sync.js';
-import { captureShapeRestore, shapeFromNative } from '../../../src/engine/shapes-sync.js';
+import { shapeFromNative } from '../../../src/engine/shapes-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import type { EngineShape } from '../../../src/engine/workbook-handle-drawing-objects.js';
 import { en } from '../../../src/i18n/strings.js';
@@ -46,6 +48,14 @@ import {
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
 import { zipEntries, zipStored, zipText } from './zip-entries.js';
+
+// 1x1 transparent PNG.
+const PNG = Uint8Array.from(
+  atob(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  ),
+  (char) => char.charCodeAt(0),
+);
 
 const open: WorkbookHandle[] = [];
 afterEach(() => {
@@ -689,8 +699,6 @@ describe('loaded shapes the overlay cannot draw', () => {
     if (!shape) throw new Error('no shape');
     const custom = { ...shape, presetGeometry: null };
     expect(shapeFromNative(store, 0, custom, wb)).toMatchObject({ nativeLocked: true });
-    const handle = { listShapes: () => [custom] } as unknown as WorkbookHandle;
-    expect(captureShapeRestore(handle, 0, shape.objectId)).toBeNull();
   });
 
   it('loads a saved line with its direction', async () => {
@@ -774,6 +782,93 @@ describe('loaded shapes the overlay cannot draw', () => {
       expect(item?.nativeAnchor).toEqual(live && drawingAnchorOf(live));
     },
   );
+
+  it('keeps the glue of a connector a row delete took, when the delete is undone', async () => {
+    const { wb, store, history } = await gluedConnector('both');
+    const frame = wb.listShapes(0).find((shape) => shape.objectId === 4)?.anchor;
+    if (!frame) throw new Error('no connector');
+
+    expect(deleteRows(store, wb, history, frame.fromRow, frame.toRow - frame.fromRow + 1)).toBe(
+      true,
+    );
+    expect(wb.listShapes(0).some((shape) => shape.objectId === 4)).toBe(false);
+
+    history.undo();
+    expect(wb.listShapes(0).find((shape) => shape.objectId === 4)).toMatchObject({
+      startConnection: { objectId: 2 },
+      endConnection: { objectId: 3 },
+    });
+  });
+
+  /** A workbook holding a rect shape, a picture and a chart, bound to a store. */
+  const withPictureAndChart = () =>
+    session((wb) => {
+      insertShape(wb, 0, {
+        prst: 'rect',
+        anchorKind: AnchorKind.TwoCell,
+        editAs: AnchorEditAs.TwoCell,
+        fromRow: 2,
+        fromCol: 1,
+        toRow: 4,
+        toCol: 3,
+      });
+      wb.insertImage(0, PNG, {
+        anchor: { fromRow: 10, fromCol: 1, widthEmu: 95250, heightEmu: 95250 },
+      });
+      wb.setText({ sheet: 0, row: 0, col: 0 }, 'k');
+      wb.setNumber({ sheet: 0, row: 0, col: 1 }, 1);
+      wb.insertChart(0, {
+        type: ChartPlotType.Bar,
+        barDirection: ChartBarDirection.Column,
+        range: 'Sheet1!$A$1:$B$1',
+      });
+    });
+
+  it('re-reads the shapes of the sheet after a picture is moved', async () => {
+    const { wb, store, history } = await withPictureAndChart();
+    const shape = wb.listShapes(0)[0]?.objectId ?? -1;
+    const picture = store.getState().illustrations.illustrations.find((i) => i.kind === 'image');
+    if (!picture) throw new Error('no picture');
+    expect(wb.updateShape(0, shape, { rotationDeg: 45, flipV: true })).toBe(true);
+
+    updateSessionIllustration(store, picture.id, { x: 300, y: 200 }, history, wb);
+
+    expect(sessionIllustrationById(store.getState(), `shape-native-0-${shape}`)).toMatchObject({
+      rotationDeg: 45,
+      flipV: true,
+    });
+  });
+
+  it('re-reads the shapes of the sheet after a picture is turned', async () => {
+    const { wb, store, history } = await withPictureAndChart();
+    const shape = wb.listShapes(0)[0]?.objectId ?? -1;
+    const picture = store.getState().illustrations.illustrations.find((i) => i.kind === 'image');
+    if (!picture) throw new Error('no picture');
+    expect(wb.updateShape(0, shape, { rotationDeg: 45 })).toBe(true);
+
+    applySessionShapeRotation(store, picture, 90, history, wb);
+
+    expect(sessionIllustrationById(store.getState(), `shape-native-0-${shape}`)?.rotationDeg).toBe(
+      45,
+    );
+  });
+
+  it('re-reads the shapes of the sheet after a chart is moved', async () => {
+    const { wb, store } = await withPictureAndChart();
+    const shape = wb.listShapes(0)[0]?.objectId ?? -1;
+    const chart = wb.listDrawingObjects(0).find((o) => o.kind === DrawingObjectKind.Chart);
+    if (!chart) throw new Error('no chart');
+    expect(wb.updateShape(0, shape, { rotationDeg: 45, flipH: true })).toBe(true);
+
+    expect(
+      wb.setDrawingAnchor(0, chart.objectId, { kind: AnchorKind.OneCell, fromRow: 20, fromCol: 3 }),
+    ).toBe(true);
+
+    expect(sessionIllustrationById(store.getState(), `shape-native-0-${shape}`)).toMatchObject({
+      rotationDeg: 45,
+      flipH: true,
+    });
+  });
 
   it('flips a loaded glued line, which the engine then unglues', async () => {
     const { wb, store, history } = await gluedConnector('both');

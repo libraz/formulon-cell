@@ -144,7 +144,9 @@ export interface Drawing extends Pick<EngineDrawing, DrawingMemberName> {
   /** The sheet whose drawing holds the object. */
   readonly sheet: Sheet;
 }
-export interface Picture extends Pick<EnginePicture, KindMemberName | 'snapshot'> {}
+export interface Picture extends Pick<EnginePicture, KindMemberName | 'snapshot'> {
+  update: EnginePicture['update'];
+}
 export interface Shape extends Pick<EngineShape, KindMemberName | 'snapshot'> {
   update: EngineShape['update'];
 }
