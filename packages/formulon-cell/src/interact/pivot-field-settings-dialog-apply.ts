@@ -425,7 +425,7 @@ export function updatePivotDataField(
     const next: PivotDataFieldSpec = {
       ...rest,
       ...(patch.aggregation === undefined ? {} : { aggregation: patch.aggregation }),
-      ...(!rename && name ? { name } : {}),
+      ...(rename ? {} : { name }),
       ...(format ? { numberFormat: format } : {}),
       ...(kind !== PivotShowValuesAs.Normal
         ? { showValuesAs: kind as PivotDataFieldSpec['showValuesAs'] }

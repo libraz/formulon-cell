@@ -399,4 +399,21 @@ describe('WorkbookHandle PivotTable projection', () => {
     expect(dataSpec).not.toHaveProperty('name');
     expect(dataSpec).not.toHaveProperty('showValuesAs');
   });
+
+  it('passes a data-field name verbatim, the empty caption included', () => {
+    const names: unknown[] = [];
+    const wb = makeHandle({
+      pivot: {
+        addDataField: (spec: Record<string, unknown>) => {
+          names.push(spec.name);
+          return 0;
+        },
+      },
+    });
+    // The spreadsheet saves an emptied caption as name="" and a space as name=" ".
+    for (const name of ['', ' ', 'X']) {
+      wb.addPivotDataField(0, 3, { name, fieldIndex: 1, aggregation: PivotAggregation.Sum });
+    }
+    expect(names).toEqual(['', ' ', 'X']);
+  });
 });

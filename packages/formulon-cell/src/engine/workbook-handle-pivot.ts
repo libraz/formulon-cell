@@ -1432,8 +1432,8 @@ function dateBound(
 
 function toDataFieldInput(spec: PivotDataFieldSpec) {
   return {
-    // A blank name is left out, so the engine names the field from the workbook profile.
-    ...(spec.name?.trim() ? { name: spec.name.trim() } : {}),
+    // An absent name lets the engine name the field; "" is an empty caption, as the spreadsheet saves it.
+    ...(spec.name !== undefined ? { name: spec.name } : {}),
     fieldIndex: spec.fieldIndex,
     aggregation: spec.aggregation,
     ...(spec.numberFormat !== undefined ? { numberFormat: spec.numberFormat.trim() || null } : {}),

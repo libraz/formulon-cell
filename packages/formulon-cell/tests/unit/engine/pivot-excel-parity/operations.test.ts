@@ -29,12 +29,13 @@ const setValueField = (
 ): void => {
   const current = wb.getPivotDefinition(0, 0)?.dataFields[0];
   if (!current) throw new Error('no data field');
-  const { showAsBaseField: _f, showAsBaseItem: _i, ...rest } = current;
+  const { showAsBaseField: _f, showAsBaseItem: _i, name, ...rest } = current;
+  // A function change leaves the name out, so the engine names the field as the desktop app does.
   const renamed = patch.aggregation !== undefined && patch.aggregation !== current.aggregation;
   expect(
     wb.setPivotDataField(0, 0, 0, {
       ...rest,
-      ...(renamed ? { name: '' } : {}),
+      ...(renamed ? {} : { name }),
       ...patch,
     }),
   ).toBe(true);
