@@ -38,6 +38,7 @@ import type {
   ChartSeriesPatch,
   ChartTitle,
   Color,
+  DrawingColor,
   ChartData as EngineChartData,
   SheetRect,
 } from '@libraz/formulon';
@@ -338,6 +339,12 @@ const TICK_LABEL_FROM_ENGINE = invert(TICK_LABEL_TO_ENGINE);
 const cssOf = (color: Color | null): string | undefined =>
   color !== null && color.kind === ColorKind.Rgb ? cssColorFromArgb(color.argb) : undefined;
 
+/** `#rrggbb` of a fill or line colour on an RGB base, as drawn; undefined for none or a theme base. */
+const cssOfPaint = (color: DrawingColor | null): string | undefined =>
+  color !== null && color.base.kind === ColorKind.Rgb
+    ? cssColorFromArgb(color.resolved?.argb ?? color.base.argb)
+    : undefined;
+
 /** Lower-case `#rrggbb` for a colour the engine can store; other strings unchanged. */
 const canonicalColor = (color: string): string => {
   const argb = argbFromCssColor(color);
@@ -406,7 +413,7 @@ const readFill = (fill: ChartFill | null): ChartFillSpec | undefined =>
   fill === null
     ? undefined
     : defined<ChartFillSpec>({
-        color: cssOf(fill.color),
+        color: cssOfPaint(fill.color),
         transparency: fill.transparencyPct ?? undefined,
       });
 
@@ -416,7 +423,7 @@ const readLine = (line: ChartLine | null): ChartLineSpec | undefined =>
   line === null || line.none
     ? undefined
     : defined<ChartLineSpec>({
-        color: cssOf(line.color),
+        color: cssOfPaint(line.color),
         transparency: line.transparencyPct ?? undefined,
         width: line.widthPt ?? undefined,
         dash: line.dash === null ? undefined : DASH_FROM_ENGINE.get(line.dash),

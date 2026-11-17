@@ -80,9 +80,9 @@ const flat = (shape: EngineShape) => ({
   cx: shape.anchor.widthEmu,
   cy: shape.anchor.heightEmu,
   fillKind: paintKind(shape.fill),
-  fillRgb: (shape.fill?.color?.argb ?? 0) & 0xffffff,
+  fillRgb: (shape.fill?.color?.resolved?.argb ?? 0) & 0xffffff,
   lineKind: paintKind(shape.line),
-  lineRgb: (shape.line?.color?.argb ?? 0) & 0xffffff,
+  lineRgb: (shape.line?.color?.resolved?.argb ?? 0) & 0xffffff,
   lineWidthEmu: Math.round((shape.line?.widthPt ?? 0) * EMU_PER_PT),
 });
 
@@ -770,14 +770,26 @@ describe('theme colours of saved shapes', () => {
 
   /** The theme reference of a paint's colour, as the engine holds it. */
   const themeOf = (paint: ChartFill | ChartLine | null | undefined) => ({
-    kind: paint?.color?.kind,
-    theme: paint?.color?.theme,
-    tint: Math.round((paint?.color?.tint ?? 0) * 1000) / 1000,
+    kind: paint?.color?.base.kind,
+    theme: paint?.color?.base.theme,
+    transforms: paint?.color?.transforms,
   });
 
+  /** The theme references of the shape as first inserted. */
+  let inserted: { fill: ReturnType<typeof themeOf>; line: ReturnType<typeof themeOf> };
+
+  const recordAccents = (wb: WorkbookHandle): void => {
+    const shape = wb.listShapes(0)[0];
+    inserted = { fill: themeOf(shape?.fill), line: themeOf(shape?.line) };
+    expect(inserted.fill).toMatchObject({ kind: ColorKind.Theme, theme: 5 });
+    expect(inserted.fill.transforms?.length).toBeGreaterThan(0);
+    expect(inserted.line).toMatchObject({ kind: ColorKind.Theme, theme: 4 });
+    expect(inserted.line.transforms?.length).toBeGreaterThan(0);
+  };
+
   const expectAccents = (shape: EngineShape | undefined): void => {
-    expect(themeOf(shape?.fill)).toEqual({ kind: ColorKind.Theme, theme: 5, tint: 0.4 });
-    expect(themeOf(shape?.line)).toEqual({ kind: ColorKind.Theme, theme: 4, tint: -0.25 });
+    expect(themeOf(shape?.fill)).toEqual(inserted.fill);
+    expect(themeOf(shape?.line)).toEqual(inserted.line);
   };
 
   it('shows the colour the theme renders', async () => {
@@ -791,6 +803,7 @@ describe('theme colours of saved shapes', () => {
 
   it('keeps the theme colours through duplicate, paste, sheet move and a save', async () => {
     const { wb, store, history } = await session(accented);
+    recordAccents(wb);
     const id = only(store).id;
 
     duplicateSessionIllustration(store, id, history, wb);
@@ -811,6 +824,7 @@ describe('theme colours of saved shapes', () => {
 
   it('puts the theme colours back when a row delete is undone', async () => {
     const { wb, store, history } = await session(accented);
+    recordAccents(wb);
 
     expect(deleteRows(store, wb, history, 9, 5)).toBe(true);
     history.undo();
@@ -829,8 +843,8 @@ describe('theme colours of saved shapes', () => {
       fillRgb: 0x00ff00,
       lineRgb: 0x0000ff,
     });
-    expect(wb.listShapes(0)[0]?.fill?.color?.kind).toBe(ColorKind.Rgb);
-    expect(wb.listShapes(0)[0]?.line?.color?.kind).toBe(ColorKind.Rgb);
+    expect(wb.listShapes(0)[0]?.fill?.color?.base.kind).toBe(ColorKind.Rgb);
+    expect(wb.listShapes(0)[0]?.line?.color?.base.kind).toBe(ColorKind.Rgb);
   });
 });
 
@@ -986,7 +1000,7 @@ describe('copies of a saved shape', () => {
         transparencyPct: 40,
         widthPt: 2,
       });
-      expect((shape.fill?.color?.argb ?? 0) & 0xffffff).toBe(0x00ff00);
+      expect((shape.fill?.color?.resolved?.argb ?? 0) & 0xffffff).toBe(0x00ff00);
     }
     expect(shapes[1]?.anchor.kind).toBe(AnchorKind.TwoCell);
     expect(shapes[1]?.anchor).not.toEqual(shapes[0]?.anchor);

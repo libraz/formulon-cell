@@ -1,4 +1,4 @@
-import type { ChartFill, ChartLine, ChartLineDash, Color } from '@libraz/formulon';
+import type { ChartFill, ChartLine, ChartLineDash, DrawingColor } from '@libraz/formulon';
 import { AnchorEditAs, AnchorKind, ColorKind, DrawingObjectKind } from '@libraz/formulon';
 import {
   DEFAULT_SHAPE_COLOR,
@@ -84,11 +84,29 @@ const paintOf = (paint: ChartFill | ChartLine | null): Paint => {
   return paint.color !== null ? 'solid' : 'unset';
 };
 
-/** A paint's colour: as drawn, and as the file stores it. */
+/** Transforms that set a colour's opacity; the shape's transparency writes them. */
+const ALPHA_TRANSFORMS: ReadonlySet<string> = new Set(['alpha', 'alphaMod', 'alphaOff']);
+
+/** A paint's colour: as drawn, and as the file stores it, less the opacity the transparency writes. */
 const nativeColor = (
   wb: Pick<WorkbookHandle, 'resolveColorArgb'>,
-  spec: Color,
-): SessionNativeColor => ({ spec, css: cssColorFromArgb(renderedThemeColor(wb, spec).argb) });
+  color: DrawingColor,
+): SessionNativeColor => ({
+  spec: {
+    base: color.base,
+    transforms: color.transforms.filter((transform) => !ALPHA_TRANSFORMS.has(transform.name)),
+  },
+  css: cssColorFromArgb(color.resolved?.argb ?? renderedThemeColor(wb, color.base).argb),
+});
+
+/** Whether the file's colour says more than the RGB the overlay would write for it. */
+const keepsNativeColor = (color: DrawingColor): boolean =>
+  color.base.kind !== ColorKind.Rgb ||
+  color.transforms.some((transform) => !ALPHA_TRANSFORMS.has(transform.name));
+
+/** The transparency a paint is drawn with. */
+const drawnTransparencyPct = (paint: ChartFill | null): number =>
+  paint?.color?.resolvedTransparencyPct ?? paint?.transparencyPct ?? 0;
 
 /** The dash style an engine dash reads as; none for one the overlay has no style for. */
 const dashOfSaved = (saved: ChartLineDash): SessionShapeLineDash | undefined =>
@@ -101,7 +119,10 @@ const savedDash = (item: SessionIllustration): ChartLineDash | undefined =>
   item.lineDash === undefined ? undefined : SAVED_LINE_DASH[item.lineDash];
 
 /** The colour to write for `css`: the file's own while the shape still shows it. */
-const colorInput = (css: string, native: SessionNativeColor | undefined): string | Color =>
+const colorInput = (
+  css: string,
+  native: SessionNativeColor | undefined,
+): string | SessionNativeColor['spec'] =>
   native !== undefined && native.css === css ? native.spec : css;
 
 const anchorInput = (anchor: EngineDrawingAnchor) => ({
@@ -209,8 +230,8 @@ export function shapeFromNative(
   if ((fill === 'solid' || fill === 'other') && fillColor) {
     const color = nativeColor(wb, fillColor);
     item.color = color.css;
-    if (fill === 'solid' && color.spec.kind !== ColorKind.Rgb) item.nativeFill = color;
-    const transparencyPct = shape.fill?.transparencyPct ?? 0;
+    if (fill === 'solid' && keepsNativeColor(fillColor)) item.nativeFill = color;
+    const transparencyPct = drawnTransparencyPct(shape.fill);
     if (transparencyPct > 0) item.opacity = (100 - transparencyPct) / 100;
   } else if (fill === 'none') item.opacity = 0;
   if (fill === 'other') item.nativeFillOther = true;
@@ -218,7 +239,7 @@ export function shapeFromNative(
   else if ((line === 'solid' || line === 'other') && lineColor) {
     const color = nativeColor(wb, lineColor);
     item.lineColor = color.css;
-    if (line === 'solid' && color.spec.kind !== ColorKind.Rgb) item.nativeLine = color;
+    if (line === 'solid' && keepsNativeColor(lineColor)) item.nativeLine = color;
   }
   if (line === 'other') item.nativeLineOther = true;
   const width = shape.line?.widthPt ?? 0;

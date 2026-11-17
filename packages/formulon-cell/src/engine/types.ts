@@ -20,6 +20,7 @@ export type {
   ConditionalFormatInput,
   DataValidation,
   DataValidationInput,
+  DrawingColorInput,
   Formulon,
   FormulonError,
   FunctionMetadataEntry,

@@ -13,6 +13,7 @@ import type {
   ChartTickLabelPosition,
   ChartTitle,
   Color,
+  DrawingColor,
   ChartData as EngineChartData,
 } from '@libraz/formulon';
 import {
@@ -29,6 +30,7 @@ import {
   ChartSourceKind,
   ChartTitleKind,
   ColorKind,
+  ColorResolution,
   ChartGrouping as EngineChartGrouping,
   ChartLabelPosition as EngineChartLabelPosition,
   ChartSeriesDirection as EngineChartSeriesDirection,
@@ -87,8 +89,19 @@ const PLOT = {
 const rgb = (argb: number | null): Color | null =>
   argb === null ? null : { kind: ColorKind.Rgb, argb, theme: 0, tint: 0, indexed: 0 };
 
+/** An opaque RGB paint colour as the engine reads it; null stays null. */
+const drawingRgb = (argb: number | null): DrawingColor | null =>
+  argb === null
+    ? null
+    : {
+        base: { kind: ColorKind.Rgb, argb, theme: 0, tint: 0, indexed: 0 },
+        transforms: [],
+        resolved: { argb, resolution: ColorResolution.Exact },
+        resolvedTransparencyPct: null,
+      };
+
 const fillInfo = (color: number | null = null, transparency: number | null = null): ChartFill => ({
-  color: rgb(color),
+  color: drawingRgb(color),
   transparencyPct: transparency,
   none: false,
   other: false,
@@ -104,12 +117,14 @@ const lineInfo = ({
   transparency = null,
   ...rest
 }: LineOverrides = {}): ChartLine => ({
-  color: rgb(color),
+  color: drawingRgb(color),
   transparencyPct: transparency,
   widthPt: null,
   dash: null,
   none: false,
   other: false,
+  headEnd: null,
+  tailEnd: null,
   ...rest,
 });
 
@@ -324,6 +339,8 @@ const chartInfo = (
   naAsBlank: null,
   date1904: false,
   style: null,
+  chartArea: { fill: null, line: null },
+  plotArea: { fill: null, line: null },
   plots: [plotInfo(kind, plot)],
   axes: axesFor(kind),
   filter: { hiddenSeries: [], hiddenCategories },

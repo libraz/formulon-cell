@@ -9,6 +9,7 @@ import type {
   Addr,
   CellValue,
   Color,
+  DrawingColorInput,
   EngineDrawingAnchor,
   Range,
   SheetAxisFormatOverride,
@@ -567,7 +568,8 @@ export type SessionShapeLineDash =
 
 /** A colour as the file stores it, with the CSS colour it renders to. */
 export interface SessionNativeColor {
-  readonly spec: Color;
+  /** The colour as written back: a plain colour, or a base with its transforms. */
+  readonly spec: Color | DrawingColorInput;
   readonly css: string;
 }
 

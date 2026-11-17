@@ -29,7 +29,8 @@ async function seriesFills(file: string): Promise<Map<string, Rgb>> {
         (entry) => entry.seriesId === series.seriesId,
       )?.fill?.color;
       if (!fill || series.name === null) continue;
-      const argb = fill.argb;
+      const argb = fill.resolved?.argb;
+      if (argb === undefined) continue;
       fills.set(series.name, [(argb >> 16) & 0xff, (argb >> 8) & 0xff, argb & 0xff]);
     }
   }
