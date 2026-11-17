@@ -6,26 +6,15 @@ import type { ExcelRibbonIconName } from '../../excel-ribbon-icons.js';
 import type {
   RibbonCommand,
   RibbonGroupModel,
-  RibbonOption,
   RibbonTabModel,
   ToolbarLang,
 } from '../../ribbon-model.js';
 import { findMacBundleLabel } from './bundle-text.js';
-import {
-  EMBEDDED_UNSUPPORTED,
-  type LabelLike,
-  labels,
-  macGroupTitle,
-  macRibbonDisabledReason,
-  macRibbonLabelForCommand,
-  NOT_IMPLEMENTED,
-  OFFICE_REQUIRED,
-  t,
-  text,
-} from './labels.js';
+import { labels, macGroupTitle, macRibbonLabelForCommand, t } from './labels.js';
+import { MAC_CONTEXT_LABELS, type MacRibbonReason } from './labels-data.js';
 import { MAC_RIBBON_MENU_COMMANDS, MAC_RIBBON_MENU_ITEMS, macMenuLeaves } from './menu-manifest.js';
 
-export { macRibbonDisabledReason, macRibbonLabelForCommand } from './labels.js';
+export { macRibbonLabelForCommand } from './labels.js';
 export {
   MAC_FORMULAS_MORE_MENU_ID,
   MAC_RIBBON_MENU_COMMAND_SET,
@@ -37,117 +26,142 @@ export {
 } from './menu-manifest.js';
 export { projectMacRibbonState } from './state-projection.js';
 
-const PAGE_SCALE_OPTIONS: readonly RibbonOption[] = [
-  { value: '0', label: 'Automatic' },
-  { value: '1', label: '1 page' },
-  { value: '2', label: '2 pages' },
-  { value: '3', label: '3 pages' },
-  { value: 'custom', label: 'Custom' },
-];
+/** Select options by value; their text comes from the dictionaries when the model is localized. */
+interface MacSelectOptions {
+  readonly values: readonly string[];
+  readonly text: (value: string, strings: Strings) => string;
+}
+
+/** A Mac command before localization: its title and label come from its id, its reason from a
+ *  dictionary key. */
+type MacCommandDraft = Omit<RibbonCommand, 'title' | 'label' | 'disabledReason' | 'options'> & {
+  reason?: MacRibbonReason;
+  options?: MacSelectOptions;
+};
+
+interface MacGroupDraft {
+  title: string;
+  commands: MacCommandDraft[];
+  variant: string;
+}
+
+interface MacTabDraft {
+  id: RibbonTabModel['id'];
+  groups: MacGroupDraft[];
+}
+
+const PAGE_SCALE_OPTIONS: MacSelectOptions = {
+  values: ['0', '1', '2', '3', 'custom'],
+  text: (value, { pageScale }) => {
+    if (value === '0') return pageScale.automatic;
+    if (value === 'custom') return pageScale.custom;
+    return `${value} ${value === '1' ? pageScale.page : pageScale.pages}`;
+  },
+};
+
+const SHEET_VIEW_OPTIONS: MacSelectOptions = {
+  values: [DEFAULT_SHEET_VIEW_ID, TEMPORARY_SHEET_VIEW_ID],
+  text: (value, { mac }) =>
+    value === TEMPORARY_SHEET_VIEW_ID ? mac.sheetViews.temporaryView : mac.sheetViews.defaultView,
+};
 
 const command = (
   id: string,
-  label: LabelLike,
   icon?: string,
   options: {
     kind?: RibbonCommand['kind'];
     disabled?: boolean;
-    disabledReason?: LabelLike;
+    reason?: MacRibbonReason;
     className?: string;
     layout?: RibbonCommand['layout'];
   } = {},
-): RibbonCommand => ({
+): MacCommandDraft => ({
   id,
-  title: text('en', label),
-  label: text('en', label),
   icon,
   kind: options.kind ?? 'wide',
   layout: options.layout,
   className: options.className,
   disabled: options.disabled,
-  disabledReason: options.disabledReason ? text('en', options.disabledReason) : undefined,
+  reason: options.reason,
 });
 
 /** A group titled by its `groups:` label key, which the localize pass turns into the title. */
-const group = (key: string, commands: RibbonCommand[], variant = 'tiles'): RibbonGroupModel => ({
+const group = (key: string, commands: MacCommandDraft[], variant = 'tiles'): MacGroupDraft => ({
   title: key,
   commands,
   variant,
 });
 
-const menuCommand = (id: string, label: LabelLike, icon?: string): RibbonCommand =>
-  command(id, label, icon, { kind: 'wide' });
+const menuCommand = (id: string, icon?: string): MacCommandDraft =>
+  command(id, icon, { kind: 'wide' });
 
-const compactCommand = (id: string, label: LabelLike, icon?: string): RibbonCommand =>
-  command(id, label, icon, { kind: 'wide', layout: 'stacked' });
+const compactCommand = (id: string, icon?: string): MacCommandDraft =>
+  command(id, icon, { kind: 'wide', layout: 'stacked' });
 
-const iconCommand = (id: string, label: LabelLike, icon?: string): RibbonCommand =>
-  command(id, label, icon, { kind: 'button', className: 'fc-tb__rb--mac-icon-only' });
+const iconCommand = (id: string, icon?: string): MacCommandDraft =>
+  command(id, icon, { kind: 'button', className: 'fc-tb__rb--mac-icon-only' });
 
 const disabledCompactCommand = (
   id: string,
-  label: LabelLike,
   icon: string | undefined,
-  reason: LabelLike,
-): RibbonCommand =>
-  command(id, label, icon, {
-    kind: 'wide',
-    layout: 'stacked',
-    disabled: true,
-    disabledReason: reason,
-  });
+  reason: MacRibbonReason,
+): MacCommandDraft =>
+  command(id, icon, { kind: 'wide', layout: 'stacked', disabled: true, reason });
 
-const checkboxCommand = (id: string, label: LabelLike, icon?: string): RibbonCommand =>
-  command(id, label, icon, {
-    kind: 'wide',
-    layout: 'stacked',
-    className: 'fc-tb__rb--mac-checkbox',
-  });
+const checkboxCommand = (id: string, icon?: string): MacCommandDraft =>
+  command(id, icon, { kind: 'wide', layout: 'stacked', className: 'fc-tb__rb--mac-checkbox' });
 
 /** A checkbox the current view does not offer, as Ruler in Normal view. */
-const disabledCheckboxCommand = (id: string, label: LabelLike, reason: LabelLike): RibbonCommand =>
-  command(id, label, undefined, {
+const disabledCheckboxCommand = (id: string, reason: MacRibbonReason): MacCommandDraft =>
+  command(id, undefined, {
     kind: 'wide',
     layout: 'stacked',
     className: 'fc-tb__rb--mac-checkbox',
     disabled: true,
-    disabledReason: reason,
+    reason,
   });
 
 /** A static caption inside a group; it carries no action. */
-const labelCommand = (id: string, label: LabelLike): RibbonCommand =>
-  command(id, label, undefined, { kind: 'label' });
+const labelCommand = (id: string): MacCommandDraft => command(id, undefined, { kind: 'label' });
 
 const selectCommand = (
   id: string,
-  label: LabelLike,
-  options: readonly RibbonOption[],
+  options: MacSelectOptions,
   className = 'fc-tb__rb-select--border',
-): RibbonCommand => ({
-  id,
-  title: label.en,
-  label: label.en,
-  kind: 'select',
-  options,
-  className,
-});
+): MacCommandDraft => ({ id, kind: 'select', options, className });
 
-const disabledCommand = (
-  id: string,
-  label: LabelLike,
-  icon: string | undefined,
-  reason: LabelLike,
-) => command(id, label, icon, { disabled: true, disabledReason: reason, kind: 'wide' });
+const disabledCommand = (id: string, icon: string | undefined, reason: MacRibbonReason) =>
+  command(id, icon, { disabled: true, reason, kind: 'wide' });
 
-const macTab = (
-  id: RibbonTabModel['id'],
-  label: LabelLike,
-  groups: RibbonGroupModel[],
-): RibbonTabModel => ({
+const macTab = (id: RibbonTabModel['id'], groups: MacGroupDraft[]): MacTabDraft => ({
   id,
-  label: label.en,
   groups,
 });
+
+/** The text of a command: its id's label in `lang`. */
+const localizeCommand = (draft: MacCommandDraft, lang: ToolbarLang): RibbonCommand => {
+  const { id, reason, ...rest } = draft;
+  const label = macRibbonLabelForCommand(id, lang);
+  const options = draft.options;
+  return {
+    id,
+    title: label,
+    label,
+    ...rest,
+    disabledReason: reason && MAC_CONTEXT_LABELS[reason][lang],
+    options: options?.values.map((value) => ({
+      value,
+      label: options.text(value, dictionaries[lang]),
+    })),
+  };
+};
+
+const localizeGroup = (draft: MacGroupDraft, lang: ToolbarLang): RibbonGroupModel => ({
+  ...draft,
+  title: macGroupTitle(draft.title, lang),
+  commands: draft.commands.map((c) => localizeCommand(c, lang)),
+});
+
 type FormulaFamily =
   | 'recent'
   | 'financial'
@@ -180,155 +194,143 @@ const FORMULA_FAMILY_ICONS = {
   more: 'functionMore',
 } as const satisfies Record<FormulaFamily, ExcelRibbonIconName>;
 
-const insertTab = (): RibbonTabModel =>
-  macTab('insert', t('insert'), [
+const insertTab = (): MacTabDraft =>
+  macTab('insert', [
     group('Tables', [
-      menuCommand('mac.insert.pivotTable', t('pivotTable'), 'pivotTable'),
-      menuCommand('mac.insert.recommendedPivotTable', t('recommendedPivotTable'), 'pivotTable'),
-      menuCommand('mac.insert.table', t('table'), 'table'),
+      menuCommand('mac.insert.pivotTable', 'pivotTable'),
+      menuCommand('mac.insert.recommendedPivotTable', 'pivotTable'),
+      menuCommand('mac.insert.table', 'table'),
     ]),
-    group('Forms', [disabledCommand('mac.insert.forms', t('forms'), 'form', OFFICE_REQUIRED)]),
+    group('Forms', [disabledCommand('mac.insert.forms', 'form', 'officeRequired')]),
     group('Data from Picture', [
-      disabledCommand(
-        'mac.insert.pictureFromData',
-        t('pictureFromData'),
-        'picture',
-        OFFICE_REQUIRED,
-      ),
+      disabledCommand('mac.insert.pictureFromData', 'picture', 'officeRequired'),
     ]),
     group(
       'Illustrations',
       [
-        menuCommand('mac.insert.photo', t('photo'), 'picture'),
-        menuCommand('mac.insert.shapes', t('shapes'), 'shapes'),
-        disabledCommand('mac.insert.icons', t('icons'), 'icons', NOT_IMPLEMENTED),
-        disabledCompactCommand(
-          'mac.insert.threeDModel',
-          t('threeDModel'),
-          'threeD',
-          NOT_IMPLEMENTED,
-        ),
-        disabledCompactCommand('mac.insert.smartArt', t('smartArt'), 'smartArt', NOT_IMPLEMENTED),
-        compactCommand('mac.insert.screenshot', t('screenshot'), 'screenshot'),
+        menuCommand('mac.insert.photo', 'picture'),
+        menuCommand('mac.insert.shapes', 'shapes'),
+        disabledCommand('mac.insert.icons', 'icons', 'notImplemented'),
+        disabledCompactCommand('mac.insert.threeDModel', 'threeD', 'notImplemented'),
+        disabledCompactCommand('mac.insert.smartArt', 'smartArt', 'notImplemented'),
+        compactCommand('mac.insert.screenshot', 'screenshot'),
       ],
       'illustrations',
     ),
-    group('Controls', [
-      disabledCommand('mac.insert.checkBox', t('checkBox'), 'checkBox', NOT_IMPLEMENTED),
-    ]),
+    group('Controls', [disabledCommand('mac.insert.checkBox', 'checkBox', 'notImplemented')]),
     group(
       'Charts',
       [
-        menuCommand('mac.insert.recommendedChart', t('recommendedChart'), 'chartRecommended'),
-        iconCommand('mac.insert.chartColumn', t('chartColumn'), 'chartColumn'),
-        iconCommand('mac.insert.chartLine', t('chartLine'), 'chartLine'),
-        iconCommand('mac.insert.chartPie', t('chartPie'), 'chartPie'),
-        iconCommand('mac.insert.chartHierarchy', t('chartHierarchy'), 'chartHierarchy'),
-        iconCommand('mac.insert.chartStatistical', t('chartStatistical'), 'chartStatistical'),
-        iconCommand('mac.insert.chartScatter', t('chartScatter'), 'chartScatter'),
-        iconCommand('mac.insert.chartWaterfall', t('chartWaterfall'), 'chartWaterfall'),
-        iconCommand('mac.insert.chartCombo', t('chartCombo'), 'chartCombo'),
-        menuCommand('mac.insert.chartMap', t('chartMap'), 'chartMap'),
-        disabledCommand('mac.insert.pivotChart', t('pivotChart'), 'pivotTable', NOT_IMPLEMENTED),
+        menuCommand('mac.insert.recommendedChart', 'chartRecommended'),
+        iconCommand('mac.insert.chartColumn', 'chartColumn'),
+        iconCommand('mac.insert.chartLine', 'chartLine'),
+        iconCommand('mac.insert.chartPie', 'chartPie'),
+        iconCommand('mac.insert.chartHierarchy', 'chartHierarchy'),
+        iconCommand('mac.insert.chartStatistical', 'chartStatistical'),
+        iconCommand('mac.insert.chartScatter', 'chartScatter'),
+        iconCommand('mac.insert.chartWaterfall', 'chartWaterfall'),
+        iconCommand('mac.insert.chartCombo', 'chartCombo'),
+        menuCommand('mac.insert.chartMap', 'chartMap'),
+        disabledCommand('mac.insert.pivotChart', 'pivotTable', 'notImplemented'),
       ],
       'charts',
     ),
-    group('Sparklines', [menuCommand('mac.insert.sparkline', t('sparkline'), 'sparkline')]),
+    group('Sparklines', [menuCommand('mac.insert.sparkline', 'sparkline')]),
     group('Filters', [
-      menuCommand('mac.insert.slicer', t('slicer'), 'slicer'),
-      disabledCommand('mac.insert.timeline', t('timeline'), 'timeline', NOT_IMPLEMENTED),
+      menuCommand('mac.insert.slicer', 'slicer'),
+      disabledCommand('mac.insert.timeline', 'timeline', 'notImplemented'),
     ]),
-    group('Links', [menuCommand('mac.insert.link', t('link'), 'link')]),
-    group('Comments', [command('mac.insert.newComment', t('newComment'), 'commentAdd')]),
+    group('Links', [menuCommand('mac.insert.link', 'link')]),
+    group('Comments', [command('mac.insert.newComment', 'commentAdd')]),
     group('Text', [
-      menuCommand('mac.insert.textBox', t('textBox'), 'textBox'),
-      menuCommand('mac.insert.headerFooter', t('headerFooter'), 'headerFooter'),
-      disabledCommand('mac.insert.wordArt', t('wordArt'), 'wordArt', NOT_IMPLEMENTED),
-      disabledCommand('mac.insert.object', t('object'), 'object', NOT_IMPLEMENTED),
+      menuCommand('mac.insert.textBox', 'textBox'),
+      menuCommand('mac.insert.headerFooter', 'headerFooter'),
+      disabledCommand('mac.insert.wordArt', 'wordArt', 'notImplemented'),
+      disabledCommand('mac.insert.object', 'object', 'notImplemented'),
     ]),
     group('Symbols', [
-      disabledCommand('mac.insert.equation', t('equation'), 'function', NOT_IMPLEMENTED),
-      menuCommand('mac.insert.symbol', t('symbol'), 'symbol'),
+      disabledCommand('mac.insert.equation', 'function', 'notImplemented'),
+      menuCommand('mac.insert.symbol', 'symbol'),
     ]),
   ]);
 
-const drawTab = (): RibbonTabModel =>
-  macTab('draw', t('draw'), [
+const drawTab = (): MacTabDraft =>
+  macTab('draw', [
     group(
       'Tools',
       [
-        menuCommand('mac.draw.toggle', t('draw'), 'pen'),
-        menuCommand('mac.draw.eraser', t('eraser'), 'eraser'),
-        disabledCommand('mac.draw.lasso', t('lasso'), 'lasso', EMBEDDED_UNSUPPORTED),
+        menuCommand('mac.draw.toggle', 'pen'),
+        menuCommand('mac.draw.eraser', 'eraser'),
+        disabledCommand('mac.draw.lasso', 'lasso', 'embeddedUnsupported'),
       ],
       'draw-tools',
     ),
     group(
       'Pens',
       [
-        iconCommand('mac.draw.penBlack', t('penBlack'), 'penBlack'),
-        iconCommand('mac.draw.penRed', t('penRed'), 'penRed'),
-        iconCommand('mac.draw.pencil', t('pencil'), 'pencil'),
-        iconCommand('mac.draw.highlighter', t('highlighter'), 'highlighter'),
-        menuCommand('mac.draw.add', t('add'), 'plus'),
+        iconCommand('mac.draw.penBlack', 'penBlack'),
+        iconCommand('mac.draw.penRed', 'penRed'),
+        iconCommand('mac.draw.pencil', 'pencil'),
+        iconCommand('mac.draw.highlighter', 'highlighter'),
+        menuCommand('mac.draw.add', 'plus'),
       ],
       'pens',
     ),
-    group('Mode', [menuCommand('mac.draw.trackpad', t('trackpad'), 'trackpad')], 'draw-mode'),
+    group('Mode', [menuCommand('mac.draw.trackpad', 'trackpad')], 'draw-mode'),
   ]);
 
-const pageLayoutTab = (): RibbonTabModel =>
-  macTab('pageLayout', t('pageLayout'), [
+const pageLayoutTab = (): MacTabDraft =>
+  macTab('pageLayout', [
     group(
       'Themes',
       [
-        menuCommand('mac.page.theme', t('theme'), 'pageTheme'),
-        compactCommand('mac.page.color', t('color'), 'pageTheme'),
-        compactCommand('mac.page.font', t('font'), 'font'),
+        menuCommand('mac.page.theme', 'pageTheme'),
+        compactCommand('mac.page.color', 'pageTheme'),
+        compactCommand('mac.page.font', 'font'),
       ],
       'themes',
     ),
     group(
       'Page Setup',
       [
-        menuCommand('mac.page.margins', t('margins'), 'pageSetup'),
-        menuCommand('mac.page.orientation', t('orientation'), 'pageSetup'),
-        menuCommand('mac.page.size', t('size'), 'pageSetup'),
-        menuCommand('mac.page.printArea', t('printArea'), 'printArea'),
-        menuCommand('mac.page.pageBreaks', t('pageBreaks'), 'pageBreaks'),
-        menuCommand('mac.page.background', t('background'), 'sheetBackground'),
-        menuCommand('mac.page.printTitles', t('printTitles'), 'printTitles'),
-        menuCommand('mac.page.pageSetup', t('pageSetup'), 'pageSetup'),
+        menuCommand('mac.page.margins', 'pageSetup'),
+        menuCommand('mac.page.orientation', 'pageSetup'),
+        menuCommand('mac.page.size', 'pageSetup'),
+        menuCommand('mac.page.printArea', 'printArea'),
+        menuCommand('mac.page.pageBreaks', 'pageBreaks'),
+        menuCommand('mac.page.background', 'sheetBackground'),
+        menuCommand('mac.page.printTitles', 'printTitles'),
+        menuCommand('mac.page.pageSetup', 'pageSetup'),
       ],
       'page-setup',
     ),
     group('Scale to Fit', [
-      selectCommand('scaleWidth', t('scaleWidth'), PAGE_SCALE_OPTIONS),
-      selectCommand('scaleHeight', t('scaleHeight'), PAGE_SCALE_OPTIONS),
+      selectCommand('scaleWidth', PAGE_SCALE_OPTIONS),
+      selectCommand('scaleHeight', PAGE_SCALE_OPTIONS),
     ]),
     group(
       'Sheet Options',
       [
-        labelCommand('mac.page.gridlinesHeading', t('gridlinesHeading')),
-        checkboxCommand('mac.page.showGridlines', t('showGridlines')),
-        checkboxCommand('mac.page.printGridlines', t('printGridlines')),
-        labelCommand('mac.page.headingsHeading', t('headingsHeading')),
-        checkboxCommand('mac.page.showHeadings', t('showHeadings')),
-        checkboxCommand('mac.page.printHeadings', t('printHeadings')),
+        labelCommand('mac.page.gridlinesHeading'),
+        checkboxCommand('mac.page.showGridlines'),
+        checkboxCommand('mac.page.printGridlines'),
+        labelCommand('mac.page.headingsHeading'),
+        checkboxCommand('mac.page.showHeadings'),
+        checkboxCommand('mac.page.printHeadings'),
       ],
       'checks',
     ),
   ]);
 
-const formulasTab = (): RibbonTabModel =>
-  macTab('formulas', t('formulas'), [
+const formulasTab = (): MacTabDraft =>
+  macTab('formulas', [
     group(
       'Function Library',
       [
-        menuCommand('mac.formulas.insertFunction', t('insertFunction'), 'function'),
-        menuCommand('mac.formulas.autoSum', t('autoSum'), 'autosum'),
+        menuCommand('mac.formulas.insertFunction', 'function'),
+        menuCommand('mac.formulas.autoSum', 'autosum'),
         ...FORMULA_FAMILY_KEYS.map((key) =>
-          menuCommand(`mac.formulas.${key}`, t(key), FORMULA_FAMILY_ICONS[key]),
+          menuCommand(`mac.formulas.${key}`, FORMULA_FAMILY_ICONS[key]),
         ),
       ],
       'function-library',
@@ -336,295 +338,224 @@ const formulasTab = (): RibbonTabModel =>
     group(
       'Python (Preview)',
       [
-        disabledCommand('mac.formulas.python', t('python'), 'python', OFFICE_REQUIRED),
-        disabledCompactCommand('mac.formulas.reset', t('reset'), 'clear', OFFICE_REQUIRED),
-        disabledCompactCommand('mac.formulas.editor', t('editor'), 'script', OFFICE_REQUIRED),
-        disabledCompactCommand(
-          'mac.formulas.initialize',
-          t('initialize'),
-          'script',
-          OFFICE_REQUIRED,
-        ),
+        disabledCommand('mac.formulas.python', 'python', 'officeRequired'),
+        disabledCompactCommand('mac.formulas.reset', 'clear', 'officeRequired'),
+        disabledCompactCommand('mac.formulas.editor', 'script', 'officeRequired'),
+        disabledCompactCommand('mac.formulas.initialize', 'script', 'officeRequired'),
       ],
       'python',
     ),
     group(
       'Defined Names',
       [
-        menuCommand('mac.formulas.namesManager', t('namesManager'), 'names'),
-        compactCommand('mac.formulas.defineName', t('defineName'), 'names'),
-        compactCommand('mac.formulas.useInFormula', t('useInFormula'), 'names'),
-        compactCommand('mac.formulas.createFromSelection', t('createFromSelection'), 'names'),
+        menuCommand('mac.formulas.namesManager', 'names'),
+        compactCommand('mac.formulas.defineName', 'names'),
+        compactCommand('mac.formulas.useInFormula', 'names'),
+        compactCommand('mac.formulas.createFromSelection', 'names'),
       ],
       'defined-names',
     ),
     group(
       'Formula Auditing',
       [
-        compactCommand('mac.formulas.precedents', t('precedents'), 'trace'),
-        compactCommand('mac.formulas.dependents', t('dependents'), 'dependents'),
-        compactCommand('mac.formulas.removeArrows', t('removeArrows'), 'clearArrows'),
-        menuCommand('mac.formulas.showFormulas', t('showFormulas'), 'function'),
-        menuCommand('mac.formulas.errorCheck', t('errorCheck'), 'errorChecking'),
-        menuCommand('mac.formulas.watch', t('watch'), 'watch'),
+        compactCommand('mac.formulas.precedents', 'trace'),
+        compactCommand('mac.formulas.dependents', 'dependents'),
+        compactCommand('mac.formulas.removeArrows', 'clearArrows'),
+        menuCommand('mac.formulas.showFormulas', 'function'),
+        menuCommand('mac.formulas.errorCheck', 'errorChecking'),
+        menuCommand('mac.formulas.watch', 'watch'),
       ],
       'formula-auditing',
     ),
     group(
       'Calculation',
       [
-        menuCommand('mac.formulas.calcOptions', t('calcOptions'), 'calcOptions'),
-        compactCommand('mac.formulas.recalc', t('recalc'), 'autosum'),
-        compactCommand('mac.formulas.sheetRecalc', t('sheetRecalc'), 'autosum'),
+        menuCommand('mac.formulas.calcOptions', 'calcOptions'),
+        compactCommand('mac.formulas.recalc', 'autosum'),
+        compactCommand('mac.formulas.sheetRecalc', 'autosum'),
       ],
       'calculation',
     ),
   ]);
 
-const dataTab = (): RibbonTabModel =>
-  macTab('data', t('data'), [
+const dataTab = (): MacTabDraft =>
+  macTab('data', [
     group('Get & Transform Data', [
-      disabledCommand('mac.data.powerQuery', t('powerQuery'), 'data', NOT_IMPLEMENTED),
-      menuCommand('mac.data.pictureFromData', t('pictureFromData'), 'picture'),
+      disabledCommand('mac.data.powerQuery', 'data', 'notImplemented'),
+      menuCommand('mac.data.pictureFromData', 'picture'),
     ]),
     group(
       'Queries & Connections',
       [
-        disabledCompactCommand('mac.data.refreshAll', t('refreshAll'), 'refresh', NOT_IMPLEMENTED),
-        disabledCompactCommand(
-          'mac.data.queriesConnections',
-          t('queriesConnections'),
-          'link',
-          NOT_IMPLEMENTED,
-        ),
-        disabledCompactCommand('mac.data.properties', t('properties'), 'inspect', NOT_IMPLEMENTED),
-        compactCommand('mac.data.workbookLinks', t('workbookLinks'), 'link'),
+        disabledCompactCommand('mac.data.refreshAll', 'refresh', 'notImplemented'),
+        disabledCompactCommand('mac.data.queriesConnections', 'link', 'notImplemented'),
+        disabledCompactCommand('mac.data.properties', 'inspect', 'notImplemented'),
+        compactCommand('mac.data.workbookLinks', 'link'),
       ],
       'compact',
     ),
-    group('Data Types', [menuCommand('mac.data.dataTypes', t('dataTypes'), 'data')], 'compact'),
+    group('Data Types', [menuCommand('mac.data.dataTypes', 'data')], 'compact'),
     group(
       'Sort & Filter',
       [
-        iconCommand('mac.data.sortAsc', t('sortAsc'), 'sortAsc'),
-        iconCommand('mac.data.sortDesc', t('sortDesc'), 'sortDesc'),
-        menuCommand('mac.data.sortCustom', t('sortCustom'), 'sortAsc'),
-        menuCommand('mac.data.filter', t('filter'), 'filter'),
-        compactCommand('mac.data.clear', t('clear'), 'clear'),
-        compactCommand('mac.data.reapply', t('reapply'), 'refresh'),
-        compactCommand('mac.data.advancedFilter', t('advancedFilter'), 'filter'),
+        iconCommand('mac.data.sortAsc', 'sortAsc'),
+        iconCommand('mac.data.sortDesc', 'sortDesc'),
+        menuCommand('mac.data.sortCustom', 'sortAsc'),
+        menuCommand('mac.data.filter', 'filter'),
+        compactCommand('mac.data.clear', 'clear'),
+        compactCommand('mac.data.reapply', 'refresh'),
+        compactCommand('mac.data.advancedFilter', 'filter'),
       ],
       'sort-filter',
     ),
     group(
       'Data Tools',
       [
-        compactCommand('mac.data.textToColumns', t('textToColumns'), 'textToColumns'),
-        disabledCompactCommand('mac.data.dataCleanup', t('dataCleanup'), 'clear', OFFICE_REQUIRED),
-        disabledCompactCommand(
-          'mac.data.dataAnalysis',
-          t('dataAnalysis'),
-          'inspect',
-          OFFICE_REQUIRED,
-        ),
-        compactCommand('mac.data.flashFill', t('flashFill'), 'flashFill'),
-        compactCommand('mac.data.removeDuplicates', t('removeDuplicates'), 'removeDuplicates'),
-        compactCommand('mac.data.validation', t('validation'), 'dataValidation'),
-        compactCommand('mac.data.consolidate', t('consolidate'), 'merge'),
+        compactCommand('mac.data.textToColumns', 'textToColumns'),
+        disabledCompactCommand('mac.data.dataCleanup', 'clear', 'officeRequired'),
+        disabledCompactCommand('mac.data.dataAnalysis', 'inspect', 'officeRequired'),
+        compactCommand('mac.data.flashFill', 'flashFill'),
+        compactCommand('mac.data.removeDuplicates', 'removeDuplicates'),
+        compactCommand('mac.data.validation', 'dataValidation'),
+        compactCommand('mac.data.consolidate', 'merge'),
       ],
       'compact',
     ),
-    group('Forecast', [menuCommand('mac.data.whatIf', t('whatIf'), 'whatIf')], 'compact'),
+    group('Forecast', [menuCommand('mac.data.whatIf', 'whatIf')], 'compact'),
     group(
       'Outline',
       [
-        compactCommand('mac.data.group', t('group'), 'outlineGroup'),
-        compactCommand('mac.data.ungroup', t('ungroup'), 'outlineUngroup'),
-        compactCommand('mac.data.subtotal', t('subtotal'), 'outlineGroup'),
-        compactCommand('mac.data.showDetail', t('showDetail'), 'outlineShow'),
-        compactCommand('mac.data.hideDetail', t('hideDetail'), 'outlineHide'),
+        compactCommand('mac.data.group', 'outlineGroup'),
+        compactCommand('mac.data.ungroup', 'outlineUngroup'),
+        compactCommand('mac.data.subtotal', 'outlineGroup'),
+        compactCommand('mac.data.showDetail', 'outlineShow'),
+        compactCommand('mac.data.hideDetail', 'outlineHide'),
       ],
       'compact',
     ),
     group(
       'Analysis',
-      [disabledCompactCommand('mac.data.analysis', t('analysis'), 'chart', NOT_IMPLEMENTED)],
+      [disabledCompactCommand('mac.data.analysis', 'chart', 'notImplemented')],
       'compact',
     ),
   ]);
 
-const reviewTab = (): RibbonTabModel =>
-  macTab('review', t('review'), [
+const reviewTab = (): MacTabDraft =>
+  macTab('review', [
     group('Proofing', [
-      menuCommand('mac.review.spelling', t('spelling'), 'spelling'),
-      disabledCommand('mac.review.thesaurus', t('thesaurus'), 'spelling', EMBEDDED_UNSUPPORTED),
-      menuCommand('mac.review.stats', t('stats'), 'count'),
+      menuCommand('mac.review.spelling', 'spelling'),
+      disabledCommand('mac.review.thesaurus', 'spelling', 'embeddedUnsupported'),
+      menuCommand('mac.review.stats', 'count'),
     ]),
-    group('Accessibility', [
-      menuCommand('mac.review.accessibility', t('accessibility'), 'accessibility'),
-    ]),
-    group('Language', [
-      disabledCommand('mac.review.translate', t('translate'), 'translate', NOT_IMPLEMENTED),
-    ]),
+    group('Accessibility', [menuCommand('mac.review.accessibility', 'accessibility')]),
+    group('Language', [disabledCommand('mac.review.translate', 'translate', 'notImplemented')]),
     group('Changes', [
-      disabledCommand(
-        'mac.review.showChanges',
-        t('showChanges'),
-        'showChanges',
-        EMBEDDED_UNSUPPORTED,
-      ),
+      disabledCommand('mac.review.showChanges', 'showChanges', 'embeddedUnsupported'),
     ]),
     group('Comments', [
-      menuCommand('mac.review.newComment', t('newComment'), 'commentAdd'),
-      menuCommand('mac.review.deleteComment', t('deleteComment'), 'clear'),
-      menuCommand('mac.review.previousComment', t('previousComment'), 'goTo'),
-      menuCommand('mac.review.nextComment', t('nextComment'), 'goTo'),
-      menuCommand('mac.review.showComments', t('showComments'), 'commentAdd'),
+      menuCommand('mac.review.newComment', 'commentAdd'),
+      menuCommand('mac.review.deleteComment', 'clear'),
+      menuCommand('mac.review.previousComment', 'goTo'),
+      menuCommand('mac.review.nextComment', 'goTo'),
+      menuCommand('mac.review.showComments', 'commentAdd'),
     ]),
-    group('Notes', [menuCommand('mac.review.notes', t('notes'), 'commentAdd')]),
+    group('Notes', [menuCommand('mac.review.notes', 'commentAdd')]),
     group('Protection Changes', [
-      menuCommand('mac.review.protectSheet', t('protectSheet'), 'protect'),
-      menuCommand('mac.review.protectWorkbook', t('protectWorkbook'), 'protect'),
+      menuCommand('mac.review.protectSheet', 'protect'),
+      menuCommand('mac.review.protectWorkbook', 'protect'),
     ]),
-    group('Protect', [
-      disabledCommand('mac.review.alwaysReadOnly', t('alwaysReadOnly'), 'protect', NOT_IMPLEMENTED),
-    ]),
-    group('Ink', [
-      disabledCommand('mac.review.hideInk', t('hideInk'), 'pen', EMBEDDED_UNSUPPORTED),
-    ]),
+    group('Protect', [disabledCommand('mac.review.alwaysReadOnly', 'protect', 'notImplemented')]),
+    group('Ink', [disabledCommand('mac.review.hideInk', 'pen', 'embeddedUnsupported')]),
   ]);
 
-const viewTab = (): RibbonTabModel =>
-  macTab('view', t('view'), [
+const viewTab = (): MacTabDraft =>
+  macTab('view', [
     group(
       'Sheet Views',
       [
-        selectCommand('sheetViewSelect', t('sheetViewSelect'), [
-          { value: DEFAULT_SHEET_VIEW_ID, label: 'Default' },
-          { value: TEMPORARY_SHEET_VIEW_ID, label: 'Temporary View' },
-        ]),
-        compactCommand('mac.view.sheetViewKeep', t('sheetViewKeep'), 'save'),
-        compactCommand('mac.view.sheetViewExit', t('sheetViewExit'), 'paneClose'),
-        compactCommand('mac.view.sheetViewNew', t('sheetViewNew'), 'plus'),
-        compactCommand('mac.view.sheetViewOptions', t('sheetViewOptions'), 'options'),
+        selectCommand('sheetViewSelect', SHEET_VIEW_OPTIONS),
+        compactCommand('mac.view.sheetViewKeep', 'save'),
+        compactCommand('mac.view.sheetViewExit', 'paneClose'),
+        compactCommand('mac.view.sheetViewNew', 'plus'),
+        compactCommand('mac.view.sheetViewOptions', 'options'),
       ],
       'compact',
     ),
     group(
       'Workbook Views',
       [
-        compactCommand('mac.view.standard', t('standard'), 'table'),
-        compactCommand('mac.view.pageBreakPreview', t('pageBreakPreview'), 'table'),
-        compactCommand('mac.view.pageLayout', t('pageLayout'), 'page'),
-        disabledCompactCommand(
-          'mac.view.customViews',
-          t('customViews'),
-          'customViews',
-          NOT_IMPLEMENTED,
-        ),
+        compactCommand('mac.view.standard', 'table'),
+        compactCommand('mac.view.pageBreakPreview', 'table'),
+        compactCommand('mac.view.pageLayout', 'page'),
+        disabledCompactCommand('mac.view.customViews', 'customViews', 'notImplemented'),
       ],
       'compact',
     ),
     group(
       'Show',
       [
-        disabledCompactCommand('mac.view.navigation', t('navigation'), 'show', NOT_IMPLEMENTED),
-        disabledCheckboxCommand('mac.view.ruler', t('ruler'), NOT_IMPLEMENTED),
-        checkboxCommand('mac.view.gridlines', t('gridlines'), 'show'),
-        checkboxCommand('mac.view.formulaBar', t('formulaBar'), 'show'),
-        checkboxCommand('mac.view.headings', t('headings'), 'show'),
-        disabledCompactCommand(
-          'mac.view.dataTypeIcons',
-          t('dataTypeIcons'),
-          'show',
-          NOT_IMPLEMENTED,
-        ),
-        compactCommand('mac.view.cellFocus', t('cellFocus'), 'show'),
+        disabledCompactCommand('mac.view.navigation', 'show', 'notImplemented'),
+        disabledCheckboxCommand('mac.view.ruler', 'notImplemented'),
+        checkboxCommand('mac.view.gridlines', 'show'),
+        checkboxCommand('mac.view.formulaBar', 'show'),
+        checkboxCommand('mac.view.headings', 'show'),
+        disabledCompactCommand('mac.view.dataTypeIcons', 'show', 'notImplemented'),
+        compactCommand('mac.view.cellFocus', 'show'),
       ],
       'compact',
     ),
     group(
       'Zoom',
       [
-        compactCommand('mac.view.zoom', t('zoom'), 'zoom'),
-        compactCommand('mac.view.zoom100', t('zoom100'), 'zoom'),
-        compactCommand('mac.view.zoomSelection', t('zoomSelection'), 'zoom'),
+        compactCommand('mac.view.zoom', 'zoom'),
+        compactCommand('mac.view.zoom100', 'zoom'),
+        compactCommand('mac.view.zoomSelection', 'zoom'),
       ],
       'compact',
     ),
     group(
       'Window',
       [
-        disabledCompactCommand(
-          'mac.view.newWindow',
-          t('newWindow'),
-          'window',
-          EMBEDDED_UNSUPPORTED,
-        ),
-        disabledCompactCommand('mac.view.arrange', t('arrange'), 'arrange', EMBEDDED_UNSUPPORTED),
-        compactCommand('mac.view.freeze', t('freeze'), 'freeze'),
-        compactCommand('mac.view.split', t('split'), 'split'),
-        disabledCompactCommand('mac.view.hide', t('hide'), 'hide', EMBEDDED_UNSUPPORTED),
-        disabledCompactCommand('mac.view.unhide', t('unhide'), 'show', EMBEDDED_UNSUPPORTED),
-        disabledCompactCommand(
-          'mac.view.sideBySide',
-          t('sideBySide'),
-          'window',
-          EMBEDDED_UNSUPPORTED,
-        ),
-        disabledCompactCommand(
-          'mac.view.syncScroll',
-          t('syncScroll'),
-          'window',
-          EMBEDDED_UNSUPPORTED,
-        ),
-        disabledCompactCommand(
-          'mac.view.resetWindow',
-          t('resetWindow'),
-          'window',
-          EMBEDDED_UNSUPPORTED,
-        ),
-        disabledCompactCommand(
-          'mac.view.switchWindow',
-          t('switchWindow'),
-          'window',
-          EMBEDDED_UNSUPPORTED,
-        ),
+        disabledCompactCommand('mac.view.newWindow', 'window', 'embeddedUnsupported'),
+        disabledCompactCommand('mac.view.arrange', 'arrange', 'embeddedUnsupported'),
+        compactCommand('mac.view.freeze', 'freeze'),
+        compactCommand('mac.view.split', 'split'),
+        disabledCompactCommand('mac.view.hide', 'hide', 'embeddedUnsupported'),
+        disabledCompactCommand('mac.view.unhide', 'show', 'embeddedUnsupported'),
+        disabledCompactCommand('mac.view.sideBySide', 'window', 'embeddedUnsupported'),
+        disabledCompactCommand('mac.view.syncScroll', 'window', 'embeddedUnsupported'),
+        disabledCompactCommand('mac.view.resetWindow', 'window', 'embeddedUnsupported'),
+        disabledCompactCommand('mac.view.switchWindow', 'window', 'embeddedUnsupported'),
       ],
       'compact',
     ),
     group(
       'Macros',
       [
-        disabledCompactCommand('mac.view.macros', t('macros'), 'script', NOT_IMPLEMENTED),
-        disabledCompactCommand('mac.view.recordMacro', t('recordMacro'), 'script', NOT_IMPLEMENTED),
-        disabledCompactCommand(
-          'mac.view.relativeRecording',
-          t('relativeRecording'),
-          'script',
-          NOT_IMPLEMENTED,
-        ),
+        disabledCompactCommand('mac.view.macros', 'script', 'notImplemented'),
+        disabledCompactCommand('mac.view.recordMacro', 'script', 'notImplemented'),
+        disabledCompactCommand('mac.view.relativeRecording', 'script', 'notImplemented'),
       ],
       'compact',
     ),
   ]);
 
-const automateTab = (): RibbonTabModel =>
-  macTab('automate', t('automate'), [
+const automateTab = (): MacTabDraft =>
+  macTab('automate', [
     group('Office Scripts', [
-      disabledCommand('mac.automate.newScript', t('newScript'), 'script', OFFICE_REQUIRED),
-      menuCommand('mac.automate.showScripts', t('showScripts'), 'script'),
+      disabledCommand('mac.automate.newScript', 'script', 'officeRequired'),
+      menuCommand('mac.automate.showScripts', 'script'),
     ]),
     group(
       'Office Scripts Gallery',
       [
-        compactCommand('mac.automate.allRowsColumns', t('allRowsColumns'), 'show'),
-        compactCommand('mac.automate.freezeSelection', t('freezeSelection'), 'freeze'),
-        compactCommand('mac.automate.makeSubtable', t('makeSubtable'), 'table'),
-        compactCommand('mac.automate.removeHyperlinks', t('removeHyperlinks'), 'link'),
-        compactCommand('mac.automate.countEmptyRows', t('countEmptyRows'), 'count'),
-        compactCommand('mac.automate.tableToJson', t('tableToJson'), 'code'),
-        compactCommand('mac.automate.newPivotTable', t('newPivotTable'), 'pivotTable'),
+        compactCommand('mac.automate.allRowsColumns', 'show'),
+        compactCommand('mac.automate.freezeSelection', 'freeze'),
+        compactCommand('mac.automate.makeSubtable', 'table'),
+        compactCommand('mac.automate.removeHyperlinks', 'link'),
+        compactCommand('mac.automate.countEmptyRows', 'count'),
+        compactCommand('mac.automate.tableToJson', 'code'),
+        compactCommand('mac.automate.newPivotTable', 'pivotTable'),
       ],
       'gallery',
     ),
@@ -711,23 +642,34 @@ const MAC_HOME_GROUP_KEYS = [
   'Editing',
 ] as const;
 
+/** A shared Home command keeps its own text unless its id has a Mac label. */
+const localizeHomeCommand = (candidate: RibbonCommand, lang: ToolbarLang): RibbonCommand => {
+  const shaped = macHomeCommand(candidate, lang);
+  const label = macRibbonLabelForCommand(shaped.id, lang);
+  return label === shaped.id ? shaped : { ...shaped, title: label, label };
+};
+
 const macHomeTab = (home: RibbonTabModel, lang: ToolbarLang): RibbonTabModel => ({
   ...home,
+  label: labels[home.id]?.[lang] ?? home.label,
   groups: [
     ...home.groups.map((shared, index) => {
-      const current = { ...shared, title: MAC_HOME_GROUP_KEYS[index] ?? shared.title };
+      const current = {
+        ...shared,
+        title: macGroupTitle(MAC_HOME_GROUP_KEYS[index] ?? shared.title, lang),
+      };
       if (current.variant === 'cells') {
         // Tile layout rather than the shared stacked-rows layout.
         return {
           ...current,
           variant: 'tiles',
-          commands: current.commands.map((candidate) => macHomeCommand(candidate, lang)),
+          commands: current.commands.map((candidate) => localizeHomeCommand(candidate, lang)),
         };
       }
       if (current.variant !== 'font') {
         return {
           ...current,
-          commands: current.commands.map((candidate) => macHomeCommand(candidate, lang)),
+          commands: current.commands.map((candidate) => localizeHomeCommand(candidate, lang)),
         };
       }
       const isPhonetic = (id: string): boolean => id === 'showPhonetic';
@@ -737,71 +679,27 @@ const macHomeTab = (home: RibbonTabModel, lang: ToolbarLang): RibbonTabModel => 
         commands: [
           ...current.commands
             .filter((candidate) => candidate.id !== 'strike' && !isPhonetic(candidate.id))
-            .map((candidate) => macHomeCommand(candidate, lang)),
-          ...phonetic.map((candidate) => macHomeCommand(candidate, lang)),
+            .map((candidate) => localizeHomeCommand(candidate, lang)),
+          ...phonetic.map((candidate) => localizeHomeCommand(candidate, lang)),
         ],
       };
     }),
-    group('Add-ins', [menuCommand('mac.home.addins', t('addins'), 'addIn')]),
+    localizeGroup(group('Add-ins', [menuCommand('mac.home.addins', 'addIn')]), lang),
   ],
+});
+
+const localizeTab = (draft: MacTabDraft, lang: ToolbarLang): RibbonTabModel => ({
+  id: draft.id,
+  label: t(draft.id)[lang],
+  groups: draft.groups.map((g) => localizeGroup(g, lang)),
 });
 
 /** Builds the Office 365 Mac command surface. The shared Home model is passed
  *  in by ribbon-model.ts so its established formatting controls and active
  *  state projection remain identical across profiles. */
-export const buildMacRibbonModel = (lang: ToolbarLang, home: RibbonTabModel): RibbonTabModel[] => {
-  const localizeSelectOptions = (
-    commandId: string,
-    options: readonly RibbonOption[] | undefined,
-  ): readonly RibbonOption[] | undefined => {
-    if (!options) return undefined;
-    if (
-      commandId !== 'scaleWidth' &&
-      commandId !== 'scaleHeight' &&
-      commandId !== 'sheetViewSelect'
-    ) {
-      return options;
-    }
-    const strings = dictionaries[lang];
-    const pageScale = strings.pageScale;
-    const pageLabel = (value: string): string => {
-      if (value === '0') return pageScale.automatic;
-      if (value === 'custom') return pageScale.custom;
-      return `${value} ${value === '1' ? pageScale.page : pageScale.pages}`;
-    };
-    return options.map((option) => ({
-      ...option,
-      label:
-        commandId === 'sheetViewSelect'
-          ? option.value === TEMPORARY_SHEET_VIEW_ID
-            ? strings.mac.sheetViews.temporaryView
-            : strings.mac.sheetViews.defaultView
-          : pageLabel(option.value),
-    }));
-  };
-  const localize = (tab: RibbonTabModel): RibbonTabModel => ({
-    ...tab,
-    label: labels[tab.id]?.[lang] ?? tab.label,
-    groups: tab.groups.map((g) => ({
-      ...g,
-      title: macGroupTitle(g.title, lang),
-      commands: g.commands.map((c) => ({
-        ...c,
-        title:
-          macRibbonLabelForCommand(c.id, lang) === c.id
-            ? c.title
-            : macRibbonLabelForCommand(c.id, lang),
-        label:
-          macRibbonLabelForCommand(c.id, lang) === c.id
-            ? c.label
-            : macRibbonLabelForCommand(c.id, lang),
-        disabledReason: macRibbonDisabledReason(c.disabledReason, lang),
-        options: localizeSelectOptions(c.id, c.options),
-      })),
-    })),
-  });
-  return [
-    macHomeTab(home, lang),
+export const buildMacRibbonModel = (lang: ToolbarLang, home: RibbonTabModel): RibbonTabModel[] => [
+  macHomeTab(home, lang),
+  ...[
     insertTab(),
     drawTab(),
     pageLayoutTab(),
@@ -810,8 +708,8 @@ export const buildMacRibbonModel = (lang: ToolbarLang, home: RibbonTabModel): Ri
     reviewTab(),
     viewTab(),
     automateTab(),
-  ].map(localize);
-};
+  ].map((tab) => localizeTab(tab, lang)),
+];
 
 const macCatalogHome: RibbonTabModel = { id: 'home', label: 'Home', groups: [] };
 const macCatalog = buildMacRibbonModel('en', macCatalogHome).filter((tab) => tab.id !== 'home');

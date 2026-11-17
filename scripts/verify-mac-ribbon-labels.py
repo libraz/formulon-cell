@@ -138,11 +138,11 @@ def read_model():
     s = (MAC / 'model.ts').read_text(encoding='utf-8')
     family = re.findall(r"'(\w+)'", re.search(r'const FORMULA_FAMILY_KEYS = \[(.*?)\]', s, re.S).group(1))
     tabs = {}
-    for m in re.finditer(r"const \w+Tab = \(\): RibbonTabModel =>\s*macTab\(\s*'(\w+)',", s):
+    for m in re.finditer(r"const \w+Tab = \(\): MacTabDraft =>\s*macTab\(\s*'(\w+)',", s):
         op = s.index('(', s.rindex('macTab', 0, m.end()))
         args = split_top(s[op + 1:match_close(s, op, '(', ')')])
         groups = []
-        for g in split_top(args[2][1:-1]):
+        for g in split_top(args[1][1:-1]):
             if not g.startswith('group('):
                 raise ValueError(f'model.ts: unexpected group expression {g[:40]!r}')
             gargs = split_top(g[len('group('):-1])
@@ -162,7 +162,9 @@ def read_model():
 
 
 def read_menus():
-    """menu command id -> [{'id', 'own'}] for the menus written out literally in menu-manifest.ts."""
+    """menu command id -> [{'id', 'own'}] for the menus written out literally in menu-manifest.ts.
+
+    A spread entry contributes its own rows; a menu holding a separator or a computed entry is skipped."""
     s = (MAC / 'menu-manifest.ts').read_text(encoding='utf-8')
     m = re.search(r'export const MAC_RIBBON_MENU_ITEMS[^=]*=\s*\{', s)
     start = m.end() - 1
@@ -171,20 +173,32 @@ def read_menus():
         key, _, expr = entry.partition(':')
         key = key.strip().strip("'")
         expr = expr.strip()
-        wrapped = expr.startswith('menu([')
-        if not wrapped and not expr.startswith('['):
+        if not expr.startswith('['):
             continue
-        arr = expr[expr.index('['):]
-        items = []
-        for it in split_top(arr[1:match_close(arr, 0, '[', ']')]):
-            mm = re.match(r"leaf\(\s*'([^']+)'", it) or re.search(r"\bid:\s*'([^']+)'", it)
-            if not mm:
-                items = None
-                break
-            items.append({'id': mm.group(1), 'own': (not wrapped) or bool(re.search(r'\bown:\s*true', it))})
+        items = menu_rows(expr)
         if items is not None:
             out[key] = items
     return out
+
+
+def menu_rows(arr):
+    """The rows of one literal `[...]` menu array, or None when a row is not a literal entry."""
+    items = []
+    for it in split_top(arr[1:match_close(arr, 0, '[', ']')]):
+        if it.startswith('...'):
+            inner = it[3:]
+            if '[' not in inner:
+                return None
+            rows = menu_rows(inner[inner.index('['):])
+            if rows is None:
+                return None
+            items += rows
+            continue
+        mm = re.search(r"\bid:\s*'([^']+)'", it)
+        if not mm:
+            return None
+        items.append({'id': mm.group(1), 'own': bool(re.search(r'\bown:\s*true', it))})
+    return items
 
 
 class Surface:
@@ -207,7 +221,6 @@ class Surface:
         self.ids |= {i['id'] for items in self.menus.values() for i in items}
         self.tail = {i.rsplit('.', 1)[-1] for i in self.ids}
         direct = set(re.findall(r"\bt\('(\w+)'\)", text)) | set(re.findall(r"\blabels(?:\.|\[')(\w+)", text))
-        direct |= set(re.findall(r"\bleaf\(\s*'[^']+',\s*'(\w+)'", text))
         # More Functions categories are worded by the label of their id (macFunctionCategoryLabel).
         direct |= set(re.findall(r"\{ category: '(\w+)' \}", text))
         table = (MAC.parent / 'menus' / 'table.ts').read_text(encoding='utf-8')

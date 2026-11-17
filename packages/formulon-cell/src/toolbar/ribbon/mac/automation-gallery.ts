@@ -37,9 +37,6 @@ export type MacAutomationScriptId =
 export interface MacAutomationScriptDescriptor {
   readonly id: MacAutomationScriptId;
   readonly commandId: `mac.automate.${string}`;
-  /** English name and description. */
-  readonly label: string;
-  readonly detail: string;
   readonly labels: Label;
   readonly details: Label;
 }
@@ -50,8 +47,6 @@ const automationScript = (id: MacAutomationScriptId): MacAutomationScriptDescrip
   return {
     id,
     commandId: `mac.automate.${id}`,
-    label: labels.en,
-    detail: details.en,
     labels,
     details,
   };

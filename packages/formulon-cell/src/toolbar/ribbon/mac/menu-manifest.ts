@@ -4,23 +4,14 @@ import {
   type CatalogFunctionCategory,
   supportedFunctionNames,
 } from '../../../commands/function-categories.js';
-import { macBundleLabel } from './bundle-text.js';
-import {
-  EMBEDDED_UNSUPPORTED,
-  type Label,
-  labelFor,
-  labels,
-  NOT_IMPLEMENTED,
-  OFFICE_REQUIRED,
-} from './labels.js';
+import type { MacRibbonReason } from './labels-data.js';
 import { MAC_SHAPE_GALLERY } from './shape-gallery.js';
 
-/** A leaf rendered in one of the Mac Office-style command menus. */
+/** A leaf rendered in one of the Mac Office-style command menus. Its text comes from its id. */
 export interface MacRibbonMenuItem {
   id: string;
-  label: string;
   disabled?: boolean;
-  disabledReason?: string;
+  disabledReason?: MacRibbonReason;
   icon?: string;
   /** A section caption rather than a command. */
   heading?: boolean;
@@ -42,7 +33,7 @@ export const macMenuLeaves = (items: readonly MacRibbonMenuItem[]): MacRibbonMen
     item.submenu ? macMenuLeaves(item.submenu) : item.separator ? [] : [item],
   );
 
-const separator: MacRibbonMenuItem = { id: 'separator', label: '', separator: true };
+const separator: MacRibbonMenuItem = { id: 'separator', separator: true };
 
 /** DOM id of the Mac Formulas "More Functions" menu. */
 export const MAC_FORMULAS_MORE_MENU_ID = 'menu-mac-formulas-more';
@@ -117,44 +108,23 @@ export const MAC_RIBBON_MENU_COMMANDS: readonly string[] = Object.keys(MAC_RIBBO
 
 export const MAC_RIBBON_MENU_COMMAND_SET: ReadonlySet<string> = new Set(MAC_RIBBON_MENU_COMMANDS);
 
-const menu = (items: readonly MacRibbonMenuItem[]): readonly MacRibbonMenuItem[] =>
-  items.map((item) => {
-    const label = labelFor(item.id);
-    const localized = label ? { ...item, label: label.en } : item;
-    return item.submenu ? { ...localized, submenu: menu(item.submenu) } : localized;
-  });
 /** Disable a row and, recursively, every entry of its submenu. */
-const greyOutItem = (item: MacRibbonMenuItem, reason: Label): MacRibbonMenuItem => ({
+const greyOutItem = (item: MacRibbonMenuItem, reason: MacRibbonReason): MacRibbonMenuItem => ({
   ...item,
   disabled: true,
-  disabledReason: reason.en,
+  disabledReason: reason,
   ...(item.submenu ? { submenu: item.submenu.map((entry) => greyOutItem(entry, reason)) } : {}),
 });
 
 /** A menu whose entries the host cannot run: every row greyed out with the same reason. */
 const unavailable = (
   items: readonly MacRibbonMenuItem[],
-  reason: Label,
-): readonly MacRibbonMenuItem[] => menu(items).map((item) => greyOutItem(item, reason));
-const leaf = (
-  id: string,
-  key: string,
-  disabled = false,
-  disabledReason?: Label,
-): MacRibbonMenuItem => ({
-  id,
-  label: labels[key]?.en ?? key,
-  disabled,
-  disabledReason: disabledReason?.en,
-});
+  reason: MacRibbonReason,
+): readonly MacRibbonMenuItem[] => items.map((item) => greyOutItem(item, reason));
 
-/** English wording of a gallery's own row; every locale's is generated as `gallery:<id>`. */
-const galleryLabel = (id: string): string => macBundleLabel(`gallery:${id}`).en;
-
-/** A gallery section caption. */
+/** A gallery section caption, worded by its generated `gallery:` label. */
 const section = (id: string): MacRibbonMenuItem => ({
   id: `mac.insert.heading.${id}`,
-  label: galleryLabel(`mac.insert.heading.${id}`),
   heading: true,
   own: true,
 });
@@ -162,10 +132,9 @@ const section = (id: string): MacRibbonMenuItem => ({
 /** A gallery entry; `enabled` entries run their chart command, the rest stay greyed out. */
 const galleryItem = (id: string, enabled = false): MacRibbonMenuItem => ({
   id,
-  label: galleryLabel(id),
   own: true,
   disabled: !enabled,
-  disabledReason: enabled ? undefined : NOT_IMPLEMENTED.en,
+  disabledReason: enabled ? undefined : 'notImplemented',
 });
 
 const chartGallery = {
@@ -270,12 +239,7 @@ const chartGallery = {
 } as const satisfies Record<string, readonly MacRibbonMenuItem[]>;
 
 const functionMenu = (category: CatalogFunctionCategory): readonly MacRibbonMenuItem[] =>
-  menu(
-    supportedFunctionNames(category).map((name) => ({
-      id: macFunctionCommandId(name),
-      label: name,
-    })),
-  );
+  supportedFunctionNames(category).map((name) => ({ id: macFunctionCommandId(name) }));
 
 /** Menu leaves are data commands so the host's normal ribbon click delegation
  *  and restricted-interaction guard can handle them exactly like top-level
@@ -284,73 +248,61 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
   // Forms is a cloud feature the host does not provide, so its menu stays greyed out.
   'mac.insert.forms': unavailable(
     [
-      { id: 'mac.insert.forms.new', label: 'New Form' },
-      { id: 'mac.insert.forms.preview', label: 'Preview Form' },
-      { id: 'mac.insert.forms.edit', label: 'Edit Form' },
-      { id: 'mac.insert.forms.send', label: 'Send Form' },
+      { id: 'mac.insert.forms.new' },
+      { id: 'mac.insert.forms.preview' },
+      { id: 'mac.insert.forms.edit' },
+      { id: 'mac.insert.forms.send' },
     ],
-    OFFICE_REQUIRED,
+    'officeRequired',
   ),
   'mac.insert.pictureFromData': unavailable(
-    [
-      { id: 'mac.insert.pictureFromData.file', label: 'Picture From File...' },
-      { id: 'mac.insert.pictureFromData.clipboard', label: 'Picture From Clipboard' },
-    ],
-    OFFICE_REQUIRED,
+    [{ id: 'mac.insert.pictureFromData.file' }, { id: 'mac.insert.pictureFromData.clipboard' }],
+    'officeRequired',
   ),
   // Photo Browser, Stock Images and Online Pictures need the cloud or the OS photo library.
-  'mac.insert.photo': menu([
-    { id: 'mac.insert.photo.browser', label: 'Photo Browser…' },
-    { id: 'mac.insert.photo.file', label: 'Picture from File...' },
-    { id: 'mac.insert.photo.stock', label: 'Stock Images...' },
-    { id: 'mac.insert.photo.online', label: 'Online Pictures...' },
-  ]).map((item) =>
-    item.id === 'mac.insert.photo.file'
-      ? item
-      : { ...item, disabled: true, disabledReason: NOT_IMPLEMENTED.en },
+  'mac.insert.photo': [
+    { id: 'mac.insert.photo.browser' },
+    { id: 'mac.insert.photo.file' },
+    { id: 'mac.insert.photo.stock' },
+    { id: 'mac.insert.photo.online' },
+  ].map((item) =>
+    item.id === 'mac.insert.photo.file' ? item : greyOutItem(item, 'notImplemented'),
   ),
   'mac.insert.shapes': MAC_SHAPE_GALLERY,
   'mac.insert.threeDModel': unavailable(
-    [
-      { id: 'mac.insert.threeDModel.device', label: 'This Device...' },
-      { id: 'mac.insert.threeDModel.stock', label: 'Stock 3D Models...' },
-    ],
-    NOT_IMPLEMENTED,
+    [{ id: 'mac.insert.threeDModel.device' }, { id: 'mac.insert.threeDModel.stock' }],
+    'notImplemented',
   ),
   'mac.insert.smartArt': unavailable(
     [
-      { id: 'mac.insert.smartArt.list', label: 'List' },
-      { id: 'mac.insert.smartArt.process', label: 'Process' },
-      { id: 'mac.insert.smartArt.cycle', label: 'Cycle' },
-      { id: 'mac.insert.smartArt.hierarchy', label: 'Hierarchy' },
-      { id: 'mac.insert.smartArt.relationship', label: 'Relationship' },
-      { id: 'mac.insert.smartArt.matrix', label: 'Matrix' },
-      { id: 'mac.insert.smartArt.pyramid', label: 'Pyramid' },
-      { id: 'mac.insert.smartArt.picture', label: 'Picture' },
+      { id: 'mac.insert.smartArt.list' },
+      { id: 'mac.insert.smartArt.process' },
+      { id: 'mac.insert.smartArt.cycle' },
+      { id: 'mac.insert.smartArt.hierarchy' },
+      { id: 'mac.insert.smartArt.relationship' },
+      { id: 'mac.insert.smartArt.matrix' },
+      { id: 'mac.insert.smartArt.pyramid' },
+      { id: 'mac.insert.smartArt.picture' },
     ],
-    NOT_IMPLEMENTED,
+    'notImplemented',
   ),
-  'mac.insert.screenshot': menu([
-    { id: 'mac.insert.screenshot.clipping', label: 'Screen Clipping' },
-  ]),
+  'mac.insert.screenshot': [{ id: 'mac.insert.screenshot.clipping' }],
   // With no data selected the menu carries only the explanation; otherwise the recommendation.
   'mac.insert.recommendedChart': [
     {
       id: 'mac.insert.recommendedChart.none',
-      label: galleryLabel('mac.insert.recommendedChart.none'),
       own: true,
       disabled: true,
     },
     {
       id: 'mac.insert.recommendedChart.apply',
-      label: galleryLabel('mac.insert.recommendedChart.apply'),
       own: true,
     },
   ],
   'mac.insert.chartColumn': chartGallery.column,
-  'mac.insert.chartBar': menu([leaf('mac.insert.chartBar', 'chartBar')]),
+  'mac.insert.chartBar': [{ id: 'mac.insert.chartBar' }],
   'mac.insert.chartLine': chartGallery.line,
-  'mac.insert.chartArea': menu([leaf('mac.insert.chartArea', 'chartArea')]),
+  'mac.insert.chartArea': [{ id: 'mac.insert.chartArea' }],
   'mac.insert.chartPie': chartGallery.pie,
   'mac.insert.chartScatter': chartGallery.scatter,
   'mac.insert.chartHierarchy': chartGallery.hierarchy,
@@ -359,194 +311,166 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
   'mac.insert.chartCombo': chartGallery.combo,
   'mac.insert.chartMap': chartGallery.map,
   // Each type opens the sparkline dialog with that type chosen.
-  'mac.insert.sparkline': menu([
-    { id: 'mac.insert.sparkline.line', label: 'Line' },
-    { id: 'mac.insert.sparkline.column', label: 'Column' },
-    { id: 'mac.insert.sparkline.winLoss', label: 'Win/Loss' },
-  ]),
+  'mac.insert.sparkline': [
+    { id: 'mac.insert.sparkline.line' },
+    { id: 'mac.insert.sparkline.column' },
+    { id: 'mac.insert.sparkline.winLoss' },
+  ],
   // The file the engine writes holds no vertical text.
-  'mac.insert.textBox': menu([
-    { id: 'mac.insert.textBox.horizontal', label: 'Horizontal Text Box' },
-    { id: 'mac.insert.textBox.vertical', label: 'Vertical Text Box' },
-  ]).map((item) =>
-    item.id === 'mac.insert.textBox.vertical' ? greyOutItem(item, EMBEDDED_UNSUPPORTED) : item,
+  'mac.insert.textBox': [
+    { id: 'mac.insert.textBox.horizontal' },
+    { id: 'mac.insert.textBox.vertical' },
+  ].map((item) =>
+    item.id === 'mac.insert.textBox.vertical' ? greyOutItem(item, 'embeddedUnsupported') : item,
   ),
   // The WordArt gallery carries styles, not named entries.
   'mac.insert.wordArt': [],
-  'mac.insert.equation': unavailable(
-    [{ id: 'mac.insert.equation.insert', label: 'Equation' }],
-    NOT_IMPLEMENTED,
-  ),
+  'mac.insert.equation': unavailable([{ id: 'mac.insert.equation.insert' }], 'notImplemented'),
   // Only the whole-stroke eraser exists; point and segment erasing are not built.
-  'mac.draw.eraser': menu([
-    { id: 'mac.draw.eraser.stroke', label: 'Stroke Eraser' },
+  'mac.draw.eraser': [
+    { id: 'mac.draw.eraser.stroke' },
     {
       id: 'mac.draw.eraser.small',
-      label: 'Small Eraser',
       disabled: true,
-      disabledReason: NOT_IMPLEMENTED.en,
+      disabledReason: 'notImplemented',
     },
     {
       id: 'mac.draw.eraser.medium',
-      label: 'Medium Eraser',
       disabled: true,
-      disabledReason: NOT_IMPLEMENTED.en,
+      disabledReason: 'notImplemented',
     },
     {
       id: 'mac.draw.eraser.segment',
-      label: 'Segment Eraser',
       disabled: true,
-      disabledReason: NOT_IMPLEMENTED.en,
+      disabledReason: 'notImplemented',
     },
-  ]),
+  ],
   // Adding a pen kind to the strip is not built; the four pens have fixed buttons.
   'mac.draw.add': unavailable(
-    [
-      { id: 'mac.draw.add.pen', label: 'Pen' },
-      { id: 'mac.draw.add.highlighter', label: 'Highlighter' },
-      { id: 'mac.draw.add.pencil', label: 'Pencil' },
-    ],
-    NOT_IMPLEMENTED,
+    [{ id: 'mac.draw.add.pen' }, { id: 'mac.draw.add.highlighter' }, { id: 'mac.draw.add.pencil' }],
+    'notImplemented',
   ),
   // Office and Grayscale are the themes the host can apply; the commands below them
   // are the desktop's online-gallery, browse and save-to-file entries, which it has no backing for.
-  'mac.page.theme': menu([
-    { id: 'mac.page.theme.office', label: 'Office' },
-    { id: 'mac.page.theme.gray', label: 'Grayscale' },
+  'mac.page.theme': [
+    { id: 'mac.page.theme.office' },
+    { id: 'mac.page.theme.gray' },
     {
       id: 'mac.page.theme.enableUpdates',
-      label: 'Enable Content Updates',
       disabled: true,
-      disabledReason: OFFICE_REQUIRED.en,
+      disabledReason: 'officeRequired',
     },
     {
       id: 'mac.page.theme.browse',
-      label: 'Browse for Themes...',
       disabled: true,
-      disabledReason: NOT_IMPLEMENTED.en,
+      disabledReason: 'notImplemented',
     },
     {
       id: 'mac.page.theme.save',
-      label: 'Save Current Theme...',
       disabled: true,
-      disabledReason: NOT_IMPLEMENTED.en,
+      disabledReason: 'notImplemented',
     },
-  ]),
-  'mac.page.color': menu([
-    { id: 'mac.page.color.office', label: 'Office' },
-    { id: 'mac.page.color.gray', label: 'Grayscale' },
-  ]),
-  'mac.page.font': menu([
-    { id: 'mac.page.font.office', label: 'Office' },
-    { id: 'mac.page.font.gray', label: 'Grayscale' },
-  ]),
-  'mac.page.margins': menu([
-    { id: 'mac.page.margins.normal', label: 'Normal' },
-    { id: 'mac.page.margins.wide', label: 'Wide' },
-    { id: 'mac.page.margins.narrow', label: 'Narrow' },
-    { id: 'mac.page.margins.custom', label: 'Custom Margins' },
-  ]),
-  'mac.page.orientation': menu([
-    { id: 'mac.page.orientation.portrait', label: 'Portrait' },
-    { id: 'mac.page.orientation.landscape', label: 'Landscape' },
-  ]),
-  'mac.page.size': menu([
-    { id: 'mac.page.size.a4', label: 'A4' },
-    { id: 'mac.page.size.a3', label: 'A3' },
-    { id: 'mac.page.size.letter', label: 'Letter' },
-    { id: 'mac.page.size.legal', label: 'Legal' },
-  ]),
-  'mac.page.printArea': menu([
-    { id: 'mac.page.printArea.set', label: 'Set Print Area' },
-    { id: 'mac.page.printArea.add', label: 'Add to Print Area' },
-    { id: 'mac.page.printArea.clear', label: 'Clear Print Area' },
-  ]),
-  'mac.page.pageBreaks': menu([
-    { id: 'mac.page.break.insert', label: 'Insert Page Break' },
-    { id: 'mac.page.break.remove', label: 'Remove Page Break' },
+  ],
+  'mac.page.color': [{ id: 'mac.page.color.office' }, { id: 'mac.page.color.gray' }],
+  'mac.page.font': [{ id: 'mac.page.font.office' }, { id: 'mac.page.font.gray' }],
+  'mac.page.margins': [
+    { id: 'mac.page.margins.normal' },
+    { id: 'mac.page.margins.wide' },
+    { id: 'mac.page.margins.narrow' },
+    { id: 'mac.page.margins.custom' },
+  ],
+  'mac.page.orientation': [
+    { id: 'mac.page.orientation.portrait' },
+    { id: 'mac.page.orientation.landscape' },
+  ],
+  'mac.page.size': [
+    { id: 'mac.page.size.a4' },
+    { id: 'mac.page.size.a3' },
+    { id: 'mac.page.size.letter' },
+    { id: 'mac.page.size.legal' },
+  ],
+  'mac.page.printArea': [
+    { id: 'mac.page.printArea.set' },
+    { id: 'mac.page.printArea.add' },
+    { id: 'mac.page.printArea.clear' },
+  ],
+  'mac.page.pageBreaks': [
+    { id: 'mac.page.break.insert' },
+    { id: 'mac.page.break.remove' },
     {
       id: 'mac.page.break.reset',
-      label: 'Reset All Page Breaks',
     },
-  ]),
-  'mac.formulas.autoSum': menu([
-    { id: 'mac.autosum.SUM', label: 'Sum' },
-    { id: 'mac.autosum.AVERAGE', label: 'Average' },
-    { id: 'mac.autosum.COUNT', label: 'Count Numbers' },
-    { id: 'mac.autosum.MAX', label: 'Max' },
-    { id: 'mac.autosum.MIN', label: 'Min' },
-    { id: 'mac.formulas.category.all', label: 'More Functions...' },
-  ]),
-  'mac.formulas.recent': menu([{ id: 'mac.formulas.category.recent', label: 'More Functions...' }]),
+  ],
+  'mac.formulas.autoSum': [
+    { id: 'mac.autosum.SUM' },
+    { id: 'mac.autosum.AVERAGE' },
+    { id: 'mac.autosum.COUNT' },
+    { id: 'mac.autosum.MAX' },
+    { id: 'mac.autosum.MIN' },
+    { id: 'mac.formulas.category.all' },
+  ],
+  'mac.formulas.recent': [{ id: 'mac.formulas.category.recent' }],
   'mac.formulas.financial': functionMenu('financial'),
   'mac.formulas.logical': functionMenu('logical'),
   'mac.formulas.text': functionMenu('text'),
   'mac.formulas.dateTime': functionMenu('datetime'),
   'mac.formulas.lookup': functionMenu('lookup'),
   'mac.formulas.math': functionMenu('math'),
-  'mac.formulas.more': menu([]),
+  'mac.formulas.more': [],
   // Python is a cloud feature the host does not provide, so its menu stays greyed out.
   'mac.formulas.reset': unavailable(
     [
-      { id: 'mac.formulas.reset.clear', label: 'Reset' },
-      { id: 'mac.formulas.reset.runtime', label: 'Reset Runtime' },
+      { id: 'mac.formulas.reset.clear' },
+      { id: 'mac.formulas.reset.runtime' },
       separator,
       {
         id: 'mac.formulas.reset.version',
-        label: 'Version',
         submenu: [
-          { id: 'mac.formulas.reset.versionStable', label: 'Stable' },
-          { id: 'mac.formulas.reset.versionLatest', label: 'Latest' },
+          { id: 'mac.formulas.reset.versionStable' },
+          { id: 'mac.formulas.reset.versionLatest' },
           separator,
-          { id: 'mac.formulas.reset.versionLearnMore', label: 'Learn More' },
+          { id: 'mac.formulas.reset.versionLearnMore' },
         ],
       },
     ],
-    OFFICE_REQUIRED,
+    'officeRequired',
   ),
-  'mac.formulas.defineName': menu([
-    { id: 'mac.formulas.defineName.define', label: 'Define Name...' },
+  'mac.formulas.defineName': [
+    { id: 'mac.formulas.defineName.define' },
     {
       id: 'mac.formulas.defineName.apply',
-      label: 'Apply...',
       disabled: true,
-      disabledReason: NOT_IMPLEMENTED.en,
+      disabledReason: 'notImplemented',
     },
-  ]),
-  'mac.formulas.useInFormula': menu([
-    { id: 'mac.formulas.useInFormula.paste', label: 'Paste Names...' },
-  ]),
-  'mac.formulas.calcOptions': menu([
-    { id: 'mac.formulas.calc.auto', label: 'Automatic' },
+  ],
+  'mac.formulas.useInFormula': [{ id: 'mac.formulas.useInFormula.paste' }],
+  'mac.formulas.calcOptions': [
+    { id: 'mac.formulas.calc.auto' },
     {
       id: 'mac.formulas.calc.autoNoTable',
-      label: 'Partial',
     },
-    { id: 'mac.formulas.calc.manual', label: 'Manual' },
+    { id: 'mac.formulas.calc.manual' },
     separator,
-    { id: 'mac.formulas.calc.formatStale', label: 'Format Stale Values', check: 'checkbox' },
+    { id: 'mac.formulas.calc.formatStale', check: 'checkbox' },
     separator,
     {
       id: 'mac.formulas.calc.compatVersion',
-      label: 'Compatibility Version',
       submenu: [
         ...COMPATIBILITY_VERSIONS.map(
           (version): MacRibbonMenuItem => ({
             id: `mac.formulas.calc.compatVersion.${version}`,
-            label: `Version ${version}`,
             check: 'radio',
           }),
         ),
         separator,
         {
           id: 'mac.formulas.calc.compatVersion.learnMore',
-          label: 'Learn More',
           disabled: true,
-          disabledReason: NOT_IMPLEMENTED.en,
+          disabledReason: 'notImplemented',
         },
       ],
     },
-  ]),
+  ],
   // The host has no linked data types, so the gallery lists Excel's entries greyed out.
   'mac.data.dataTypes': [
     galleryItem('mac.data.dataTypes.stocks'),
@@ -557,109 +481,88 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     galleryItem('mac.data.pictureFromData.file'),
     galleryItem('mac.data.pictureFromData.clipboard'),
   ],
-  'mac.data.sortFilter': menu([
-    leaf('mac.data.sortAsc', 'sortAsc'),
-    leaf('mac.data.sortDesc', 'sortDesc'),
-    leaf('mac.data.sortCustom', 'sortCustom'),
-    leaf('mac.data.filter', 'filter'),
-    leaf('mac.data.clear', 'clear'),
-    leaf('mac.data.reapply', 'reapply'),
-    leaf('mac.data.advancedFilter', 'advancedFilter'),
-  ]),
-  'mac.formulas.removeArrows': menu([
-    { id: 'mac.formulas.removeArrows.all', label: 'Remove Arrows' },
-    { id: 'mac.formulas.removeArrows.precedents', label: 'Remove Precedent Arrows' },
-    { id: 'mac.formulas.removeArrows.dependents', label: 'Remove Dependent Arrows' },
-  ]),
-  'mac.formulas.errorCheck': menu([
-    { id: 'mac.formulas.errorCheck.run', label: 'Error Checking...' },
-    { id: 'mac.formulas.errorCheck.trace', label: 'Trace Error' },
+  'mac.data.sortFilter': [
+    { id: 'mac.data.sortAsc' },
+    { id: 'mac.data.sortDesc' },
+    { id: 'mac.data.sortCustom' },
+    { id: 'mac.data.filter' },
+    { id: 'mac.data.clear' },
+    { id: 'mac.data.reapply' },
+    { id: 'mac.data.advancedFilter' },
+  ],
+  'mac.formulas.removeArrows': [
+    { id: 'mac.formulas.removeArrows.all' },
+    { id: 'mac.formulas.removeArrows.precedents' },
+    { id: 'mac.formulas.removeArrows.dependents' },
+  ],
+  'mac.formulas.errorCheck': [
+    { id: 'mac.formulas.errorCheck.run' },
+    { id: 'mac.formulas.errorCheck.trace' },
     // Its entries are the active sheet's cycle members, listed when the menu opens.
-    { id: 'mac.formulas.errorCheck.circular', label: 'Circular References', submenu: [] },
-  ]),
-  'mac.data.validation': menu([
-    { id: 'mac.data.validation.settings', label: 'Data Validation...' },
-    { id: 'mac.data.validation.circleInvalid', label: 'Circle Invalid Data' },
-    { id: 'mac.data.validation.clearCircles', label: 'Clear Validation Circles' },
-    { id: 'mac.data.validation.clearRules', label: 'Clear Validation' },
-  ]),
-  'mac.data.whatIf': menu([
+    { id: 'mac.formulas.errorCheck.circular', submenu: [] },
+  ],
+  'mac.data.validation': [
+    { id: 'mac.data.validation.settings' },
+    { id: 'mac.data.validation.circleInvalid' },
+    { id: 'mac.data.validation.clearCircles' },
+    { id: 'mac.data.validation.clearRules' },
+  ],
+  'mac.data.whatIf': [
     {
       id: 'mac.data.scenarioManager',
-      label: 'Scenario Manager',
       disabled: true,
-      disabledReason: NOT_IMPLEMENTED.en,
+      disabledReason: 'notImplemented',
     },
-    { id: 'mac.data.goalSeek', label: 'Goal Seek' },
-    { id: 'mac.data.dataTable', label: 'Data Table' },
-  ]),
+    { id: 'mac.data.goalSeek' },
+    { id: 'mac.data.dataTable' },
+  ],
   // Alt Text and Accessibility Help have nothing behind them.
-  'mac.review.accessibility': menu([
-    { id: 'mac.review.accessibility.check', label: 'Check Accessibility' },
-    ...menu([{ id: 'mac.review.accessibility.altText', label: 'Alt Text' }]).map((item) => ({
-      ...item,
-      disabled: true,
-      disabledReason: NOT_IMPLEMENTED.en,
-    })),
-    { id: 'mac.review.accessibility.formatTable', label: 'Format as Table' },
-    { id: 'mac.review.accessibility.unmerge', label: 'Unmerge Cells' },
-    ...menu([{ id: 'mac.review.accessibility.help', label: 'Accessibility Help' }]).map((item) => ({
-      ...item,
-      disabled: true,
-      disabledReason: NOT_IMPLEMENTED.en,
-    })),
-  ]),
+  'mac.review.accessibility': [
+    { id: 'mac.review.accessibility.check' },
+    ...unavailable([{ id: 'mac.review.accessibility.altText' }], 'notImplemented'),
+    { id: 'mac.review.accessibility.formatTable' },
+    { id: 'mac.review.accessibility.unmerge' },
+    ...unavailable([{ id: 'mac.review.accessibility.help' }], 'notImplemented'),
+  ],
   // Ink cannot be hidden or deleted in this host, so every entry is greyed out.
   'mac.review.hideInk': [
-    ...unavailable([{ id: 'mac.review.hideInk.hide', label: 'Hide Ink' }], EMBEDDED_UNSUPPORTED),
+    ...unavailable([{ id: 'mac.review.hideInk.hide' }], 'embeddedUnsupported'),
     ...unavailable(
-      [
-        { id: 'mac.review.hideInk.deleteSheet', label: 'Delete All Ink on Sheet' },
-        { id: 'mac.review.hideInk.deleteWorkbook', label: 'Delete All Ink in Workbook' },
-      ],
-      NOT_IMPLEMENTED,
+      [{ id: 'mac.review.hideInk.deleteSheet' }, { id: 'mac.review.hideInk.deleteWorkbook' }],
+      'notImplemented',
     ),
   ],
-  'mac.review.notes': menu([
-    { id: 'mac.review.newNote', label: 'New Note' },
-    { id: 'mac.review.previousNote', label: 'Previous Note' },
-    { id: 'mac.review.nextNote', label: 'Next Note' },
-    { id: 'mac.review.showHideNote', label: 'Show/Hide Note' },
-    { id: 'mac.review.showNotes', label: 'Show All Notes' },
-    { id: 'mac.review.convertNotes', label: 'Convert to Comments' },
-  ]),
+  'mac.review.notes': [
+    { id: 'mac.review.newNote' },
+    { id: 'mac.review.previousNote' },
+    { id: 'mac.review.nextNote' },
+    { id: 'mac.review.showHideNote' },
+    { id: 'mac.review.showNotes' },
+    { id: 'mac.review.convertNotes' },
+  ],
   // Only the measured default colour is built; Focus Cell Color stays greyed out.
   'mac.view.cellFocus': [
-    { id: 'mac.view.cellFocus.focusCell', label: 'Focus Cell', check: 'checkbox' },
-    ...unavailable(
-      [{ id: 'mac.view.cellFocus.color', label: 'Focus Cell Color' }],
-      NOT_IMPLEMENTED,
-    ),
-    { id: 'mac.view.cellFocus.autoHighlight', label: 'Show Auto-Highlight', check: 'checkbox' },
+    { id: 'mac.view.cellFocus.focusCell', check: 'checkbox' },
+    ...unavailable([{ id: 'mac.view.cellFocus.color' }], 'notImplemented'),
+    { id: 'mac.view.cellFocus.autoHighlight', check: 'checkbox' },
   ],
-  'mac.view.freeze': menu([
-    { id: 'mac.view.freeze.panes', label: 'Freeze Panes' },
-    { id: 'mac.view.freeze.firstRow', label: 'Freeze Top Row' },
-    { id: 'mac.view.freeze.firstColumn', label: 'Freeze First Column' },
-  ]),
+  'mac.view.freeze': [
+    { id: 'mac.view.freeze.panes' },
+    { id: 'mac.view.freeze.firstRow' },
+    { id: 'mac.view.freeze.firstColumn' },
+  ],
   // Office Scripts is a cloud feature the host does not provide, so New Script's menu stays greyed out.
   'mac.automate.newScript': unavailable(
-    [
-      { id: 'mac.automate.newScript.editor', label: 'Create in Code Editor' },
-      { id: 'mac.automate.newScript.recording', label: 'Create from Recording' },
-    ],
-    OFFICE_REQUIRED,
+    [{ id: 'mac.automate.newScript.editor' }, { id: 'mac.automate.newScript.recording' }],
+    'officeRequired',
   ),
   // Samples opens the script gallery; the other two lists have no script storage behind them.
   'mac.automate.showScripts': [
     ...unavailable(
-      [
-        { id: 'mac.automate.showScripts.recent', label: 'Recent Scripts' },
-        { id: 'mac.automate.showScripts.workbook', label: 'Scripts from this Workbook' },
-      ],
-      NOT_IMPLEMENTED,
+      [{ id: 'mac.automate.showScripts.recent' }, { id: 'mac.automate.showScripts.workbook' }],
+      'notImplemented',
     ),
-    ...menu([{ id: 'mac.automate.showScripts.samples', label: 'Samples' }]),
+    { id: 'mac.automate.showScripts.samples' },
   ],
 };
 

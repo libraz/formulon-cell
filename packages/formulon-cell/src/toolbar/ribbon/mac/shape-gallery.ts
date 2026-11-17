@@ -1,5 +1,3 @@
-import { macBundleLabel } from './bundle-text.js';
-import { NOT_IMPLEMENTED } from './labels.js';
 import type { MacRibbonMenuItem } from './menu-manifest.js';
 
 /** A gallery section: how many shapes it lists, and the ones the host draws by position. Every
@@ -31,23 +29,20 @@ const SECTIONS: readonly ShapeSection[] = [
   { key: 'stars', size: 20 },
 ];
 
-const galleryLabel = (id: string): string => macBundleLabel(`gallery:${id}`).en;
-
 /** The Shapes gallery: every Excel section, with the shapes the host draws enabled. */
 export const MAC_SHAPE_GALLERY: readonly MacRibbonMenuItem[] = SECTIONS.flatMap((group) => {
   const headingId = `mac.insert.heading.shape.${group.key}`;
   return [
-    { id: headingId, label: galleryLabel(headingId), heading: true, own: true },
+    { id: headingId, heading: true, own: true },
     ...Array.from({ length: group.size }, (_, index): MacRibbonMenuItem => {
       const icon = group.drawn?.[index];
       const id = icon ? `mac.insert.${icon}` : `mac.insert.shape.${group.key}.${index}`;
       return {
         id,
-        label: galleryLabel(id),
         own: true,
         ...(icon ? { icon } : {}),
         disabled: !icon,
-        disabledReason: icon ? undefined : NOT_IMPLEMENTED.en,
+        disabledReason: icon ? undefined : 'notImplemented',
       };
     }),
   ];

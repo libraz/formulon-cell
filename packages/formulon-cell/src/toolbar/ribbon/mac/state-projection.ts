@@ -32,7 +32,7 @@ import {
 import type { ToolbarLang } from '../../ribbon-model.js';
 import { projectPressedState } from '../button.js';
 import { RIBBON_VIEW_MODES } from '../command-tables.js';
-import { EMBEDDED_UNSUPPORTED, macRibbonLabelForCommand } from './labels.js';
+import { macRibbonLabelForCommand } from './labels.js';
 import { MAC_CONTEXT_LABELS } from './labels-data.js';
 import { toolbarLangForLocale } from './locale.js';
 
@@ -269,7 +269,7 @@ const contextualDisabledReason = (instance: SpreadsheetInstance, id: string): st
     return strings.splitNotSaved;
   }
   if (id === 'mac.data.dataTable' && !instance.workbook?.capabilities?.dataTables) {
-    return EMBEDDED_UNSUPPORTED[lang];
+    return MAC_CONTEXT_LABELS.embeddedUnsupported[lang];
   }
   if (id === 'mac.data.clear' && !activeFilterRange(state)) {
     return MAC_CONTEXT_LABELS.filterRangeRequired[lang];

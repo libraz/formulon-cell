@@ -109,17 +109,6 @@ const LOCALE_TABLES_PENDING: Readonly<Record<string, string>> = {
   'toolbar/ribbon/mac/labels.ts:labelSeeds': 'ja/en command label seeds, not yet converted',
   'toolbar/ribbon/mac/labels.ts:menuLabelSeeds': 'ja/en menu label seeds, not yet converted',
   'toolbar/ribbon/mac/labels.ts:text': 'English fallback for the ja/en seeds above',
-  'toolbar/ribbon/mac/labels.ts:macRibbonDisabledReason':
-    'menu items carry the English reason as its id, translated here at render',
-  'toolbar/ribbon/mac/model.ts:*': 'ribbon model group titles and English-carried item labels',
-  'toolbar/ribbon/mac/menu-manifest.ts:*':
-    'menu items carry English labels and reasons, translated at render',
-  'toolbar/ribbon/mac/shape-gallery.ts:galleryLabel':
-    'gallery items carry the English label, translated at render',
-  'toolbar/ribbon/mac/shape-gallery.ts:MAC_SHAPE_GALLERY':
-    'gallery items carry the English reason, translated at render',
-  'toolbar/ribbon/mac/automation-gallery.ts:automationScript':
-    'gallery items carry the English label, translated at render',
   'interact/function-catalog-text.ts:FUNCTION_DESCRIPTIONS':
     'function descriptions, not yet in the dictionaries',
   'commands/input-grammar.ts:BACKSLASH_CURRENCY': 'currency symbol per input locale, data',

@@ -40,7 +40,8 @@ export const MAC_LABEL_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>>
   penRed: { de: 'Roter Stift', fr: 'Stylet rouge', zh: '红色笔', ko: '빨간색 펜', th: 'ปากกาสีแดง' },
 };
 
-type MacRibbonReason = keyof MacRibbonReasonStrings;
+/** Why a Mac ribbon command or menu row is unavailable: a key of the dictionaries' reasons. */
+export type MacRibbonReason = keyof MacRibbonReasonStrings;
 
 /** Why a ribbon command or menu item is unavailable, in every locale, from the dictionaries. */
 export const MAC_CONTEXT_LABELS = Object.fromEntries(

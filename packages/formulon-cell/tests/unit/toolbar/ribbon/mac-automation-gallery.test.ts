@@ -160,7 +160,9 @@ describe('Mac automation gallery', () => {
 
   it('ships named descriptors for every local sample', () => {
     expect(
-      MAC_AUTOMATION_GALLERY.every((entry) => entry.label.length > 0 && entry.labels.ja.length > 0),
+      MAC_AUTOMATION_GALLERY.every(
+        (entry) => entry.labels.en.length > 0 && entry.labels.ja.length > 0,
+      ),
     ).toBe(true);
     expect(MAC_AUTOMATION_GALLERY.map((entry) => entry.id)).toEqual([
       'allRowsColumns',

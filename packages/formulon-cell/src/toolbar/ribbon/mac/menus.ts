@@ -34,14 +34,13 @@ import {
   visualMenuGrid,
   visualMenuTile,
 } from '../menus/general.js';
-import { findMacBundleLabel } from './bundle-text.js';
+import { macBundleText } from './bundle-text.js';
 import { macFunctionCategoryLabel } from './labels.js';
 import { localizedFunctionName, MAC_CONTEXT_LABELS } from './labels-data.js';
 import {
   MAC_FORMULAS_MORE_MENU_ID,
   MAC_RIBBON_MENU_ITEMS,
   type MacRibbonMenuItem,
-  macRibbonDisabledReason,
   macRibbonLabelForCommand,
   macRibbonMenuIdForCommand,
 } from './model.js';
@@ -271,9 +270,19 @@ const SHAPE_ICONS: Readonly<Record<string, VisualTileIconSlug>> = {
   shapeDiamond: 'shape-diamond',
 };
 
-/** The wording of a gallery's own row: its generated label, else the row's own label. */
+/** The wording of a gallery's own row: its generated `gallery:` label. */
 const ownLabel = (item: MacRibbonMenuItem, lang: Locale): string =>
-  findMacBundleLabel(`gallery:${item.id}`)?.[lang] ?? item.label;
+  macBundleText(`gallery:${item.id}`, lang);
+
+/** The text a menu row renders with: a function's name, the gallery's own wording, or the
+ *  label of its id. */
+export const macMenuRowLabel = (item: MacRibbonMenuItem, lang: Locale): string => {
+  const functionName = macFunctionNameOf(item.id);
+  const localized = functionName
+    ? functionDisplayName(undefined, lang, functionName)
+    : macRibbonLabelForCommand(item.id, lang);
+  return item.own || localized === item.id ? ownLabel(item, lang) : localized;
+};
 
 const menuItemButton = (
   item: MacRibbonMenuItem,
@@ -281,13 +290,7 @@ const menuItemButton = (
   visual = false,
   displayName?: string,
 ): HTMLButtonElement => {
-  const functionName = macFunctionNameOf(item.id);
-  const localized =
-    displayName ??
-    (functionName
-      ? functionDisplayName(undefined, lang, functionName)
-      : macRibbonLabelForCommand(item.id, lang));
-  const label = item.own || localized === item.id ? ownLabel(item, lang) : localized;
+  const label = displayName ?? macMenuRowLabel(item, lang);
   const icon = CHART_ICONS[item.id] ?? SHAPE_ICONS[item.icon ?? ''];
   const button =
     visual && icon
@@ -312,7 +315,7 @@ const menuItemButton = (
   projectDisabledState(
     button,
     !!item.disabled,
-    macRibbonDisabledReason(item.disabledReason, lang) ?? null,
+    item.disabledReason ? MAC_CONTEXT_LABELS[item.disabledReason][lang] : null,
     {
       datasetKey: RIBBON_DISABLED_REASON_KEY,
       titlePrefix: label,
@@ -384,7 +387,7 @@ const createMoreFunctionsMenu = (lang: Locale): HTMLDivElement => {
     });
     panel.append(
       ...supportedFunctionNames(category).map((name) =>
-        menuItemButton({ id: macFunctionCommandId(name), label: name }, lang),
+        menuItemButton({ id: macFunctionCommandId(name) }, lang),
       ),
     );
     prepareMenu(panel, localizedLabel);
@@ -469,7 +472,7 @@ const projectMacRecentMenuPrepared = (
       ? (menu.ownerDocument.activeElement as HTMLElement).dataset.ribbonCommand
       : undefined;
   const items: MacRibbonMenuItem[] = [
-    ...names.map((name) => ({ id: macFunctionCommandId(name), label: name })),
+    ...names.map((name) => ({ id: macFunctionCommandId(name) })),
     ...(MAC_RIBBON_MENU_ITEMS['mac.formulas.recent'] ?? []),
   ];
   if (rebuild) {
@@ -553,7 +556,7 @@ const projectFunctionCategoryMenu = (
     menu.replaceChildren(
       ...supportedFunctionNames(category, liveSet).map((name) =>
         menuItemButton(
-          { id: macFunctionCommandId(name), label: name },
+          { id: macFunctionCommandId(name) },
           lang,
           false,
           functionDisplayName(availabilityContext?.reader, lang, name),

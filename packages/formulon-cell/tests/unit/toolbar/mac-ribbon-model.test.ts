@@ -24,6 +24,7 @@ import {
 } from '../../../src/toolbar/ribbon/mac/dispatch.js';
 import {
   createMacRibbonMenuFactory,
+  macMenuRowLabel,
   projectMacFunctionCategoryMenus,
   projectMacRecentMenu,
 } from '../../../src/toolbar/ribbon/mac/menus.js';
@@ -32,6 +33,7 @@ import {
   MAC_RIBBON_DISABLED_COMMAND_IDS,
   MAC_RIBBON_MENU_COMMAND_SET,
   MAC_RIBBON_MENU_ITEMS,
+  type MacRibbonMenuItem,
   macMenuLeaves,
   macRibbonLabelForCommand,
   macRibbonMenuIdForCommand,
@@ -40,6 +42,10 @@ import {
 import type { RibbonRenderHelpers } from '../../../src/toolbar/ribbon/render-ribbon.js';
 import { buildRibbonModel, EXCEL365_MAC_RIBBON_TABS } from '../../../src/toolbar/ribbon-model.js';
 import { mountStubSheet } from '../../test-utils/mount.js';
+
+/** The English text a menu row renders with; a separator has none. */
+const rowText = (item: MacRibbonMenuItem): string =>
+  item.separator ? '' : macMenuRowLabel(item, 'en');
 
 const findCommand = (tabId: string, commandId: string) =>
   buildRibbonModel('en', { profile: 'excel365Mac' })
@@ -1177,7 +1183,7 @@ describe('Mac Excel ribbon profile', () => {
 
     it('declares Reset, Define Name and Use in Formula as menu buttons with the drawn items', () => {
       const items = (root: string) =>
-        MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, item.label, !!item.disabled]);
+        MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, rowText(item), !!item.disabled]);
       expect(items('mac.formulas.reset')).toEqual([
         ['mac.formulas.reset.clear', 'Reset', true],
         ['mac.formulas.reset.runtime', 'Reset Runtime', true],
@@ -1187,7 +1193,7 @@ describe('Mac Excel ribbon profile', () => {
       expect(
         MAC_RIBBON_MENU_ITEMS['mac.formulas.reset']
           ?.find((item) => item.id === 'mac.formulas.reset.version')
-          ?.submenu?.map((item) => [item.id, item.label, !!item.disabled]),
+          ?.submenu?.map((item) => [item.id, rowText(item), !!item.disabled]),
       ).toEqual([
         ['mac.formulas.reset.versionStable', 'Stable', true],
         ['mac.formulas.reset.versionLatest', 'Latest', true],
@@ -1259,7 +1265,7 @@ describe('Mac Excel ribbon profile', () => {
         .find((group) => group.title === groupTitle)
         ?.commands.map((command) => [command.id, sizeOf(command)]);
     const items = (root: string) =>
-      MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, item.label, !!item.disabled]);
+      MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, rowText(item), !!item.disabled]);
 
     it('keeps the drawn group order with Data from Picture as the third group', () => {
       expect(insertGroups().map((group) => group.title)).toEqual([
@@ -1491,7 +1497,7 @@ describe('Mac Excel ribbon profile', () => {
         .find((group) => group.title === groupTitle)
         ?.commands.map((command) => [command.id, sizeOf(command)]);
     const items = (root: string) =>
-      MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, item.label, !!item.disabled]);
+      MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, rowText(item), !!item.disabled]);
 
     it('draws Tools as three large tiles, Add beside the pen strip and Trackpad as a large tile', () => {
       expect(drawGroups().map((group) => group.title)).toEqual(['Tools', 'Pens', 'Mode']);
@@ -1610,7 +1616,7 @@ describe('Mac Excel ribbon profile', () => {
         .find((group) => group.title === groupTitle)
         ?.commands.map((command) => [command.id, sizeOf(command)]);
     const items = (root: string) =>
-      MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, item.label, !!item.disabled]);
+      MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, rowText(item), !!item.disabled]);
 
     it('draws Page Setup as eight large tiles and Themes as a large tile beside two small rows', () => {
       expect(pageGroups().map((group) => group.title)).toEqual([
@@ -1737,7 +1743,7 @@ describe('Mac Excel ribbon profile', () => {
     const sizeOf = (command: { layout?: string }) =>
       command.layout === 'stacked' ? 'small' : 'large';
     const items = (root: string) =>
-      MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, item.label, !!item.disabled]);
+      MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, rowText(item), !!item.disabled]);
     const commandIds = [
       'mac.review.spelling',
       'mac.review.thesaurus',
@@ -1937,7 +1943,7 @@ describe('Mac Excel ribbon profile', () => {
         .find((tab) => tab.id === 'automate')
         ?.groups.find((group) => group.title === 'Office Scripts');
     const items = (root: string) =>
-      MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, item.label, !!item.disabled]);
+      MAC_RIBBON_MENU_ITEMS[root]?.map((item) => [item.id, rowText(item), !!item.disabled]);
 
     it('draws New Script and View Scripts as large menu buttons and no Script Gallery button', () => {
       const commands = toolsGroup()?.commands ?? [];

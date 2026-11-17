@@ -14,7 +14,6 @@ import {
   type LegacyLabel,
   localizedLabel,
   localizedMenuLabel,
-  MAC_CONTEXT_LABELS,
   MAC_LOCALES,
 } from './labels-data.js';
 
@@ -22,10 +21,6 @@ export type { Label, LabelLike } from './labels-data.js';
 
 export const text = (lang: ToolbarLang, label: LabelLike): string =>
   lang in label ? (label as Label)[lang] : label.en;
-
-export const OFFICE_REQUIRED: Label = MAC_CONTEXT_LABELS.officeRequired;
-export const NOT_IMPLEMENTED: Label = MAC_CONTEXT_LABELS.notImplemented;
-export const EMBEDDED_UNSUPPORTED: Label = MAC_CONTEXT_LABELS.embeddedUnsupported;
 
 /** Command labels the app bundle words in every locale, as `labels:` keys. */
 const BUNDLE_LABEL_KEYS: readonly string[] = [
@@ -356,17 +351,6 @@ export const GROUP_LABELS: Readonly<Record<string, Label>> = Object.fromEntries(
 /** A ribbon group title in `lang`, or `key` itself when it has no label. */
 export const macGroupTitle = (key: string, lang: ToolbarLang): string =>
   GROUP_LABELS[key]?.[lang] ?? key;
-
-export const macRibbonDisabledReason = (
-  reason: string | undefined,
-  lang: ToolbarLang,
-): string | undefined => {
-  if (!reason) return undefined;
-  if (reason === OFFICE_REQUIRED.en) return OFFICE_REQUIRED[lang];
-  if (reason === NOT_IMPLEMENTED.en) return NOT_IMPLEMENTED[lang];
-  if (reason === EMBEDDED_UNSUPPORTED.en) return EMBEDDED_UNSUPPORTED[lang];
-  return reason;
-};
 
 /** Label for a command id: an explicit menu override, else the entry keyed by
  *  the id's last segment. */
