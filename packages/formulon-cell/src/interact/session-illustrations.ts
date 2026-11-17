@@ -297,6 +297,21 @@ const shapeTextTheme = (wb: WorkbookHandle | null, item: SessionIllustration): S
   };
 };
 
+/** How each vertical text direction lays its lines out: a quarter turn of the whole text, or a
+ *  vertical writing mode whose lines stack right to left (`rl`) or left to right (`lr`). */
+type TextFlow =
+  | { turn: 90 | -90 }
+  | { mode: 'vertical-rl' | 'vertical-lr'; orientation: 'mixed' | 'upright' };
+
+const TEXT_FLOWS: Partial<Record<NonNullable<SessionIllustration['textVert']>, TextFlow>> = {
+  vert: { turn: 90 },
+  vert270: { turn: -90 },
+  eaVert: { mode: 'vertical-rl', orientation: 'mixed' },
+  mongolianVert: { mode: 'vertical-lr', orientation: 'mixed' },
+  wordArtVert: { mode: 'vertical-rl', orientation: 'upright' },
+  wordArtVertRtl: { mode: 'vertical-rl', orientation: 'upright' },
+};
+
 /** Top-left the shape's text lines in its `w` x `h` box, clipped to it. */
 const drawShapeText = (
   svg: SVGSVGElement,
@@ -308,20 +323,38 @@ const drawShapeText = (
   if (!item.text || item.shape === 'line' || item.shape === 'arrow') return;
   const lines = item.text.split('\n');
   const step = SHAPE_TEXT_SIZE * SHAPE_TEXT_LINE_HEIGHT;
-  const clip = appendSvg(svg, 'svg', { x: 0, y: 0, width: w, height: h });
+  const flow = item.textVert ? TEXT_FLOWS[item.textVert] : undefined;
+  const turn = flow && 'turn' in flow ? flow.turn : 0;
+  const mode = flow && 'mode' in flow ? flow : null;
+  // A quarter turn lays the text out in the box turned on its side.
+  const [boxW, boxH] = turn === 0 ? [w, h] : [h, w];
+  const host =
+    turn === 0
+      ? svg
+      : appendSvg(svg, 'g', {
+          transform: turn === 90 ? `translate(${w} 0) rotate(90)` : `translate(0 ${h}) rotate(-90)`,
+        });
+  const clip = appendSvg(host, 'svg', { x: 0, y: 0, width: boxW, height: boxH });
+  const left = mode?.mode === 'vertical-rl' ? boxW - SHAPE_TEXT_INSET_X : SHAPE_TEXT_INSET_X;
   const text = appendSvg(clip, 'text', {
-    x: SHAPE_TEXT_INSET_X,
+    x: left,
     y: SHAPE_TEXT_INSET_Y,
-    'dominant-baseline': 'hanging',
+    'dominant-baseline': mode ? 'central' : 'hanging',
     'font-size': SHAPE_TEXT_SIZE,
     ...(theme.family ? { 'font-family': theme.family } : {}),
     fill: theme.color ?? textColorOn(shapeFillColor(item)),
+    ...(mode ? { 'writing-mode': mode.mode, 'text-orientation': mode.orientation } : {}),
   });
+  // A vertical line is a column: the next one sits beside it, on the side the mode flows to.
+  const columnStep = mode?.mode === 'vertical-rl' ? -step : step;
   for (const [index, line] of lines.entries()) {
-    const span = appendSvg(text, 'tspan', {
-      x: SHAPE_TEXT_INSET_X,
-      dy: index === 0 ? 0 : step,
-    });
+    const span = appendSvg(
+      text,
+      'tspan',
+      mode
+        ? { x: left + index * columnStep, y: SHAPE_TEXT_INSET_Y }
+        : { x: SHAPE_TEXT_INSET_X, dy: index === 0 ? 0 : step },
+    );
     span.textContent = line;
   }
 };

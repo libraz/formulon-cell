@@ -569,6 +569,16 @@ export type SessionShapeLineDash =
   | 'sysDashDot'
   | 'sysDashDotDot';
 
+/** The text direction a shape states (`a:bodyPr/@vert`); unset states none, which draws horizontal. */
+export type SessionTextVert =
+  | 'horz'
+  | 'vert'
+  | 'vert270'
+  | 'eaVert'
+  | 'wordArtVert'
+  | 'wordArtVertRtl'
+  | 'mongolianVert';
+
 /** The decoration at one end of a line. */
 export type SessionLineEndType = 'triangle' | 'stealth' | 'diamond' | 'oval' | 'arrow';
 
@@ -635,6 +645,8 @@ export interface SessionIllustration {
    *  triangle at the end; the kind stands for that pair when neither is stated. */
   headEnd?: SessionLineEnd;
   tailEnd?: SessionLineEnd;
+  /** A shape's text direction, kept as the file states it. */
+  textVert?: SessionTextVert;
   /** A shape's fill opacity, opaque when unset; 0 is No Fill. */
   opacity?: number;
   /** A shape's text, lines joined with `\n`. */

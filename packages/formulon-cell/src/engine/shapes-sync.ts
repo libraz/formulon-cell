@@ -1,5 +1,11 @@
 import type { ChartFill, ChartLine, DrawingColor } from '@libraz/formulon';
-import { AnchorEditAs, AnchorKind, ColorKind, DrawingObjectKind } from '@libraz/formulon';
+import {
+  AnchorEditAs,
+  AnchorKind,
+  ColorKind,
+  DrawingObjectKind,
+  ShapeTextVert,
+} from '@libraz/formulon';
 import {
   DEFAULT_SHAPE_COLOR,
   shapeFillColor,
@@ -14,6 +20,7 @@ import type {
   SessionLineEnd,
   SessionNativeColor,
   SessionShapeKind,
+  SessionTextVert,
   SpreadsheetStore,
   State,
 } from '../store/store.js';
@@ -160,6 +167,23 @@ const paintInput = (item: SessionIllustration): Pick<EngineShapeInput, 'fill' | 
   return input;
 };
 
+/** The engine's value of each text direction. */
+const ENGINE_TEXT_VERT: Record<SessionTextVert, ShapeTextVert> = {
+  horz: ShapeTextVert.Horz,
+  vert: ShapeTextVert.Vert,
+  vert270: ShapeTextVert.Vert270,
+  eaVert: ShapeTextVert.EaVert,
+  wordArtVert: ShapeTextVert.WordArtVert,
+  wordArtVertRtl: ShapeTextVert.WordArtVertRtl,
+  mongolianVert: ShapeTextVert.MongolianVert,
+};
+
+const TEXT_VERT_OF_ENGINE = new Map(
+  (Object.entries(ENGINE_TEXT_VERT) as [SessionTextVert, ShapeTextVert][]).map(
+    ([token, value]) => [value, token] as const,
+  ),
+);
+
 /** The guide of a rounded rectangle that holds its corner. */
 const CORNER_GUIDE = 'adj';
 
@@ -266,6 +290,8 @@ export function shapeFromNative(
   if (item.shape === 'rounded-rectangle' && corner !== undefined) {
     item.cornerAdj = corner;
   }
+  const vert = shape.textVert === null ? undefined : TEXT_VERT_OF_ENGINE.get(shape.textVert);
+  if (vert !== undefined) item.textVert = vert;
   if (shape.text) item.text = shape.text;
   return item;
 }
@@ -299,6 +325,9 @@ const shapeInputOf = (shape: EngineShape): EngineShapeInput | null => {
     rotationDeg: shape.rotationDeg,
     ...(shape.flipH ? { flipH: true } : {}),
     ...(shape.flipV ? { flipV: true } : {}),
+    ...(shape.textVert !== null && shape.kind !== DrawingObjectKind.Connector
+      ? { textVert: shape.textVert }
+      : {}),
     ...(Object.keys(shape.adjustValues).length > 0
       ? { adjustValues: { ...shape.adjustValues } }
       : {}),
@@ -527,6 +556,9 @@ export class ShapeMirror {
       ...paintInput(item),
       ...(item.text && !isLineKind(item.shape) ? { text: item.text } : {}),
       ...(item.textBox && !isLineKind(item.shape) ? { textBox: true } : {}),
+      ...(item.textVert && !isLineKind(item.shape)
+        ? { textVert: ENGINE_TEXT_VERT[item.textVert] }
+        : {}),
       ...(item.name ? { name: item.name } : {}),
       ...(item.alt ? { description: item.alt } : {}),
       ...(item.rotationDeg !== undefined ? { rotationDeg: item.rotationDeg } : {}),
@@ -586,6 +618,9 @@ export class ShapeMirror {
         input.presetGeometry = PRST_OF_KIND[item.shape as SessionShapeKind];
       }
       if (item.text !== old.text) input.text = item.text ?? '';
+      if (item.textVert !== old.textVert) {
+        input.textVert = item.textVert === undefined ? null : ENGINE_TEXT_VERT[item.textVert];
+      }
       if (item.rotationDeg !== old.rotationDeg) input.rotationDeg = item.rotationDeg ?? 0;
       if (item.flipH !== old.flipH) input.flipH = item.flipH === true;
       if (item.flipV !== old.flipV) input.flipV = item.flipV === true;
