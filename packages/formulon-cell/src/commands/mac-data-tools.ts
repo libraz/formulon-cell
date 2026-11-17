@@ -508,7 +508,17 @@ export async function solveMacGoalSeek(
   let scratch: WorkbookHandle | null = null;
   try {
     const sourceBytes = new Uint8Array(wb.save({ snapshot: true }));
-    scratch = await WorkbookHandle.loadBytes(sourceBytes, { preferStub: wb.isStub });
+    // The scratch book calculates under the profile of the book it copies.
+    const profile = wb.spreadsheetProfileId();
+    scratch = await WorkbookHandle.loadBytes(sourceBytes, {
+      preferStub: wb.isStub,
+      ...(profile
+        ? {
+            locale: profile.slice(profile.indexOf('-') + 1),
+            platform: profile.startsWith('mac-') ? ('mac' as const) : ('default' as const),
+          }
+        : {}),
+    });
     // A workbook in Manual calculation mode can carry stale cached results in
     // its saved bytes. Goal Seek always starts from a fresh calculation and
     // explicitly recalculates every trial for the same reason.

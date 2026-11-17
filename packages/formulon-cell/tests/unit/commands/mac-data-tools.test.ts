@@ -227,6 +227,27 @@ describe('Mac Data command operations', () => {
     expect(wb.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({ kind: 'number', value: 4 });
   });
 
+  it('opens the Goal Seek scratch book under the workbook profile', async () => {
+    const wb = await WorkbookHandle.createDefault({ locale: 'ja', platform: 'mac' });
+    handles.push(wb);
+    expect(wb.isStub).toBe(false);
+    const store = createSpreadsheetStore();
+    wb.setNumber({ sheet: 0, row: 0, col: 0 }, 3);
+    wb.setFormula({ sheet: 0, row: 0, col: 1 }, '=A1*2');
+    wb.recalc();
+    const load = vi.spyOn(WorkbookHandle, 'loadBytes');
+    await solveMacGoalSeek(makeInstance(wb, store), {
+      formulaCell: { sheet: 0, row: 0, col: 1 },
+      targetValue: 10,
+      changingCell: { sheet: 0, row: 0, col: 0 },
+    });
+    expect(load).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ locale: 'ja_JP', platform: 'mac' }),
+    );
+    load.mockRestore();
+  });
+
   it('records accepted Goal Seek as one undoable controller intent', async () => {
     const wb = await WorkbookHandle.createDefault();
     handles.push(wb);

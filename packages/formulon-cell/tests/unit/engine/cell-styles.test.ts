@@ -440,7 +440,7 @@ describe('named-style engine publication', () => {
       const defaultFont = wb.getFontRecord(0);
       expect(defaultFont).toBeDefined();
       if (!defaultFont) return;
-      const normalFont = wb.addFontRecord({ ...defaultFont, name: 'Normal Native' });
+      const normalFont = wb.addFontRecord({ ...defaultFont, name: 'Normal Native', scheme: 0 });
       const resolvedNormal = wb.addCellStyleXfRecord({ ...normal, fontIndex: normalFont });
       expect(resolvedNormal).toBeGreaterThan(0);
       expect(wb.setNamedCellStyle('Normal', resolvedNormal, 0)).toBe(true);

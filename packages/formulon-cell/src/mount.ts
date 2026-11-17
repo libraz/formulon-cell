@@ -269,7 +269,6 @@ export const Spreadsheet = {
       // Select it before a seed writes formulas so seeded values use the same
       // host semantics as the first hydrated paint.
       syncLocaleProfile(wb, i18n.locale, ui.platform, { throwOnFailure: true });
-      wb.fontScriptProfile = wb.spreadsheetProfileId();
       if (opts.seed && ownsWb) opts.seed(wb);
       if (opts.viewport) {
         validateViewportAgainstWorkbook(opts.viewport, wb, viewportRangeSheet(opts.viewport, wb));
@@ -1203,7 +1202,6 @@ export const Spreadsheet = {
         // A rejected profile leaves the current workbook and its store
         // untouched because detachment happens only after this call.
         syncLocaleProfile(next, i18n.locale, ui.platform, { throwOnFailure: true });
-        next.fontScriptProfile = next.spreadsheetProfileId();
         next.geometryPlatform = ui.platform;
         discardMacPalette();
         // A Draw stroke belongs to the current workbook. Cancel it before

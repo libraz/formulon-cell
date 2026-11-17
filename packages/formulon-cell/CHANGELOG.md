@@ -73,6 +73,7 @@ versioning is [SemVer](https://semver.org/).
 - Keys pressed in a modal dialog no longer reach key handlers on the host page, or the ribbon's, the backstage's and the title bar's shortcuts (Ctrl+F1 in Go To no longer collapses the ribbon behind it): every dialog keeps its keys, as Format Cells, Page Setup and six other dialogs already did, and a capture-phase listener still sees them. Nothing is default-prevented on the way.
 - **Breaking:** The sheet's grid, not the mount element, takes keyboard focus and is the sheet's one tab stop: the element passed to `mount` is no longer focusable, and keys reach the grid only when pressed in it, not on the sheet bar, status bar, formula bar buttons, ribbon or a pane: Tab and Shift+Tab leave the sheet bar, Enter reaches the focused button, and Delete or a typed character no longer clears or edits the active cell. Focus the sheet with `instance.focus()`.
 - Shift+Tab after an edit in the formula bar moves left on the default profile, as on the Mac. An unset `tabBoundary` follows the spreadsheet's shape: `'stop'`, or `'leave'` when the grid is its only region, and the resolved viewport options report it unset.
+- Theme-linked font names come from the engine, which names them by the workbook theme and the language profile. Switching the UI language now shows that language's theme face, as the spreadsheet does, rather than keeping the face the book opened with. A charset no longer picks the script face. Goal Seek calculates its trials under the workbook's profile.
 
 ### Added
 

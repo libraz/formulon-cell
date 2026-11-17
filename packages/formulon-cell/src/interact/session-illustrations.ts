@@ -35,7 +35,7 @@ import { fontPointsToCssPx } from '../engine/font-units.js';
 import { DEFAULT_ILLUSTRATION_FRAME } from '../engine/shapes-sync.js';
 import { argbFromCssColor, cssColorFromArgb } from '../engine/theme-color.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { themeFontFace } from '../engine/workbook-handle-styles.js';
+import { minorThemeFontFace } from '../engine/workbook-handle-styles.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import type { State } from '../store/types.js';
@@ -205,7 +205,7 @@ interface ShapeTextTheme {
 const shapeTextTheme = (wb: WorkbookHandle | null, item: SessionIllustration): ShapeTextTheme => {
   const theme = wb?.getWorkbookTheme();
   const color = theme?.colors[item.textBox ? 0 : 1];
-  const family = wb ? themeFontFace(wb, false) : undefined;
+  const family = wb ? minorThemeFontFace(wb) : undefined;
   return {
     ...(family ? { family } : {}),
     ...(color !== undefined ? { color: cssColorFromArgb(color) } : {}),

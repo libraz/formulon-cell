@@ -190,12 +190,6 @@ export class WorkbookHandle {
     if (this.setSpreadsheetProfileId(next)) this.recalcAuto();
   }
 
-  /** Profile whose language picks the theme script face of a charset-less
-   *  theme font. The mount pins it when it binds the workbook, so a later UI
-   *  locale switch keeps the faces the book opened with; null follows the
-   *  current profile. */
-  fontScriptProfile: SpreadsheetProfileId | null = null;
-
   private readonly module: Formulon;
 
   private readonly wb: Workbook;

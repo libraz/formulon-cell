@@ -61,18 +61,7 @@ declare module './workbook-handle.js' {
  *  below, and painting resolves a theme-linked font for every visible cell. */
 const themeCache = new WeakMap<object, WorkbookTheme | null>();
 
-/** ISO 15924 theme script a font `charset` selects; any other charset takes the latin face. */
-const SCRIPT_FOR_CHARSET: ReadonlyMap<number, string> = new Map([
-  [128, 'Jpan'],
-  [129, 'Hang'],
-  [134, 'Hans'],
-  [136, 'Hant'],
-  [222, 'Thai'],
-]);
-
-/** Theme script of the editing language a profile models; a theme-linked font
- *  without a charset takes that script's face, as a Japanese host shows a
- *  minor-scheme Calibri record in the theme's Jpan typeface. */
+/** Theme script of the editing language a profile models. */
 const SCRIPT_FOR_PROFILE_LOCALE: ReadonlyMap<string, string> = new Map([
   ['ja_JP', 'Jpan'],
   ['ko_KR', 'Hang'],
@@ -82,29 +71,21 @@ const SCRIPT_FOR_PROFILE_LOCALE: ReadonlyMap<string, string> = new Map([
 ]);
 
 function profileScript(handle: WorkbookHandleStylesMethods): string | undefined {
-  const wbh = handle as unknown as WorkbookHandle;
-  const profile = wbh.fontScriptProfile ?? wbh.spreadsheetProfileId();
+  const profile = (handle as unknown as WorkbookHandle).spreadsheetProfileId();
   const locale = profile?.slice(profile.indexOf('-') + 1);
   return locale ? SCRIPT_FOR_PROFILE_LOCALE.get(locale) : undefined;
 }
 
-/** The theme face a major or minor scheme font draws in: the script face its
- *  `charset` (or, without one, the profile's language) selects, else the Latin face. */
-export function themeFontFace(
-  handle: WorkbookHandleStylesMethods,
-  major: boolean,
-  charset?: number | null,
-): string | undefined {
+/** The theme's minor (body) face in the profile language's script, else its Latin face.
+ *  Font records are named by the engine; this is only for text that has no record, such
+ *  as a shape's. */
+export function minorThemeFontFace(handle: WorkbookHandleStylesMethods): string | undefined {
   const theme = handle.capabilities.workbookTheme ? readTheme(handle) : null;
-  const script =
-    charset !== null && charset !== undefined
-      ? SCRIPT_FOR_CHARSET.get(charset)
-      : profileScript(handle);
+  const script = profileScript(handle);
   const scriptFace = script
-    ? (major ? theme?.majorScripts : theme?.minorScripts)?.find((s) => s.script === script)
-        ?.typeface
+    ? theme?.minorScripts.find((s) => s.script === script)?.typeface
     : undefined;
-  return scriptFace || (major ? theme?.fonts.majorLatin : theme?.fonts.minorLatin) || undefined;
+  return scriptFace || theme?.fonts.minorLatin || undefined;
 }
 
 function readTheme(handle: WorkbookHandleStylesMethods): WorkbookTheme | null {
@@ -349,20 +330,12 @@ export abstract class WorkbookHandleStylesMethods {
 
   /** Resolve a font record's theme, indexed, or automatic colour for display
    *  while retaining its raw selector: the resolved ARGB is `color.argb`.
-   *  Theme-linked font names are projected from the current workbook theme
-   *  for rendering; the returned `scheme` still preserves the source link so
-   *  writeback can keep it linked. */
+   *  The name is the engine's, which already follows the theme. */
   getResolvedFontRecord(fontIndex: number): FontRecord | null {
     const record = this.getFontRecord(fontIndex);
-    if (!record) return null;
-    let resolved = record;
-    if (record.scheme === FontScheme.Major || record.scheme === FontScheme.Minor) {
-      const themeName = themeFontFace(this, record.scheme === FontScheme.Major, record.charset);
-      if (themeName) resolved = { ...resolved, name: themeName };
-    }
-    if (!record.color) return resolved;
+    if (!record?.color) return record;
     const argb = resolveArgb(this, record.color, 0);
-    return argb === null ? resolved : { ...resolved, color: withArgb(record.color, argb) };
+    return argb === null ? record : { ...record, color: withArgb(record.color, argb) };
   }
 
   /** Resolve a fill index to its plain-data record. */

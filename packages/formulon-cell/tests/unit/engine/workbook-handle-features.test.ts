@@ -150,7 +150,8 @@ describe('engine/workbook-handle — workbook default font', () => {
     } finally {
       authored.dispose();
     }
-    const reloaded = await WorkbookHandle.loadBytes(bytes);
+    // A file carries no profile; the host states it on load.
+    const reloaded = await WorkbookHandle.loadBytes(bytes, { locale: 'ja-JP' });
     try {
       expect(reloaded.getFontRecord(0)?.name).toBe('游ゴシック');
     } finally {

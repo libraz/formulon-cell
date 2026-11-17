@@ -33,13 +33,13 @@ describe('getResolvedFontRecord theme script faces', () => {
     }
   });
 
-  it('keeps the latin face for a charset without a theme script', async () => {
+  it('names a theme-linked font by the profile script whatever its charset', async () => {
     const wb = await WorkbookHandle.createDefault({ locale: 'zh', platform: 'mac' });
     try {
       const base = wb.getFontRecord(0);
       if (!base) throw new Error('font 0 missing');
       const index = wb.addFontRecord({ ...base, charset: 204 });
-      expect(wb.getResolvedFontRecord(index)?.name).toBe('Aptos Narrow');
+      expect(wb.getResolvedFontRecord(index)?.name).toBe('等线');
     } finally {
       wb.dispose();
     }
@@ -56,20 +56,6 @@ describe('theme-linked fonts without a charset', () => {
       expect(wb.getResolvedFontRecord(index)?.name).toBe('Aptos Narrow');
       expect(wb.setSpreadsheetProfileId('windows-ja_JP')).toBe(true);
       expect(wb.getResolvedFontRecord(index)?.name).toBe('游ゴシック');
-    } finally {
-      wb.dispose();
-    }
-  });
-
-  it('keep the pinned font script profile across a profile change', async () => {
-    const wb = await WorkbookHandle.createDefault({ locale: 'en' });
-    try {
-      const base = wb.getFontRecord(0);
-      if (!base) throw new Error('font 0 missing');
-      const index = wb.addFontRecord({ ...base, name: 'Calibri', scheme: 2, charset: null });
-      wb.fontScriptProfile = wb.spreadsheetProfileId();
-      expect(wb.setSpreadsheetProfileId('windows-ja_JP')).toBe(true);
-      expect(wb.getResolvedFontRecord(index)?.name).toBe('Aptos Narrow');
     } finally {
       wb.dispose();
     }

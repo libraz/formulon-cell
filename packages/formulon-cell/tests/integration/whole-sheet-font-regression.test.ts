@@ -228,7 +228,7 @@ describe('whole-sheet font structure remap regression', () => {
   it('clears a loaded axis through undo/redo and preserves the cleared result after reload', async () => {
     const source = await WorkbookHandle.createDefault({ locale: 'ja' });
     installImportedAxisFont(source);
-    const loaded = await WorkbookHandle.loadBytes(source.save());
+    const loaded = await WorkbookHandle.loadBytes(source.save(), { locale: 'ja' });
     source.dispose();
     const mounted = await mountStubSheet({ workbook: loaded, locale: 'ja' });
     const history = new History();
@@ -253,7 +253,7 @@ describe('whole-sheet font structure remap regression', () => {
         sizePt: defaultFont.sizePt,
         bold: null,
       });
-      const reloaded = await WorkbookHandle.loadBytes(loaded.save());
+      const reloaded = await WorkbookHandle.loadBytes(loaded.save(), { locale: 'ja' });
       try {
         expect(rawAt(reloaded).font).toMatchObject({
           name: defaultFont.name,

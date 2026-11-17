@@ -176,10 +176,10 @@ describe('formulon 0.13 style projections and workbook themes', () => {
       expect(wb.getTheme()?.colors).toHaveLength(12);
       expect(wb.setThemeColors(colors)).toBe(true);
       expect(wb.setThemeFonts(fonts)).toBe(true);
-      // A theme-linked minor font keeps its raw scheme selector while the
-      // display projection follows the edited workbook face.
+      // A theme-linked minor font keeps its raw scheme selector and the engine
+      // names it with the edited theme face.
       expect(wb.setWorkbookDefaultFont({ scheme: 2 })).toBe(true);
-      expect(wb.getFontRecord(0)?.name).toBe('Aptos Narrow');
+      expect(wb.getFontRecord(0)?.name).toBe(fonts.minorLatin);
       expect(wb.getResolvedFontRecord(0)?.name).toBe(fonts.minorLatin);
       wb.setText({ sheet: 0, row: 0, col: 0 }, 'themed');
       expect(effectiveCellFormatFromEngine(wb, 0, 0, 0)?.fontFamily).toBe(fonts.minorLatin);

@@ -76,14 +76,11 @@ function displayWidthModel(handle: unknown, sheet: number): WidthModel | null {
   return orFallback(null, () => ws(handle, sheet).getWidthModel(GeometryMode.Display));
 }
 
-/** `sheet`'s Normal font as displayed — a theme-linked record takes the face
- *  the theme resolves it to — or null when the engine cannot report it. */
+/** `sheet`'s Normal font as the engine names it, or null when it cannot report it. */
 function sheetNormalFont(handle: unknown, sheet: number): { name: string; size: number } | null {
   const model = displayWidthModel(handle, sheet);
   if (!model || !Number.isFinite(model.normalFontSizePt)) return null;
-  const normal = (handle as WorkbookHandle).getResolvedFontRecord(0);
-  const name = normal?.scheme ? normal.name : model.normalFontName;
-  return { name, size: model.normalFontSizePt };
+  return { name: model.normalFontName, size: model.normalFontSizePt };
 }
 
 /** `sheet`'s digit width and column padding in screen pixels, and the CSS px per screen pixel:
