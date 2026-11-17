@@ -236,6 +236,8 @@ export const ribbonMenusZh: RibbonMenusStrings = {
     shapeNoFill: '无填充',
     shapeRotateRight: '向右旋转 90°',
     shapeRotateLeft: '向左旋转 90°',
+    shapeFlipVertical: '垂直翻转',
+    shapeFlipHorizontal: '水平翻转',
     shapeNoOutline: '无轮廓',
     shapeOutlineWeight: '粗细',
     shapeOutlineDashes: '虚线',

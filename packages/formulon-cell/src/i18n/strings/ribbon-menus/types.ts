@@ -238,6 +238,8 @@ export interface RibbonMenusStrings {
     shapeNoFill: string;
     shapeRotateRight: string;
     shapeRotateLeft: string;
+    shapeFlipVertical: string;
+    shapeFlipHorizontal: string;
     shapeNoOutline: string;
     shapeOutlineWeight: string;
     shapeOutlineDashes: string;

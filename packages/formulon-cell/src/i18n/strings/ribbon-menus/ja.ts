@@ -238,6 +238,8 @@ export const ribbonMenusJa: RibbonMenusStrings = {
     shapeNoFill: '塗りつぶしなし',
     shapeRotateRight: '右へ 90 度回転',
     shapeRotateLeft: '左へ 90 度回転',
+    shapeFlipVertical: '上下反転',
+    shapeFlipHorizontal: '左右反転',
     shapeNoOutline: '枠線なし',
     shapeOutlineWeight: '太さ',
     shapeOutlineDashes: '実線/点線',

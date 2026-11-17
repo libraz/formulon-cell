@@ -243,6 +243,8 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     shapeNoFill: 'Keine Füllung',
     shapeRotateRight: 'Rechtsdrehung 90°',
     shapeRotateLeft: 'Linksdrehung 90°',
+    shapeFlipVertical: 'Vertikal kippen',
+    shapeFlipHorizontal: 'Horizontal kippen',
     shapeNoOutline: 'Keine Kontur',
     shapeOutlineWeight: 'Stärke',
     shapeOutlineDashes: 'Striche',

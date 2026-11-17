@@ -130,6 +130,15 @@ const drawShape = (svg: SVGSVGElement, item: SessionIllustration, w: number, h: 
   svg.replaceChildren();
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   if (!item.shape) return;
+  // The geometry mirrors inside its own group; the text is drawn outside it.
+  const mirror = [
+    ...(item.flipH ? [`translate(${w} 0) scale(-1 1)`] : []),
+    ...(item.flipV ? [`translate(0 ${h}) scale(1 -1)`] : []),
+  ].join(' ');
+  drawGeometry(mirror ? appendSvg(svg, 'g', { transform: mirror }) : svg, item, w, h);
+};
+
+const drawGeometry = (svg: SVGElement, item: SessionIllustration, w: number, h: number): void => {
   const outline = shapeOutlineColor(item);
   const width = (shapeOutlineWeight(item) ?? 0) * PX_PER_PT;
   const dash = shapeDashStroke(shapeOutlineDash(item), width);

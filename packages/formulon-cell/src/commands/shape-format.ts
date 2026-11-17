@@ -1,5 +1,5 @@
 import { ChartLineDash } from '@libraz/formulon';
-import { displayRotation } from '../engine/drawing-geometry.js';
+import { displayRotation, flippedRotation } from '../engine/drawing-geometry.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type {
   SessionIllustration,
@@ -241,6 +241,22 @@ export function applySessionShapeRotation(
 ): SessionIllustration | null {
   const rotationDeg = displayRotation((item.rotationDeg ?? 0) + stepDeg);
   return applyShapePatch(store, item, { rotationDeg }, 'shapeRotate', history, wb);
+}
+
+/** Flip Horizontal or Flip Vertical: toggles the flag and mirrors the rotation; one undo step. */
+export function applySessionDrawingFlip(
+  store: SpreadsheetStore,
+  item: SessionIllustration,
+  axis: 'horizontal' | 'vertical',
+  history: History | null = null,
+  wb?: WorkbookHandle,
+): SessionIllustration | null {
+  const key = axis === 'horizontal' ? 'flipH' : 'flipV';
+  const patch = {
+    [key]: item[key] ? undefined : true,
+    rotationDeg: flippedRotation(item.rotationDeg),
+  };
+  return applyShapePatch(store, item, patch, 'shapeRotate', history, wb);
 }
 
 /** Change Shape: a new kind with the same paint, text and frame; one undo step. */

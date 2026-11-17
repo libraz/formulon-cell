@@ -162,6 +162,9 @@ export const createShapeFormatMenuFactories = (
     menu.append(
       menuIconButton(t.shapeRotateRight, 'shapeRotate', 'right', 'rotate-right'),
       menuIconButton(t.shapeRotateLeft, 'shapeRotate', 'left', 'rotate-left'),
+      menuSeparator(),
+      menuIconButton(t.shapeFlipVertical, 'shapeRotate', 'flip-vertical', 'flip-vertical'),
+      menuIconButton(t.shapeFlipHorizontal, 'shapeRotate', 'flip-horizontal', 'flip-horizontal'),
     );
     return menu;
   };

@@ -15,13 +15,14 @@ afterEach(() => {
 });
 
 /** A workbook holding one rect shape turned by `rotationDeg`, drawn into a host. */
-async function drawn(rotationDeg: number) {
+async function drawn(rotationDeg: number, flips: { flipH?: boolean; flipV?: boolean } = {}) {
   const wb = await WorkbookHandle.createDefault();
   cleanup.push(() => wb.dispose());
   wb.insertShape(0, {
     name: 'R',
     presetGeometry: 'rect',
     rotationDeg,
+    ...flips,
     text: 'hi',
     anchor: {
       kind: AnchorKind.TwoCell,
@@ -95,6 +96,26 @@ describe('a shape loaded with a rotation', () => {
     const reopened = await WorkbookHandle.loadBytes(wb.save());
     cleanup.push(() => reopened.dispose());
     expect(reopened.listShapes(0)[0]?.rotationDeg).toBe(before);
+  });
+
+  it('draws a flipped shape mirrored inside its turned panel, with the text unmirrored', async () => {
+    const { panel, item } = await drawn(330, { flipH: true });
+
+    expect(item.flipH).toBe(true);
+    expect(item.flipV).toBeUndefined();
+    expect(panel.style.transform).toBe('rotate(330deg)');
+    const group = panel.querySelector('svg > g');
+    expect(group?.getAttribute('transform')).toMatch(/^translate\([\d.]+ 0\) scale\(-1 1\)$/);
+    expect(group?.querySelector('rect')).not.toBeNull();
+    expect(group?.querySelector('text')).toBeNull();
+    expect(panel.querySelector('svg text')).not.toBeNull();
+  });
+
+  it('mirrors a vertically flipped shape about its horizontal axis', async () => {
+    const { panel } = await drawn(0, { flipV: true });
+    expect(panel.querySelector('svg > g')?.getAttribute('transform')).toMatch(
+      /^translate\(0 [\d.]+\) scale\(1 -1\)$/,
+    );
   });
 
   it('leaves an unrotated shape without a transform', async () => {

@@ -238,6 +238,8 @@ export const ribbonMenusEn: RibbonMenusStrings = {
     shapeNoFill: 'No Fill',
     shapeRotateRight: 'Rotate Right 90°',
     shapeRotateLeft: 'Rotate Left 90°',
+    shapeFlipVertical: 'Flip Vertical',
+    shapeFlipHorizontal: 'Flip Horizontal',
     shapeNoOutline: 'No Outline',
     shapeOutlineWeight: 'Weight',
     shapeOutlineDashes: 'Dashes',

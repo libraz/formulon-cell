@@ -1,5 +1,6 @@
 import { selectedSessionIllustration } from '../../commands/session-illustration.js';
 import {
+  applySessionDrawingFlip,
   applySessionShapeFill,
   applySessionShapeKind,
   applySessionShapeOutline,
@@ -98,6 +99,12 @@ const isLineDash = (value: string): value is SessionShapeLineDash =>
 /** Quarter turn of each Rotate entry, in degrees clockwise. */
 const ROTATE_STEP: Readonly<Record<string, number>> = { right: 90, left: -90 };
 
+/** Axis of each Flip entry. */
+const FLIP_AXIS: Readonly<Record<string, 'horizontal' | 'vertical'>> = {
+  'flip-horizontal': 'horizontal',
+  'flip-vertical': 'vertical',
+};
+
 export function createShapeFormatDropdownDefaults(
   instance: SpreadsheetInstance,
 ): ShapeFormatDropdownDefaults {
@@ -188,8 +195,14 @@ export function createShapeFormatDropdownDefaults(
     },
     applyShapeRotateAction(value) {
       const item = selectedShape();
+      if (!item) return;
+      const axis = FLIP_AXIS[value];
+      if (axis) {
+        applySessionDrawingFlip(instance.store, item, axis, instance.history, instance.workbook);
+        return;
+      }
       const step = ROTATE_STEP[value];
-      if (!item || step === undefined) return;
+      if (step === undefined) return;
       applySessionShapeRotation(instance.store, item, step, instance.history, instance.workbook);
     },
     updateShapeRotateMenu(menu) {

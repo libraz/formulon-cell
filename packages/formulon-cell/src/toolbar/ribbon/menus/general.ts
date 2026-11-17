@@ -143,6 +143,8 @@ export const MENU_ICON_GLYPHS = {
   'remove-duplicates': 'removeDuplicates',
   'rotate-left': 'rotateLeft',
   'rotate-right': 'rotateRight',
+  'flip-vertical': 'flipVertical',
+  'flip-horizontal': 'flipHorizontal',
   wrap: 'wrap',
   'script-clear': 'script',
   'script-custom': 'script',

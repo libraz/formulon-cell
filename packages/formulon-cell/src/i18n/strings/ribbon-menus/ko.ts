@@ -238,6 +238,8 @@ export const ribbonMenusKo: RibbonMenusStrings = {
     shapeNoFill: '채우기 없음',
     shapeRotateRight: '오른쪽으로 90도 회전',
     shapeRotateLeft: '왼쪽으로 90도 회전',
+    shapeFlipVertical: '상하 대칭',
+    shapeFlipHorizontal: '좌우 대칭',
     shapeNoOutline: '윤곽선 없음',
     shapeOutlineWeight: '두께',
     shapeOutlineDashes: '대시',

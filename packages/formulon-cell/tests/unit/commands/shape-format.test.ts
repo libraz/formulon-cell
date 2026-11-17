@@ -6,6 +6,7 @@ import {
   sessionIllustrationById,
 } from '../../../src/commands/session-illustration.js';
 import {
+  applySessionDrawingFlip,
   applySessionShapeFill,
   applySessionShapeKind,
   applySessionShapeOutline,
@@ -174,6 +175,32 @@ describe('shape format commands', () => {
     expect(current(item.id).rotationDeg).toBe(130);
   });
 
+  it('flips a shape on either axis, mirroring its rotation, one undo step each', () => {
+    const item = shape();
+    mutators.updateIllustration(store, item.id, { rotationDeg: 30 });
+    applySessionDrawingFlip(store, current(item.id), 'horizontal', history);
+    expect(current(item.id)).toMatchObject({ flipH: true, rotationDeg: 330 });
+    expect(current(item.id).flipV).toBeUndefined();
+    applySessionDrawingFlip(store, current(item.id), 'vertical', history);
+    expect(current(item.id)).toMatchObject({ flipH: true, flipV: true, rotationDeg: 30 });
+    applySessionDrawingFlip(store, current(item.id), 'horizontal', history);
+    expect(current(item.id).flipH).toBeUndefined();
+    expect(current(item.id).flipV).toBe(true);
+
+    history.undo();
+    expect(current(item.id)).toMatchObject({ flipH: true, flipV: true, rotationDeg: 30 });
+    history.undo();
+    history.undo();
+    expect(current(item.id).flipH).toBeUndefined();
+    expect(current(item.id).rotationDeg).toBe(30);
+  });
+
+  it('keeps an unrotated flipped shape at no rotation', () => {
+    const item = shape();
+    applySessionDrawingFlip(store, item, 'vertical', history);
+    expect(current(item.id)).toMatchObject({ flipV: true, rotationDeg: 0 });
+  });
+
   it('changes the kind of a shape, keeping its paint, text and frame', () => {
     const created = createSessionShape(store, range, {
       id: 'box',
@@ -208,6 +235,7 @@ describe('shape format commands', () => {
     mutators.updateIllustration(store, box.id, { nativeLocked: true });
     expect(applySessionShapeKind(store, current(box.id), 'oval', history)).toBeNull();
     expect(applySessionShapeRotation(store, current(box.id), 90, history)).toBeNull();
+    expect(applySessionDrawingFlip(store, current(box.id), 'horizontal', history)).toBeNull();
     expect(history.canUndo()).toBe(false);
   });
 });

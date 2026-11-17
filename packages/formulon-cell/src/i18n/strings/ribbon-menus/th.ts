@@ -236,6 +236,8 @@ export const ribbonMenusTh: RibbonMenusStrings = {
     shapeNoFill: 'ไม่มีการเติม',
     shapeRotateRight: 'หมุนขวา 90°',
     shapeRotateLeft: 'หมุนซ้าย 90°',
+    shapeFlipVertical: 'พลิกแนวตั้ง',
+    shapeFlipHorizontal: 'พลิกแนวนอน',
     shapeNoOutline: 'ไม่มีเส้นกรอบ',
     shapeOutlineWeight: 'น้ำหนัก',
     shapeOutlineDashes: 'เส้นประ',

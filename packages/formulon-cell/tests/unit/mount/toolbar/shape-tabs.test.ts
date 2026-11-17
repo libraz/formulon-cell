@@ -167,6 +167,36 @@ describe('shape and picture tabs of the ribbon', () => {
     tb.dispose();
   });
 
+  it('flips the selected shape from the Rotate menu, mirroring its rotation', () => {
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    const shape = insertShape();
+
+    command('shapeRotate').click();
+    const entries = Array.from(
+      host.querySelectorAll<HTMLElement>('[data-shape-rotate]'),
+      (entry) => entry.dataset.shapeRotate,
+    );
+    expect(entries).toEqual(['right', 'left', 'flip-vertical', 'flip-horizontal']);
+    pick(tb, '[data-shape-rotate="right"]');
+    command('shapeRotate').click();
+    pick(tb, '[data-shape-rotate="flip-horizontal"]');
+    expect(current(shape.id)).toMatchObject({ flipH: true, rotationDeg: 270 });
+    command('shapeRotate').click();
+    pick(tb, '[data-shape-rotate="flip-vertical"]');
+    expect(current(shape.id)).toMatchObject({ flipH: true, flipV: true, rotationDeg: 90 });
+
+    sheet.instance.history.undo();
+    expect(current(shape.id)).toMatchObject({ flipH: true, rotationDeg: 270 });
+    expect(current(shape.id).flipV).toBeUndefined();
+    sheet.instance.history.undo();
+    expect(current(shape.id)).toMatchObject({ rotationDeg: 90 });
+    expect(current(shape.id).flipH).toBeUndefined();
+    tb.dispose();
+  });
+
   it('changes the selected shape to another from the shapes gallery', () => {
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
       dynamicDropdowns: true,

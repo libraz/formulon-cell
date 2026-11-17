@@ -14,6 +14,7 @@ import {
   updateSessionIllustration,
 } from '../../../src/commands/session-illustration.js';
 import {
+  applySessionDrawingFlip,
   applySessionShapeFill,
   applySessionShapeKind,
   applySessionShapeOutline,
@@ -168,6 +169,9 @@ const only = (store: SpreadsheetStore): SessionIllustration => {
 
 /** What the file holds, read back from a fresh engine. */
 const saved = async (wb: WorkbookHandle) => session(undefined, wb.save());
+
+const ovalItem = (store: SpreadsheetStore): SessionIllustration =>
+  sessionIllustrationById(store.getState(), 's1') as SessionIllustration;
 
 const oval = (store: SpreadsheetStore, history: History | null = null) =>
   createSessionShape(
@@ -365,6 +369,58 @@ describe('shapes saved with the workbook', () => {
 
     history.undo();
     expect(listShapes(wb, 0)[0]?.rotation).toBe(270);
+  });
+
+  it('writes the flips of a shape, reads them back after save, and undoes them', async () => {
+    const { wb, store, history } = await session();
+    oval(store);
+    applySessionShapeRotation(store, only(store), 30, history, wb);
+
+    applySessionDrawingFlip(store, only(store), 'horizontal', history, wb);
+    expect(wb.listShapes(0)[0]).toMatchObject({ flipH: true, flipV: false, rotationDeg: 330 });
+    applySessionDrawingFlip(store, only(store), 'vertical', history, wb);
+    expect(wb.listShapes(0)[0]).toMatchObject({ flipH: true, flipV: true, rotationDeg: 30 });
+
+    const reopened = await saved(wb);
+    expect(only(reopened.store)).toMatchObject({ flipH: true, flipV: true, rotationDeg: 30 });
+
+    history.undo();
+    expect(wb.listShapes(0)[0]).toMatchObject({ flipH: true, flipV: false, rotationDeg: 330 });
+    history.undo();
+    expect(wb.listShapes(0)[0]).toMatchObject({ flipH: false, flipV: false, rotationDeg: 30 });
+    expect(only(store).flipH).toBeUndefined();
+  });
+
+  it('keeps the flips of a shape through duplicate and delete-undo', async () => {
+    const { wb, store, history } = await session();
+    oval(store);
+    applySessionDrawingFlip(store, only(store), 'horizontal', history, wb);
+    const copy = duplicateSessionIllustration(store, 's1', history, wb);
+    expect(copy).not.toBeNull();
+    expect(wb.listShapes(0).map((shape) => shape.flipH)).toEqual([true, true]);
+  });
+
+  it('re-reads every shape of the sheet after one is edited', async () => {
+    const { wb, store, history } = await session();
+    oval(store);
+    createSessionShape(store, range, {
+      id: 's2',
+      shape: 'rectangle',
+      x: 400,
+      y: 80,
+      w: 100,
+      h: 60,
+    });
+    const second = sessionIllustrationById(store.getState(), 's2')?.nativeObjectId ?? -1;
+    // The engine turns the other shape behind the store's back.
+    expect(wb.updateShape(0, second, { rotationDeg: 45, flipV: true })).toBe(true);
+
+    applySessionShapeRotation(store, ovalItem(store), 90, history, wb);
+
+    expect(sessionIllustrationById(store.getState(), 's2')).toMatchObject({
+      rotationDeg: 45,
+      flipV: true,
+    });
   });
 
   it('changes the kind of a shape in the file, keeping its paint, text and anchor', async () => {

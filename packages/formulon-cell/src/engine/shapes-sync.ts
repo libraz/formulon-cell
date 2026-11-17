@@ -208,6 +208,8 @@ export function shapeFromNative(
     nativeAnchor: anchor,
     nativeGeometryEditable: shape.anchor.kind !== ANCHOR_KIND_ABSOLUTE,
     ...(shape.rotationDeg !== 0 ? { rotationDeg: shape.rotationDeg } : {}),
+    ...(shape.flipH ? { flipH: true as const } : {}),
+    ...(shape.flipV ? { flipV: true as const } : {}),
     ...(shape.name ? { name: shape.name } : {}),
     ...(shape.description ? { alt: shape.description } : {}),
     ...(shape.textBox ? { textBox: true } : {}),
@@ -275,6 +277,8 @@ const shapeInputOf = (shape: EngineShape): EngineShapeInput | null => {
     ...(shape.description ? { description: shape.description } : {}),
     presetGeometry: shape.presetGeometry,
     rotationDeg: shape.rotationDeg,
+    ...(shape.flipH ? { flipH: true } : {}),
+    ...(shape.flipV ? { flipV: true } : {}),
     hidden: shape.hidden,
     ...(shape.kind !== DrawingObjectKind.Connector
       ? { text: shape.text, textBox: shape.textBox }
@@ -354,6 +358,9 @@ export class ShapeMirror {
 
   private last: State['illustrations'] | null = null;
 
+  /** Sheets whose shapes were edited or removed since the last sync: the engine may have moved others. */
+  private readonly touched = new Set<number>();
+
   /** Engine object id of each mirrored overlay item. */
   private readonly objectIds = new Map<string, number>();
 
@@ -414,6 +421,8 @@ export class ShapeMirror {
         if (Object.keys(patch).length > 0) patches.set(item.id, patch);
       }
     }
+    for (const sheet of this.touched) this.refreshSheet(store, slice.illustrations, sheet, patches);
+    this.touched.clear();
     if (patches.size === 0) return;
     store.setState((state) => {
       const illustrations = state.illustrations.illustrations.flatMap((item) => {
@@ -437,6 +446,41 @@ export class ShapeMirror {
     }
     this.handle.removeShape(sheet, objectId);
     this.objectIds.delete(id);
+    this.touched.add(sheet);
+  }
+
+  /** Add to `patches` what the engine now holds for each shape of `sheet` that differs from
+   *  the overlay: an edit to one drawing can move, turn or flip another (a connector). */
+  private refreshSheet(
+    store: SpreadsheetStore,
+    items: readonly SessionIllustration[],
+    sheet: number,
+    patches: Map<string, Partial<SessionIllustration> | null>,
+  ): void {
+    const live = new Map(this.handle.listShapes(sheet).map((shape) => [shape.objectId, shape]));
+    for (const item of items) {
+      const objectId = this.objectIds.get(item.id);
+      const shape = objectId === undefined ? undefined : live.get(objectId);
+      if (item.kind !== 'shape' || item.sheet !== sheet || !shape) continue;
+      const pending = patches.get(item.id);
+      if (pending === null) continue;
+      const now = { ...item, ...pending };
+      const diff: Partial<SessionIllustration> = {};
+      const anchor = drawingAnchorOf(shape);
+      if (!sameAnchor(now.nativeAnchor, anchor)) {
+        Object.assign(diff, {
+          ...sessionPosition(store, anchor),
+          nativeAnchor: anchor,
+          nativeGeometryEditable: shape.anchor.kind !== ANCHOR_KIND_ABSOLUTE,
+        });
+      }
+      if ((now.rotationDeg ?? 0) !== shape.rotationDeg) {
+        diff.rotationDeg = shape.rotationDeg !== 0 ? shape.rotationDeg : undefined;
+      }
+      if ((now.flipH ?? false) !== shape.flipH) diff.flipH = shape.flipH ? true : undefined;
+      if ((now.flipV ?? false) !== shape.flipV) diff.flipV = shape.flipV ? true : undefined;
+      if (Object.keys(diff).length > 0) patches.set(item.id, { ...pending, ...diff });
+    }
   }
 
   /** Insert `item`; returns the fields that tie it to the new shape, or null. */
@@ -471,6 +515,8 @@ export class ShapeMirror {
       ...(item.name ? { name: item.name } : {}),
       ...(item.alt ? { description: item.alt } : {}),
       ...(item.rotationDeg !== undefined ? { rotationDeg: item.rotationDeg } : {}),
+      ...(item.flipH ? { flipH: true } : {}),
+      ...(item.flipV ? { flipV: true } : {}),
     };
     if (item.nativeAnchor) return { ...spec, ...anchorInput(item.nativeAnchor) };
     const frame = {
@@ -523,9 +569,12 @@ export class ShapeMirror {
       }
       if (item.text !== old.text) input.text = item.text ?? '';
       if (item.rotationDeg !== old.rotationDeg) input.rotationDeg = item.rotationDeg ?? 0;
+      if (item.flipH !== old.flipH) input.flipH = item.flipH === true;
+      if (item.flipV !== old.flipV) input.flipV = item.flipV === true;
     }
     if (Object.keys(input).length === 0) return null;
     if (this.handle.updateShape(item.sheet, objectId, input)) {
+      this.touched.add(item.sheet);
       const tie = this.tie(item.sheet, objectId);
       return tie.nativeAnchor && sameAnchor(tie.nativeAnchor, item.nativeAnchor) ? null : tie;
     }

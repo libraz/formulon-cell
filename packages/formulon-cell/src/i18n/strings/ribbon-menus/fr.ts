@@ -240,6 +240,8 @@ export const ribbonMenusFr: RibbonMenusStrings = {
     shapeNoFill: 'Aucun remplissage',
     shapeRotateRight: 'Faire pivoter à droite de 90°',
     shapeRotateLeft: 'Faire pivoter à gauche de 90°',
+    shapeFlipVertical: 'Retourner verticalement',
+    shapeFlipHorizontal: 'Retourner horizontalement',
     shapeNoOutline: 'Sans contour',
     shapeOutlineWeight: 'Épaisseur',
     shapeOutlineDashes: 'Tirets',

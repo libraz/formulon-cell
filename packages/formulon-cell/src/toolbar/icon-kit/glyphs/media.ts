@@ -1,6 +1,6 @@
 /** Picture, screenshot and drawing-shape icons. */
 
-import { circle, ellipse, poly, rect, roundRect } from '../path.js';
+import { circle, ellipse, hLine, poly, rect, roundRect, vLine } from '../path.js';
 import { arcArrow, arrow, badge, filled, monitor, outlined, stroked } from '../primitives.js';
 import { PALETTE } from '../tokens.js';
 import type { IconDefinition, IconSegment } from '../types.js';
@@ -32,6 +32,36 @@ const rotateMark = (left: boolean): IconSegment[] => {
       weight: 'bold',
       head: 'solid',
     }),
+  ];
+};
+
+/** A right triangle and its mirror image across a dashed axis through the centre. */
+const flipMark = (axis: 'horizontal' | 'vertical'): IconSegment[] => {
+  const across = (point: [number, number]): [number, number] =>
+    axis === 'horizontal' ? [24 - point[0], point[1]] : [point[0], 24 - point[1]];
+  const side: [number, number][] =
+    axis === 'horizontal'
+      ? [
+          [3.4, 20.6],
+          [9.8, 20.6],
+          [3.4, 7.8],
+        ]
+      : [
+          [3.4, 9.8],
+          [20.6, 9.8],
+          [3.4, 3.4],
+        ];
+  return [
+    outlined(poly(side, true), PALETTE.paper, PALETTE.accent, 'bold'),
+    outlined(poly(side.map(across), true), PALETTE.paper, PALETTE.info, 'bold'),
+    stroked(
+      axis === 'horizontal' ? vLine(12, 2.4, 19.2) : hLine(2.4, 12, 19.2),
+      PALETTE.ink,
+      'regular',
+      {
+        dash: '2 2',
+      },
+    ),
   ];
 };
 
@@ -158,6 +188,8 @@ export const MEDIA_ICONS = {
   ],
   rotateRight: rotateMark(false),
   rotateLeft: rotateMark(true),
+  flipVertical: flipMark('vertical'),
+  flipHorizontal: flipMark('horizontal'),
   // One shape turning into another.
   changeShape: [
     outlined(rect(2.6, 2.6, 9.4, 9.4), PALETTE.paper, PALETTE.info, 'bold'),
