@@ -10,7 +10,7 @@ const addr = { sheet: 0, row: 0, col: 0 } as const;
 const key = addrKey(addr);
 
 describe('CellXf metadata round-trip', () => {
-  it('keeps raw apply flags, protection and quotePrefix through a cell edit', async () => {
+  it('keeps raw apply flags in memory, and the save rule across a save, with protection and quotePrefix', async () => {
     const wb = await WorkbookHandle.createDefault();
     let reloaded: WorkbookHandle | null = null;
     try {
@@ -33,12 +33,25 @@ describe('CellXf metadata round-trip', () => {
       });
       expect(wb.setCellXfIndex(0, 0, 0, sourceXf)).toBe(true);
 
-      reloaded = await WorkbookHandle.loadBytes(wb.save());
-      const loadedSource = reloaded.getCellXf(reloaded.getCellXfIndex(0, 0, 0) ?? -1);
-      expect(loadedSource).toMatchObject({
+      // Without a save the flags stay as written.
+      expect(wb.getCellXf(sourceXf)).toMatchObject({
         applyNumberFormat: true,
         applyFont: false,
         applyFill: true,
+        applyBorder: false,
+        applyAlignment: false,
+        applyProtection: true,
+      });
+
+      // A save writes a flag only for a group that differs from the parent
+      // style, as the spreadsheet app does: number format and fill equal the
+      // parent's here, so their flags are dropped.
+      reloaded = await WorkbookHandle.loadBytes(wb.save());
+      const loadedSource = reloaded.getCellXf(reloaded.getCellXfIndex(0, 0, 0) ?? -1);
+      expect(loadedSource).toMatchObject({
+        applyNumberFormat: false,
+        applyFont: false,
+        applyFill: false,
         applyBorder: false,
         applyAlignment: false,
         applyProtection: true,
@@ -60,7 +73,7 @@ describe('CellXf metadata round-trip', () => {
       syncCellFormatsToEngine(reloaded, store, 0, { strict: true });
       const edited = reloaded.getCellXf(reloaded.getCellXfIndex(0, 0, 0) ?? -1);
       expect(edited).toMatchObject({
-        applyNumberFormat: true,
+        applyNumberFormat: false,
         applyFont: false,
         applyFill: true,
         applyBorder: false,
@@ -86,8 +99,9 @@ describe('CellXf metadata round-trip', () => {
       const savedAgain = await WorkbookHandle.loadBytes(reloaded.save());
       try {
         const savedXf = savedAgain.getCellXf(savedAgain.getCellXfIndex(0, 0, 0) ?? -1);
+        // The protection values now equal the parent's, so the save drops the flag.
         expect(savedXf).toMatchObject({
-          applyProtection: true,
+          applyProtection: false,
           quotePrefix: true,
           locked: true,
           hidden: false,
@@ -136,7 +150,13 @@ describe('CellXf metadata round-trip', () => {
         hidden: true,
       });
       expect(wb.setCellXfIndex(0, 0, 0, sourceXf)).toBe(true);
+      expect(wb.getCellXf(sourceXf)).toMatchObject({
+        applyNumberFormat: true,
+        applyBorder: true,
+      });
 
+      // The save drops the number-format and border flags: neither group
+      // differs from the parent style.
       reloaded = await WorkbookHandle.loadBytes(wb.save());
       const store = createSpreadsheetStore();
       store.setState((state) => ({
@@ -159,9 +179,9 @@ describe('CellXf metadata round-trip', () => {
       const edited = reloaded.getCellXf(reloaded.getCellXfIndex(0, 0, 0) ?? -1);
       expect(edited).toMatchObject({
         styleXfIndex: namedStyleXf,
-        applyNumberFormat: true,
+        applyNumberFormat: false,
         applyFont: false,
-        applyBorder: true,
+        applyBorder: false,
         applyProtection: true,
         quotePrefix: true,
         locked: false,
