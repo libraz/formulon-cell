@@ -161,12 +161,13 @@ export abstract class WorkbookHandleValidationMethods {
       ...(input.showInputMessage !== undefined ? { showInputMessage: input.showInputMessage } : {}),
       ...(input.showErrorMessage !== undefined ? { showErrorMessage: input.showErrorMessage } : {}),
       ...(input.showDropDown !== undefined ? { showInCellDropdown: input.showDropDown } : {}),
-      ...(input.formula1 !== undefined ? { formula1: input.formula1 } : {}),
-      ...(input.formula2 !== undefined ? { formula2: input.formula2 } : {}),
-      ...(input.errorTitle !== undefined ? { errorTitle: input.errorTitle } : {}),
-      ...(input.errorMessage !== undefined ? { errorMessage: input.errorMessage } : {}),
-      ...(input.promptTitle !== undefined ? { promptTitle: input.promptTitle } : {}),
-      ...(input.promptMessage !== undefined ? { promptMessage: input.promptMessage } : {}),
+      // The engine refuses an empty string; an empty text is the absent one.
+      ...(input.formula1 ? { formula1: input.formula1 } : {}),
+      ...(input.formula2 ? { formula2: input.formula2 } : {}),
+      ...(input.errorTitle ? { errorTitle: input.errorTitle } : {}),
+      ...(input.errorMessage ? { errorMessage: input.errorMessage } : {}),
+      ...(input.promptTitle ? { promptTitle: input.promptTitle } : {}),
+      ...(input.promptMessage ? { promptMessage: input.promptMessage } : {}),
     };
     return attemptWrite(() => {
       ws(this, sheet).addValidation(dv);

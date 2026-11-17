@@ -14,6 +14,32 @@ declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandleProtectionMethods {}
 }
 
+/** The engine refuses an empty hash, salt, algorithm or descriptor string; an empty one is the absent one. */
+const blankToNull = <T extends object>(input: T, keys: readonly (keyof T)[]): T => {
+  const out = { ...input };
+  for (const key of keys) if ((out[key] as unknown) === '') out[key] = null as T[keyof T];
+  return out;
+};
+
+const WORKBOOK_PROTECTION_TEXT_KEYS = [
+  'workbookLegacyPasswordHash',
+  'workbookAlgorithmName',
+  'workbookHashValue',
+  'workbookSaltValue',
+  'revisionsLegacyPasswordHash',
+  'revisionsAlgorithmName',
+  'revisionsHashValue',
+  'revisionsSaltValue',
+] as const satisfies readonly (keyof WorkbookProtectionInput)[];
+
+const PROTECTED_RANGE_TEXT_KEYS = [
+  'legacyPasswordHash',
+  'algorithmName',
+  'hashValue',
+  'saltValue',
+  'securityDescriptor',
+] as const satisfies readonly (keyof ProtectedRangeInput)[];
+
 export abstract class WorkbookHandleProtectionMethods {
   declare readonly capabilities: EngineCapabilities;
 
@@ -150,7 +176,8 @@ export abstract class WorkbookHandleProtectionMethods {
   setWorkbookProtection(protection: WorkbookProtectionInput | null): boolean {
     assertAlive(this);
     if (!this.capabilities.workbookProtectionRoundtrip) return false;
-    return attemptWrite(() => wb(this).setWorkbookProtection(protection));
+    const input = protection && blankToNull(protection, WORKBOOK_PROTECTION_TEXT_KEYS);
+    return attemptWrite(() => wb(this).setWorkbookProtection(input));
   }
 
   /** The `<protectedRange>` records of `sheet` in file order; empty when the
@@ -165,14 +192,15 @@ export abstract class WorkbookHandleProtectionMethods {
     assertAlive(this);
     if (!this.capabilities.protectedRanges) return false;
     return attemptWrite(() => {
-      ws(this, sheet).addProtectedRange(range);
+      ws(this, sheet).addProtectedRange(blankToNull(range, PROTECTED_RANGE_TEXT_KEYS));
     });
   }
 
   updateProtectedRange(sheet: number, index: number, range: ProtectedRangeInput): boolean {
     assertAlive(this);
     if (!this.capabilities.protectedRanges) return false;
-    return attemptWrite(() => ws(this, sheet).updateProtectedRange(index, range));
+    const input = blankToNull(range, PROTECTED_RANGE_TEXT_KEYS);
+    return attemptWrite(() => ws(this, sheet).updateProtectedRange(index, input));
   }
 
   removeProtectedRange(sheet: number, index: number): boolean {

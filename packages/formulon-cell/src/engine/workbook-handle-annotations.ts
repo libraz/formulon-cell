@@ -268,7 +268,9 @@ export abstract class WorkbookHandleAnnotationsMethods {
     return attemptWrite(() => {
       ws(this, sheet).addThreadedComment({
         ...comment,
-        mentions: comment.mentions?.map((mention) => ({ ...mention })),
+        // An empty reply target opens a new thread.
+        ...(comment.parentId === '' ? { parentId: null } : {}),
+        mentions: comment.mentions?.map(mentionInput),
       });
     });
   }
@@ -284,7 +286,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
     return attemptWrite(() =>
       ws(this, sheet).updateThreadedComment(id, {
         text,
-        mentions: mentions.map((mention) => ({ ...mention })),
+        mentions: mentions.map(mentionInput),
       }),
     );
   }
@@ -568,6 +570,12 @@ type StackableDrawing = {
   setZOrder?: (zOrderIndex: number) => void;
   snapshot?: () => Uint8Array;
 };
+
+/** A mention with an empty id leaves the id out, so the engine generates one. */
+function mentionInput(mention: EngineMentionInput): EngineMentionInput {
+  const { mentionId, ...rest } = mention;
+  return mentionId === '' ? rest : { ...mention };
+}
 
 /** The engine's link record for formulon-cell's empty-means-absent strings. */
 function hyperlinkInput(

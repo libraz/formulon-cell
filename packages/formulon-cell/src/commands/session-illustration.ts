@@ -288,8 +288,8 @@ export function createSessionImage(
           nativeHeightEmu = placed.heightEmu ?? nativeHeightEmu;
         }
         nativeObjectId = options.wb.insertImage(range.sheet, options.bytes, {
-          name: options.name ?? options.alt ?? '',
-          description: options.alt ?? '',
+          ...((options.name ?? options.alt) ? { name: options.name ?? options.alt } : {}),
+          ...(options.alt ? { description: options.alt } : {}),
           anchor: {
             fromRow: placed?.fromRow ?? range.r0,
             fromCol: placed?.fromCol ?? range.c0,
