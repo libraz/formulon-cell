@@ -2,7 +2,6 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { shiftRangeAxis } from './axis-shift.js';
 import type { TableOverlay } from './format-as-table.js';
-import { shiftFormulaRefs } from './formula-refs.js';
 import type { History } from './history.js';
 import { recordTablesChange, recordTablesFollowingEngine } from './slice-history.js';
 
@@ -10,9 +9,9 @@ import { recordTablesChange, recordTablesFollowingEngine } from './slice-history
  * Re-point the tables of `sheet` after rows were inserted (`delta > 0`) or
  * deleted (`delta < 0`) at row `split`. A table below the edit moves and one
  * the edit lands inside grows or shrinks; deleting its totals row turns the
- * totals off. A new data row takes the calculated columns of the rows beside
- * it. A delete never reaches a header row (`rowDeleteHitsTableHeader`). When the engine ran the
- * edit (`engineMoved`) it moved its tables already, so the overlays only follow it.
+ * totals off. A delete never reaches a header row (`rowDeleteHitsTableHeader`).
+ * New data rows take their calculated columns from the engine. When the engine ran the edit (`engineMoved`)
+ * it moved its tables already, so the overlays only follow it.
  */
 export function shiftTablesForRows(
   store: SpreadsheetStore,
@@ -46,47 +45,6 @@ export function shiftTablesForRows(
   };
   if (engineMoved) recordTablesFollowingEngine(history, store, wb, shift);
   else recordTablesChange(history, store, shift);
-  if (delta < 0) return;
-  wb.withBatchedRecalc(() => {
-    for (const { table, range } of edits) {
-      const t = table.range;
-      // The edit landed inside the table, so its new rows are data rows.
-      if (range && split > t.r0 && split <= t.r1) {
-        fillCalculatedColumns(wb, range, table, [split, split + count - 1]);
-      }
-    }
-  });
-}
-
-/** Give each new data row the formula a column holds in every row beside it. */
-function fillCalculatedColumns(
-  wb: WorkbookHandle,
-  range: NonNullable<TableOverlay['range']>,
-  table: TableOverlay,
-  [first, last]: [number, number],
-): void {
-  const start = range.r0 + (table.showHeader ? 1 : 0);
-  const end = table.showTotal ? range.r1 - 1 : range.r1;
-  const existing: number[] = [];
-  for (let row = start; row <= end; row += 1) if (row < first || row > last) existing.push(row);
-  const templateRow = existing.includes(first - 1) ? first - 1 : existing[0];
-  if (templateRow === undefined) return;
-  for (let col = range.c0; col <= range.c1; col += 1) {
-    const formula = wb.cellFormula({ sheet: range.sheet, row: templateRow, col });
-    if (!formula) continue;
-    const isCalculated = existing.every(
-      (row) =>
-        wb.cellFormula({ sheet: range.sheet, row, col }) ===
-        shiftFormulaRefs(formula, row - templateRow, 0),
-    );
-    if (!isCalculated) continue;
-    for (let row = first; row <= last; row += 1) {
-      wb.setFormula(
-        { sheet: range.sheet, row, col },
-        shiftFormulaRefs(formula, row - templateRow, 0),
-      );
-    }
-  }
 }
 
 /** Whether deleting `count` rows from `at` takes in the header row of a table on `sheet`. */
