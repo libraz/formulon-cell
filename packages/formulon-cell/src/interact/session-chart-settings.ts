@@ -523,5 +523,3 @@ export function createSessionChartSettings(
     },
   };
 }
-
-export const chartSettingsDefaults = DEFAULT_LABELS;

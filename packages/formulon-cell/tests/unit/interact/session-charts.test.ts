@@ -24,6 +24,7 @@ import {
 } from '../../../src/engine/charts-sync.js';
 import type { Range } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { dictionaries } from '../../../src/i18n/strings.js';
 import { createSessionChartFormatter } from '../../../src/interact/session-chart-format.js';
 import { attachSessionCharts } from '../../../src/interact/session-charts.js';
 import {
@@ -372,6 +373,32 @@ describe('attachSessionCharts', () => {
     apply();
     expect(lastPatch().legend).toEqual({ visible: true });
     expect(host.querySelectorAll('[data-chart-role="legend"]')).not.toHaveLength(0);
+    handle.detach();
+  });
+
+  it('titles the settings tabs from the dictionary of the labels the host supplies', () => {
+    put([
+      ['Month', 'Sales'],
+      ['Jan', 10],
+    ]);
+    create(range(0, 0, 1, 1), { kind: 'column' });
+    const tabLabels = (): string[] =>
+      Array.from(openTab().querySelectorAll<HTMLElement>('[role="tab"]')).map((tab) =>
+        (tab.textContent ?? '').trim(),
+      );
+    const bare = attach();
+    expect(tabLabels()).toEqual([
+      dictionaries.en.sessionCharts.elementsTab,
+      dictionaries.en.sessionCharts.stylesTab,
+      dictionaries.en.sessionCharts.filtersTab,
+    ]);
+    bare.detach();
+    const handle = attach({ labels: dictionaries.ja.sessionCharts });
+    expect(tabLabels()).toEqual([
+      dictionaries.ja.sessionCharts.elementsTab,
+      dictionaries.ja.sessionCharts.stylesTab,
+      dictionaries.ja.sessionCharts.filtersTab,
+    ]);
     handle.detach();
   });
 
@@ -1770,7 +1797,7 @@ describe('attachSessionCharts', () => {
     const markerVisible = (): HTMLInputElement => {
       const row = Array.from(
         surface().querySelectorAll<HTMLElement>('.fc-chart-settings__check'),
-      ).find((candidate) => candidate.textContent?.includes('Visible'));
+      ).find((candidate) => candidate.textContent?.includes('Show marker'));
       const input = row?.querySelector<HTMLInputElement>('input');
       if (!input) throw new Error('missing marker checkbox');
       return input;

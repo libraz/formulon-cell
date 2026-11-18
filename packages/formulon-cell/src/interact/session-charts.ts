@@ -40,6 +40,7 @@ import { rangeForRef } from '../engine/range-resolver.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
+import { defaultStrings } from '../i18n/strings.js';
 import type { SessionChart, SpreadsheetStore } from '../store/store.js';
 import type { ChartSourceHighlight, State } from '../store/types.js';
 import { SVG_NS } from '../svg-namespace.js';
@@ -76,14 +77,10 @@ import { createSessionChartFormatter } from './session-chart-format.js';
 import {
   type ChartSettingsTarget,
   type ChartValueFormatter,
-  chartSettingsDefaults,
   createSessionChartSettings,
   type SessionChartSettingsHandle,
 } from './session-chart-settings.js';
-import {
-  DEFAULT_LABELS as SETTINGS_DEFAULT_LABELS,
-  type SessionChartSettingsLabels,
-} from './session-chart-settings-labels.js';
+import type { SessionChartSettingsLabels } from './session-chart-settings-labels.js';
 import type { SessionChartSettingsShape } from './session-chart-settings-model.js';
 import { acquireDrawingRoot } from './session-illustrations.js';
 
@@ -139,38 +136,7 @@ const PLOT_INSET = 14;
 /** Data marks that carry a tooltip of their point. */
 const POINT_ROLES = new Set(['bar', 'point', 'slice']);
 
-const DEFAULT_LABELS: SessionChartLabels = {
-  elementsButton: 'Chart Elements',
-  stylesButton: 'Chart Styles',
-  filtersButton: 'Chart Filters',
-  pointTooltip: 'Series "{series}" Point "{point}"',
-  pointValue: 'Value: {value}',
-  objectName: 'Chart {n}',
-  changeChartType: 'Change Chart Type...',
-  selectData: 'Select Data...',
-  formatChartArea: 'Format Chart Area...',
-  bringToFront: 'Bring to Front',
-  sendToBack: 'Send to Back',
-  columnChart: 'Column chart',
-  barChart: 'Bar chart',
-  lineChart: 'Line chart',
-  areaChart: 'Area chart',
-  pieChart: 'Pie chart',
-  doughnutChart: 'Doughnut chart',
-  scatterChart: 'Scatter chart',
-  unsupportedChart: 'This chart type cannot be displayed.',
-  chartTitle: 'Chart Title',
-  axisTitle: 'Axis Title',
-};
-
-const SETTINGS_TAB_LABELS: Pick<
-  SessionChartSettingsLabels,
-  'elementsTab' | 'stylesTab' | 'filtersTab'
-> = {
-  elementsTab: chartSettingsDefaults.elementsTab,
-  stylesTab: chartSettingsDefaults.stylesTab,
-  filtersTab: chartSettingsDefaults.filtersTab,
-};
+const DEFAULT_LABELS: SessionChartLabels = defaultStrings.sessionCharts;
 
 /** `color` at `opacity`, as a CSS colour. */
 const withOpacity = (color: string, opacity: number | undefined): string =>
@@ -399,7 +365,7 @@ export function attachSessionCharts(deps: {
     history,
     locale,
     formatValue,
-    labels: { ...SETTINGS_TAB_LABELS, ...deps.labels },
+    labels: deps.labels,
     canEdit: canEditChart,
     readData: draftData,
     accents: workbookAccents,
@@ -590,7 +556,6 @@ export function attachSessionCharts(deps: {
         getWb: chartWorkbook,
         getLabels: () =>
           ({
-            ...SETTINGS_DEFAULT_LABELS,
             ...DEFAULT_SELECT_DATA_LABELS,
             ...labels,
           }) as SelectDataLabels,
