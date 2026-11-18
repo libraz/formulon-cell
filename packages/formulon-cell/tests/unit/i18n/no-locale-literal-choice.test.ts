@@ -104,8 +104,6 @@ const LOCALE_TABLES_PENDING: Readonly<Record<string, string>> = {
     'ribbon command labels not yet on the bundle route',
   'toolbar/ribbon/mac/labels-data.ts:MAC_MENU_TRANSLATIONS':
     'ribbon menu labels not yet on the bundle route',
-  'toolbar/ribbon/mac/labels-data.ts:MAC_FUNCTION_TRANSLATIONS':
-    'function names in the ribbon function menus, not yet on the bundle route',
   'toolbar/ribbon/mac/labels.ts:labelSeeds': 'ja/en command label seeds, not yet converted',
   'toolbar/ribbon/mac/labels.ts:menuLabelSeeds': 'ja/en menu label seeds, not yet converted',
   'toolbar/ribbon/mac/labels.ts:text': 'English fallback for the ja/en seeds above',

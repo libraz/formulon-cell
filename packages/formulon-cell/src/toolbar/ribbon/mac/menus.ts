@@ -14,6 +14,7 @@ import {
 import { getRecentFunctions } from '../../../commands/function-history.js';
 import { interactionControllerFor } from '../../../commands/interaction-controller.js';
 import { localizedDecisionReason } from '../../../commands/permission-reasons.js';
+import { localizedFunctionNameFromEngine } from '../../../engine/loader.js';
 import { dictionaries, type Locale } from '../../../i18n/strings.js';
 import { catalogLocaleOrdinal, catalogLocaleTag } from '../../../interact/function-catalog-text.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
@@ -36,7 +37,7 @@ import {
 } from '../menus/general.js';
 import { macBundleText } from './bundle-text.js';
 import { macFunctionCategoryLabel } from './labels.js';
-import { localizedFunctionName, MAC_CONTEXT_LABELS } from './labels-data.js';
+import { MAC_CONTEXT_LABELS } from './labels-data.js';
 import {
   MAC_FORMULAS_MORE_MENU_ID,
   MAC_RIBBON_MENU_ITEMS,
@@ -58,7 +59,6 @@ export interface MacFunctionAvailabilityContext {
 
 type LocalizedFunctionCatalogReader = FunctionCatalogReader & {
   canonicalizeFunctionName?: (name: string, locale: CatalogLocaleOrdinal) => string | null;
-  localizeFunctionName?: (name: string, locale: CatalogLocaleOrdinal) => string | null;
 };
 
 type ReaderAvailabilityCache = {
@@ -239,14 +239,9 @@ const functionDisplayName = (
       byName.set(canonicalName, metadataName);
       return metadataName;
     }
-    const localized = reader.localizeFunctionName?.(canonicalName, localeOrdinal)?.trim();
-    if (localized) {
-      byName.set(canonicalName, localized);
-      return localized;
-    }
     byName.set(canonicalName, undefined);
   }
-  return localizedFunctionName(canonicalName, lang);
+  return localizedFunctionNameFromEngine(canonicalName, localeTag)?.trim() || canonicalName;
 };
 
 const menuLabel = (commandId: string, lang: Locale): string =>

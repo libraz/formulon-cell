@@ -6,10 +6,12 @@
 // isolation. Initialization errors still reject: the in-memory stub is
 // intentionally opt-in for tests and demos.
 import createFormulon, { type Formulon, type FormulonOptions } from '@libraz/formulon';
+import { engineProfileIdFor } from './spreadsheet-profile.js';
 import { createStubModule } from './stub-engine.js';
 
 let cachedWasm: Promise<Formulon> | null = null;
 let cachedStub: Promise<Formulon> | null = null;
+let loadedWasm: Formulon | null = null;
 const stubModules = new WeakSet<Formulon>();
 
 export interface LoadOptions {
@@ -48,8 +50,32 @@ export function loadFormulon(opts: LoadOptions = {}): Promise<Formulon> {
     throw new Error(`formulon WASM init failed: ${String(reason)}`);
   });
   cachedWasm = promise;
+  promise.then(
+    (module) => {
+      loadedWasm = module;
+    },
+    () => {},
+  );
 
   return promise;
+}
+
+/**
+ * The spreadsheet's name for a function in `locale` (a BCP-47 tag) on the Mac profile, read from
+ * the loaded engine module itself so no workbook is needed. Returns `null` until the real engine
+ * has loaded, and for a function it has no name for.
+ */
+export function localizedFunctionNameFromEngine(
+  canonicalName: string,
+  locale: string,
+): string | null {
+  if (!loadedWasm) return null;
+  try {
+    const name = loadedWasm.localizeFunctionName(canonicalName, engineProfileIdFor(locale, 'mac'));
+    return name || null;
+  } catch {
+    return null;
+  }
 }
 
 export function isUsingStub(module?: Formulon): boolean {

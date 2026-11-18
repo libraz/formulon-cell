@@ -98,36 +98,6 @@ export const localizedMenuLabel = (key: string, seed: LegacyLabel): Label => {
   throw new Error(`Missing Mac ribbon translations for menu item: ${key}`);
 };
 
-/** Common function aliases used while a native live catalog is still being
- * assembled. A live engine's localized metadata supersedes these values. */
-export const MAC_FUNCTION_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> = {
-  SUM: { de: 'SUMME', fr: 'SOMME', zh: 'SUM', ko: 'SUM', th: 'SUM' },
-  AVERAGE: { de: 'MITTELWERT', fr: 'MOYENNE', zh: 'AVERAGE', ko: 'AVERAGE', th: 'AVERAGE' },
-  COUNT: { de: 'ANZAHL', fr: 'NB', zh: 'COUNT', ko: 'COUNT', th: 'COUNT' },
-  COUNTA: { de: 'ANZAHL2', fr: 'NBVAL', zh: 'COUNTA', ko: 'COUNTA', th: 'COUNTA' },
-  COUNTIF: { de: 'ZÄHLENWENN', fr: 'NB.SI', zh: 'COUNTIF', ko: 'COUNTIF', th: 'COUNTIF' },
-  SUMIF: { de: 'SUMMEWENN', fr: 'SOMME.SI', zh: 'SUMIF', ko: 'SUMIF', th: 'SUMIF' },
-  SUMIFS: { de: 'SUMMEWENNS', fr: 'SOMME.SI.ENS', zh: 'SUMIFS', ko: 'SUMIFS', th: 'SUMIFS' },
-  IF: { de: 'WENN', fr: 'SI', zh: 'IF', ko: 'IF', th: 'IF' },
-  AND: { de: 'UND', fr: 'ET', zh: 'AND', ko: 'AND', th: 'AND' },
-  OR: { de: 'ODER', fr: 'OU', zh: 'OR', ko: 'OR', th: 'OR' },
-  NOT: { de: 'NICHT', fr: 'NON', zh: 'NOT', ko: 'NOT', th: 'NOT' },
-  XLOOKUP: { de: 'XVERWEIS', fr: 'RECHERCHEX', zh: 'XLOOKUP', ko: 'XLOOKUP', th: 'XLOOKUP' },
-  VLOOKUP: { de: 'SVERWEIS', fr: 'RECHERCHEV', zh: 'VLOOKUP', ko: 'VLOOKUP', th: 'VLOOKUP' },
-  HLOOKUP: { de: 'WVERWEIS', fr: 'RECHERCHEH', zh: 'HLOOKUP', ko: 'HLOOKUP', th: 'HLOOKUP' },
-  MATCH: { de: 'VERGLEICH', fr: 'EQUIV', zh: 'MATCH', ko: 'MATCH', th: 'MATCH' },
-  ROUND: { de: 'RUNDEN', fr: 'ARRONDI', zh: 'ROUND', ko: 'ROUND', th: 'ROUND' },
-  TODAY: { de: 'HEUTE', fr: 'AUJOURDHUI', zh: 'TODAY', ko: 'TODAY', th: 'TODAY' },
-  NOW: { de: 'JETZT', fr: 'MAINTENANT', zh: 'NOW', ko: 'NOW', th: 'NOW' },
-  DATE: { de: 'DATUM', fr: 'DATE', zh: 'DATE', ko: 'DATE', th: 'DATE' },
-};
-
-export const localizedFunctionName = (name: string, locale: Locale): string => {
-  if (locale === 'ja' || locale === 'en') return name;
-  const translations = MAC_FUNCTION_TRANSLATIONS[name.toUpperCase()];
-  return translations?.[locale] ?? name;
-};
-
 export const localizedLabel = (key: string, seed: LegacyLabel): Label => {
   const bundled = MAC_BUNDLE_LABELS[`labels:${key}`];
   if (bundled) return bundled;
