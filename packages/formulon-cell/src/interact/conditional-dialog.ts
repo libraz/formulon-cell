@@ -8,7 +8,10 @@ import type { History } from '../commands/history.js';
 import { recordConditionalRulesChange } from '../commands/slice-history.js';
 import { formatA1Range } from '../engine/address.js';
 import { hydrateConditionalRulesFromEngine } from '../engine/cf-sync.js';
-import { rewriteLoadedConditionalRule } from '../engine/cf-writeback.js';
+import {
+  engineTakesConditionalRule,
+  rewriteLoadedConditionalRule,
+} from '../engine/cf-writeback.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -37,7 +40,13 @@ import {
 } from './conditional-dialog-spec.js';
 import { conditionalSelect } from './conditional-form-controls.js';
 import { appendIconSetForm } from './conditional-icon-set-form.js';
-import { appendDialogButton, createDialogShell, deferInitialFocus } from './dialog-shell.js';
+import {
+  appendDialogButton,
+  clearDialogError,
+  createDialogShell,
+  deferInitialFocus,
+  showDialogError,
+} from './dialog-shell.js';
 import { attachFormatDialog, type FormatDialogHandle } from './format-dialog.js';
 import { makeCheckbox } from './format-dialog-dom.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
@@ -515,7 +524,11 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const addRow = document.createElement('div');
   addRow.className = 'fc-fmtdlg__row fc-conddlg__addrow';
   const addBtn = appendDialogButton(addRow, { label: t.addRule, variant: 'primary' });
-  form.appendChild(addRow);
+  const errorRow = document.createElement('div');
+  errorRow.className = 'fc-fmtdlg__error';
+  errorRow.setAttribute('role', 'alert');
+  errorRow.hidden = true;
+  form.append(errorRow, addRow);
 
   // Footer
   const footer = document.createElement('div');
@@ -993,16 +1006,26 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       currentMode === 'edit' && editIndex !== null
         ? store.getState().conditional.rules[editIndex]
         : undefined;
+    clearDialogError(errorRow);
+    const wb = deps.getWb?.() ?? null;
+    const finalRule = loaded?.stopIfTrue === true ? { ...newRule, stopIfTrue: true } : newRule;
     if (loaded?.engineId !== undefined) {
       // A rule from the file is rewritten in the engine (id and priority kept)
       // and re-read, so the store copy always matches what a save writes.
-      const wb = deps.getWb?.() ?? null;
-      const replacement = loaded.stopIfTrue === true ? { ...newRule, stopIfTrue: true } : newRule;
-      if (!wb || !rewriteLoadedConditionalRule(wb, loaded, replacement)) return;
+      if (!wb) return;
+      if (!rewriteLoadedConditionalRule(wb, loaded, finalRule)) {
+        showDialogError(errorRow, strings.commandRefusal.engineFailed);
+        return;
+      }
       hydrateConditionalRulesFromEngine(wb, store, loaded.range.sheet);
       deps.onChanged?.();
       renderRules();
       api.close();
+      return;
+    }
+    // The engine is asked before the store and history take the rule.
+    if (wb && !engineTakesConditionalRule(wb, finalRule)) {
+      showDialogError(errorRow, strings.commandRefusal.engineFailed);
       return;
     }
     recordConditionalRulesChange(history, store, () => {
@@ -1010,9 +1033,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
         store.setState((state) => {
           if (!state.conditional.rules[editIndex]) return state;
           const rules = [...state.conditional.rules];
-          const previous = rules[editIndex];
-          rules[editIndex] =
-            previous?.stopIfTrue === true ? { ...newRule, stopIfTrue: true } : newRule;
+          rules[editIndex] = finalRule;
           return { ...state, conditional: { rules } };
         });
       } else {
@@ -1081,6 +1102,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const api: ConditionalDialogHandle = {
     open(options = {}): void {
       pickFormat.begin();
+      clearDialogError(errorRow);
       currentMode = options.mode ?? 'manage';
       currentEditIndex = currentMode === 'edit' ? (options.editIndex ?? null) : null;
       const sel = store.getState().selection.range;

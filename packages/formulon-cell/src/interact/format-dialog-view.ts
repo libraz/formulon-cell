@@ -76,6 +76,13 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   hintBar.className = 'fc-fmtdlg__hintbar';
   panel.appendChild(hintBar);
 
+  // Refusal row shown when the engine does not take the applied settings.
+  const errorRow = document.createElement('div');
+  errorRow.className = 'fc-fmtdlg__error';
+  errorRow.setAttribute('role', 'alert');
+  errorRow.hidden = true;
+  panel.appendChild(errorRow);
+
   // Footer
   const footer = document.createElement('div');
   footer.className = 'fc-fmtdlg__footer';
@@ -659,5 +666,6 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     cancelBtn,
     clearBtn,
     hintBar,
+    errorRow,
   };
 }

@@ -20,6 +20,7 @@ import { recordFormatChange } from '../commands/slice-history.js';
 import { syncColorPaletteTheme, themeColorColumns } from '../components/color-palette.js';
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import { displayCellFormatFromXf, effectiveCellFormat } from '../engine/cell-format-projection.js';
+import { StrictSyncError } from '../engine/strict-sync-error.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -38,7 +39,7 @@ import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { syncCustomSelects } from './custom-select.js';
 import { type DialogEntry, INSTANCE_API_FORMAT_ENTRY } from './dialog-entry.js';
-import { deferInitialFocus } from './dialog-shell.js';
+import { clearDialogError, deferInitialFocus, showDialogError } from './dialog-shell.js';
 import {
   type DraftState,
   defaultPatternForLocale,
@@ -299,6 +300,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     cancelBtn,
     clearBtn,
     hintBar,
+    errorRow,
   } = view;
   overlay.classList.toggle('fc-fmtdlg--mac', isMacHost(host));
   // The Mac dialog has no text-direction control.
@@ -603,6 +605,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       return;
     }
 
+    clearDialogError(errorRow);
     const state = store.getState();
     // The dialog stays open while a password-guarded range under the selection is unlocked.
     if (deferForAllowedRangeUnlock(store, selectionEditRanges(state), () => void applyAndClose())) {
@@ -721,17 +724,25 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       patch: actionPatch,
       ...(borderAction ? { border: borderAction } : {}),
     };
-    const completed = runFormatDialogTransaction({
-      store,
-      history,
-      getWb,
-      state,
-      liveWb,
-      plan,
-      action,
-      merge: { action: mergeAction, range: mergeRange },
-      entry: dialogEntry,
-    });
+    let completed: boolean;
+    try {
+      completed = runFormatDialogTransaction({
+        store,
+        history,
+        getWb,
+        state,
+        liveWb,
+        plan,
+        action,
+        merge: { action: mergeAction, range: mergeRange },
+        entry: dialogEntry,
+      });
+    } catch (error) {
+      // The transaction has rolled back; the dialog stays open with the refusal.
+      if (!(error instanceof StrictSyncError)) throw error;
+      showDialogError(errorRow, strings.commandRefusal.engineFailed);
+      return;
+    }
     if (completed) api.close();
   };
 
@@ -893,6 +904,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
         previewValue = options.previewValue;
         renderPreview();
       }
+      clearDialogError(errorRow);
       setDialogMode(options?.mode);
       // The Mac app reopens on the tab used last.
       const requested =

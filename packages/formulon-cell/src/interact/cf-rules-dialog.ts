@@ -17,8 +17,10 @@ import {
   appendDialogButton,
   appendDialogFrame,
   appendDialogIconButton,
+  clearDialogError,
   createDialogButton,
   createDialogShell,
+  showDialogError,
 } from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
 import { createRangePickFormatter } from './range-pick-format.js';
@@ -293,6 +295,13 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   const tableWrap = document.createElement('div');
   tableWrap.className = 'fc-cfrulesdlg__tablewrap';
   body.appendChild(tableWrap);
+
+  const errorRow = document.createElement('div');
+  errorRow.className = 'fc-fmtdlg__error';
+  errorRow.setAttribute('role', 'alert');
+  errorRow.hidden = true;
+  body.appendChild(errorRow);
+  const showRefusal = (): void => showDialogError(errorRow, strings.commandRefusal.engineFailed);
 
   // A label would forward clicks to the Mac row's first button, so that row is a div.
   const appliesToRow = document.createElement(mac ? 'div' : 'label');
@@ -614,7 +623,11 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
         rewriteEngineConditionalFormat(wb, sheet, neighbor.id, {
           priority: managedRule.priorityValue,
         });
-      if (!moved) return;
+      if (!moved) {
+        refreshLoadedRules();
+        showRefusal();
+        return;
+      }
       refreshLoadedRules();
     } else if (managedRule.source === 'session' && neighbor.source === 'session' && deps.store) {
       const store = deps.store;
@@ -648,10 +661,9 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       pending.stop.set(managedRule.index, stopIfTrue);
     } else if (managedRule.source === 'engine') {
       const wb = getWb();
-      if (
-        !wb ||
-        !rewriteEngineConditionalFormat(wb, getActiveSheet(), managedRule.id, { stopIfTrue })
-      ) {
+      if (!wb) return;
+      if (!rewriteEngineConditionalFormat(wb, getActiveSheet(), managedRule.id, { stopIfTrue })) {
+        showRefusal();
         return;
       }
       refreshLoadedRules();
@@ -1022,7 +1034,8 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   };
 
   /** Applies the staged edits: loaded rules go to the engine, session rules as one history step. */
-  const commitDraft = (): void => {
+  const commitDraft = (): boolean => {
+    clearDialogError(errorRow);
     commitAppliesTo();
     const wb = getWb();
     const sheet = getActiveSheet();
@@ -1032,6 +1045,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       ...pending.range.keys(),
     ]);
     let changed = pending.removed.size > 0 || touched.size > 0;
+    let refused = false;
     if (wb) {
       const formats = wb.getConditionalFormats(sheet);
       const rewrites = [...touched]
@@ -1060,7 +1074,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
         wb.removeConditionalFormatAt(sheet, index);
       }
       for (const { id, patch } of rewrites) {
-        rewriteEngineConditionalFormat(wb, sheet, id, patch);
+        if (!rewriteEngineConditionalFormat(wb, sheet, id, patch)) refused = true;
       }
       if (changed) refreshLoadedRules();
     }
@@ -1078,11 +1092,17 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     }
     resetDraft();
     if (changed) onChanged?.();
+    if (refused) {
+      renderTable();
+      showRefusal();
+    }
+    return !refused;
   };
 
   const open = (): void => {
     resetArmed();
     resetDraft();
+    clearDialogError(errorRow);
     sessionSnapshot = deps.store ? [...deps.store.getState().conditional.rules] : null;
     scopeSelect.value = mac ? 'selection' : 'worksheet';
     renderTable();
@@ -1097,13 +1117,12 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
 
   /** Leaves for a companion dialog; the Mac manager keeps what was staged. */
   const leave = (): void => {
-    if (mac) commitDraft();
+    if (mac && !commitDraft()) return;
     close();
   };
   if (macOkBtn && macCancelBtn) {
     shell.on(macOkBtn, 'click', () => {
-      commitDraft();
-      close();
+      if (commitDraft()) close();
     });
     shell.on(macCancelBtn, 'click', () => close());
   }

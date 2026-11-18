@@ -674,6 +674,23 @@ export function syncTrackedConditionalRulesToEngine(
 }
 
 /**
+ * Whether the engine takes `rule`, checked by writing it and removing it
+ * again. True when there is nothing to write: no mutate capability, or a rule
+ * with no engine form (it stays in the store only).
+ */
+export function engineTakesConditionalRule(wb: WorkbookHandle, rule: ConditionalRule): boolean {
+  if (!wb.capabilities.conditionalFormatMutate) return true;
+  const input = conditionalRuleToEngineInput(rule);
+  if (!input) return true;
+  const sheet = rule.range.sheet;
+  // The format does not decide acceptance, so no dxf is written.
+  const index = wb.addConditionalFormat(sheet, input);
+  if (index < 0) return false;
+  wb.removeConditionalFormatAt(sheet, index);
+  return true;
+}
+
+/**
  * Replace a loaded rule (one hydrated from the file, carrying an `engineId`)
  * by `next` in the engine. The rule keeps its id and priority. Returns false
  * when `next` has no engine form or the engine refuses the rewrite.

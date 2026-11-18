@@ -408,6 +408,12 @@
   .fc-conddlg__addrow {
     justify-content: flex-end;
   }
+  .fc-fmtdlg__error {
+    margin: 4px 16px 8px;
+    color: #c50f1f;
+    font-size: 12px;
+    line-height: 1.3;
+  }
   .fc-namedlg__row {
     font-size: 12px;
   }
@@ -641,7 +647,8 @@
   .fc-conddlg--mac .fc-conddlg__style-row,
   .fc-conddlg--mac .fc-conddlg__mac-types > :first-child,
   .fc-conddlg--mac .fc-conddlg__format-row,
-  .fc-conddlg--mac .fc-conddlg__addrow {
+  .fc-conddlg--mac .fc-conddlg__addrow,
+  .fc-conddlg--mac .fc-fmtdlg__error {
     grid-column: 1 / -1;
   }
   .fc-conddlg--mac .fc-conddlg__style-row,
