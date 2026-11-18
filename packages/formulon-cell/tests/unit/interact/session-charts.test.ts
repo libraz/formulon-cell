@@ -2564,7 +2564,7 @@ describe('attachSessionCharts', () => {
     const handle = attach();
 
     // Excel draws a 1 pt #898989 outline; the fill is the sheet's own, as an unfilled cell's is.
-    expect(panel().style.getPropertyValue('--fc-chart-area-line')).toBe('#898989');
+    expect(panel().querySelector('.fc-chart__frame rect')?.getAttribute('stroke')).toBe('#898989');
     expect(panel().style.getPropertyValue('--fc-chart-area-line-width')).toBe('1pt');
     const css = readFileSync(
       join(root, 'src/styles/core/app/overlays/quick-analysis-and-charts.css'),
@@ -2574,7 +2574,7 @@ describe('attachSessionCharts', () => {
     const rule = area.slice(0, area.indexOf('}'));
     expect(rule).toContain('background: var(--fc-chart-area-fill, var(--fc-bg, Canvas));');
     expect(rule.replace(/\s+/g, ' ')).toContain(
-      'border: var(--fc-chart-area-line-width) var(--fc-chart-area-line-style, solid) var(--fc-chart-area-line);',
+      'border: var(--fc-chart-area-line-width) solid transparent;',
     );
     handle.detach();
   });

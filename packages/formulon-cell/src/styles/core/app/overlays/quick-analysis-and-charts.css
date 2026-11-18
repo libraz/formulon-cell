@@ -169,8 +169,8 @@
     background: var(--fc-chart-area-fill, var(--fc-bg, Canvas));
     /* Excel draws chart text in a mid grey over the chart area. */
     color: color-mix(in srgb, var(--fc-fg, CanvasText) 65%, var(--fc-bg, Canvas));
-    border: var(--fc-chart-area-line-width) var(--fc-chart-area-line-style, solid)
-      var(--fc-chart-area-line);
+    /* The outline is drawn by `.fc-chart__frame`; the border keeps its room and shows the selection. */
+    border: var(--fc-chart-area-line-width) solid transparent;
     font-family: var(--fc-font-ui, system-ui);
     pointer-events: auto;
     cursor: default;
@@ -182,6 +182,15 @@
 
   .fc-chart--selected {
     border-color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 55%, transparent));
+  }
+
+  .fc-chart__frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
   }
 
   .fc-chart--selected:not(.fc-chart--fixed) {

@@ -3,7 +3,7 @@ import { chartDataFromEngine, chartPreviewOverrides } from '../charts/engine-ada
 import { formatChartValue } from '../charts/format.js';
 import { chartTitleText, layoutChart, layoutUnsupportedChart } from '../charts/layout.js';
 import { accentsFromTheme } from '../charts/series-colors.js';
-import { chartAreaFill, chartAreaLine } from '../charts/styles.js';
+import { chartAreaFill, chartAreaLine, dashAttrs } from '../charts/styles.js';
 import type {
   ChartAreaSpec,
   ChartData,
@@ -178,7 +178,10 @@ const withOpacity = (color: string, opacity: number | undefined): string =>
     ? color
     : `color-mix(in srgb, ${color} ${Math.round(opacity * 100)}%, transparent)`;
 
-/** Set the chart area's fill and outline on `panel`: the file's, or the chart style's own. */
+/** CSS pixels per point. */
+const PX_PER_PT = 96 / 72;
+
+/** Set the chart area's fill on `panel`, and the width of the frame its outline is drawn in. */
 const applyChartAreaPaint = (panel: HTMLElement, chart: { chartArea?: ChartAreaSpec }): void => {
   const fill = chartAreaFill(chart.chartArea);
   if (fill === null) panel.style.setProperty('--fc-chart-area-fill', 'transparent');
@@ -187,14 +190,36 @@ const applyChartAreaPaint = (panel: HTMLElement, chart: { chartArea?: ChartAreaS
   }
   const line = chartAreaLine(chart.chartArea);
   panel.style.setProperty('--fc-chart-area-line-width', `${line?.widthPt ?? 0}pt`);
-  panel.style.setProperty(
-    '--fc-chart-area-line',
-    line ? withOpacity(line.color, line.opacity) : 'transparent',
-  );
-  const dash = line?.dash;
-  const style =
-    dash === undefined || dash === 'solid' ? 'solid' : /dot|Dot/.test(dash) ? 'dotted' : 'dashed';
-  panel.style.setProperty('--fc-chart-area-line-style', style);
+};
+
+/** Draw the chart area's outline over the frame the panel's border leaves, dashed as every other line is. */
+const appendChartAreaFrame = (
+  panel: HTMLElement,
+  chart: { chartArea?: ChartAreaSpec },
+  w: number,
+  h: number,
+): void => {
+  const line = chartAreaLine(chart.chartArea);
+  if (!line) return;
+  const width = line.widthPt * PX_PER_PT;
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.classList.add('fc-chart__frame');
+  svg.setAttribute('aria-hidden', 'true');
+  const rect = document.createElementNS(SVG_NS, 'rect');
+  const attrs: Record<string, string | number> = {
+    x: -width / 2,
+    y: -width / 2,
+    width: Math.max(0, w - width),
+    height: Math.max(0, h - width),
+    fill: 'none',
+    stroke: line.color,
+    'stroke-width': width,
+    ...(line.opacity === undefined ? {} : { 'stroke-opacity': line.opacity }),
+    ...dashAttrs(line.dash, width),
+  };
+  for (const [key, value] of Object.entries(attrs)) rect.setAttribute(key, String(value));
+  svg.appendChild(rect);
+  panel.appendChild(svg);
 };
 
 const isDrawable = (chart: SessionChart): chart is SessionChartSettingsShape =>
@@ -839,6 +864,7 @@ export function attachSessionCharts(deps: {
       const width = Math.max(1, position.w - PLOT_INSET);
       const height = Math.max(1, position.h - PLOT_INSET);
       panel.appendChild(svg);
+      appendChartAreaFrame(panel, chart, position.w, position.h);
       if (drawable) {
         renderChartScene(
           svg,

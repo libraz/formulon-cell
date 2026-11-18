@@ -178,33 +178,54 @@ describe('the drawn chart area', () => {
     cleanup.push(() => handle.detach());
     const panel = host.querySelector<HTMLElement>('.fc-chart');
     if (!panel) throw new Error('no chart panel');
-    return panel.style;
+    return { style: panel.style, frame: panel.querySelector('.fc-chart__frame rect') };
   };
 
   it('is the style default where the file states none: a surface fill and a 1 pt grey outline', () => {
-    const style = drawn({});
+    const { style, frame } = drawn({});
     expect(style.getPropertyValue('--fc-chart-area-fill')).toBe('');
-    expect(style.getPropertyValue('--fc-chart-area-line')).toBe('#898989');
     expect(style.getPropertyValue('--fc-chart-area-line-width')).toBe('1pt');
+    expect(frame?.getAttribute('stroke')).toBe('#898989');
+    expect(Number(frame?.getAttribute('stroke-width'))).toBeCloseTo(96 / 72, 5);
+    expect(frame?.getAttribute('stroke-dasharray')).toBeNull();
   });
 
   it('is the fill and outline the file states', () => {
-    const style = drawn({
+    const { style, frame } = drawn({
       chartArea: {
         fill: { color: '#ffeecc', transparency: 20 },
-        line: { color: '#ff0000', width: 2, dash: 'dash' },
+        line: { color: '#ff0000', width: 3, transparency: 25 },
       },
     });
     expect(style.getPropertyValue('--fc-chart-area-fill')).toContain('#ffeecc');
     expect(style.getPropertyValue('--fc-chart-area-fill')).toContain('80%');
-    expect(style.getPropertyValue('--fc-chart-area-line')).toBe('#ff0000');
-    expect(style.getPropertyValue('--fc-chart-area-line-width')).toBe('2pt');
-    expect(style.getPropertyValue('--fc-chart-area-line-style')).toBe('dashed');
+    expect(style.getPropertyValue('--fc-chart-area-line-width')).toBe('3pt');
+    expect(frame?.getAttribute('stroke')).toBe('#ff0000');
+    expect(frame?.getAttribute('stroke-width')).toBe('4');
+    expect(frame?.getAttribute('stroke-opacity')).toBe('0.75');
   });
 
   it('draws no fill and no outline where the file states them off', () => {
-    const style = drawn({ chartArea: { fill: 'none', line: 'none' } });
+    const { style, frame } = drawn({ chartArea: { fill: 'none', line: 'none' } });
     expect(style.getPropertyValue('--fc-chart-area-fill')).toBe('transparent');
     expect(style.getPropertyValue('--fc-chart-area-line-width')).toBe('0pt');
+    expect(frame).toBeNull();
   });
+
+  it.each(['squareDot', 'longDashDot', 'roundDot'] as const)(
+    'dashes a %s outline as a series line of that dash is',
+    (dash) => {
+      // 3 pt is 4 px, the width the series line below is drawn at.
+      const { frame } = drawn({ chartArea: { line: { color: '#ff0000', width: 3, dash } } });
+      const line = layoutChart({
+        spec: { kind: 'line', seriesStyles: [{ seriesId: 'series-0', line: { width: 4, dash } }] },
+        data: DATA,
+        width: 320,
+        height: 132,
+      }).elements.find((element) => element.role === 'line');
+
+      expect(line?.attrs['stroke-dasharray']).toBeDefined();
+      expect(frame?.getAttribute('stroke-dasharray')).toBe(String(line?.attrs['stroke-dasharray']));
+    },
+  );
 });
