@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { mutators } from '../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
+import { zipEntries, zipText } from '../engine/zip-entries.js';
 
 const fixture = (): Uint8Array =>
   new Uint8Array(readFileSync(join(__dirname, '../../fixtures/charts/chart_chartsheet.xlsx')));
@@ -63,6 +64,17 @@ describe('an active chartsheet', () => {
     mutators.setSheetIndex(instance.store, 1);
     instance.cellEditor.begin('x');
     expect(instance.cellEditor.isActive()).toBe(true);
+  });
+
+  it('saves the fit-to-window zoom as the file states it', async () => {
+    const { instance } = await mountFixture();
+    mutators.setSheetIndex(instance.store, 1);
+    mutators.setSheetIndex(instance.store, 0);
+    const entries = zipEntries(instance.workbook.save());
+    const path = [...entries.keys()].find((key) => key.startsWith('xl/chartsheets/sheet'));
+    const view = (path ? zipText(entries, path) : '').match(/<sheetView\b[^>]*>/)?.[0] ?? '';
+    expect(view).toContain('zoomScale="125"');
+    expect(view).toContain('zoomToFit="1"');
   });
 
   it('is a grid again on the next worksheet tab', async () => {
