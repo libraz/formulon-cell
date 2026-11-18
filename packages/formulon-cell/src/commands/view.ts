@@ -1,3 +1,4 @@
+import { sheetZoomable } from '../engine/sheet-kind.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
   mutators,
@@ -139,13 +140,20 @@ export function setWorkbookView(
   wb?.setSheetViewMode(store.getState().data.sheetIndex, mode);
 }
 
+const activeSheetZoomable = (store: SpreadsheetStore): boolean => {
+  const state = store.getState();
+  return sheetZoomable(state, state.data.sheetIndex);
+};
+
 /** Set zoom as a decimal scale. Values are clamped by the store to 10..400%. */
 export function setZoomScale(store: SpreadsheetStore, zoom: number): void {
+  if (!activeSheetZoomable(store)) return;
   mutators.setZoom(store, zoom);
 }
 
 /** Set zoom as a percentage. Values are clamped to 10..400%. */
 export function setZoomPercent(store: SpreadsheetStore, percent: number): void {
+  if (!activeSheetZoomable(store)) return;
   mutators.setZoom(store, percent / 100);
 }
 
@@ -155,6 +163,7 @@ export function setZoomPercent(store: SpreadsheetStore, percent: number): void {
  *  through .xlsx. Not journaled — spreadsheets treat zoom as a view setting
  *  outside the undo stack. */
 export function setSheetZoom(store: SpreadsheetStore, zoom: number, wb?: WorkbookHandle): void {
+  if (!activeSheetZoomable(store)) return;
   mutators.setZoom(store, zoom);
   if (wb) {
     const sheet = store.getState().data.sheetIndex;

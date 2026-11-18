@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { canExecuteBuiltIn } from '../../../src/commands/built-in-command-policy.js';
+import { setSheetZoom } from '../../../src/commands/view.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { mutators } from '../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
@@ -75,6 +77,65 @@ describe('an active chartsheet', () => {
     const view = (path ? zipText(entries, path) : '').match(/<sheetView\b[^>]*>/)?.[0] ?? '';
     expect(view).toContain('zoomScale="125"');
     expect(view).toContain('zoomToFit="1"');
+  });
+
+  describe('zoom', () => {
+    const savedView = (workbook: WorkbookHandle): string => {
+      const entries = zipEntries(workbook.save());
+      const path = [...entries.keys()].find((key) => key.startsWith('xl/chartsheets/sheet'));
+      return (path ? zipText(entries, path) : '').match(/<sheetView\b[^>]*>/)?.[0] ?? '';
+    };
+    const wheelZoom = (host: HTMLElement, deltaY: number): void => {
+      const grid = host.querySelector<HTMLElement>('.fc-host__grid');
+      const event = new WheelEvent('wheel', { deltaY, bubbles: true, cancelable: true });
+      // happy-dom drops modifier keys from the WheelEvent init bag.
+      Object.defineProperty(event, 'ctrlKey', { value: true });
+      grid?.dispatchEvent(event);
+    };
+
+    it('stays as the file states it through every zoom path', async () => {
+      const { host, instance, workbook } = await mountFixture();
+      const before = instance.store.getState().viewport.zoom;
+      wheelZoom(host, -100);
+      wheelZoom(host, 100);
+      host.querySelectorAll<HTMLButtonElement>('.fc-host__statusbar-zoom-btn').forEach((button) => {
+        button.click();
+      });
+      setSheetZoom(instance.store, 2, workbook);
+      expect(instance.store.getState().viewport.zoom).toBe(before);
+      const view = savedView(workbook);
+      expect(view).toContain('zoomScale="125"');
+      expect(view).toContain('zoomToFit="1"');
+    });
+
+    it('greys the zoom commands with a reason of their own', async () => {
+      const { instance } = await mountFixture();
+      for (const id of [
+        'zoom100',
+        'zoom125',
+        'zoom75',
+        'zoomDialog',
+        'zoomSelection',
+        'mac.view.zoom',
+      ]) {
+        expect(canExecuteBuiltIn(instance.store, id as never, 'ribbon'), id).toMatchObject({
+          allowed: false,
+          reasonKey: 'sheetNotZoomable',
+        });
+      }
+    });
+
+    it('still zooms a worksheet', async () => {
+      const { host, instance, workbook } = await mountFixture();
+      mutators.setSheetIndex(instance.store, 1);
+      expect(canExecuteBuiltIn(instance.store, 'zoom125' as never, 'ribbon').allowed).toBe(true);
+      setSheetZoom(instance.store, 1.5, workbook);
+      expect(instance.store.getState().viewport.zoom).toBe(1.5);
+      wheelZoom(host, -100);
+      expect(instance.store.getState().viewport.zoom).toBeGreaterThan(1.5);
+      host.querySelector<HTMLButtonElement>('.fc-host__statusbar-zoom-btn')?.click();
+      expect(instance.store.getState().viewport.zoom).toBeLessThan(1.7);
+    });
   });
 
   it('is a grid again on the next worksheet tab', async () => {

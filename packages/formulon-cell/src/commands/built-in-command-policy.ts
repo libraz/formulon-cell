@@ -1,7 +1,7 @@
 import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
-import { sheetHasCells } from '../engine/sheet-kind.js';
+import { sheetHasCells, sheetZoomable } from '../engine/sheet-kind.js';
 import type { Range } from '../engine/types.js';
 import {
   isWholeColumnRange,
@@ -693,6 +693,18 @@ const builtInOperation = (
   return outlineDetailAxis(store, selection.range) === 'col' ? 'resizeColumns' : 'resizeRows';
 };
 
+/** The commands that change the sheet's zoom; a sheet that cannot be zoomed greys them. */
+const ZOOM_COMMANDS: ReadonlySet<string> = new Set([
+  'zoom100',
+  'zoom125',
+  'zoom75',
+  'zoomDialog',
+  'zoomSelection',
+  'mac.view.zoom',
+  'mac.view.zoom100',
+  'mac.view.zoomSelection',
+]);
+
 /** Clear Contents and the Home Clear control, which a locked selected cell greys as a whole. */
 const CLEAR_CONTROL_COMMANDS: ReadonlySet<string> = new Set(['clear', 'clearFormat']);
 
@@ -895,6 +907,8 @@ export const builtInProtectionDecision = (
     return deny('protected', 'workbookStructureProtected');
   if (operation !== null && needsCells(operation) && !sheetHasCells(state, sheet))
     return deny('operationDenied', 'sheetHasNoCells');
+  if (ZOOM_COMMANDS.has(id) && !sheetZoomable(state, sheet))
+    return deny('operationDenied', 'sheetNotZoomable');
   // A cell shift is refused on a protected sheet whatever its options, so Insert / Delete Cells
   // over part of the rows never opens its dialog there; over whole rows or columns it acts at once.
   const shift =

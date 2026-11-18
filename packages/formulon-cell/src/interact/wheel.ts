@@ -1,3 +1,4 @@
+import { setSheetZoom } from '../commands/view.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
   frozenColsWidth,
@@ -76,7 +77,7 @@ const wheelUnit = (deltaMode: number, cell: number, count: number): number =>
 /**
  * Wheel-to-scroll bridge.
  *
- * - **Ctrl/Cmd + wheel** → zoom (delegates to `mutators.setZoom`).
+ * - **Ctrl/Cmd + wheel** → zoom (delegates to `setSheetZoom`).
  * - **Shift + wheel**    → horizontal scroll (deltaY redirected to deltaX).
  * - **Plain wheel**      → vertical (deltaY) and horizontal (deltaX) scroll.
  *   Over a split's top or left pane, that pane scrolls on its own axis.
@@ -98,19 +99,17 @@ export function attachWheel(deps: WheelDeps): () => void {
   const onWheel = (e: WheelEvent): void => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
-      mutators.setZoom(store, steppedZoom(store.getState().viewport.zoom, e.deltaY < 0 ? 1 : -1));
       // A bounded embedded viewport owns zoom as session presentation state.
       // Do not persist it through the workbook unless the host explicitly
       // mounted an unrestricted navigation policy; this keeps a wheel gesture
       // from becoming an unexpected workbook mutation.
       const navOptions = navigationPolicyFor(store)?.options;
       const restricted = !!(navOptions?.range || navOptions?.selectable);
-      const wb = getWb?.();
-      if (wb && !restricted) {
-        const sheet = store.getState().data.sheetIndex;
-        const pct = Math.round(store.getState().viewport.zoom * 100);
-        wb.setSheetZoom(sheet, pct);
-      }
+      setSheetZoom(
+        store,
+        steppedZoom(store.getState().viewport.zoom, e.deltaY < 0 ? 1 : -1),
+        restricted ? undefined : (getWb?.() ?? undefined),
+      );
       return;
     }
     const state = store.getState();

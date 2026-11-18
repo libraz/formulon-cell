@@ -6,6 +6,7 @@ import {
   statusAggregateValue,
 } from '../commands/aggregate.js';
 import { filterRecordCounts } from '../commands/filter-state.js';
+import { setSheetZoom } from '../commands/view.js';
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import { formatGeneralNumber } from '../engine/value.js';
 import { isMacHost } from '../extensions/ui-options.js';
@@ -701,7 +702,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   const setZoom = (next: number): void => {
     const z = clampZoom(next);
     if (deps.onZoomChange) deps.onZoomChange(z);
-    else mutators.setZoom(store, z);
+    else setSheetZoom(store, z);
     refresh();
   };
 

@@ -23,6 +23,7 @@ export const permissionReasonsDe: PermissionReasonsStrings = {
     cellOutsideWorkbook: 'Die Zelladresse liegt außerhalb der Arbeitsmappe.',
     cellNotEditable: 'Die Zelle kann nicht bearbeitet werden.',
     sheetHasNoCells: 'Dieses Blatt enthält keine Zellen.',
+    sheetNotZoomable: 'Dieses Blatt kann nicht gezoomt werden.',
     rangeOutsideBounds: 'Der Bereich liegt außerhalb des zulässigen Bereichs.',
     rangeOutsideWorkbook: 'Der Bereich liegt außerhalb der Arbeitsmappe.',
     rangeNotEditable: 'Der Bereich enthält Zellen, die nicht bearbeitet werden können.',

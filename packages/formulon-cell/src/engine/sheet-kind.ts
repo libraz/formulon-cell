@@ -12,3 +12,6 @@ export const isChartsheet = (state: State, sheet: number): boolean =>
 /** Whether `sheet` holds cells; only a worksheet does. */
 export const sheetHasCells = (state: State, sheet: number): boolean =>
   sheetKindOf(state, sheet) === SheetKind.Worksheet;
+
+/** Whether `sheet` can be zoomed; a chartsheet cannot, so its saved zoom stays as the file has it. */
+export const sheetZoomable = (state: State, sheet: number): boolean => !isChartsheet(state, sheet);

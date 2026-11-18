@@ -23,6 +23,7 @@ export const permissionReasonsFr: PermissionReasonsStrings = {
     cellOutsideWorkbook: "L'adresse de la cellule est en dehors du classeur.",
     cellNotEditable: "La cellule n'est pas modifiable.",
     sheetHasNoCells: 'Cette feuille ne contient pas de cellules.',
+    sheetNotZoomable: 'Cette feuille ne peut pas être zoomée.',
     rangeOutsideBounds: 'La plage est en dehors de la zone autorisée.',
     rangeOutsideWorkbook: 'La plage est en dehors du classeur.',
     rangeNotEditable: 'La plage contient des cellules non modifiables.',
