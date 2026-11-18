@@ -11,6 +11,7 @@ import {
   inheritsUnlocked,
   syncAllowedEditRangesToEngine,
 } from '../engine/protection-sync.js';
+import { sheetHasCells } from '../engine/sheet-kind.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
@@ -1063,6 +1064,7 @@ const columnsUnlocked = (state: State, sheet: number, first: number, last: numbe
  *  OR the cell is explicitly unlocked. Used by the command layer at write
  *  time so locked + protected → no-op rather than throw. */
 export function isCellWritable(state: State, addr: Addr): boolean {
+  if (!sheetHasCells(state, addr.sheet)) return false;
   if (!isSheetProtected(state, addr.sheet)) return true;
   if (isAddrInAllowedEditRange(state, addr)) return true;
   return !isCellLocked(state, addr);
@@ -1071,6 +1073,7 @@ export function isCellWritable(state: State, addr: Addr): boolean {
 /** Whether a format write may touch the cell: a writable cell, or any cell
  *  of a protected sheet that allows formatting cells. */
 export function isCellFormattable(state: State, addr: Addr): boolean {
+  if (!sheetHasCells(state, addr.sheet)) return false;
   return sheetPermits(state, addr.sheet, 'formatCells') || isCellWritable(state, addr);
 }
 

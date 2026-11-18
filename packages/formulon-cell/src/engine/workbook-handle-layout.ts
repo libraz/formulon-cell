@@ -14,7 +14,7 @@ import { macDigitAdvance } from './mac-digit-metrics.js';
 import { macDefaultRowPt } from './mac-row-model.js';
 import { attemptWrite, formulonErrorCode, orFallback } from './result.js';
 import type { EngineCapabilities, Range } from './types.js';
-import { SheetVisibility } from './types.js';
+import { SheetKind, SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 import {
   assertAlive,
@@ -356,6 +356,14 @@ export abstract class WorkbookHandleLayoutMethods {
     assertAlive(this);
     if (!this.capabilities.outlineCollapse) return false;
     return attemptWrite(() => ws(this, sheet).setColumnCollapsed(first, last, collapsed));
+  }
+
+  /** The type of `sheet`: a `SheetKind` ordinal. Every sheet reads as a worksheet when the engine
+   *  does not report kinds (the stub). */
+  sheetKind(sheet: number): SheetKind {
+    assertAlive(this);
+    if (!this.capabilities.sheetKind) return SheetKind.Worksheet;
+    return orFallback(SheetKind.Worksheet, () => ws(this, sheet).kind);
   }
 
   /** Set or clear the `collapsed` flag on the summary row `row`. */

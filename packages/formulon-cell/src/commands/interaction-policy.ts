@@ -290,6 +290,33 @@ const MUTATING_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
   'pageSetup',
 ]);
 
+/** Operations that read or write a sheet's cells, so a sheet without cells refuses them. */
+const CELL_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
+  'valueEdit',
+  'formulaEdit',
+  'clear',
+  'paste',
+  'fill',
+  'format',
+  'insertRows',
+  'deleteRows',
+  'insertColumns',
+  'deleteColumns',
+  'resizeRows',
+  'resizeColumns',
+  'sort',
+  'merge',
+  'filter',
+  'table',
+  'pivot',
+  'comment',
+  'hyperlink',
+  'validation',
+]);
+
+export const needsCells = (operation: InteractionOperation): boolean =>
+  CELL_OPERATIONS.has(operation);
+
 export const isMutatingInteraction = (operation: InteractionOperation): boolean =>
   MUTATING_OPERATIONS.has(operation);
 

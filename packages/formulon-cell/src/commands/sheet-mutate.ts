@@ -1,7 +1,7 @@
 import { hydrateSheetProtectionFromEngine } from '../engine/protection-sync.js';
 import { hydrateSheetPrForSheet } from '../engine/sheet-pr-sync.js';
 import { hydrateTableOverlaysFromEngine } from '../engine/table-sync.js';
-import { SheetVisibility } from '../engine/types.js';
+import { type SheetKind, SheetVisibility } from '../engine/types.js';
 import { nearestVisibleSheet } from '../engine/view-state-sync.js';
 import {
   hasWholeSheetFontStoreBinding,
@@ -52,6 +52,11 @@ const remapWorkbookSheetLayout = (
       const next = mapIndex(idx);
       if (next !== null) veryHiddenSheets.add(next);
     }
+    const sheetKinds = new Map<number, SheetKind>();
+    for (const [idx, kind] of s.layout.sheetKinds ?? []) {
+      const next = mapIndex(idx);
+      if (next !== null) sheetKinds.set(next, kind);
+    }
     const sheetTabColors = new Map<number, string>();
     for (const [idx, color] of s.layout.sheetTabColors) {
       const next = mapIndex(idx);
@@ -77,6 +82,7 @@ const remapWorkbookSheetLayout = (
         ...s.layout,
         hiddenSheets,
         veryHiddenSheets,
+        sheetKinds,
         sheetTabColors,
         ...(s.layout.outlineSummary ? { outlineSummary } : {}),
       },

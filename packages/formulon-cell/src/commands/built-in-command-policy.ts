@@ -1,6 +1,7 @@
 import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
+import { sheetHasCells } from '../engine/sheet-kind.js';
 import type { Range } from '../engine/types.js';
 import {
   isWholeColumnRange,
@@ -22,7 +23,7 @@ import type {
   OperationIntent,
   PermissionDecision,
 } from './interaction-policy.js';
-import { valuesOnlyClipboard } from './interaction-policy.js';
+import { needsCells, valuesOnlyClipboard } from './interaction-policy.js';
 import { outlineDetailAxis } from './outline.js';
 import { deny } from './permission-reasons.js';
 import { pivotReportRange } from './pivot-actions.js';
@@ -892,6 +893,8 @@ export const builtInProtectionDecision = (
   const operation = builtInOperation(store, id);
   if (operation !== null && !workbookStructurePermits(state, operation))
     return deny('protected', 'workbookStructureProtected');
+  if (operation !== null && needsCells(operation) && !sheetHasCells(state, sheet))
+    return deny('operationDenied', 'sheetHasNoCells');
   // A cell shift is refused on a protected sheet whatever its options, so Insert / Delete Cells
   // over part of the rows never opens its dialog there; over whole rows or columns it acts at once.
   const shift =

@@ -19,6 +19,7 @@ export const permissionReasonsTh: PermissionReasonsStrings = {
     cellOutsideBounds: 'เซลล์อยู่นอกพื้นที่ที่อนุญาต',
     cellOutsideWorkbook: 'ที่อยู่เซลล์อยู่นอกเวิร์กบุ๊ก',
     cellNotEditable: 'ไม่สามารถแก้ไขเซลล์นี้ได้',
+    sheetHasNoCells: 'ชีตนี้ไม่มีเซลล์',
     rangeOutsideBounds: 'ช่วงอยู่นอกพื้นที่ที่อนุญาต',
     rangeOutsideWorkbook: 'ช่วงอยู่นอกเวิร์กบุ๊ก',
     rangeNotEditable: 'ช่วงมีเซลล์ที่แก้ไขไม่ได้',

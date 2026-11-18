@@ -70,6 +70,13 @@ export abstract class WorkbookHandleChartsMethods {
     return renderThemeColors(info, (color) => renderedThemeColor(this, color));
   }
 
+  /** The object id of a chartsheet's chart; null on any other sheet and on a chartsheet without a chart. */
+  chartsheetChartId(sheet: number): number | null {
+    assertAlive(this);
+    if (!this.capabilities.sheetKind || !this.capabilities.charts) return null;
+    return orFallback(null, () => internals(this).wb.sheet(sheet).getChart()?.objectId ?? null);
+  }
+
   /** The chart's series resolved against the current cell values. */
   getChartData(sheet: number, objectId: number): EngineChartData | null {
     assertAlive(this);

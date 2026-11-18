@@ -19,6 +19,7 @@ export const permissionReasonsJa: PermissionReasonsStrings = {
     cellOutsideBounds: 'セルが許可された領域の外にあります。',
     cellOutsideWorkbook: 'セルのアドレスがブックの外にあります。',
     cellNotEditable: 'このセルは編集できません。',
+    sheetHasNoCells: 'このシートにはセルがありません。',
     rangeOutsideBounds: '範囲が許可された領域の外にあります。',
     rangeOutsideWorkbook: '範囲がブックの外にあります。',
     rangeNotEditable: '範囲に編集できないセルが含まれています。',

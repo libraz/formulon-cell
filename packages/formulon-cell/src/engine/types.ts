@@ -340,6 +340,16 @@ export const SheetVisibility = {
 } as const;
 export type SheetVisibility = (typeof SheetVisibility)[keyof typeof SheetVisibility];
 
+/** The type of a sheet, mirroring the engine's `SheetKind` ordinals. Only a `Worksheet` has cells. */
+export const SheetKind = {
+  Worksheet: 0,
+  Chartsheet: 1,
+  Dialogsheet: 2,
+  Macrosheet: 3,
+  Other: 4,
+} as const;
+export type SheetKind = (typeof SheetKind)[keyof typeof SheetKind];
+
 /** A PivotTable label, value or date filter, in the engine's own kinds and operands
  *  (`PivotFilterInput`), addressed by axis and source field name. */
 export interface PivotFilterSpec {
@@ -593,6 +603,8 @@ export interface EngineCapabilities {
   /** Read/write display flags on `<sheetView>`: gridlines, row/column
    *  headers, zeros, and right-to-left direction. */
   readonly sheetViewFlags?: boolean;
+  /** `Sheet.kind` and `Sheet.getChart`: the sheet's type and a chartsheet's chart. */
+  readonly sheetKind?: boolean;
   /** `setSheetShowFormulas`: the per-sheet `<sheetView showFormulas>` flag. */
   readonly sheetShowFormulas?: boolean;
   /** `setSheetShowOutlineSymbols`: the per-sheet `<sheetView showOutlineSymbols>` flag. */

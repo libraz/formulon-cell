@@ -28,6 +28,7 @@ export const PERMISSION_REASONS = {
   cellOutsideBounds: 'cell is outside the configured bounds',
   cellOutsideWorkbook: 'cell address is outside the workbook',
   cellNotEditable: 'cell is outside editable cells',
+  sheetHasNoCells: 'the sheet has no cells',
   rangeOutsideBounds: 'range is outside the configured bounds',
   rangeOutsideWorkbook: 'range is outside the workbook',
   rangeNotEditable: 'range is outside editable cells',

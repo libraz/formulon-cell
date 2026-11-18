@@ -101,8 +101,14 @@ export function projectChart(
   return { ...spec, ...base, ...extra };
 }
 
-const chartObjects = (wb: WorkbookHandle, sheet: number): EngineDrawingObject[] =>
-  wb.listDrawingObjects(sheet).filter((object) => object.kind === DrawingObjectKind.Chart);
+const chartObjects = (wb: WorkbookHandle, sheet: number): EngineDrawingObject[] => {
+  const charts = wb
+    .listDrawingObjects(sheet)
+    .filter((object) => object.kind === DrawingObjectKind.Chart);
+  // A chartsheet holds exactly the chart the engine names.
+  const own = wb.chartsheetChartId(sheet);
+  return own === null ? charts : charts.filter((object) => object.objectId === own);
+};
 
 /** Rebuild the chart projections of `sheet` and take the engine's drawing order. */
 export function hydrateChartsFromEngine(

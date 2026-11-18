@@ -6,7 +6,7 @@ import { isRowHidden } from '../store/row-visibility.js';
 import { splitCount } from '../store/split-panes.js';
 import type { LayoutSlice, SpreadsheetStore } from '../store/store.js';
 import { MAX_COL, MAX_ROW, parseAddrKey } from './address.js';
-import { SheetVisibility } from './types.js';
+import { SheetKind, SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 type AxisDefaults = Pick<
@@ -82,6 +82,13 @@ export function hydrateLayoutFromEngine(
   // regardless of which sheet `hydrateLayoutFromEngine` is called for.
   const hiddenSheets = new Set<number>();
   const veryHiddenSheets = new Set<number>();
+  const sheetKinds = new Map<number, SheetKind>();
+  if (wb.capabilities.sheetKind) {
+    for (let i = 0; i < wb.sheetCount; i += 1) {
+      const kind = wb.sheetKind(i);
+      if (kind !== SheetKind.Worksheet) sheetKinds.set(i, kind);
+    }
+  }
   if (wb.capabilities.sheetView) {
     const n = wb.sheetCount;
     for (let i = 0; i < n; i += 1) {
@@ -104,9 +111,10 @@ export function hydrateLayoutFromEngine(
     rows.length === 0 &&
     engineDefaults === null &&
     view === null &&
-    hiddenSheets.size === 0
+    hiddenSheets.size === 0 &&
+    sheetKinds.size === 0
   ) {
-    store.setState((s) => ({ ...s, layout: { ...s.layout, ...defaults } }));
+    store.setState((s) => ({ ...s, layout: { ...s.layout, ...defaults, sheetKinds } }));
     return;
   }
 
@@ -161,6 +169,7 @@ export function hydrateLayoutFromEngine(
       outlineColGutter: outlineGutterWidth(outlineCols, s.layout),
       hiddenSheets,
       veryHiddenSheets,
+      sheetKinds,
     };
     if (view) {
       layout.freezeRows = view.freezeRows;

@@ -18,6 +18,7 @@ import {
 import { formulaForEdit } from '../engine/edit-seed.js';
 import { numFmtToFormatCode } from '../engine/format-writeback.js';
 import { syncActiveSheet } from '../engine/layout-sync.js';
+import { isChartsheet } from '../engine/sheet-kind.js';
 import { formatBoolean, formatEditableNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isDataTableFormula } from '../engine/workbook-handle-data-tables.js';
@@ -509,6 +510,10 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     const viewportChanged = !sameViewport(currentViewport, viewport);
     const contentChanged = forceContent || !sameContent(currentContent, snapshot);
     host.dataset.fcWorkbookView = s.ui.workbookView;
+    const chartsheet = isChartsheet(s, s.data.sheetIndex);
+    if (chartsheet) host.dataset.fcSheetKind = 'chartsheet';
+    else delete host.dataset.fcSheetKind;
+    tag.readOnly = chartsheet;
 
     if (viewportChanged) {
       rebuildMirror(s, wb, viewport, contentChanged);
@@ -534,11 +539,12 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     const ref = selectionRef(s);
     const object = s.ui.selectedObject;
     if (document.activeElement !== tag) {
-      tag.value = object ? object.name : (dragSizeText(s) ?? nameBoxText());
+      tag.value = object ? object.name : chartsheet ? '' : (dragSizeText(s) ?? nameBoxText());
     }
     if (!getFormulaEditing()) {
-      fxInput.value = object ? '' : formulaBarText(s, wb, active, display);
-      fxInput.readOnly = !object && isDataTableFormula(s.data.cells.get(addrKey(active))?.formula);
+      fxInput.value = object || chartsheet ? '' : formulaBarText(s, wb, active, display);
+      fxInput.readOnly =
+        chartsheet || (!object && isDataTableFormula(s.data.cells.get(addrKey(active))?.formula));
     }
     activeCellMirror.setAttribute('aria-rowindex', String(active.row + 1));
     activeCellMirror.setAttribute('aria-colindex', String(active.col + 1));

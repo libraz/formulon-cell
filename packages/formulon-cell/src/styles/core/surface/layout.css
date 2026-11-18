@@ -47,4 +47,11 @@
     min-width: 0;
     min-height: 0;
   }
+
+  /* A chartsheet has no cells: its chart is drawn over the grid's area, which shows neither the
+     grid, the headers nor the cell cursor. */
+  .fc-host[data-fc-sheet-kind="chartsheet"] .fc-host__canvas,
+  .fc-host[data-fc-sheet-kind="chartsheet"] .fc-host__a11y {
+    visibility: hidden;
+  }
 }

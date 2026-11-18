@@ -11,6 +11,7 @@ import { refusedBatch } from '../commands/interaction-policy.js';
 import { PERMISSION_REASONS, type RefusalLike } from '../commands/permission-reasons.js';
 import { deferForAllowedRangeUnlock, isCellWritable } from '../commands/protection.js';
 import { dblClickRange, editorRefHighlights, extractRefs, rotateRefAt } from '../commands/refs.js';
+import { sheetHasCells } from '../engine/sheet-kind.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
@@ -345,6 +346,8 @@ export class InlineEditor {
     this.referenceGesture = null;
     const s = this.deps.store.getState();
     const a = s.selection.active;
+    // A sheet without cells has nothing to edit.
+    if (!sheetHasCells(s, a.sheet)) return;
     const cell = rangeOfAddr(a);
     if (deferForAllowedRangeUnlock(this.deps.store, [cell], () => this.begin(seed, options)))
       return;

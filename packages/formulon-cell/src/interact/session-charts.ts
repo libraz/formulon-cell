@@ -37,6 +37,7 @@ import {
   sessionPosition,
 } from '../engine/drawing-geometry.js';
 import { rangeForRef } from '../engine/range-resolver.js';
+import { isChartsheet } from '../engine/sheet-kind.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
@@ -513,7 +514,36 @@ export function attachSessionCharts(deps: {
 
   /** The engine cannot re-anchor an absolutely positioned object. */
   const canPlace = (chart: SessionChart): boolean =>
-    chart.nativeAnchor.kind !== ANCHOR_KIND_ABSOLUTE;
+    chart.nativeAnchor.kind !== ANCHOR_KIND_ABSOLUTE &&
+    !isChartsheet(store.getState(), chart.sheet);
+
+  const layerElement = deps.layer ?? host;
+  const gridElement = (): HTMLElement | null =>
+    layerElement.querySelector<HTMLElement>(':scope > .fc-host__grid');
+  /** A chartsheet's chart fills the grid's area. */
+  const chartsheetFrame = (): { x: number; y: number; w: number; h: number } => {
+    const grid = gridElement();
+    return {
+      x: grid?.offsetLeft ?? 0,
+      y: grid?.offsetTop ?? 0,
+      w: Math.max(1, grid?.clientWidth ?? layerElement.clientWidth),
+      h: Math.max(1, grid?.clientHeight ?? layerElement.clientHeight),
+    };
+  };
+  let observedGrid: HTMLElement | null = null;
+  const gridObserver =
+    typeof ResizeObserver === 'function'
+      ? new ResizeObserver(() => {
+          if (isChartsheet(store.getState(), store.getState().data.sheetIndex)) render();
+        })
+      : null;
+  const observeGrid = (): void => {
+    const grid = gridElement();
+    if (grid === observedGrid) return;
+    if (observedGrid) gridObserver?.unobserve(observedGrid);
+    observedGrid = grid;
+    if (grid) gridObserver?.observe(grid);
+  };
 
   /** Drag the whole chart (`handle` omitted) or one of its sizing handles. The
    *  frame follows the pointer and the workbook is changed once, on release. */
@@ -757,6 +787,7 @@ export function attachSessionCharts(deps: {
     // controller replacement the next time the chart root renders.
     syncControllerSubscription();
     const state = store.getState();
+    observeGrid();
     const visibleChartIds = new Set<string>();
     const focusedId = focusedPanelId(root, '.fc-chart', 'chartId');
     root.replaceChildren();
@@ -772,7 +803,10 @@ export function attachSessionCharts(deps: {
     charts.forEach((chart) => {
       const drawable = isDrawable(chart);
       if (drawable) visibleChartIds.add(chart.id);
-      const position = sessionPosition(store, chart.nativeAnchor);
+      const onChartsheet = isChartsheet(store.getState(), chart.sheet);
+      const position = onChartsheet
+        ? chartsheetFrame()
+        : sessionPosition(store, chart.nativeAnchor);
       const placeable = canPlace(chart);
       const panel = document.createElement('section');
       panel.className = drawable ? 'fc-chart' : 'fc-chart fc-chart--unsupported';
@@ -793,7 +827,9 @@ export function attachSessionCharts(deps: {
       panel.style.top = `${position.y}px`;
       panel.style.width = `${position.w}px`;
       panel.style.height = `${position.h}px`;
-      panel.style.clipPath = drawingClipPath(store, chart.nativeAnchor, position);
+      panel.style.clipPath = onChartsheet
+        ? ''
+        : drawingClipPath(store, chart.nativeAnchor, position);
       panel.style.zIndex = zIndex(chart.id);
       applyChartAreaPaint(panel, chart);
       panel.classList.toggle('fc-chart--selected', chart.id === selectedId);
@@ -947,6 +983,7 @@ export function attachSessionCharts(deps: {
       selectedId = null;
       syncSelection();
       unsubscribeController();
+      gridObserver?.disconnect();
       settings.detach();
       selectData?.detach();
       root.remove();

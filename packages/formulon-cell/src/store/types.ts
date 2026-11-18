@@ -14,6 +14,7 @@ import type {
   Range,
   SheetAxisFormatOverride,
   SheetFontOverride,
+  SheetKind,
 } from '../engine/types.js';
 import type { EngineShapeInput } from '../engine/workbook-handle-drawing-objects.js';
 import type { DatePeriodKey } from '../i18n/strings/data-objects/types.js';
@@ -121,6 +122,9 @@ export interface LayoutSlice {
    *  a settings or lookup sheet is kept out of a user's reach. Every member is
    *  also in `hiddenSheets`. */
   veryHiddenSheets: Set<number>;
+  /** The type of each sheet that is not a worksheet, keyed by sheet index (an engine `SheetKind`
+   *  ordinal). A sheet with no entry is a worksheet. */
+  sheetKinds?: Map<number, SheetKind>;
   /** Sheet tab fill colors keyed by sheet index, matching Excel's Tab Color affordance. */
   sheetTabColors: Map<number, string>;
   /** Outline summary position per sheet index. A sheet with no entry uses the

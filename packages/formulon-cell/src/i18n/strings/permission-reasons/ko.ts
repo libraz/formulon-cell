@@ -19,6 +19,7 @@ export const permissionReasonsKo: PermissionReasonsStrings = {
     cellOutsideBounds: '셀이 허용된 영역 밖에 있습니다.',
     cellOutsideWorkbook: '셀 주소가 통합 문서 밖에 있습니다.',
     cellNotEditable: '이 셀은 편집할 수 없습니다.',
+    sheetHasNoCells: '이 시트에는 셀이 없습니다.',
     rangeOutsideBounds: '범위가 허용된 영역 밖에 있습니다.',
     rangeOutsideWorkbook: '범위가 통합 문서 밖에 있습니다.',
     rangeNotEditable: '범위에 편집할 수 없는 셀이 포함되어 있습니다.',

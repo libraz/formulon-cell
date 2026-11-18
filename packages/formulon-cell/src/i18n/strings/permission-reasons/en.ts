@@ -19,6 +19,7 @@ export const permissionReasonsEn: PermissionReasonsStrings = {
     cellOutsideBounds: 'The cell is outside the allowed area.',
     cellOutsideWorkbook: 'The cell address is outside the workbook.',
     cellNotEditable: 'The cell is not editable.',
+    sheetHasNoCells: 'This sheet has no cells.',
     rangeOutsideBounds: 'The range is outside the allowed area.',
     rangeOutsideWorkbook: 'The range is outside the workbook.',
     rangeNotEditable: 'The range includes cells that are not editable.',

@@ -18,6 +18,7 @@ export const permissionReasonsZh: PermissionReasonsStrings = {
     cellOutsideBounds: '该单元格超出允许的区域。',
     cellOutsideWorkbook: '该单元格地址超出工作簿范围。',
     cellNotEditable: '该单元格不可编辑。',
+    sheetHasNoCells: '此工作表没有单元格。',
     rangeOutsideBounds: '该区域超出允许的范围。',
     rangeOutsideWorkbook: '该区域超出工作簿范围。',
     rangeNotEditable: '该区域包含不可编辑的单元格。',

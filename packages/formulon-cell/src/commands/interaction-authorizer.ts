@@ -1,4 +1,5 @@
 import { addrKey } from '../engine/address.js';
+import { sheetHasCells } from '../engine/sheet-kind.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeContainsAddr, rangeContainsRange } from '../store/selection-geometry.js';
@@ -20,6 +21,7 @@ import {
   isMutatingInteraction,
   isPolicyCellEligible,
   isPolicyRangeEligible,
+  needsCells,
   type OperationEffect,
   type OperationIntent,
   operationDecision,
@@ -394,6 +396,8 @@ export class InteractionAuthorizer {
     if (!workbookStructurePermits(state, intent.operation))
       return deny('protected', 'workbookStructureProtected');
     for (const sheet of effectSheets(intent, state.data.sheetIndex)) {
+      if (needsCells(intent.operation) && !sheetHasCells(state, sheet))
+        return deny('operationDenied', 'sheetHasNoCells');
       if (
         refusedOnProtectedSheet(state, sheet, intent.commandId) ||
         (intent.operation === 'table' && !tableChangePermitted(state, sheet))
