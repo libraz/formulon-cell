@@ -1,3 +1,4 @@
+import type { StatusCode } from '@libraz/formulon';
 import {
   addrKey,
   colFromLetters,
@@ -38,12 +39,14 @@ export type DefinedNameMutationResult =
   | { ok: true; entry: DefinedNameEntry }
   | {
       ok: false;
-      reason: 'empty-name' | 'invalid-name' | 'empty-formula' | 'unsupported' | 'engine-failed';
-    };
+      reason: 'empty-name' | 'invalid-name' | 'empty-formula' | 'unsupported';
+    }
+  | { ok: false; reason: 'engine-failed'; status: StatusCode | null };
 
 export type DefinedNameDeleteResult =
   | { ok: true; entry: DefinedNameEntry }
-  | { ok: false; reason: 'empty-name' | 'unsupported' | 'engine-failed' };
+  | { ok: false; reason: 'empty-name' | 'unsupported' }
+  | { ok: false; reason: 'engine-failed'; status: StatusCode | null };
 
 /** The selection's edges whose labels name the rest of each row or column. */
 export interface CreateDefinedNamesEdges {
@@ -267,7 +270,7 @@ export function moveDefinedNamesForCut(
       );
       const next = hasEquals ? moved : moved.slice(1);
       if (next === entry.formula) continue;
-      if (wb.setDefinedNameEntry(entry.name, next, entry.localSheetId)) changed = true;
+      if (wb.setDefinedNameEntry(entry.name, next, entry.localSheetId).ok) changed = true;
       if (wb.capabilities.definedNameAttrs && (entry.comment || entry.hidden)) {
         wb.setDefinedNameAttrs(entry.name, entry.localSheetId, attrsOf(entry));
       }
@@ -381,12 +384,12 @@ export function upsertDefinedName(
       isSameDefinedName(e.name, trimmedName) &&
       e.name !== trimmedName,
   );
-  if (previous && !wb.setDefinedNameEntry(previous.name, '', localSheetId)) {
-    return { ok: false, reason: 'engine-failed' };
-  }
-  if (!wb.setDefinedNameEntry(trimmedName, trimmedFormula, localSheetId)) {
+  const removed = previous ? wb.setDefinedNameEntry(previous.name, '', localSheetId) : null;
+  if (removed && !removed.ok) return { ok: false, reason: 'engine-failed', status: removed.status };
+  const written = wb.setDefinedNameEntry(trimmedName, trimmedFormula, localSheetId);
+  if (!written.ok) {
     if (previous) wb.setDefinedNameEntry(previous.name, previous.formula, localSheetId);
-    return { ok: false, reason: 'engine-failed' };
+    return { ok: false, reason: 'engine-failed', status: written.status };
   }
   const keptAttrs: DefinedNameAttrs = {
     ...(previous?.comment !== undefined ? { comment: previous.comment } : {}),
@@ -395,24 +398,26 @@ export function upsertDefinedName(
   };
   if (
     wb.capabilities.definedNameAttrs &&
-    (keptAttrs.comment !== undefined || keptAttrs.hidden !== undefined) &&
-    !wb.setDefinedNameAttrs(trimmedName, localSheetId, keptAttrs)
+    (keptAttrs.comment !== undefined || keptAttrs.hidden !== undefined)
   ) {
-    return { ok: false, reason: 'engine-failed' };
+    const attrsWritten = wb.setDefinedNameAttrs(trimmedName, localSheetId, keptAttrs);
+    if (!attrsWritten.ok) {
+      return { ok: false, reason: 'engine-failed', status: attrsWritten.status };
+    }
   }
   // Defining/redefining a name changes what `=MyRange` resolves to — recompute
   // so dependent cells and a subsequent save reflect the new target.
   wb.recalcAuto();
   // The entry is the name as the engine stored it, read back: its formula may be respelled.
-  const written = findDefinedName(wb, trimmedName, localSheetId);
+  const stored = findDefinedName(wb, trimmedName, localSheetId);
   return {
     ok: true,
     entry: {
-      name: written?.name ?? trimmedName,
-      formula: written?.formula ?? trimmedFormula.replace(/^=/, ''),
+      name: stored?.name ?? trimmedName,
+      formula: stored?.formula ?? trimmedFormula.replace(/^=/, ''),
       localSheetId,
-      ...(written?.comment ? { comment: written.comment } : {}),
-      ...(written?.hidden ? { hidden: true } : {}),
+      ...(stored?.comment ? { comment: stored.comment } : {}),
+      ...(stored?.hidden ? { hidden: true } : {}),
     },
   };
 }
@@ -426,9 +431,8 @@ export function deleteDefinedName(
   const trimmedName = name.trim();
   if (!trimmedName) return { ok: false, reason: 'empty-name' };
   if (!wb.capabilities.definedNameMutate) return { ok: false, reason: 'unsupported' };
-  if (!wb.setDefinedNameEntry(trimmedName, '', localSheetId)) {
-    return { ok: false, reason: 'engine-failed' };
-  }
+  const removed = wb.setDefinedNameEntry(trimmedName, '', localSheetId);
+  if (!removed.ok) return { ok: false, reason: 'engine-failed', status: removed.status };
   // Removing a name usually turns `=MyRange` into #NAME? — recompute so the
   // change is reflected in dependents and on save.
   wb.recalcAuto();

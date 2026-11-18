@@ -15,7 +15,7 @@ import {
   localeTag,
   mergeFunctionMetadata,
 } from './function-metadata.js';
-import { attemptWrite, orFallback } from './result.js';
+import { attemptWrite, attemptWriteStatus, orFallback, type WriteResult } from './result.js';
 import { computeEngineSpillRanges } from './spill.js';
 import {
   type EngineSpreadsheetProfileId,
@@ -687,17 +687,17 @@ export abstract class WorkbookHandleFormulasMethods {
   }
 
   /** Add or replace a workbook/sheet-scoped defined name. Pass an empty `formula`
-   *  to remove the name (engine convention). Returns false on engine failure
-   *  or when the engine doesn't expose scoped names. */
-  setDefinedNameEntry(name: string, formula: string, localSheetId = -1): boolean {
+   *  to remove the name (engine convention). A failure carries the engine
+   *  status, or null when the engine doesn't expose scoped names. */
+  setDefinedNameEntry(name: string, formula: string, localSheetId = -1): WriteResult {
     assertAlive(this);
-    if (!this.capabilities.definedNameMutate) return false;
+    if (!this.capabilities.definedNameMutate) return { ok: false, status: null };
     const scope = localSheetId < 0 ? null : localSheetId;
     const w = wb(this);
-    if (formula.length === 0) return attemptWrite(() => w.removeDefinedName(name, scope));
+    if (formula.length === 0) return attemptWriteStatus(() => w.removeDefinedName(name, scope));
     // The engine replaces every attribute; a formula edit keeps the note and flag.
     const existing = orFallback(null, () => w.getDefinedName(name, scope));
-    return attemptWrite(() =>
+    return attemptWriteStatus(() =>
       w.setDefinedName({
         name,
         formula,
@@ -709,20 +709,20 @@ export abstract class WorkbookHandleFormulasMethods {
   }
 
   /** Set the comment and/or hidden flag of an existing defined name; an
-   *  omitted key is left unchanged. Returns false when the name is missing or
-   *  the engine lacks the API. */
+   *  omitted key is left unchanged. A failure carries the engine status, or
+   *  null when the name is missing or the engine lacks the API. */
   setDefinedNameAttrs(
     name: string,
     localSheetId: number,
     attrs: { comment?: string; hidden?: boolean },
-  ): boolean {
+  ): WriteResult {
     assertAlive(this);
-    if (!this.capabilities.definedNameAttrs) return false;
+    if (!this.capabilities.definedNameAttrs) return { ok: false, status: null };
     const scope = localSheetId < 0 ? null : localSheetId;
     const w = wb(this);
     const existing = orFallback(null, () => w.getDefinedName(name, scope));
-    if (!existing) return false;
-    return attemptWrite(() =>
+    if (!existing) return { ok: false, status: null };
+    return attemptWriteStatus(() =>
       w.setDefinedName({
         name: existing.name,
         formula: existing.formula,

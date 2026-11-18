@@ -344,7 +344,7 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
       seed();
       if (metadata === 'name') {
         const formula = axis === 'col' ? '=Source!$B$1' : '=Source!$A$2';
-        expect(wb.setDefinedNameEntry('CutSource', formula)).toBe(true);
+        expect(wb.setDefinedNameEntry('CutSource', formula)).toEqual({ ok: true });
       } else if (metadata === 'filter') {
         store.setState((state) => ({
           ...state,

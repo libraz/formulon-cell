@@ -3,6 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
+import type { WriteResult } from '../../../src/engine/result.js';
 import { SpreadsheetEmitter } from '../../../src/events.js';
 import { defaultStrings } from '../../../src/i18n/strings.js';
 import { attachChromeSync } from '../../../src/mount/chrome-sync.js';
@@ -665,11 +666,11 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
       value: { ...sheet.workbook.capabilities, definedNameMutate: true },
     });
     const wb = sheet.workbook as unknown as {
-      setDefinedNameEntry(name: string, formula: string): boolean;
+      setDefinedNameEntry(name: string, formula: string): WriteResult;
     };
     wb.setDefinedNameEntry = (name, formula) => {
       calls.push({ name, formula });
-      return true;
+      return { ok: true };
     };
 
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 });
@@ -687,13 +688,13 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
       value: { ...sheet.workbook.capabilities, definedNameMutate: true },
     });
     const wb = sheet.workbook as unknown as {
-      setDefinedNameEntry(name: string, formula: string): boolean;
+      setDefinedNameEntry(name: string, formula: string): WriteResult;
       sheetName(idx: number): string;
     };
     wb.sheetName = () => "FY 26's Plan";
     wb.setDefinedNameEntry = (name, formula) => {
       calls.push({ name, formula });
-      return true;
+      return { ok: true };
     };
 
     tag.focus();
@@ -710,11 +711,11 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
       value: { ...sheet.workbook.capabilities, definedNameMutate: true },
     });
     const wb = sheet.workbook as unknown as {
-      setDefinedNameEntry(name: string, formula: string): boolean;
+      setDefinedNameEntry(name: string, formula: string): WriteResult;
     };
     wb.setDefinedNameEntry = (name, formula) => {
       calls.push({ name, formula });
-      return true;
+      return { ok: true };
     };
 
     for (const value of ['not a name', 'A1', 'C', 'R']) {
@@ -839,13 +840,13 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
     });
     const store = new Map<string, string>();
     const wb = sheet.workbook as unknown as {
-      setDefinedNameEntry(name: string, formula: string): boolean;
+      setDefinedNameEntry(name: string, formula: string): WriteResult;
       definedNames: () => Iterable<unknown>;
     };
     wb.setDefinedNameEntry = (name, formula) => {
       if (formula) store.set(name, formula);
       else store.delete(name);
-      return true;
+      return { ok: true };
     };
     wb.definedNames = function* () {
       for (const [name, formula] of store) yield { name, formula, localSheetId: -1 };
@@ -856,6 +857,28 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
     expect(store.get('Fresh')).toBe('=Sheet1!$A$1');
     history.undo();
     expect(store.has('Fresh')).toBe(false);
+    controller.detach();
+    ownTag.remove();
+  });
+
+  it('Enter with a name the engine refuses alerts and restores the box', () => {
+    Object.defineProperty(sheet.workbook, 'capabilities', {
+      configurable: true,
+      value: { ...sheet.workbook.capabilities, definedNameMutate: true },
+    });
+    const wb = sheet.workbook as unknown as {
+      setDefinedNameEntry(name: string, formula: string): WriteResult;
+    };
+    wb.setDefinedNameEntry = () => ({ ok: false, status: 2 });
+    const alerts: string[] = [];
+    const { controller, ownTag } = standaloneChrome({
+      getStrings: () =>
+        ({ a11y: { nameBox: 'Name box', nameBoxInvalidReference: 'bad ref' } }) as never,
+      onAlert: (o) => alerts.push(o.message),
+    });
+    pressEnter('Refused', ownTag);
+    expect(alerts).toEqual(['bad ref']);
+    expect(ownTag.value).toBe('A1');
     controller.detach();
     ownTag.remove();
   });

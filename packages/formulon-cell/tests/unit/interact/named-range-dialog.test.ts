@@ -3,6 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
+import type { WriteResult } from '../../../src/engine/result.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import { attachNamedRangeDialog } from '../../../src/interact/named-range-dialog.js';
@@ -112,7 +113,7 @@ interface MutableWb {
   sheetName(index: number): string;
   sheetIndexByName(name: string): number | null;
   getValue(addr: { sheet: number; row: number; col: number }): FakeCellValue;
-  setDefinedNameEntry(name: string, formula: string, localSheetId?: number): boolean;
+  setDefinedNameEntry(name: string, formula: string, localSheetId?: number): WriteResult;
   recalc(): void;
   recalcAuto(): void;
 }
@@ -151,11 +152,11 @@ const makeMutableWb = (): {
     getValue(addr) {
       return values.get(`${addr.sheet}:${addr.row}:${addr.col}`) ?? { kind: 'blank' };
     },
-    setDefinedNameEntry(name: string, formula: string, localSheetId = -1): boolean {
+    setDefinedNameEntry(name: string, formula: string, localSheetId = -1): WriteResult {
       calls.push({ name, formula, localSheetId });
       if (formula === '') registry.delete(name);
       else registry.set(name, formula);
-      return true;
+      return { ok: true };
     },
     recalc() {},
     recalcAuto() {},
@@ -1073,7 +1074,9 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
   it('returns focus to the delete button when deletion fails', () => {
     const { wb, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
-    const setDefinedNameEntry = vi.spyOn(wb, 'setDefinedNameEntry').mockReturnValue(false);
+    const setDefinedNameEntry = vi
+      .spyOn(wb, 'setDefinedNameEntry')
+      .mockReturnValue({ ok: false, status: null });
     const handle = attachNamedRangeDialog({
       store: createSpreadsheetStore(),
       strings: ja,

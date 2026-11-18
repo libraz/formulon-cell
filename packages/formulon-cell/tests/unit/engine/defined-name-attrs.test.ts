@@ -65,9 +65,9 @@ describe.skipIf(!canLoadWasm())('defined name comment and hidden', () => {
     try {
       upsertDefinedName(wb, 'Shown', 'Sheet1!$A$1');
       upsertDefinedName(wb, 'Secret', 'Sheet1!$C$3');
-      expect(wb.setDefinedNameAttrs('Secret', -1, { hidden: true, comment: 'internal' })).toBe(
-        true,
-      );
+      expect(wb.setDefinedNameAttrs('Secret', -1, { hidden: true, comment: 'internal' })).toEqual({
+        ok: true,
+      });
 
       const restored = await WorkbookHandle.loadBytes(wb.save());
       try {

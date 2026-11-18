@@ -116,8 +116,10 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
       if (first.capabilities.definedNameMutate) {
         first.setNumber({ sheet: 0, row: 0, col: 0 }, 4);
         first.setNumber({ sheet: 0, row: 0, col: 1 }, 7);
-        expect(first.setDefinedNameEntry('RoundTripName', 'Sheet1!$A$1')).toBe(true);
-        expect(first.setDefinedNameEntry('LocalRoundTripName', 'Sheet1!$B$1', 0)).toBe(true);
+        expect(first.setDefinedNameEntry('RoundTripName', 'Sheet1!$A$1')).toEqual({ ok: true });
+        expect(first.setDefinedNameEntry('LocalRoundTripName', 'Sheet1!$B$1', 0)).toEqual({
+          ok: true,
+        });
         first.setFormula({ sheet: 0, row: 0, col: 3 }, '=RoundTripName');
         first.setFormula({ sheet: 0, row: 0, col: 4 }, '=LocalRoundTripName');
         first.recalc();

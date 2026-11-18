@@ -975,9 +975,13 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       });
     }
     if (renamed && !caseOnly) {
-      if (result.ok && !deleteDefinedName(wb, previous.name, scope).ok) {
-        deleteDefinedName(wb, result.entry.name, scope);
-        return { ok: false, reason: 'engine-failed' };
+      if (result.ok) {
+        const removed = deleteDefinedName(wb, previous.name, scope);
+        if (!removed.ok) {
+          deleteDefinedName(wb, result.entry.name, scope);
+          const status = removed.reason === 'engine-failed' ? removed.status : null;
+          return { ok: false, reason: 'engine-failed', status };
+        }
       }
     }
     return result;

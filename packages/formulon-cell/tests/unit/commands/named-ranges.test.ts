@@ -1,3 +1,4 @@
+import { StatusCode } from '@libraz/formulon';
 import { describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import {
@@ -13,6 +14,7 @@ import {
   sanitizeName,
   upsertDefinedName,
 } from '../../../src/commands/named-ranges.js';
+import type { WriteResult } from '../../../src/engine/result.js';
 import type { Addr } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
@@ -24,7 +26,7 @@ import {
 interface MutableWb {
   capabilities: { definedNameMutate: boolean };
   definedNames(): IterableIterator<{ name: string; formula: string; localSheetId: number }>;
-  setDefinedNameEntry(name: string, formula: string, localSheetId?: number): boolean;
+  setDefinedNameEntry(name: string, formula: string, localSheetId?: number): WriteResult;
   setFormula?(addr: Addr, formula: string): void;
   recalc(): void;
   recalcAuto(): void;
@@ -54,11 +56,11 @@ const makeWb = (
     },
     setDefinedNameEntry(name, formula, localSheetId = -1) {
       calls.push({ name, formula, localSheetId });
-      if (!writeOk) return false;
+      if (!writeOk) return { ok: false, status: StatusCode.InvalidArgument };
       const key = `${localSheetId}:${name}`;
       if (formula === '') registry.delete(key);
       else registry.set(key, { name, formula });
-      return true;
+      return { ok: true };
     },
     setFormula(addr, formula) {
       formulas.set(`${addr.sheet}:${addr.row}:${addr.col}`, formula);
@@ -323,6 +325,7 @@ describe('named range commands', () => {
     expect(upsertDefinedName(makeWb(true, false).wb, 'Name', '=A1')).toEqual({
       ok: false,
       reason: 'engine-failed',
+      status: StatusCode.InvalidArgument,
     });
   });
 
@@ -376,7 +379,7 @@ describe('named range commands', () => {
       setDefinedNameEntry(name: string, formula: string) {
         if (formula === '') registry.delete(name);
         else registry.set(name, formula);
-        return true;
+        return { ok: true };
       },
       recalc() {},
       recalcAuto() {},
