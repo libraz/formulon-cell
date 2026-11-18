@@ -95,13 +95,20 @@ describe('automatic font row height against the native engine', () => {
         const xf = effective && source.getCellXf(effective.xfIndex);
         return xf ? (source.getFontRecord(xf.fontIndex)?.sizePt ?? undefined) : undefined;
       };
+      // A row xf equal to xf 0 saves as a bare customFormat row, as the spreadsheet saves it,
+      // so only the row's own 11 pt font, distinct from the column's 24 pt xf, is kept.
       const assertRowAxisCellXf = (source: WorkbookHandle): void => {
-        const rowAxis = source.getSheetFontAxisSnapshot(0)?.rows.find((entry) => entry.row === row);
-        expect(rowAxis?.styleXf).toBeGreaterThan(0);
-        const cellXf = rowAxis && source.getCellXf(rowAxis.styleXf);
-        expect(cellXf && source.getFontRecord(cellXf.fontIndex)?.sizePt).toBe(11);
-        const namedStyleXf = rowAxis && source.getCellStyleXf(rowAxis.styleXf);
-        expect(namedStyleXf && source.getFontRecord(namedStyleXf.fontIndex)?.sizePt).not.toBe(11);
+        const snapshot = source.getSheetFontAxisSnapshot(0);
+        const rowAxis = snapshot?.rows.find((entry) => entry.row === row);
+        expect(rowAxis).toBeDefined();
+        const sizeOf = (xfIndex: number | undefined): number | undefined => {
+          const xf = xfIndex === undefined ? null : source.getCellXf(xfIndex);
+          return xf ? (source.getFontRecord(xf.fontIndex)?.sizePt ?? undefined) : undefined;
+        };
+        expect(sizeOf(rowAxis?.styleXf)).toBe(11);
+        const columnXf = snapshot?.columns.find((entry) => entry.first <= 0 && 0 <= entry.last);
+        expect(sizeOf(columnXf?.styleXf)).toBe(24);
+        expect(rowAxis?.styleXf).not.toBe(columnXf?.styleXf);
       };
 
       mutators.selectAll(store);
