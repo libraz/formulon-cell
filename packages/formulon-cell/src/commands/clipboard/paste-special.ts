@@ -14,6 +14,7 @@ import { addMergeToMaps, removeIntersectingMerges } from '../../store/merge-maps
 import {
   isWholeColumnRange,
   isWholeRowRange,
+  rangeContainsAddr,
   rangeContainsRange,
   rangesIntersect,
   sameRange,
@@ -451,22 +452,21 @@ const clearSourceFormats = (store: SpreadsheetStore, source: Range): void => {
   });
 };
 
-const clearSourceValues = (wb: WorkbookHandle, source: Range): void => {
+/** Blank patches for every populated cell of a cut source. */
+const sourceClearPatches = (wb: WorkbookHandle, source: Range): CellPatch[] =>
   // `cellFormula`/`getValue` each scan a sheet in the engine. Materialize the
   // source sheet once so a large cut remains linear in the sheet's populated
   // cells rather than quadratic in the source rectangle.
-  const sourceCells = Array.from(wb.physicalCells(source.sheet)).filter(
-    (cell) =>
-      cell.addr.row >= source.r0 &&
-      cell.addr.row <= source.r1 &&
-      cell.addr.col >= source.c0 &&
-      cell.addr.col <= source.c1 &&
-      (cell.formula !== null || cell.value.kind !== 'blank'),
-  );
-  wb.withBatchedRecalc(() => {
-    for (const cell of sourceCells) wb.setBlank(cell.addr);
-  });
-};
+  Array.from(wb.physicalCells(source.sheet))
+    .filter(
+      (cell) =>
+        cell.addr.row >= source.r0 &&
+        cell.addr.row <= source.r1 &&
+        cell.addr.col >= source.c0 &&
+        cell.addr.col <= source.c1 &&
+        (cell.formula !== null || cell.value.kind !== 'blank'),
+    )
+    .map((cell) => ({ addr: cell.addr, value: { kind: 'blank' }, formula: null }));
 
 const mutateMergeSlice = (
   store: SpreadsheetStore,
@@ -894,12 +894,16 @@ function applyPaste(
     ? materializedPasteCells(snap, destination, opt.transpose)
     : null;
   if (bandDestination && !bandCells) return null;
-  const valuePatches: CellPatch[] | null =
-    snap.mode === 'copy' &&
-    pastesAll(opt.what) &&
-    opt.operation === 'none' &&
-    !opt.transpose &&
-    history !== null
+  // A cut writes every cell it touches (source, destination, moved references)
+  // in one engine transaction, before anything else changes, so a refused
+  // formula leaves the workbook as it was.
+  const valuePatches: CellPatch[] | null = sourceCut
+    ? sourceClearPatches(wb, sourceLogical)
+    : snap.mode === 'copy' &&
+        pastesAll(opt.what) &&
+        opt.operation === 'none' &&
+        !opt.transpose &&
+        history !== null
       ? []
       : null;
   const bandTargetKeys = bandCells
@@ -979,28 +983,46 @@ function applyPaste(
     }
   }
 
-  // Remove source/destination merges before writing cells. This is especially
-  // important for overlapping cuts: the captured snapshot remains available
-  // while the live source is cleared, so the destination can be rebuilt from
-  // the original payload.
-  const removalsBySheet = new Map<number, Range[]>();
-  const addRemoval = (range: Range): void => {
-    const list = removalsBySheet.get(range.sheet) ?? [];
-    list.push(range);
-    removalsBySheet.set(range.sheet, list);
+  // Remove source/destination merges. An overlapping cut rebuilds the
+  // destination from the captured snapshot, so the live source can go first.
+  const removeMerges = (): void => {
+    const removalsBySheet = new Map<number, Range[]>();
+    const addRemoval = (range: Range): void => {
+      const list = removalsBySheet.get(range.sheet) ?? [];
+      list.push(range);
+      removalsBySheet.set(range.sheet, list);
+    };
+    if (sourceCut) addRemoval(sourceLogical);
+    if (applyTopology && checked.preservedMerges.length === 0) addRemoval(destination);
+    for (const [mergeSheet, removals] of removalsBySheet) {
+      recordMergesChangeWithEngine(history, store, wb, mergeSheet, () => {
+        mutateMergeSlice(store, mergeSheet, removals, []);
+      });
+    }
   };
-  if (sourceCut) addRemoval(sourceLogical);
-  if (applyTopology && checked.preservedMerges.length === 0) addRemoval(destination);
-  for (const [mergeSheet, removals] of removalsBySheet) {
-    recordMergesChangeWithEngine(history, store, wb, mergeSheet, () => {
-      mutateMergeSlice(store, mergeSheet, removals, []);
-    });
-  }
+  // A cut's cell writes can be refused, so its merges change only after them.
+  if (!sourceCut) removeMerges();
 
-  if (sourceCut) {
-    clearSourceValues(wb, sourceLogical);
-    recordFormatChange(history, store, () => clearSourceFormats(store, sourceLogical));
-  }
+  // A cut keeps references bound to the cells' original sheets and follows the
+  // ones inside the moved block to their destination coordinates.
+  const cutFormula = (formula: string): string =>
+    adjustFormulaForCutPasteMove(
+      formula,
+      {
+        r0: sourceLogical.r0,
+        c0: sourceLogical.c0,
+        r1: sourceLogical.r1,
+        c1: sourceLogical.c1,
+      },
+      { r0: destination.r0, c0: destination.c0 },
+      {
+        sourceSheet: source.sheet,
+        destinationSheet: destination.sheet,
+        formulaSheet: source.sheet,
+        outputSheet: destination.sheet,
+        sheetNames,
+      },
+    );
 
   // A copied formula re-anchors to its destination; under Transpose the
   // references into the copied block follow their cells to the transposed tile.
@@ -1077,7 +1099,11 @@ function applyPaste(
       const shouldPasteFormula = Boolean(src.formula && wantsFormulas(opt.what) && !operating);
       if (valuePatches) {
         const formula =
-          shouldPasteFormula && src.formula ? copiedFormula(src.formula, row, col, sr, sc) : null;
+          shouldPasteFormula && src.formula
+            ? sourceCut
+              ? cutFormula(src.formula)
+              : copiedFormula(src.formula, row, col, sr, sc)
+            : null;
         valuePatches.push({ addr, value: src.value, formula });
       } else if (operating) {
         const srcNum = numericValue(src);
@@ -1093,34 +1119,7 @@ function applyPaste(
         }
         // Non-numeric source cells leave the destination unchanged (parity).
       } else if (shouldPasteFormula && src.formula) {
-        // Cut moves cells and keeps references bound to the cells' original
-        // sheets. The contextual transform also follows references that are
-        // inside the moved block to their new destination coordinates. Copy
-        // re-anchors relative refs by the paste offset.
-        if (snap.mode === 'cut') {
-          wb.setFormula(
-            addr,
-            adjustFormulaForCutPasteMove(
-              src.formula,
-              {
-                r0: sourceLogical.r0,
-                c0: sourceLogical.c0,
-                r1: sourceLogical.r1,
-                c1: sourceLogical.c1,
-              },
-              { r0: destination.r0, c0: destination.c0 },
-              {
-                sourceSheet: source.sheet,
-                destinationSheet: destination.sheet,
-                formulaSheet: source.sheet,
-                outputSheet: destination.sheet,
-                sheetNames,
-              },
-            ),
-          );
-        } else {
-          wb.setFormula(addr, copiedFormula(src.formula, row, col, sr, sc));
-        }
+        wb.setFormula(addr, copiedFormula(src.formula, row, col, sr, sc));
       } else if (wantsValues(opt.what) || wantsFormulas(opt.what)) {
         writeCell(wb, addr, src.value, null);
       }
@@ -1186,7 +1185,14 @@ function applyPaste(
     }
   });
 
-  if (valuePatches) applyPatchesAtomic(wb, valuePatches, history);
+  if (valuePatches) {
+    if (sourceCut) valuePatches.push(...cutReferencePatches(wb, sourceLogical, destination));
+    applyPatchesAtomic(wb, valuePatches, history);
+  }
+  if (sourceCut) {
+    removeMerges();
+    recordFormatChange(history, store, () => clearSourceFormats(store, sourceLogical));
+  }
 
   if (formatWrites.length > 0) {
     recordFormatChange(history, store, () => {
@@ -1377,44 +1383,36 @@ function applyPaste(
   selectWritten(store, writtenRange, bandDestination);
   if (!bandDestination) extendTablesForPaste(store, history, writtenRange);
   if (snap.mode === 'cut') {
-    updateExternalRefsForCutPaste(wb, sourceLogical, writtenRange);
     moveDefinedNamesForCut(history, wb, sourceLogical, writtenRange);
     consumeCutMarquee(store);
   }
   return { writtenRange, skippedNonFiniteOperations };
 }
 
-function updateExternalRefsForCutPaste(
-  wb: WorkbookHandle,
-  source: Range,
-  writtenRange: Range,
-): void {
+/** Rewrites of the formulas outside a cut's source and destination whose
+ *  references follow the moved cells, read before anything is written. */
+function cutReferencePatches(wb: WorkbookHandle, source: Range, destination: Range): CellPatch[] {
   const sheetNames = sheetNamesFor(wb);
-  wb.withBatchedRecalc(() => {
-    for (let formulaSheet = 0; formulaSheet < wb.sheetCount; formulaSheet += 1) {
-      const context = {
-        sourceSheet: source.sheet,
-        destinationSheet: writtenRange.sheet,
-        formulaSheet,
-        outputSheet: formulaSheet,
-        sheetNames,
-      };
-      for (const entry of wb.cells(formulaSheet)) {
-        if (!entry.formula) continue;
-        if (
-          entry.addr.sheet === writtenRange.sheet &&
-          entry.addr.row >= writtenRange.r0 &&
-          entry.addr.row <= writtenRange.r1 &&
-          entry.addr.col >= writtenRange.c0 &&
-          entry.addr.col <= writtenRange.c1
-        ) {
-          continue;
-        }
-        const next = adjustFormulaForCutPasteMove(entry.formula, source, writtenRange, context);
-        if (next !== entry.formula) wb.setFormula(entry.addr, next);
+  const patches: CellPatch[] = [];
+  for (let formulaSheet = 0; formulaSheet < wb.sheetCount; formulaSheet += 1) {
+    const context = {
+      sourceSheet: source.sheet,
+      destinationSheet: destination.sheet,
+      formulaSheet,
+      outputSheet: formulaSheet,
+      sheetNames,
+    };
+    for (const entry of wb.cells(formulaSheet)) {
+      if (!entry.formula) continue;
+      if (rangeContainsAddr(destination, entry.addr) || rangeContainsAddr(source, entry.addr)) {
+        continue;
       }
+      const next = adjustFormulaForCutPasteMove(entry.formula, source, destination, context);
+      if (next !== entry.formula)
+        patches.push({ addr: entry.addr, value: entry.value, formula: next });
     }
-  });
+  }
+  return patches;
 }
 
 function sheetNamesFor(wb: WorkbookHandle): string[] {
