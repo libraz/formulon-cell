@@ -93,34 +93,39 @@ describe('an active chartsheet', () => {
       grid?.dispatchEvent(event);
     };
 
-    it('stays as the file states it through every zoom path', async () => {
-      const { host, instance, workbook } = await mountFixture();
-      const before = instance.store.getState().viewport.zoom;
-      wheelZoom(host, -100);
-      wheelZoom(host, 100);
-      host.querySelectorAll<HTMLButtonElement>('.fc-host__statusbar-zoom-btn').forEach((button) => {
-        button.click();
-      });
-      setSheetZoom(instance.store, 2, workbook);
-      expect(instance.store.getState().viewport.zoom).toBe(before);
+    it('saves a zoom set on it as that zoom, ending the fit to the window', async () => {
+      const { instance, workbook } = await mountFixture();
+      setSheetZoom(instance.store, 0.8, workbook);
+      expect(instance.store.getState().viewport.zoom).toBe(0.8);
       const view = savedView(workbook);
-      expect(view).toContain('zoomScale="125"');
-      expect(view).toContain('zoomToFit="1"');
+      expect(view).toContain('zoomScale="80"');
+      expect(view).not.toContain('zoomToFit');
     });
 
-    it('greys the zoom commands with a reason of their own', async () => {
+    it('zooms through the wheel and the status bar', async () => {
+      const { host, instance, workbook } = await mountFixture();
+      // Kept clear of 100%, the default a saved view leaves unwritten.
+      setSheetZoom(instance.store, 0.5, workbook);
+      wheelZoom(host, -100);
+      const wheeled = instance.store.getState().viewport.zoom;
+      expect(wheeled).toBeGreaterThan(0.5);
+      host.querySelector<HTMLButtonElement>('.fc-host__statusbar-zoom-btn')?.click();
+      expect(instance.store.getState().viewport.zoom).toBeLessThan(wheeled);
+      const pct = Math.round(instance.store.getState().viewport.zoom * 100);
+      const view = savedView(workbook);
+      expect(view).toContain(`zoomScale="${pct}"`);
+      expect(view).not.toContain('zoomToFit');
+    });
+
+    it('runs the zoom commands but refuses zoom to selection, which needs cells', async () => {
       const { instance } = await mountFixture();
-      for (const id of [
-        'zoom100',
-        'zoom125',
-        'zoom75',
-        'zoomDialog',
-        'zoomSelection',
-        'mac.view.zoom',
-      ]) {
+      for (const id of ['zoom100', 'zoom125', 'zoom75', 'zoomDialog', 'mac.view.zoom']) {
+        expect(canExecuteBuiltIn(instance.store, id as never, 'ribbon').allowed, id).toBe(true);
+      }
+      for (const id of ['zoomSelection', 'mac.view.zoomSelection']) {
         expect(canExecuteBuiltIn(instance.store, id as never, 'ribbon'), id).toMatchObject({
           allowed: false,
-          reasonKey: 'sheetNotZoomable',
+          reasonKey: 'sheetHasNoCells',
         });
       }
     });

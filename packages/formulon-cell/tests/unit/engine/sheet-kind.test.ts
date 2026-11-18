@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { moveSheet } from '../../../src/commands/sheet-mutate.js';
 import { hydrateChartsFromEngine } from '../../../src/engine/charts-sync.js';
 import { hydrateLayoutFromEngine } from '../../../src/engine/layout-sync.js';
-import { isChartsheet, sheetHasCells } from '../../../src/engine/sheet-kind.js';
+import { isChartsheet, sheetHasCells, sheetZoomable } from '../../../src/engine/sheet-kind.js';
 import { SheetKind } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
@@ -23,6 +23,30 @@ describe('sheet kind', () => {
     opened.push(wb);
     expect(wb.sheetKind(0)).toBe(SheetKind.Worksheet);
     expect(wb.chartsheetChartId(0)).toBeNull();
+  });
+
+  it('zooms a worksheet and a chartsheet, and no other kind', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      layout: {
+        ...s.layout,
+        sheetKinds: new Map([
+          [1, SheetKind.Chartsheet],
+          [2, SheetKind.Dialogsheet],
+          [3, SheetKind.Macrosheet],
+          [4, SheetKind.Other],
+        ]),
+      },
+    }));
+    const state = store.getState();
+    expect([0, 1, 2, 3, 4].map((sheet) => sheetZoomable(state, sheet))).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
   });
 
   describe('in a file with a chartsheet', () => {
