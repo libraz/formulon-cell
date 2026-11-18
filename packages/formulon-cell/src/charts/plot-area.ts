@@ -24,9 +24,9 @@ export const plotAreaPrimitives = (
         ...(line
           ? {
               stroke: line.color,
-              'stroke-width': line.widthPt,
+              'stroke-width': line.widthPx,
               ...(line.opacity === undefined ? {} : { 'stroke-opacity': line.opacity }),
-              ...dashAttrs(line.dash, line.widthPt),
+              ...dashAttrs(line.dash, line.widthPx),
             }
           : {}),
       },

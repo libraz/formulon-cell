@@ -129,7 +129,7 @@ describe('the drawn plot area', () => {
       fill: '#cceeff',
       'fill-opacity': 0.5,
       stroke: '#112233',
-      'stroke-width': 2,
+      'stroke-width': (2 * 96) / 72,
     });
   });
 
@@ -215,10 +215,10 @@ describe('the drawn chart area', () => {
   it.each(['squareDot', 'longDashDot', 'roundDot'] as const)(
     'dashes a %s outline as a series line of that dash is',
     (dash) => {
-      // 3 pt is 4 px, the width the series line below is drawn at.
+      // The same 3 pt as the series line below.
       const { frame } = drawn({ chartArea: { line: { color: '#ff0000', width: 3, dash } } });
       const line = layoutChart({
-        spec: { kind: 'line', seriesStyles: [{ seriesId: 'series-0', line: { width: 4, dash } }] },
+        spec: { kind: 'line', seriesStyles: [{ seriesId: 'series-0', line: { width: 3, dash } }] },
         data: DATA,
         width: 320,
         height: 132,

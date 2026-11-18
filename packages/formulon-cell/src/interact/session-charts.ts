@@ -178,9 +178,6 @@ const withOpacity = (color: string, opacity: number | undefined): string =>
     ? color
     : `color-mix(in srgb, ${color} ${Math.round(opacity * 100)}%, transparent)`;
 
-/** CSS pixels per point. */
-const PX_PER_PT = 96 / 72;
-
 /** Set the chart area's fill on `panel`, and the width of the frame its outline is drawn in. */
 const applyChartAreaPaint = (panel: HTMLElement, chart: { chartArea?: ChartAreaSpec }): void => {
   const fill = chartAreaFill(chart.chartArea);
@@ -201,7 +198,7 @@ const appendChartAreaFrame = (
 ): void => {
   const line = chartAreaLine(chart.chartArea);
   if (!line) return;
-  const width = line.widthPt * PX_PER_PT;
+  const width = line.widthPx;
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.classList.add('fc-chart__frame');
   svg.setAttribute('aria-hidden', 'true');

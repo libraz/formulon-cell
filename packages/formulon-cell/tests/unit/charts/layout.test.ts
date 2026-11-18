@@ -2056,8 +2056,9 @@ describe('layoutChart', () => {
     expect(bars[1]?.attrs['fill-opacity']).toBe(0.25);
     expect(bars[0]?.attrs.stroke).toBe('#edge');
     expect(bars[0]?.attrs['stroke-opacity']).toBe(0.75);
-    expect(bars[0]?.attrs['stroke-width']).toBe(3);
-    expect(bars[0]?.attrs['stroke-dasharray']).toBe('12 9 3 9');
+    // A stated 3 pt is 4 px in the scene.
+    expect(bars[0]?.attrs['stroke-width']).toBe(4);
+    expect(bars[0]?.attrs['stroke-dasharray']).toBe('16 12 4 12');
     const legend = scene.elements.find(
       (element) => element.role === 'legend' && element.tag === 'rect',
     );
@@ -2215,7 +2216,7 @@ describe('layoutChart', () => {
     );
     expect(moved).toEqual(attrs);
     if (tag === 'path') {
-      expect(drawn?.attrs['stroke-width']).toBe(2);
+      expect(drawn?.attrs['stroke-width']).toBeCloseTo((2 * 96) / 72, 10);
       // Without an outline colour the line shapes take the series colour.
       expect(marker()?.attrs.stroke).toBe('#series');
     }

@@ -122,13 +122,25 @@ export const DEFAULT_CHART_AREA_LINE = { color: '#898989', widthPt: 1 } as const
 /** The chart area's outline as the file states it, over the default. A stated No Line is null. */
 export const chartAreaLine = (
   area: ChartAreaSpec | undefined,
-): { color: string; widthPt: number; opacity?: number; dash?: ChartLineSpec['dash'] } | null => {
+): {
+  color: string;
+  widthPt: number;
+  /** The drawn width in scene pixels. */
+  widthPx: number;
+  opacity?: number;
+  dash?: ChartLineSpec['dash'];
+} | null => {
   if (area?.line === 'none') return null;
   const opacity = lineOpacity(area?.line);
+  const stated = area?.line?.width;
+  const widthPt =
+    stated !== undefined && Number.isFinite(stated)
+      ? clamp(stated, 0, 72)
+      : DEFAULT_CHART_AREA_LINE.widthPt;
   return {
     color: area?.line?.color ?? DEFAULT_CHART_AREA_LINE.color,
-    widthPt:
-      lineWidth(area?.line, DEFAULT_CHART_AREA_LINE.widthPt) ?? DEFAULT_CHART_AREA_LINE.widthPt,
+    widthPt,
+    widthPx: widthPt * PX_PER_PT,
     ...(opacity === undefined ? {} : { opacity }),
     ...(area?.line?.dash === undefined ? {} : { dash: area.line.dash }),
   };
@@ -155,13 +167,19 @@ export const fillOpacity = (
 export const lineOpacity = (line: ChartLineSpec | undefined): number | undefined =>
   transparencyOpacity(line?.transparency);
 
+/** CSS pixels per point: a scene is laid out in pixels and a stated line width is in points. */
+export const PX_PER_PT = 96 / 72;
+
+/** The drawn stroke width in scene pixels of a line stating its width in points, or `fallback` (pixels). */
 export const lineWidth = (
   line: ChartLineSpec | undefined,
   fallback?: number,
 ): number | undefined =>
-  line?.width !== undefined && Number.isFinite(line.width) ? clamp(line.width, 0, 72) : fallback;
+  line?.width !== undefined && Number.isFinite(line.width)
+    ? clamp(line.width, 0, 72) * PX_PER_PT
+    : fallback;
 
-/** The SVG stroke attributes of a dash style at `width` points; none for a solid line. */
+/** The SVG stroke attributes of a dash style at a drawn `width` in scene pixels; none for a solid line. */
 export const dashAttrs = (dash: ChartLineSpec['dash'], width: number): Record<string, string> => {
   if (dash === undefined || dash === 'solid') return {};
   const stroke = shapeDashStroke(dash, width);

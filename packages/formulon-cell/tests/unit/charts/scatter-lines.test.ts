@@ -152,12 +152,12 @@ describe('scatter line geometry', () => {
     const connector = lines(scene)[0];
     expect(connector?.attrs.stroke).toBe('#123456');
     expect(connector?.attrs['stroke-opacity']).toBe(0.8);
-    expect(connector?.attrs['stroke-width']).toBe(3);
-    expect(connector?.attrs['stroke-dasharray']).toBe('0 6');
+    expect(connector?.attrs['stroke-width']).toBe(4);
+    expect(connector?.attrs['stroke-dasharray']).toBe('0 8');
     expect(connector?.attrs['stroke-linecap']).toBe('round');
     const styledMarker = points(scene).find((point) => point.pointId === 'p1');
     expect(styledMarker?.attrs.stroke).toBe('#abcdef');
-    expect(styledMarker?.attrs['stroke-width']).toBe(5);
+    expect(styledMarker?.attrs['stroke-width']).toBeCloseTo((5 * 96) / 72, 10);
 
     const suppressed = sceneFor(
       {
