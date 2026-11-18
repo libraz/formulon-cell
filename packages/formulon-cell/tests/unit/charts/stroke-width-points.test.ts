@@ -77,14 +77,20 @@ describe('stated line widths are points, drawn in scene pixels', () => {
     );
     expect(bar?.attrs['stroke-width']).toBe(3 * PX_PER_PT);
   });
+
+  // The spreadsheet reads a series line that states no width as 3 pt (lnw-2026-11-18).
+  it('draws a line series that states no width 3 pt wide', () => {
+    const [line] = role({ kind: 'line' }, 'line');
+    expect(line?.attrs['stroke-width']).toBe(4);
+  });
+
+  it('draws a scatter connector that states no width 3 pt wide', () => {
+    const [line] = role({ kind: 'scatter', scatterStyle: 'lineMarker' }, 'line', XY);
+    expect(line?.attrs['stroke-width']).toBe(4);
+  });
 });
 
 describe('widths measured in pixels are unchanged', () => {
-  it('draws a series line that states no width 2 px wide', () => {
-    const [line] = role({ kind: 'line' }, 'line');
-    expect(line?.attrs['stroke-width']).toBe(2);
-  });
-
   it('draws the separators of pie slices 1 px wide', () => {
     const slices = role({ kind: 'pie' }, 'slice');
     expect(slices.length).toBeGreaterThan(0);

@@ -170,6 +170,9 @@ export const lineOpacity = (line: ChartLineSpec | undefined): number | undefined
 /** CSS pixels per point: a scene is laid out in pixels and a stated line width is in points. */
 export const PX_PER_PT = 96 / 72;
 
+/** The drawn width of a line or scatter series line that states none: the spreadsheet reads it as 3 pt. */
+export const DEFAULT_SERIES_LINE_PX = 3 * PX_PER_PT;
+
 /** The drawn stroke width in scene pixels of a line stating its width in points, or `fallback` (pixels). */
 export const lineWidth = (
   line: ChartLineSpec | undefined,

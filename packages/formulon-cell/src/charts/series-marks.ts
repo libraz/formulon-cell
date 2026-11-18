@@ -18,6 +18,7 @@ import {
   segmentsFor,
 } from './series-geometry.js';
 import {
+  DEFAULT_SERIES_LINE_PX,
   dashAttrs,
   fillColor,
   fillOpacity,
@@ -369,7 +370,7 @@ export const addCategoryMarks = (
           undefined,
         );
         const opacity = lineOpacity(style.line);
-        const width = lineWidth(style.line, 2) ?? 2;
+        const width = lineWidth(style.line, DEFAULT_SERIES_LINE_PX) ?? DEFAULT_SERIES_LINE_PX;
         const dash = dashAttrs(style.line?.dash, width);
         const smooth = spec.kind === 'line' && smoothed(spec, series.id);
         const coordinates = lineRun.map(
@@ -535,7 +536,7 @@ export const addScatterMarks = (
         originalSeriesIndex,
         undefined,
       );
-      const width = lineWidth(lineStyle.line, 2) ?? 2;
+      const width = lineWidth(lineStyle.line, DEFAULT_SERIES_LINE_PX) ?? DEFAULT_SERIES_LINE_PX;
       // A zero-width series line is an explicit request to suppress the
       // connector while leaving point markers independently controllable.
       if (width > 0) {
