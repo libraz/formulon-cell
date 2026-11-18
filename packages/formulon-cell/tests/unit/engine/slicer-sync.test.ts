@@ -203,16 +203,25 @@ describe('table slicers saved with the workbook', () => {
     add(store, wb, { style: 'SlicerStyleDark1' });
     const slicer = wb.listSlicers(0)[0];
     const before = { ...slicer?.anchor, name: slicer?.name } as {
+      editAs: number;
       fromRow: number;
       toRow: number;
+      toRowOffsetEmu: number;
       name: string;
     };
+    expect(before.editAs).toBe(AnchorEditAs.OneCell);
 
     expect(
       deleteRows(store, wb, history, before.fromRow - 1, before.toRow - before.fromRow + 2),
     ).toBe(true);
     expect(wb.listSlicers(0)).toHaveLength(1);
-    expect(wb.listSlicers(0)[0]?.anchor.toRow).toBe(wb.listSlicers(0)[0]?.anchor.fromRow);
+    // A move-only frame keeps its height: it starts at the first deleted row.
+    expect(wb.listSlicers(0)[0]?.anchor).toMatchObject({
+      fromRow: before.fromRow - 1,
+      fromRowOffsetEmu: 0,
+      toRow: before.toRow - 1,
+      toRowOffsetEmu: before.toRowOffsetEmu,
+    });
 
     history.undo();
     expect(wb.listSlicers(0)).toHaveLength(1);
