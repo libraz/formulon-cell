@@ -49,7 +49,7 @@ import { dictionaries } from '../i18n/strings.js';
 import { openSheetViewOptionsDialog } from '../interact/sheet-view-options-dialog.js';
 import { openSpellingDialog } from '../interact/spelling-dialog.js';
 import { reportDialogLabels, showReport } from '../toolbar/dialogs/report.js';
-import { showMacZoomDialog, showZoomDialog, zoomForSelection } from '../toolbar/dialogs/zoom.js';
+import { selectionZoom, showMacZoomDialog, showZoomDialog } from '../toolbar/dialogs/zoom.js';
 import { backstageMenuText, pageScaleMenuText, toolbarMenuText } from '../toolbar/menu-text.js';
 import {
   buildTranslationReviewItems,
@@ -553,7 +553,7 @@ export function createDefaultRibbonHooks(
           if (choice === null) return;
           const zoom =
             choice.kind === 'selection'
-              ? zoomForSelection(instance.store.getState().selection.range)
+              ? selectionZoom(instance.store.getState())
               : choice.percent / 100;
           setSheetZoom(instance.store, zoom, instance.workbook);
           opts.refreshZoom?.();

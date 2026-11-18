@@ -85,7 +85,7 @@ import { outlineSummaryFor } from '../../store/outline-summary.js';
 import { getPageSetup } from '../../store/store.js';
 import type { CellBorderStyle } from '../../store/types.js';
 import { showMessage } from '../dialogs/prompt.js';
-import { zoomForSelection } from '../dialogs/zoom.js';
+import { selectionZoom } from '../dialogs/zoom.js';
 import type { SessionShapeKind } from '../illustration-types.js';
 import type { ToolbarMenuText } from '../menu-text.js';
 import { applyMergeAction } from '../merge-action.js';
@@ -885,7 +885,7 @@ const applyGenericRibbonCommand = (
       hooks?.automation?.addInManager?.();
       return true;
     case 'zoomSelection': {
-      setSheetZoom(i.store, zoomForSelection(i.store.getState().selection.range), i.workbook);
+      setSheetZoom(i.store, selectionZoom(i.store.getState()), i.workbook);
       runtime.refreshZoom();
       runtime.focusSheet();
       return true;

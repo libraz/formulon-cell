@@ -1,6 +1,8 @@
 import { parseLocalizedNumericInput } from '../../commands/coerce-input.js';
+import { sheetHasCells } from '../../engine/sheet-kind.js';
 import type { Range } from '../../engine/types.js';
 import { clampZoom, ZOOM_MAX, ZOOM_MIN } from '../../store/render-scale.js';
+import type { State } from '../../store/types.js';
 import { showNumberPrompt } from './prompt.js';
 import {
   appendDialogActions,
@@ -44,6 +46,10 @@ export const zoomForSelection = (range: Range): number => {
   const cols = Math.max(1, range.c1 - range.c0 + 1);
   return clampZoom(Math.min(20 / rows, 12 / cols));
 };
+
+/** Zoom to Selection on the active sheet; a sheet without cells takes the minimum zoom. */
+export const selectionZoom = (state: State): number =>
+  sheetHasCells(state, state.data.sheetIndex) ? zoomForSelection(state.selection.range) : ZOOM_MIN;
 
 /** Preset magnifications of the Mac Zoom dialog, top to bottom. */
 const MAC_ZOOM_PRESETS = [200, 150, 125, 100, 75, 50, 25] as const;

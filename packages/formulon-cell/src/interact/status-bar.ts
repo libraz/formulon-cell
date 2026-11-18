@@ -37,7 +37,7 @@ import {
   type StatusBarOptionKey,
   type WorkbookViewMode,
 } from '../store/store.js';
-import { showMacZoomDialog, showZoomDialog, zoomForSelection } from '../toolbar/dialogs/zoom.js';
+import { selectionZoom, showMacZoomDialog, showZoomDialog } from '../toolbar/dialogs/zoom.js';
 import { focusMenuItem, handleMenuKeydown, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { onOutsidePress } from './outside-press.js';
@@ -726,11 +726,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
         custom: mac.custom,
       });
       if (choice === null) return;
-      setZoom(
-        choice.kind === 'selection'
-          ? zoomForSelection(store.getState().selection.range)
-          : choice.percent / 100,
-      );
+      setZoom(choice.kind === 'selection' ? selectionZoom(store.getState()) : choice.percent / 100);
       return;
     }
     const next = await showZoomDialog({ ...common, label: strings.ribbon.zoomDialogPercent });

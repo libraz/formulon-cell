@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { SheetKind } from '../../../src/engine/types.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 import {
+  selectionZoom,
   showMacZoomDialog,
   showZoomDialog,
   zoomForSelection,
@@ -132,5 +135,22 @@ describe('zoomForSelection', () => {
     expect(zoomForSelection({ sheet: 0, r0: 0, c0: 0, r1: 39, c1: 0 })).toBe(0.5);
     expect(zoomForSelection({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 23 })).toBe(0.5);
     expect(zoomForSelection({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 })).toBe(4);
+  });
+});
+
+describe('selectionZoom', () => {
+  it('fits the selection on a worksheet', () => {
+    const store = createSpreadsheetStore();
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    expect(selectionZoom(store.getState())).toBe(4);
+  });
+
+  it('takes the minimum zoom on a chartsheet, which has no cells to fit', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, sheetKinds: new Map([[0, SheetKind.Chartsheet]]) },
+    }));
+    expect(selectionZoom(store.getState())).toBe(0.1);
   });
 });

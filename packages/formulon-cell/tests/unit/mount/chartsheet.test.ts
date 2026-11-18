@@ -5,6 +5,7 @@ import { canExecuteBuiltIn } from '../../../src/commands/built-in-command-policy
 import { setSheetZoom } from '../../../src/commands/view.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { mutators } from '../../../src/store/store.js';
+import { selectionZoom } from '../../../src/toolbar/dialogs/zoom.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
 import { zipEntries, zipText } from '../engine/zip-entries.js';
 
@@ -117,17 +118,28 @@ describe('an active chartsheet', () => {
       expect(view).not.toContain('zoomToFit');
     });
 
-    it('runs the zoom commands but refuses zoom to selection, which needs cells', async () => {
+    it('runs every zoom command', async () => {
       const { instance } = await mountFixture();
-      for (const id of ['zoom100', 'zoom125', 'zoom75', 'zoomDialog', 'mac.view.zoom']) {
+      for (const id of [
+        'zoom100',
+        'zoom125',
+        'zoom75',
+        'zoomDialog',
+        'zoomSelection',
+        'mac.view.zoom',
+        'mac.view.zoomSelection',
+      ]) {
         expect(canExecuteBuiltIn(instance.store, id as never, 'ribbon').allowed, id).toBe(true);
       }
-      for (const id of ['zoomSelection', 'mac.view.zoomSelection']) {
-        expect(canExecuteBuiltIn(instance.store, id as never, 'ribbon'), id).toMatchObject({
-          allowed: false,
-          reasonKey: 'sheetHasNoCells',
-        });
-      }
+    });
+
+    it('zooms to the minimum on Zoom to Selection and saves that zoom', async () => {
+      const { instance, workbook } = await mountFixture();
+      setSheetZoom(instance.store, selectionZoom(instance.store.getState()), workbook);
+      expect(instance.store.getState().viewport.zoom).toBe(0.1);
+      const view = savedView(workbook);
+      expect(view).toContain('zoomScale="10"');
+      expect(view).not.toContain('zoomToFit');
     });
 
     it('still zooms a worksheet', async () => {

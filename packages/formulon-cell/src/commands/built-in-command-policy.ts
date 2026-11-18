@@ -705,12 +705,6 @@ const ZOOM_COMMANDS: ReadonlySet<string> = new Set([
   'mac.view.zoomSelection',
 ]);
 
-/** Zoom to Selection fits the selected cells, so a sheet without cells greys it. */
-const ZOOM_TO_SELECTION_COMMANDS: ReadonlySet<string> = new Set([
-  'zoomSelection',
-  'mac.view.zoomSelection',
-]);
-
 /** Clear Contents and the Home Clear control, which a locked selected cell greys as a whole. */
 const CLEAR_CONTROL_COMMANDS: ReadonlySet<string> = new Set(['clear', 'clearFormat']);
 
@@ -915,8 +909,6 @@ export const builtInProtectionDecision = (
     return deny('operationDenied', 'sheetHasNoCells');
   if (ZOOM_COMMANDS.has(id) && !sheetZoomable(state, sheet))
     return deny('operationDenied', 'sheetNotZoomable');
-  if (ZOOM_TO_SELECTION_COMMANDS.has(id) && !sheetHasCells(state, sheet))
-    return deny('operationDenied', 'sheetHasNoCells');
   // A cell shift is refused on a protected sheet whatever its options, so Insert / Delete Cells
   // over part of the rows never opens its dialog there; over whole rows or columns it acts at once.
   const shift =
