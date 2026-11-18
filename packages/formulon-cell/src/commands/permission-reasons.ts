@@ -3,6 +3,7 @@
 // surfaces can show localized text through `localizedDecisionReason`. A reason
 // without a built-in key is host-supplied text and is shown unchanged.
 
+import type { ParseError } from '@libraz/formulon';
 import type { Strings } from '../i18n/strings/types.js';
 import type { PermissionCode, PermissionDecision } from './interaction-policy.js';
 
@@ -111,6 +112,10 @@ export const permissionReasonText = (strings: Strings, key: PermissionReasonKey)
 
 const isReasonKey = (key: unknown): key is PermissionReasonKey =>
   typeof key === 'string' && Object.hasOwn(PERMISSION_REASONS, key);
+
+/** The built-in reason shown when the engine refuses a formula at `parseError`; every refusal reads the same for now. */
+export const engineRefusalReasonKey = (_parseError: ParseError | undefined): PermissionReasonKey =>
+  'valueNotWritten';
 
 /** The refusal fields a UI projection reads; decisions and batch rejections fit. */
 export interface RefusalLike {

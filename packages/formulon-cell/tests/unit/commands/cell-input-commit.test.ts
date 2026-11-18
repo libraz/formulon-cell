@@ -552,4 +552,26 @@ describe('commands/cell-input-commit', () => {
       expect(store.getState().errorIndicators.validationCircles.has(addrKey(addr))).toBe(true);
     });
   });
+
+  it('refuses an entry the engine rejects with a localizable reason, not the engine text', async () => {
+    const realWb = await createRealWorkbook();
+    const handle = withController(realWb);
+    try {
+      const result = commitCellInput({
+        store,
+        wb: realWb,
+        addr,
+        raw: '=SUM()',
+        origin: 'editor',
+      });
+
+      expect(result).toMatchObject({ status: 'rejected', operation: 'formulaEdit' });
+      const alert = (result as { alert: { refusal?: { reasonKey?: string } } | null }).alert;
+      expect(alert?.refusal?.reasonKey).toBe('valueNotWritten');
+      expect(handle.history.canUndo()).toBe(false);
+      expect(realWb.getValue(addr)).toEqual({ kind: 'blank' });
+    } finally {
+      handle.dispose();
+    }
+  });
 });

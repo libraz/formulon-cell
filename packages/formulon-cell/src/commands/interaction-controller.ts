@@ -2,6 +2,7 @@ import { addrKey } from '../engine/address.js';
 import { cellFormatFromXf } from '../engine/cell-format-projection.js';
 import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
 import { resolveCellInput } from '../engine/range-input.js';
+import { isFormulonError } from '../engine/result.js';
 import type { Addr, Range } from '../engine/types.js';
 import { sheetFontPatchFor } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -57,6 +58,7 @@ import {
   refusedBatch,
   validateInteractionPolicy,
 } from './interaction-policy.js';
+import { engineRefusalReasonKey, PERMISSION_REASONS } from './permission-reasons.js';
 import {
   changedFormatAddresses,
   type PreparedChange,
@@ -884,6 +886,12 @@ export class InteractionController {
       this.notifyChanged(result);
       return result;
     } catch (error) {
+      if (isFormulonError(error)) {
+        const reasonKey = engineRefusalReasonKey(error.parseError);
+        return this.rejectResult([
+          { code: 'invalid', reason: PERMISSION_REASONS[reasonKey], reasonKey },
+        ]);
+      }
       const reason = error instanceof Error ? error.message : 'cell patch failed';
       return this.rejectResult([{ code: 'invalid', reason }]);
     }

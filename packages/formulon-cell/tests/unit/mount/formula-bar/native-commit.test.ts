@@ -34,6 +34,27 @@ describe('mount/formula-bar — native commit result', () => {
     harness.detach();
   });
 
+  it('hands an engine refusal to the alert with its localizable reason', () => {
+    const onValidation = vi.fn();
+    const harness = attachFormulaBarHarness(sheet, onValidation);
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setActive(sheet.instance.store, addr);
+    harness.fxInput.focus();
+    harness.fxInput.dispatchEvent(new FocusEvent('focus'));
+    harness.fxInput.value = '=SUM()';
+    harness.fxInput.dispatchEvent(new Event('input'));
+
+    expect(harness.controller.commitFx('none')).toBe(false);
+    expect(onValidation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'stop',
+        refusal: expect.objectContaining({ reasonKey: 'valueNotWritten' }),
+      }),
+    );
+    expect(harness.controller.isEditing()).toBe(true);
+    harness.detach();
+  });
+
   it('raises one alert per commit attempt on a protected cell', () => {
     const onValidation = vi.fn();
     const harness = attachFormulaBarHarness(sheet, onValidation);

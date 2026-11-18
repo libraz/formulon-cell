@@ -646,11 +646,12 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     message: string,
     title?: string,
     code?: CellInputAlert['code'],
+    refusal?: CellInputAlert['refusal'],
   ): void => {
     commitRejected = true;
     // Focusing the bar under an adopted draft would blur and close the palette.
     if (!detached && !externalDraft?.lease) fxInput.focus();
-    if (onValidation) notifyValidation({ severity: 'stop', title, message, code });
+    if (onValidation) notifyValidation({ severity: 'stop', title, message, code, refusal });
     else console.warn(`formulon-cell: formula-bar commit rejected: ${message}`);
   };
 
@@ -808,6 +809,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
         result.alert?.message ?? localizedDecisionReason({ code: 'operationDenied' }, getStrings()),
         result.alert?.title,
         result.alert?.code,
+        result.alert?.refusal,
       );
       return false;
     }
