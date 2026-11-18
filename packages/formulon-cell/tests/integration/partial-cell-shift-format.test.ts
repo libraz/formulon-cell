@@ -217,7 +217,7 @@ describe('partial cell-shift native style checkpoints', () => {
     }
   });
 
-  it('aborts the TSV insertion transaction when its initial style snapshot fails', async () => {
+  it('refuses the TSV insertion when its style checkpoint cannot be captured', async () => {
     const wb = await WorkbookHandle.createDefault({ locale: 'ja' });
     const store = createSpreadsheetStore();
     const history = new History();
@@ -230,15 +230,11 @@ describe('partial cell-shift native style checkpoints', () => {
       setActive(store, source);
       wb.attachHistory(history);
 
-      let calls = 0;
-      const snapshot = vi.spyOn(wb, 'snapshotRangeStyle').mockImplementation((range) => {
-        calls += 1;
-        if (calls === 2) return null;
-        return WorkbookHandle.prototype.snapshotRangeStyle.call(wb, range);
+      const snapshot = vi.spyOn(wb, 'snapshotRangeStyle').mockReturnValue(null);
+      expect(insertCopiedCellsFromTSV(store, wb, history, 'new', 'down')).toMatchObject({
+        status: 'refused',
       });
-      expect(() => insertCopiedCellsFromTSV(store, wb, history, 'new', 'down')).toThrow(
-        /after-snapshot failed/,
-      );
+      expect(snapshot).toHaveBeenCalledTimes(1);
       snapshot.mockRestore();
 
       expect(value(wb, source)).toEqual({ kind: 'text', value: 'source' });

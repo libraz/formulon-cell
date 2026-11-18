@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   type AxisBandMoveContext,
   adjustFormulaForAxisBandMove,
-  adjustFormulaForCellBandShift,
   adjustFormulaForCutPasteMove,
   adjustFormulaForRowColEdit,
   shiftFormulaRefs,
@@ -167,111 +166,10 @@ describe('adjustFormulaForRowColEdit — insert/delete rows/cols', () => {
     expect(adjustFormulaForRowColEdit('=SUM(2:2)', 'row', 1, -1)).toBe('=SUM(#REF!)');
   });
 
-  it('leaves whole-axis ranges unchanged for partial cell-band shifts', () => {
-    const affected = { r0: 2, c0: 0, r1: 1048575, c1: 0 };
-    expect(adjustFormulaForCellBandShift('=SUM(A:A,1:3)', affected, 'down', 1)).toBe(
-      '=SUM(A:A,1:3)',
-    );
-  });
-
   it('leaves qualified Unicode refs untouched during structural edits', () => {
     expect(adjustFormulaForRowColEdit("=シート1!A3+'シート 2'!A3", 'row', 2, 1)).toBe(
       "=シート1!A3+'シート 2'!A3",
     );
-  });
-
-  it('adjusts cell-band refs by their resolved sheet binding', () => {
-    const affected = { r0: 1, c0: 0, r1: 1048575, c1: 0 };
-    const sourceFormula = {
-      editedSheet: 0,
-      formulaSheet: 0,
-      sheetNames: ['Source', 'Target'],
-    } as const;
-    const targetFormula = { ...sourceFormula, formulaSheet: 1 };
-    expect(
-      adjustFormulaForCellBandShift(
-        '=Source!$A$2+Source!A1:A3+A2',
-        affected,
-        'down',
-        1,
-        sourceFormula,
-      ),
-    ).toBe('=Source!$A$3+Source!A1:A4+A3');
-    expect(
-      adjustFormulaForCellBandShift(
-        '=Source!$A$2+Source!A1:A3+A2',
-        affected,
-        'down',
-        1,
-        targetFormula,
-      ),
-    ).toBe('=Source!$A$3+Source!A1:A4+A2');
-    expect(
-      adjustFormulaForCellBandShift('=Source!A:A+Source!1:3', affected, 'down', 1, targetFormula),
-    ).toBe('=Source!A:A+Source!1:3');
-    expect(
-      adjustFormulaForCellBandShift(
-        '=Source!$A$3+Source!A1:A3',
-        { ...affected, r0: 2 },
-        'down',
-        -1,
-        targetFormula,
-      ),
-    ).toBe('=Source!#REF!+Source!A1:A2');
-  });
-});
-
-describe('adjustFormulaForCellBandShift — insert/delete cells', () => {
-  it('shifts refs inside the band down', () => {
-    const affected = { r0: 2, c0: 0, r1: 1048575, c1: 0 };
-    expect(adjustFormulaForCellBandShift('=A3', affected, 'down', 1)).toBe('=A4');
-    // outside the column band → untouched
-    expect(adjustFormulaForCellBandShift('=B3', affected, 'down', 1)).toBe('=B3');
-  });
-
-  it('does not mangle sheet names on cell-band shift', () => {
-    const affected = { r0: 2, c0: 0, r1: 1048575, c1: 0 };
-    expect(adjustFormulaForCellBandShift('=Sheet2!A3', affected, 'down', 1)).toBe('=Sheet2!A3');
-  });
-
-  it('does not mangle function names ending in digits', () => {
-    const affected = { r0: 0, c0: 0, r1: 1048575, c1: 0 };
-    expect(adjustFormulaForCellBandShift('=LOG10(A3)', affected, 'down', 1)).toBe('=LOG10(A4)');
-  });
-
-  it('shifts every mixed absolute row reference in a cell band', () => {
-    const affected = { r0: 2, c0: 3, r1: 1048575, c1: 3 };
-    expect(adjustFormulaForCellBandShift('=$D$3+D$3+$D3+D3', affected, 'down', 1)).toBe(
-      '=$D$4+D$4+$D4+D4',
-    );
-  });
-
-  it('shifts every mixed absolute column reference in a cell band', () => {
-    const affected = { r0: 0, c0: 2, r1: 0, c1: 16383 };
-    expect(adjustFormulaForCellBandShift('=$C$1+C$1+$C1+C1', affected, 'right', 1)).toBe(
-      '=$D$1+D$1+$D1+D1',
-    );
-  });
-
-  it('turns references inside a deleted cell band into #REF!', () => {
-    const affected = { r0: 2, c0: 0, r1: 1048575, c1: 0 };
-    expect(adjustFormulaForCellBandShift('=$A$3+A$3+$A3+A3', affected, 'up', -1)).toBe(
-      '=#REF!+#REF!+#REF!+#REF!',
-    );
-    expect(adjustFormulaForCellBandShift('=A4', affected, 'up', -1)).toBe('=A3');
-  });
-
-  it('turns references inside a deleted cell band into #REF! horizontally', () => {
-    const affected = { r0: 0, c0: 2, r1: 0, c1: 16383 };
-    expect(adjustFormulaForCellBandShift('=$C$1+C$1+$C1+C1', affected, 'left', -1)).toBe(
-      '=#REF!+#REF!+#REF!+#REF!',
-    );
-  });
-
-  it('clamps a partially deleted range to the surviving boundary', () => {
-    const affected = { r0: 2, c0: 0, r1: 1048575, c1: 0 };
-    expect(adjustFormulaForCellBandShift('=SUM(A3:A20)', affected, 'up', -1)).toBe('=SUM(A3:A19)');
-    expect(adjustFormulaForCellBandShift('=SUM(A1:A3)', affected, 'up', -1)).toBe('=SUM(A1:A2)');
   });
 });
 

@@ -14,10 +14,7 @@ import {
   captureShiftReplayCheckpoint,
   deleteCells,
   restoreShiftReplayCheckpoint,
-  type ShiftHistoryReplayRecovery,
-  shiftCellsWithHistory,
-  shiftFormats,
-  shiftMerges,
+  shiftCellsViaEngine,
 } from '../cell-shift.js';
 import {
   canonicalizeLocalizedFormulaForInput,
@@ -243,26 +240,18 @@ function insertCellsAtActive(
         .map((raw) => canonicalizeLocalizedFormulaForInput(wb, raw.trim(), inputLocale));
   if (blockTableFunction(wb, pastedFormulas)) return null;
 
-  const replayRecovery: ShiftHistoryReplayRecovery = {};
-  if (history && !history.isReplaying()) {
-    replayRecovery.capture = () => captureShiftReplayCheckpoint(wb, store, affected);
-  }
   const transaction = history?.begin();
   let transactionClosed = false;
   try {
-    if (
-      !shiftCellsWithHistory(
-        wb,
-        history,
-        affected,
-        direction,
-        direction === 'down' ? height : width,
-        replayRecovery,
-      )
-    )
-      return null;
-    shiftFormats(store, history, affected, direction, direction === 'down' ? height : width);
-    shiftMerges(store, wb, history, affected, direction, direction === 'down' ? height : width);
+    // The engine shift is one step; the paste below is a separate one.
+    const inserted: Range = {
+      sheet,
+      r0: origin.row,
+      c0: origin.col,
+      r1: origin.row + height - 1,
+      c1: origin.col + width - 1,
+    };
+    if (!shiftCellsViaEngine(store, wb, history, inserted, direction)) return null;
 
     wb.withBatchedRecalc(() => {
       if (snapshot) {
@@ -284,23 +273,6 @@ function insertCellsAtActive(
     });
     copySnapshotMerges(store, wb, history, origin, snapshot);
     wb.recalcAuto();
-    if (history && !history.isReplaying()) {
-      replayRecovery.restore = (phase) => {
-        const checkpoint = phase === 'undo' ? replayRecovery.after : replayRecovery.before;
-        if (!checkpoint)
-          throw new Error(`insert copied cells: ${phase} replay checkpoint was not armed`);
-        restoreShiftReplayCheckpoint(wb, store, affected, checkpoint);
-      };
-      history.push({
-        undo: () => {
-          replayRecovery.after = replayRecovery.capture?.();
-        },
-        redo: () => {
-          replayRecovery.before = undefined;
-          replayRecovery.after = undefined;
-        },
-      });
-    }
   } catch (error) {
     if (transaction !== undefined) {
       transactionClosed = true;

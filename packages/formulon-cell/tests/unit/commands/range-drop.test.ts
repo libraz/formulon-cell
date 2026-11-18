@@ -30,7 +30,8 @@ describe('secondary-button drop of a selection', () => {
 
   beforeEach(async () => {
     store = createSpreadsheetStore();
-    wb = await WorkbookHandle.createDefault({ preferStub: true });
+    // Shift drops shift cells natively; the stub engine cannot.
+    wb = await WorkbookHandle.createDefault();
     history = new History();
     put(1, 1, 22);
     put(1, 2, 23);

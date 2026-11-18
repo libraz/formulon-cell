@@ -5,6 +5,7 @@ import {
   captureSnapshot,
 } from '../../../src/commands/clipboard/snapshot.js';
 import { History } from '../../../src/commands/history.js';
+import { applyMerge } from '../../../src/commands/merge.js';
 import { addrKey } from '../../../src/engine/address.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
@@ -13,7 +14,7 @@ import {
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
-const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
+const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault();
 
 const setActive = (
   store: ReturnType<typeof createSpreadsheetStore>,
@@ -93,9 +94,10 @@ describe('insertCopiedCellsFromTSV', () => {
   it('shifts formats and whole merges with the moved cells', async () => {
     const store = createSpreadsheetStore();
     const wb = await newWb();
+    wb.attachStore(store);
     setActive(store, 1, 1);
     mutators.setCellFormat(store, { sheet: 0, row: 1, col: 1 }, { bold: true });
-    mutators.mergeRange(store, { sheet: 0, r0: 2, c0: 1, r1: 2, c1: 2 });
+    expect(applyMerge(store, wb, null, { sheet: 0, r0: 2, c0: 1, r1: 2, c1: 2 })).toBe(true);
 
     insertCopiedCellsFromTSV(store, wb, null, 'x\ty', 'down');
 

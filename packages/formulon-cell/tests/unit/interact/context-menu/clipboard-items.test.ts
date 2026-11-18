@@ -612,6 +612,10 @@ describe('attachContextMenu', () => {
     });
 
     it('shows Insert Copied Cells only during copy mode and shifts cells after OK', async () => {
+      // Shifting cells is an engine operation; the stub engine refuses it.
+      wb.dispose();
+      wb = await WorkbookHandle.createDefault();
+      wb.attachStore(store);
       vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('new');
       seed(store, wb, [{ row: 1, col: 1, value: 'old' }]);
       setRange(store, 1, 1, 1, 1);
@@ -666,6 +670,10 @@ describe('attachContextMenu', () => {
     });
 
     it('Insert Copied Cells accepts an internal snapshot when clipboard text is empty', async () => {
+      // Shifting cells is an engine operation; the stub engine refuses it.
+      wb.dispose();
+      wb = await WorkbookHandle.createDefault();
+      wb.attachStore(store);
       vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('');
       const snap: ClipboardSnapshot = {
         mode: 'copy',
