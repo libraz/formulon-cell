@@ -12,7 +12,8 @@ import {
   mergePageSetupFragment,
   readPageSetupExtras,
 } from './page-setup-xml.js';
-import { attemptWrite } from './result.js';
+import { attemptWrite, orFallback } from './result.js';
+import { isChartsheet, sheetHasCells, sheetHasView } from './sheet-kind.js';
 import {
   type EngineSheetPr,
   type EngineSheetPrInput,
@@ -86,6 +87,7 @@ const rowLabel = (row: number): string => String(row + 1);
 const titleInput = (text: string): string | null => text || null;
 
 export abstract class WorkbookHandlePrintMethods {
+  declare sheetKind: WorkbookHandle['sheetKind'];
   declare readonly capabilities: EngineCapabilities;
 
   /**
@@ -98,6 +100,7 @@ export abstract class WorkbookHandlePrintMethods {
   paginateSheet(sheet: number): Pagination | null {
     assertAlive(this);
     if (this.capabilities.detailedPagination !== true) return null;
+    if (!sheetHasCells(this, sheet)) return null;
     return ws(this, sheet).getPagination();
   }
 
@@ -270,7 +273,10 @@ export abstract class WorkbookHandlePrintMethods {
   getSheetPr(sheet: number): EngineSheetPr | null {
     assertAlive(this);
     if (!this.capabilities.sheetPrXml) return null;
-    return readSheetPr(ws(this, sheet).ooxml.getSheetPrXml() ?? '');
+    if (!sheetHasView(this, sheet)) return null;
+    const read = () => readSheetPr(ws(this, sheet).ooxml.getSheetPrXml() ?? '');
+    // A chartsheet's part may not carry the fragment; that reads as none.
+    return isChartsheet(this, sheet) ? orFallback(null, read) : read();
   }
 
   /** Merge a tab colour and/or outline summary position into `<sheetPr>`. The

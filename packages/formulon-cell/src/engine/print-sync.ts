@@ -11,6 +11,7 @@ import {
   type PrintQuality,
   type SpreadsheetStore,
 } from '../store/store.js';
+import { sheetHasCells, sheetHasView } from './sheet-kind.js';
 import type { EngineOrientation, EnginePageBreaks, EnginePageMargins } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -172,6 +173,9 @@ export function joinHeaderFooter(sections: Partial<HeaderFooterSections>): strin
 export function pageSetupPatchFromEngine(wb: WorkbookHandle, sheet: number): Partial<PageSetup> {
   const patch: Partial<PageSetup> = {};
   if (!wb.capabilities.printSettings) return patch;
+  // A chartsheet answers its page setup, margins and header/footer; the rest is worksheet-only.
+  if (!sheetHasView(wb, sheet)) return patch;
+  const worksheet = sheetHasCells(wb, sheet);
 
   const setup = wb.getSheetPageSetup(sheet);
   if (setup) {
@@ -228,7 +232,7 @@ export function pageSetupPatchFromEngine(wb: WorkbookHandle, sheet: number): Par
     patch.footerMargin = margins.footer;
   }
 
-  const options = wb.getSheetPrintOptions(sheet);
+  const options = worksheet ? wb.getSheetPrintOptions(sheet) : null;
   if (options) {
     patch.showGridlines = options.gridLines;
     patch.showHeadings = options.headings;
@@ -264,6 +268,8 @@ export function pageSetupPatchFromEngine(wb: WorkbookHandle, sheet: number): Par
     patch.scaleHeaderFooterWithDocument = headerFooter.scaleWithDoc;
     patch.alignHeaderFooterWithMargins = headerFooter.alignWithMargins;
   }
+
+  if (!worksheet) return patch;
 
   const printArea = wb.getSheetPrintArea(sheet);
   if (printArea !== null) patch.printArea = printArea || undefined;
@@ -326,6 +332,8 @@ export function syncPageSetupToEngine(
   sheet: number,
 ): void {
   if (!wb.capabilities.printSettings) return;
+  if (!sheetHasView(wb, sheet)) return;
+  const worksheet = sheetHasCells(wb, sheet);
   const setup = getPageSetup(store.getState(), sheet);
 
   const fitWidth = setup.fitWidth ?? 0;
@@ -374,12 +382,14 @@ export function syncPageSetupToEngine(
   if (isPrintableMargin(setup.footerMargin)) margins.footer = setup.footerMargin;
   if (Object.keys(margins).length > 0) wb.setSheetPageMargins(sheet, margins);
 
-  wb.setSheetPrintOptions(sheet, {
-    gridLines: setup.showGridlines === true,
-    headings: setup.showHeadings === true,
-    horizontalCentered: setup.centerHorizontally === true,
-    verticalCentered: setup.centerVertically === true,
-  });
+  if (worksheet) {
+    wb.setSheetPrintOptions(sheet, {
+      gridLines: setup.showGridlines === true,
+      headings: setup.showHeadings === true,
+      horizontalCentered: setup.centerHorizontally === true,
+      verticalCentered: setup.centerVertically === true,
+    });
+  }
 
   wb.setSheetHeaderFooter(sheet, {
     oddHeader: joinHeaderFooter({
@@ -418,6 +428,7 @@ export function syncPageSetupToEngine(
     alignWithMargins: setup.alignHeaderFooterWithMargins !== false,
   });
 
+  if (!worksheet) return;
   wb.setSheetPrintArea(sheet, setup.printArea ?? '');
   wb.setSheetPrintTitles(sheet, setup.printTitleRows ?? '', setup.printTitleCols ?? '');
 

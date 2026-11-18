@@ -1,4 +1,5 @@
 import { formatA1Cell, quoteSheetName } from '../engine/address.js';
+import { sheetHasCells } from '../engine/sheet-kind.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 
 /** One Formulas › Error Checking › Circular References entry. */
@@ -24,6 +25,7 @@ export function circularReferenceEntries(
     (sheet) => sheet !== activeSheet,
   );
   for (const sheet of [activeSheet, ...others]) {
+    if (!sheetHasCells(wb, sheet)) continue;
     const cells = wb.circularReferences(sheet);
     if (cells === null) return [];
     if (cells.length === 0) continue;

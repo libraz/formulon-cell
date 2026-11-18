@@ -4,6 +4,7 @@ import {
   type FileLossId,
   fileLossEntries,
 } from '../engine/file-diagnostics.js';
+import { sheetHasCells } from '../engine/sheet-kind.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { EngineDrawingObject } from '../engine/workbook-handle-annotations.js';
 
@@ -62,7 +63,9 @@ const sheetIndexes = (wb: WorkbookHandle): number[] =>
   Array.from({ length: wb.sheetCount }, (_, i) => i);
 
 const sumSheets = (wb: WorkbookHandle, count: (sheet: number) => number): number =>
-  sheetIndexes(wb).reduce((total, sheet) => total + count(sheet), 0);
+  sheetIndexes(wb)
+    .filter((sheet) => sheetHasCells(wb, sheet))
+    .reduce((total, sheet) => total + count(sheet), 0);
 
 /** Itemize what the `.xlsb` writer deferred. Notes and threaded comments are
  *  always written. The rest are written except in some cases (a filter

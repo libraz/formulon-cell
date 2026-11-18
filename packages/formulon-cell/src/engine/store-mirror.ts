@@ -24,6 +24,7 @@ import {
 import { advanceNativeFormatEpoch } from './native-format-epoch.js';
 import { syncPageSetupToEngine } from './print-sync.js';
 import { hydrateAxisLocksFromEngine } from './protection-sync.js';
+import { sheetHasCells } from './sheet-kind.js';
 import { syncSheetPrToEngine } from './sheet-pr-sync.js';
 import {
   captureSyncedFormatKeyMembership,
@@ -296,7 +297,7 @@ export class StoreMirror {
       if (pageSetupChanged) this.lastPageSetupMap = nextPageSetup;
       if (this.storeSyncMuted > 0) return;
       const formatPublicationSheets = [...formatSheets].filter(
-        (sheet) => sheet < this.handle.sheetCount,
+        (sheet) => sheet < this.handle.sheetCount && sheetHasCells(this.handle, sheet),
       );
       const formatPublicationAttempted = formatPublicationSheets.length > 0 || stylesChanged;
       try {
@@ -305,7 +306,7 @@ export class StoreMirror {
         }
         // Row and column styles just written decide the lock of unformatted cells.
         for (const sheet of axisSheets) {
-          if (sheet < this.handle.sheetCount)
+          if (sheet < this.handle.sheetCount && sheetHasCells(this.handle, sheet))
             this.withMuted(() => hydrateAxisLocksFromEngine(this.handle, store, sheet));
         }
         if (stylesChanged) syncNamedStyleCatalogToEngine(this.handle, store);

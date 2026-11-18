@@ -2,6 +2,8 @@ import { selectionRangeList } from '../store/selection-geometry.js';
 import { splitPosition } from '../store/split-panes.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { SelectionSlice, SheetViewMemo } from '../store/types.js';
+import { tabVisibility } from './layout-sync.js';
+import { sheetHasCells } from './sheet-kind.js';
 import type { Range } from './types.js';
 import { SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -98,8 +100,10 @@ export function hydrateViewStateFromEngine(
   const memos = new Map<number, SheetViewMemo>();
   for (let i = 0; i < count; i += 1) {
     const view = wb.getSheetView(i);
-    if (view && view.visibility !== SheetVisibility.Visible) hidden.add(i);
-    const saved = wb.getSheetSelection(i);
+    const visibility = tabVisibility(wb, i);
+    if (visibility !== null && visibility !== SheetVisibility.Visible) hidden.add(i);
+    // Selection is a worksheet's alone.
+    const saved = sheetHasCells(wb, i) ? wb.getSheetSelection(i) : null;
     if (view || saved) memos.set(i, memoFromEngine(i, view, saved));
   }
   const saved = opts.followActiveSheet ? wb.activeSheet() : null;
@@ -132,6 +136,7 @@ const writeSheetView = (
     'selection' | 'rowStart' | 'colStart' | 'freezeOriginRow' | 'freezeOriginCol'
   >,
 ): void => {
+  if (!sheetHasCells(wb, sheet)) return;
   const { selection } = memo;
   wb.setSheetSelection(sheet, {
     activeRow: selection.active.row,
@@ -162,7 +167,7 @@ export function syncViewStateToEngine(wb: WorkbookHandle, store: SpreadsheetStor
   if (active < count) {
     // A split measures the rows its top pane shows now, which scrolling may have changed.
     const split = splitPosition(s);
-    if (split) wb.setSheetSplit(active, split.x, split.y);
+    if (split && sheetHasCells(wb, active)) wb.setSheetSplit(active, split.x, split.y);
     writeSheetView(wb, active, {
       selection: s.selection,
       rowStart: s.viewport.rowStart,

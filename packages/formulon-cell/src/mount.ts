@@ -36,6 +36,7 @@ import {
   syncTrackedConditionalRulesToEngine,
 } from './engine/cf-writeback.js';
 import { rehydrateAxisLayout, syncActiveSheet } from './engine/layout-sync.js';
+import { sheetHasCells } from './engine/sheet-kind.js';
 import { hydrateViewStateFromEngine } from './engine/view-state-sync.js';
 import { WorkbookHandle } from './engine/workbook-handle.js';
 import { SpreadsheetEmitter } from './events.js';
@@ -454,6 +455,7 @@ export const Spreadsheet = {
     const syncSessionConditionalRules = (): void => {
       const rules = store.getState().conditional.rules;
       for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
+        if (!sheetHasCells(wb, sheet)) continue;
         syncTrackedConditionalRulesToEngine(wb, rules, sheet, { tracked: syncedSessionCfRules });
       }
     };

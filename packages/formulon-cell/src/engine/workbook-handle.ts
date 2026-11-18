@@ -22,6 +22,7 @@ import {
 import type { LoadOptions } from './loader.js';
 import { isUsingStub, loadFormulon } from './loader.js';
 import { attemptWrite, isFormulonError, orFallback } from './result.js';
+import { sheetHasCells } from './sheet-kind.js';
 import { engineProfileIdFor, type SpreadsheetPlatform } from './spreadsheet-profile.js';
 import { StoreMirror } from './store-mirror.js';
 import type {
@@ -839,9 +840,11 @@ export class WorkbookHandle {
   }
 
   /** Iterate over every populated cell on a sheet. Used for initial paint.
+   *  Yields nothing for a sheet that is not a worksheet.
    *  Loaded PivotTables are projected after physical cells so the evaluated
    *  layout is what the grid displays when a pivot overlaps cached values. */
   *cells(sheet: number): Generator<{ addr: Addr; value: CellValue; formula: string | null }> {
+    if (!sheetHasCells(this, sheet)) return;
     yield* this.physicalCells(sheet);
     yield* this.pivotCells(sheet);
   }
@@ -852,6 +855,7 @@ export class WorkbookHandle {
     sheet: number,
   ): Generator<{ addr: Addr; value: CellValue; formula: string | null }> {
     this.assertAlive();
+    if (!sheetHasCells(this, sheet)) return;
     for (const e of this.ws(sheet).listCells()) {
       yield {
         addr: { sheet, row: e.row, col: e.col },

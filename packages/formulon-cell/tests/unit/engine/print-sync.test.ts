@@ -6,6 +6,7 @@ import {
   splitHeaderFooter,
   syncPageSetupToEngine,
 } from '../../../src/engine/print-sync.js';
+import { SheetKind } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, getPageSetup } from '../../../src/store/store.js';
 
@@ -83,6 +84,7 @@ function fakeHandle(
       writes.breaks = v;
       return true;
     },
+    sheetKind: () => SheetKind.Worksheet,
   } as unknown as WorkbookHandle;
   return { wb, writes };
 }

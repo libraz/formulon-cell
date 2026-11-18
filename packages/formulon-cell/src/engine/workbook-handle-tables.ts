@@ -16,6 +16,7 @@ import type {
   TablePatch,
   Workbook,
 } from './types.js';
+import { SheetKind } from './types.js';
 import { formatCell } from './value.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 import { assertAlive, wb, ws } from './workbook-handle-internals.js';
@@ -26,7 +27,11 @@ type WorkbookHandleCtor = { prototype: WorkbookHandle };
  *  table's position here is the workbook-wide index the handle methods take. */
 export function workbookTables(wb: Workbook): Table[] {
   const out: Table[] = [];
-  for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) out.push(...wb.sheet(sheet).listTables());
+  for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
+    const sh = wb.sheet(sheet);
+    // The stub engine reports no kind: every sheet of it is a worksheet.
+    if ((sh.kind ?? SheetKind.Worksheet) === SheetKind.Worksheet) out.push(...sh.listTables());
+  }
   return out;
 }
 

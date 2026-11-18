@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
 import { addrKey } from '../../../src/engine/address.js';
+import { SheetKind } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   dispatchWorkbookObjectSummaries,
@@ -53,6 +53,7 @@ describe('mount/hydration', () => {
       getSheetDefaultLayoutPx: () => null,
       withEngineSyncMuted: <T>(fn: () => T): T => fn(),
       getSheetView: () => null,
+      sheetKind: () => SheetKind.Worksheet,
       getComments: () => [{ row: 4, col: 2, author: 'Formulon', text: 'empty cell note' }],
       getHyperlinks: () => [],
     } as unknown as WorkbookHandle;

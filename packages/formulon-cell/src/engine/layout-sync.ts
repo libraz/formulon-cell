@@ -6,6 +6,7 @@ import { isRowHidden } from '../store/row-visibility.js';
 import { splitCount } from '../store/split-panes.js';
 import type { LayoutSlice, SpreadsheetStore } from '../store/store.js';
 import { MAX_COL, MAX_ROW, parseAddrKey } from './address.js';
+import { sheetHasCells, sheetHasView } from './sheet-kind.js';
 import { SheetKind, SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -33,6 +34,16 @@ const engineAxisDefaults = (wb: WorkbookHandle, sheet: number): AxisDefaults | n
 
 const platformAxisDefaults = (wb: WorkbookHandle): AxisDefaults =>
   wb.geometryPlatform === 'mac' ? MAC_AXIS_DEFAULTS : DEFAULT_AXIS_DEFAULTS;
+
+/** The tab state of `sheet`, which every sheet type carries; null when the engine does not report it. */
+export const tabVisibility = (wb: WorkbookHandle, sheet: number): SheetVisibility | null => {
+  if (!sheetHasView(wb, sheet)) return wb.sheetVisibility(sheet);
+  const v = wb.getSheetView(sheet);
+  if (!v) return null;
+  // `visibility` is authoritative; an adapter that carries only the
+  // two-state flag still resolves to hidden-or-visible.
+  return v.visibility ?? (v.tabHidden ? SheetVisibility.Hidden : SheetVisibility.Visible);
+};
 
 type ColumnLayouts = ReturnType<WorkbookHandle['getColumnLayouts']>;
 type RowLayouts = ReturnType<WorkbookHandle['getRowLayouts']>;
@@ -70,12 +81,14 @@ export function hydrateLayoutFromEngine(
   store: SpreadsheetStore,
   sheet: number,
 ): void {
-  const cols = wb.getColumnLayouts(sheet);
-  const rows = wb.getRowLayouts(sheet);
-  const engineDefaults = engineAxisDefaults(wb, sheet);
+  // Only a worksheet has axes and format defaults; a chartsheet still has a view.
+  const hasCells = sheetHasCells(wb, sheet);
+  const cols = hasCells ? wb.getColumnLayouts(sheet) : [];
+  const rows = hasCells ? wb.getRowLayouts(sheet) : [];
+  const engineDefaults = hasCells ? engineAxisDefaults(wb, sheet) : null;
   const defaults = engineDefaults ?? platformAxisDefaults(wb);
   const view = wb.getSheetView(sheet);
-  const defaultRowsHidden = wb.sheetRowsHiddenByDefault(sheet);
+  const defaultRowsHidden = hasCells && wb.sheetRowsHiddenByDefault(sheet);
   const hasAxisLayouts =
     wb.capabilities.colRowSize || wb.capabilities.hiddenRowsCols || wb.capabilities.outlines;
   // hiddenSheets is workbook-scoped — walk every sheet so the set is correct
@@ -92,13 +105,8 @@ export function hydrateLayoutFromEngine(
   if (wb.capabilities.sheetView) {
     const n = wb.sheetCount;
     for (let i = 0; i < n; i += 1) {
-      const v = wb.getSheetView(i);
-      if (!v) continue;
-      // `visibility` is authoritative; an adapter that carries only the
-      // two-state flag still resolves to hidden-or-visible.
-      const visibility =
-        v.visibility ?? (v.tabHidden ? SheetVisibility.Hidden : SheetVisibility.Visible);
-      if (visibility === SheetVisibility.Visible) continue;
+      const visibility = tabVisibility(wb, i);
+      if (visibility === null || visibility === SheetVisibility.Visible) continue;
       hiddenSheets.add(i);
       // A very-hidden sheet stays out of the tab bar *and* out of the unhide
       // list, so the two states have to be tracked apart.

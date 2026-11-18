@@ -14,6 +14,7 @@ import {
   hydrateAxisLocksFromEngine,
   hydrateProtectionFromEngine,
 } from '../engine/protection-sync.js';
+import { sheetHasCells, sheetHasView } from '../engine/sheet-kind.js';
 import { hydrateSheetPrFromEngine } from '../engine/sheet-pr-sync.js';
 import { hydrateSlicersFromEngine } from '../engine/slicer-sync.js';
 import { hydrateSparklinesFromEngine } from '../engine/sparkline-sync.js';
@@ -26,20 +27,25 @@ import { createSpreadsheetStore, mutators, type SpreadsheetStore } from '../stor
 export function hydrateActiveSheetFromEngine(wb: WorkbookHandle, store: SpreadsheetStore): void {
   const hydrate = (): void => {
     const sheet = store.getState().data.sheetIndex;
+    // A chartsheet answers its layout, chart and print setup; any other kind only its layout.
+    const hasCells = sheetHasCells(wb, sheet);
+    const hasView = sheetHasView(wb, sheet);
     mutators.replaceCells(store, wb.cells(sheet));
     hydrateLayoutFromEngine(wb, store, sheet);
-    hydrateImagesFromEngine(wb, store, sheet);
-    hydrateSparklinesFromEngine(wb, store, sheet);
-    hydrateChartsFromEngine(wb, store, sheet);
-    hydrateThreadedCommentsFromEngine(wb, store, sheet);
-    hydrateCommentsAndHyperlinksFromEngine(wb, store, sheet);
-    hydrateMergesFromEngine(wb, store, sheet);
-    hydrateValidationsFromEngine(wb, store, sheet);
-    hydrateCellFormatsFromEngine(wb, store, sheet);
-    hydrateAxisLocksFromEngine(wb, store, sheet);
-    hydrateConditionalRulesFromEngine(wb, store, sheet);
-    hydrateAutoFilterFromEngine(wb, store, sheet);
-    hydratePageSetupFromEngine(wb, store, sheet);
+    if (hasCells) hydrateImagesFromEngine(wb, store, sheet);
+    if (hasCells) hydrateSparklinesFromEngine(wb, store, sheet);
+    if (hasView) hydrateChartsFromEngine(wb, store, sheet);
+    if (hasCells) {
+      hydrateThreadedCommentsFromEngine(wb, store, sheet);
+      hydrateCommentsAndHyperlinksFromEngine(wb, store, sheet);
+      hydrateMergesFromEngine(wb, store, sheet);
+      hydrateValidationsFromEngine(wb, store, sheet);
+      hydrateCellFormatsFromEngine(wb, store, sheet);
+      hydrateAxisLocksFromEngine(wb, store, sheet);
+      hydrateConditionalRulesFromEngine(wb, store, sheet);
+      hydrateAutoFilterFromEngine(wb, store, sheet);
+    }
+    if (hasView) hydratePageSetupFromEngine(wb, store, sheet);
   };
   wb.withEngineSyncMuted(hydrate);
 }
@@ -62,7 +68,7 @@ export function hydrateWorkbookMetadataFromEngine(
   store: SpreadsheetStore,
 ): void {
   for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
-    hydrateThreadedCommentsFromEngine(wb, store, sheet);
+    if (sheetHasCells(wb, sheet)) hydrateThreadedCommentsFromEngine(wb, store, sheet);
   }
   hydrateCalcSettingsFromEngine(wb, store);
   hydrateProtectionFromEngine(wb, store);

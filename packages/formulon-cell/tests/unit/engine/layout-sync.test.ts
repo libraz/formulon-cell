@@ -6,7 +6,7 @@ import {
   syncLayoutSizesToEngine,
   syncLayoutToEngine,
 } from '../../../src/engine/layout-sync.js';
-import { SheetVisibility } from '../../../src/engine/types.js';
+import { SheetKind, SheetVisibility } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
@@ -164,6 +164,7 @@ const makeFake = (opts: {
     getColumnLayouts: () => opts.cols ?? [],
     getRowLayouts: () => opts.rows ?? [],
     getSheetDefaultLayoutPx: () => opts.defaults ?? null,
+    sheetKind: () => SheetKind.Worksheet,
     getSheetView: (sheet: number) => opts.views?.[sheet] ?? opts.view ?? null,
     sheetRowsHiddenByDefault: () => false,
     setColumnWidth: (sheet: number, first: number, last: number, width: number) => {

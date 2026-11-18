@@ -13,6 +13,7 @@ import { displayCharsForScreenPx, screenPxForDisplayChars } from './column-displ
 import { macDigitAdvance } from './mac-digit-metrics.js';
 import { macDefaultRowPt } from './mac-row-model.js';
 import { attemptWrite, formulonErrorCode, orFallback } from './result.js';
+import { sheetHasView } from './sheet-kind.js';
 import type { EngineCapabilities, Range } from './types.js';
 import { SheetKind, SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -363,7 +364,7 @@ export abstract class WorkbookHandleLayoutMethods {
   sheetKind(sheet: number): SheetKind {
     assertAlive(this);
     if (!this.capabilities.sheetKind) return SheetKind.Worksheet;
-    return orFallback(SheetKind.Worksheet, () => ws(this, sheet).kind);
+    return orFallback(SheetKind.Worksheet, () => ws(this, sheet).kind ?? SheetKind.Worksheet);
   }
 
   /** Set or clear the `collapsed` flag on the summary row `row`. */
@@ -373,8 +374,16 @@ export abstract class WorkbookHandleLayoutMethods {
     return attemptWrite(() => ws(this, sheet).setRowCollapsed(row, row, collapsed));
   }
 
+  /** `sheet`'s tab state, which every sheet type carries; null when the engine cannot report it. */
+  sheetVisibility(sheet: number): SheetVisibility | null {
+    assertAlive(this);
+    if (!this.capabilities.sheetView) return null;
+    return orFallback(null, () => ws(this, sheet).getVisibility());
+  }
+
   /** Snapshot of `sheet`'s view, including display flags. Returns null when
-   *  the engine doesn't expose `getSheetView` (i.e. the stub or an older bundle). */
+   *  the engine doesn't expose `getSheetView` (i.e. the stub or an older bundle) or
+   *  `sheet` is neither a worksheet nor a chartsheet. */
   getSheetView(sheet: number): {
     zoomScale: number;
     freezeRows: number;
@@ -402,6 +411,7 @@ export abstract class WorkbookHandleLayoutMethods {
   } | null {
     assertAlive(this);
     if (!this.capabilities.sheetView) return null;
+    if (!sheetHasView(this, sheet)) return null;
     const sh = ws(this, sheet);
     const read = orFallback(null, () => ({ view: sh.getView(), visibility: sh.getVisibility() }));
     if (!read) return null;
