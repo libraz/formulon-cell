@@ -12,6 +12,8 @@
       "!**/dist/**",
       "!**/node_modules/**",
       "!**/vendor/**",
+      "!**/*.generated.ts",
+      "!packages/formulon-cell/icons/icons.lock.json",
       "!**/.yarn/**",
       "!**/coverage/**",
       "!**/*.vue",
@@ -114,7 +116,7 @@
   },
   "overrides": [
     {
-      "includes": ["scripts/**"],
+      "includes": ["scripts/**", "packages/*/scripts/**"],
       "linter": {
         "rules": {
           "suspicious": {

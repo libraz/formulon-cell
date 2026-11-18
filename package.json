@@ -24,6 +24,8 @@
     "check:pack": "rm -rf .pack && yarn workspaces foreach -A --include '@libraz/*' pack --out \"$PROJECT_CWD/.pack/%s-%v.tgz\" && node scripts/check-pack.mjs .pack/*.tgz",
     "test": "yarn workspace @libraz/formulon-cell test",
     "icons:review": "node scripts/icons/render.mjs",
+    "icons:generate": "node packages/formulon-cell/scripts/icons/generate.mjs",
+    "icons:check": "node packages/formulon-cell/scripts/icons/generate.mjs --check",
     "test:e2e": "yarn workspaces foreach -A --include '@formulon-cell/*' run test:e2e",
     "test:e2e:visual": "yarn workspaces foreach -A --include '@formulon-cell/*' run test:e2e:visual",
     "test:e2e:visual:update": "yarn workspaces foreach -A --include '@formulon-cell/*' run test:e2e:visual:update",

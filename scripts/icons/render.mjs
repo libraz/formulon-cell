@@ -9,13 +9,21 @@
  *   node scripts/icons/render.mjs --metrics  metrics only, no screenshots
  *   node scripts/icons/render.mjs --check    fail on artwork bleeding past the canvas
  *   node scripts/icons/render.mjs undo,redo  only the named icons
+ *
+ * `--check` fails on bleed, an off-centre ink box, a longest axis outside the icon's optical
+ * class, a gap under the minimum and, with `--constraints=<file>`, a broken test constraint.
+ * `measureAll` is exported for the spec generator.
  */
 
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from '@playwright/test';
 import { rolldown } from 'rolldown';
+import {
+  classViolations,
+  constraintViolations,
+} from '../../packages/formulon-cell/scripts/icons/emit.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../..');
@@ -29,6 +37,9 @@ const SOURCE = resolve(
   sourceArg ?? 'packages/formulon-cell/src/toolbar/excel-ribbon-icons.ts',
 );
 const exportArg = args.find((a) => a.startsWith('--export='))?.slice('--export='.length);
+const constraintsArg = args
+  .find((a) => a.startsWith('--constraints='))
+  ?.slice('--constraints='.length);
 const filter = args.find((a) => !a.startsWith('--'))?.split(',') ?? null;
 const OUT = resolve(HERE, 'out', filter ? 'selected' : sourceArg ? 'alternate' : '.');
 
@@ -85,11 +96,177 @@ figcaption{margin-top:4px;font-size:10px;word-break:break-all;display:flex;flex-
 .sample{display:flex;flex-direction:column;align-items:center;gap:3px}
 .sample small{font-size:8px;color:#666}`;
 
+/** Ink box, centre, bleed and closest gap of each icon, measured in a headless chromium. */
+const measureWithPage = async (page, entries) => {
+  const rows = [];
+  await page.setContent('<svg id="s" viewBox="0 0 24 24" width="240" height="240"></svg>');
+  for (const [name, segs] of entries) {
+    const box = await page.evaluate(async (segments) => {
+      const NS = 'http://www.w3.org/2000/svg';
+      const svg = document.getElementById('s');
+      svg.textContent = '';
+      for (const s of segments) {
+        const p = document.createElementNS(NS, 'path');
+        p.setAttribute('d', s.d);
+        p.setAttribute('fill', s.fill ?? 'none');
+        if (s.stroke) p.setAttribute('stroke', s.stroke);
+        if (s.strokeWidth) p.setAttribute('stroke-width', s.strokeWidth);
+        if (s.strokeLinecap) p.setAttribute('stroke-linecap', s.strokeLinecap);
+        if (s.strokeLinejoin) p.setAttribute('stroke-linejoin', s.strokeLinejoin);
+        if (s.strokeDasharray) p.setAttribute('stroke-dasharray', s.strokeDasharray);
+        if (s.fillRule) p.setAttribute('fill-rule', s.fillRule);
+        if (s.transform) p.setAttribute('transform', s.transform);
+        svg.appendChild(p);
+      }
+      // Measured in screen space so transformed segments are accounted for,
+      // then converted back to viewBox units.
+      const frame = svg.getBoundingClientRect();
+      const unit = frame.width / 24;
+      let x0 = Infinity;
+      let y0 = Infinity;
+      let x1 = -Infinity;
+      let y1 = -Infinity;
+      for (const p of svg.querySelectorAll('path')) {
+        const b = p.getBoundingClientRect();
+        x0 = Math.min(x0, (b.x - frame.x) / unit);
+        y0 = Math.min(y0, (b.y - frame.y) / unit);
+        x1 = Math.max(x1, (b.right - frame.x) / unit);
+        y1 = Math.max(y1, (b.bottom - frame.y) / unit);
+      }
+      const geometry = { x0, y0, x1, y1 };
+
+      // Chromium's path bounding boxes exclude strokes. Measure painted alpha
+      // on a padded canvas instead, including caps, joins and nested transforms.
+      // At 16 samples per viewBox unit, bounds are accurate within 1/16 unit.
+      const samples = 16;
+      const padding = 4;
+      const extent = 24 + padding * 2;
+      const copy = svg.cloneNode(true);
+      copy.setAttribute('xmlns', NS);
+      copy.setAttribute('viewBox', `${-padding} ${-padding} ${extent} ${extent}`);
+      copy.setAttribute('width', String(extent * samples));
+      copy.setAttribute('height', String(extent * samples));
+      const blob = new Blob([new XMLSerializer().serializeToString(copy)], {
+        type: 'image/svg+xml',
+      });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      try {
+        img.src = url;
+        await img.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = extent * samples;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0);
+        const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let left = canvas.width;
+        let top = canvas.height;
+        let right = -1;
+        let bottom = -1;
+        for (let y = 0; y < canvas.height; y += 1) {
+          for (let x = 0; x < canvas.width; x += 1) {
+            if (data[(y * canvas.width + x) * 4 + 3] <= 8) continue;
+            left = Math.min(left, x);
+            top = Math.min(top, y);
+            right = Math.max(right, x);
+            bottom = Math.max(bottom, y);
+          }
+        }
+        if (right < 0) throw new Error('icon has no painted pixels');
+        if (left === 0 || top === 0 || right === canvas.width - 1 || bottom === canvas.height - 1) {
+          throw new Error('artwork exceeds measurement padding');
+        }
+        // Closest gap between separate inked parts: components of the half-density mask
+        // (alpha >= 128, 8-connected), then the nearest boundary pixels of each pair.
+        const gs = 8;
+        const gdim = extent * gs;
+        const small = document.createElement('canvas');
+        small.width = small.height = gdim;
+        const sctx = small.getContext('2d', { willReadFrequently: true });
+        sctx.drawImage(img, 0, 0, gdim, gdim);
+        const mask = sctx.getImageData(0, 0, gdim, gdim).data;
+        const ink = (x, y) =>
+          x >= 0 && y >= 0 && x < gdim && y < gdim && mask[(y * gdim + x) * 4 + 3] >= 128;
+        const label = new Int32Array(gdim * gdim).fill(-1);
+        const parts = [];
+        for (let y0 = 0; y0 < gdim; y0 += 1) {
+          for (let x0 = 0; x0 < gdim; x0 += 1) {
+            if (!ink(x0, y0) || label[y0 * gdim + x0] >= 0) continue;
+            const id = parts.length;
+            const edge = [];
+            const stack = [[x0, y0]];
+            label[y0 * gdim + x0] = id;
+            while (stack.length > 0) {
+              const [cx, cy] = stack.pop();
+              if (!ink(cx - 1, cy) || !ink(cx + 1, cy) || !ink(cx, cy - 1) || !ink(cx, cy + 1)) {
+                edge.push([cx, cy]);
+              }
+              for (let dy = -1; dy <= 1; dy += 1) {
+                for (let dx = -1; dx <= 1; dx += 1) {
+                  const nx = cx + dx;
+                  const ny = cy + dy;
+                  if (ink(nx, ny) && label[ny * gdim + nx] < 0) {
+                    label[ny * gdim + nx] = id;
+                    stack.push([nx, ny]);
+                  }
+                }
+              }
+            }
+            parts.push(edge);
+          }
+        }
+        let nearest = Infinity;
+        for (let i = 0; i < parts.length; i += 1) {
+          for (let j = i + 1; j < parts.length; j += 1) {
+            for (const [ax, ay] of parts[i]) {
+              for (const [bx, by] of parts[j]) {
+                nearest = Math.min(nearest, Math.hypot(ax - bx, ay - by));
+              }
+            }
+          }
+        }
+        const gap = Number.isFinite(nearest) ? +(Math.max(0, nearest - 1) / gs).toFixed(2) : null;
+        return {
+          x0: left / samples - padding,
+          y0: top / samples - padding,
+          x1: (right + 1) / samples - padding,
+          y1: (bottom + 1) / samples - padding,
+          geometry,
+          gap,
+        };
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }, segs);
+    rows.push({
+      name,
+      geometry: box.geometry,
+      w: +(box.x1 - box.x0).toFixed(2),
+      h: +(box.y1 - box.y0).toFixed(2),
+      cx: +((box.x0 + box.x1) / 2).toFixed(2),
+      cy: +((box.y0 + box.y1) / 2).toFixed(2),
+      gap: box.gap,
+      bleed: +Math.max(0, -box.x0, -box.y0, box.x1 - 24, box.y1 - 24).toFixed(2),
+      inset: +Math.min(box.x0, box.y0, 24 - box.x1, 24 - box.y1).toFixed(2),
+    });
+  }
+  return rows;
+};
+
+export const measureAll = async (entries) => {
+  const browser = await chromium.launch();
+  try {
+    return await measureWithPage(await browser.newPage({ deviceScaleFactor: 2 }), entries);
+  } finally {
+    await browser.close();
+  }
+};
+
 const main = async () => {
   if (!metricsOnly) await rm(OUT, { recursive: true, force: true });
   const icons = await loadIcons();
   const entries = Object.entries(icons).filter(([name]) => !filter || filter.includes(name));
-  if (entries.length === 0) throw new Error('no icons matched');
+  if (entries.length === 0 && filter) throw new Error('no icons matched');
 
   const browser = await chromium.launch();
   const rows = [];
@@ -133,110 +310,7 @@ const main = async () => {
       await nativePage.close();
     }
 
-    await page.setContent('<svg id="s" viewBox="0 0 24 24" width="240" height="240"></svg>');
-    for (const [name, segs] of entries) {
-      const box = await page.evaluate(async (segments) => {
-        const NS = 'http://www.w3.org/2000/svg';
-        const svg = document.getElementById('s');
-        svg.textContent = '';
-        for (const s of segments) {
-          const p = document.createElementNS(NS, 'path');
-          p.setAttribute('d', s.d);
-          p.setAttribute('fill', s.fill ?? 'none');
-          if (s.stroke) p.setAttribute('stroke', s.stroke);
-          if (s.strokeWidth) p.setAttribute('stroke-width', s.strokeWidth);
-          if (s.strokeLinecap) p.setAttribute('stroke-linecap', s.strokeLinecap);
-          if (s.strokeLinejoin) p.setAttribute('stroke-linejoin', s.strokeLinejoin);
-          if (s.strokeDasharray) p.setAttribute('stroke-dasharray', s.strokeDasharray);
-          if (s.fillRule) p.setAttribute('fill-rule', s.fillRule);
-          if (s.transform) p.setAttribute('transform', s.transform);
-          svg.appendChild(p);
-        }
-        // Measured in screen space so transformed segments are accounted for,
-        // then converted back to viewBox units.
-        const frame = svg.getBoundingClientRect();
-        const unit = frame.width / 24;
-        let x0 = Infinity;
-        let y0 = Infinity;
-        let x1 = -Infinity;
-        let y1 = -Infinity;
-        for (const p of svg.querySelectorAll('path')) {
-          const b = p.getBoundingClientRect();
-          x0 = Math.min(x0, (b.x - frame.x) / unit);
-          y0 = Math.min(y0, (b.y - frame.y) / unit);
-          x1 = Math.max(x1, (b.right - frame.x) / unit);
-          y1 = Math.max(y1, (b.bottom - frame.y) / unit);
-        }
-        const geometry = { x0, y0, x1, y1 };
-
-        // Chromium's path bounding boxes exclude strokes. Measure painted alpha
-        // on a padded canvas instead, including caps, joins and nested transforms.
-        // At 16 samples per viewBox unit, bounds are accurate within 1/16 unit.
-        const samples = 16;
-        const padding = 4;
-        const extent = 24 + padding * 2;
-        const copy = svg.cloneNode(true);
-        copy.setAttribute('xmlns', NS);
-        copy.setAttribute('viewBox', `${-padding} ${-padding} ${extent} ${extent}`);
-        copy.setAttribute('width', String(extent * samples));
-        copy.setAttribute('height', String(extent * samples));
-        const blob = new Blob([new XMLSerializer().serializeToString(copy)], {
-          type: 'image/svg+xml',
-        });
-        const url = URL.createObjectURL(blob);
-        const img = new Image();
-        try {
-          img.src = url;
-          await img.decode();
-          const canvas = document.createElement('canvas');
-          canvas.width = canvas.height = extent * samples;
-          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-          ctx.drawImage(img, 0, 0);
-          const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          let left = canvas.width;
-          let top = canvas.height;
-          let right = -1;
-          let bottom = -1;
-          for (let y = 0; y < canvas.height; y += 1) {
-            for (let x = 0; x < canvas.width; x += 1) {
-              if (data[(y * canvas.width + x) * 4 + 3] <= 8) continue;
-              left = Math.min(left, x);
-              top = Math.min(top, y);
-              right = Math.max(right, x);
-              bottom = Math.max(bottom, y);
-            }
-          }
-          if (right < 0) throw new Error('icon has no painted pixels');
-          if (
-            left === 0 ||
-            top === 0 ||
-            right === canvas.width - 1 ||
-            bottom === canvas.height - 1
-          ) {
-            throw new Error('artwork exceeds measurement padding');
-          }
-          return {
-            x0: left / samples - padding,
-            y0: top / samples - padding,
-            x1: (right + 1) / samples - padding,
-            y1: (bottom + 1) / samples - padding,
-            geometry,
-          };
-        } finally {
-          URL.revokeObjectURL(url);
-        }
-      }, segs);
-      rows.push({
-        name,
-        geometry: box.geometry,
-        w: +(box.x1 - box.x0).toFixed(2),
-        h: +(box.y1 - box.y0).toFixed(2),
-        cx: +((box.x0 + box.x1) / 2).toFixed(2),
-        cy: +((box.y0 + box.y1) / 2).toFixed(2),
-        bleed: +Math.max(0, -box.x0, -box.y0, box.x1 - 24, box.y1 - 24).toFixed(2),
-        inset: +Math.min(box.x0, box.y0, 24 - box.x1, 24 - box.y1).toFixed(2),
-      });
-    }
+    rows.push(...(await measureWithPage(page, entries)));
   } finally {
     await browser.close();
   }
@@ -246,9 +320,11 @@ const main = async () => {
   const dims = rows.map((r) => Math.max(r.w, r.h)).sort((a, b) => a - b);
   const at = (q) => dims[Math.floor(dims.length * q)];
   console.log(`\nicons: ${rows.length}`);
-  console.log(
-    `longest axis: min ${dims[0]} / p25 ${at(0.25)} / p50 ${at(0.5)} / p75 ${at(0.75)} / max ${dims.at(-1)}`,
-  );
+  if (rows.length > 0) {
+    console.log(
+      `longest axis: min ${dims[0]} / p25 ${at(0.25)} / p50 ${at(0.5)} / p75 ${at(0.75)} / max ${dims.at(-1)}`,
+    );
+  }
 
   const report = (label, hits, format) => {
     console.log(`\n${label} (${hits.length})`);
@@ -275,7 +351,54 @@ const main = async () => {
       .sort((a, b) => Math.max(a.w, a.h) - Math.max(b.w, b.h)),
     (r) => `${r.w} x ${r.h}`,
   );
-  if (check && rows.some((r) => r.bleed > 0.05)) process.exitCode = 1;
+
+  const { tokens, groups } = await loadRules();
+  const constraints = constraintsArg
+    ? JSON.parse(await readFile(resolve(constraintsArg), 'utf8'))
+    : [];
+  const byName = Object.fromEntries(
+    (Array.isArray(constraints) ? constraints : (constraints.constraints ?? [])).map((c) => [
+      c.name,
+      c,
+    ]),
+  );
+  const failures = [];
+  for (const row of rows) {
+    const metrics = { ...row, gap: row.gap };
+    for (const message of classViolations({
+      name: row.name,
+      group: groups[row.name],
+      metrics,
+      tokens,
+    })) {
+      failures.push({ name: row.name, message });
+    }
+    const constraint = byName[row.name];
+    if (constraint) {
+      for (const message of constraintViolations({
+        constraint,
+        segments: icons[row.name],
+        tokens,
+      })) {
+        failures.push({ name: row.name, message });
+      }
+    }
+  }
+  report('fails the optical rules', failures, (f) => f.message);
+  if (check && failures.length > 0) process.exitCode = 1;
 };
 
-await main();
+/** Tokens and the name-to-group map of the spec lock, for the class and gap rules. */
+const loadRules = async () => {
+  const dir = resolve(ROOT, 'packages/formulon-cell/icons');
+  const tokens = JSON.parse(await readFile(resolve(dir, 'tokens.json'), 'utf8'));
+  const lock = JSON.parse(await readFile(resolve(dir, 'icons.lock.json'), 'utf8'));
+  return {
+    tokens,
+    groups: Object.fromEntries(Object.entries(lock.specs).map(([n, e]) => [n, e.group])),
+  };
+};
+
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
+  await main();
+}
