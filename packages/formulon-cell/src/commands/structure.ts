@@ -41,7 +41,7 @@ import {
   remapActiveWholeSheetFontOverridesForStructure,
   restoreActiveWholeSheetFontOverrideForStructure,
 } from '../engine/whole-sheet-font-sync.js';
-import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type { CellPatch, WorkbookHandle } from '../engine/workbook-handle.js';
 import type { EngineDrawingObject } from '../engine/workbook-handle-annotations.js';
 import { sheetDrawingStack, writeDrawingOrder } from '../store/drawing-order.js';
 import { addMergeToMaps } from '../store/merge-maps.js';
@@ -72,6 +72,7 @@ import {
 } from './axis-shift.js';
 import type { CellRecord } from './cell-shift.js';
 import { isMacChrome } from './chrome-platform.js';
+import { applyPatchesAtomic } from './clipboard/apply-patches-atomic.js';
 import { alertDataTableEdit, axisEditSplitsDataTable } from './data-table-guard.js';
 import { recordFilterChange } from './filter.js';
 import { filterVisibleRowRuns } from './filter-visible.js';
@@ -166,9 +167,11 @@ function insertionWouldOverflow(
 /** Apply a row/col shift to all cells on `sheet`. Cells in the band are
  *  relocated; formulas everywhere are rewritten so refs follow the move.
  *  When `delta < 0`, cells in the deletion band are dropped and refs into
- *  the band are replaced with `#REF!`. */
+ *  the band are replaced with `#REF!`. One engine transaction: a refused
+ *  write leaves every cell as it was and records nothing. */
 function applyAxisShiftToCells(
   wb: WorkbookHandle,
+  history: History | null,
   sheet: number,
   axis: 'row' | 'col',
   split: number,
@@ -176,49 +179,45 @@ function applyAxisShiftToCells(
 ): void {
   if (delta === 0) return;
   const all = collectAllCells(wb, sheet);
-  wb.withBatchedRecalc(() => writeAxisShiftedCells(wb, all, axis, split, delta));
+  applyPatchesAtomic(wb, axisShiftedCellPatches(all, axis, split, delta), history);
 }
 
-function writeAxisShiftedCells(
-  wb: WorkbookHandle,
+function axisShiftedCellPatches(
   all: readonly CellRecord[],
   axis: 'row' | 'col',
   split: number,
   delta: number,
-): void {
+): CellPatch[] {
   const max = axis === 'row' ? MAX_ROW : MAX_COL;
-  // Blank every cell that needs to move (or be deleted) before re-writing —
-  // some target slots may overlap source slots when delta < count.
-  for (const c of all) {
-    const k = axis === 'row' ? c.addr.row : c.addr.col;
-    if (k >= split) wb.setBlank(c.addr);
-  }
-
+  const writes = new Map<string, CellPatch>();
   for (const c of all) {
     const k = axis === 'row' ? c.addr.row : c.addr.col;
     const inMovedBand = k >= split;
     const inDeletedBand = delta < 0 && inMovedBand && k < split - delta;
     if (inDeletedBand) continue; // dropped
 
-    const newAddr: Addr = inMovedBand
-      ? axis === 'row'
-        ? { ...c.addr, row: k + delta }
-        : { ...c.addr, col: k + delta }
-      : c.addr;
-
     const newFormula = c.formula ? adjustFormulaForRowColEdit(c.formula, axis, split, delta) : null;
 
     if (inMovedBand) {
-      // Cells in the moved band were blanked above; rewrite at new addr.
       const target = k + delta;
       if (target < 0 || target > max) continue;
-      writeCell(wb, newAddr, c.value, newFormula);
+      const newAddr: Addr =
+        axis === 'row' ? { ...c.addr, row: target } : { ...c.addr, col: target };
+      writes.set(addrKey(newAddr), { addr: newAddr, value: c.value, formula: newFormula });
     } else if (newFormula !== c.formula && newFormula !== null) {
-      // Stationary cell whose formula references the band — overwrite in place.
-      // (writeCell would also work but `setFormula` is direct.)
-      wb.setFormula(c.addr, newFormula);
+      // Stationary cell whose formula references the band: rewrite in place.
+      writes.set(addrKey(c.addr), { addr: c.addr, value: c.value, formula: newFormula });
     }
   }
+  // Band cells no moved cell lands on are vacated.
+  const blanks: CellPatch[] = [];
+  for (const c of all) {
+    const k = axis === 'row' ? c.addr.row : c.addr.col;
+    if (k >= split && !writes.has(addrKey(c.addr))) {
+      blanks.push({ addr: c.addr, value: { kind: 'blank' }, formula: null });
+    }
+  }
+  return [...writes.values(), ...blanks];
 }
 
 /** Move the frozen band with the cells: rows or columns inserted above/left of
@@ -1268,7 +1267,7 @@ function editAxis(
       )
         return false;
     } else {
-      applyAxisShiftToCells(wb, sheet, axis, split, delta);
+      applyAxisShiftToCells(wb, history, sheet, axis, split, delta);
     }
 
     // 2. Shift compact axis state and its workbook-local caches before any

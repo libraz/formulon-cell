@@ -3,6 +3,7 @@ import {
   type CfRangeEvaluationOptions,
   type Color,
   type ConditionalFormat,
+  type ConditionalFormatPatch,
   type Formulon,
 } from '@libraz/formulon';
 import { orFallback } from './result.js';
@@ -164,6 +165,18 @@ export abstract class WorkbookHandleConditionalFormatMethods {
       const target = ws(this, sheet);
       const id = target.addCfRule(rule as ConditionalFormatInput);
       return target.listCfRules().findIndex((entry) => entry.id === id);
+    });
+  }
+
+  /** Updates the CF rule `id` on `sheet` with the keys `patch` names; the
+   *  whole patch is validated before anything changes. Returns `false`
+   *  (no-op) under stub mode or when the engine refuses. */
+  updateConditionalFormat(sheet: number, id: string, patch: ConditionalFormatPatch): boolean {
+    assertAlive(this);
+    if (!this.capabilities.conditionalFormatMutate) return false;
+    return orFallback(false, () => {
+      ws(this, sheet).updateCfRule(id, patch);
+      return true;
     });
   }
 

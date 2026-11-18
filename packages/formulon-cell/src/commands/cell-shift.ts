@@ -1,4 +1,4 @@
-import { CellShift, type ValidationType } from '@libraz/formulon';
+import { CellShift, type ConditionalFormat, type ConditionalFormatPatch } from '@libraz/formulon';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { hydrateThreadedCommentsFromEngine } from '../engine/annotations-sync.js';
 import {
@@ -16,13 +16,12 @@ import {
 import { hydrateTableOverlaysFromEngine } from '../engine/table-sync.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { hydrateValidationsFromEngine } from '../engine/validation-sync.js';
-import { writeCell } from '../engine/value.js';
 import {
   type ActiveWholeSheetFontSnapshot,
   captureActiveWholeSheetFontOverrideForStructure,
   restoreActiveWholeSheetFontOverrideForStructure,
 } from '../engine/whole-sheet-font-sync.js';
-import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type { CellPatch, WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeContainsAddr, rangesIntersect } from '../store/selection-geometry.js';
 import {
   type CellFormat,
@@ -115,10 +114,7 @@ export const restoreShiftReplayCheckpoint = (
       checkpoint.activeWholeSheetFont,
     );
     restoreSyncedFormatKeysForStructure(wb, affected.sheet, checkpoint.syncedFormatKeys);
-    wb.withBatchedRecalc(() => {
-      restoreSheetCells(wb, affected.sheet, checkpoint.cells);
-      restoreFormulaCells(wb, checkpoint.externalFormulas);
-    });
+    restoreCheckpointCells(wb, affected.sheet, checkpoint.cells, checkpoint.externalFormulas);
     if (checkpoint.style !== null && !wb.restoreRangeStyle(affected.sheet, checkpoint.style)) {
       throw new Error('cell shift: failed to restore transaction style');
     }
@@ -284,7 +280,7 @@ interface EngineShiftCheckpoint {
   readonly comments: readonly EngineCommentRecord[];
   readonly merges: readonly Range[];
   readonly conditionalFormats: ReturnType<WorkbookHandle['getConditionalFormats']>;
-  readonly validations: ReturnType<WorkbookHandle['getValidationsForSheet']>;
+  readonly validations: ReturnType<WorkbookHandle['getValidationRules']>;
   readonly definedNames: ReturnType<typeof listNames>;
   readonly hyperlinks: ReturnType<WorkbookHandle['getHyperlinksFull']>;
 }
@@ -311,7 +307,7 @@ function captureEngineShiftCheckpoint(
     ),
     merges: wb.capabilities.merges ? wb.getMerges(sheet).map((merge) => ({ ...merge })) : [],
     conditionalFormats: wb.getConditionalFormats(sheet),
-    validations: wb.getValidationsForSheet(sheet),
+    validations: wb.getValidationRules(sheet),
     definedNames: listNames(wb),
     hyperlinks: wb.getHyperlinksFull(sheet),
   };
@@ -325,10 +321,7 @@ function restoreEngineShiftCheckpoint(
   checkpoint: EngineShiftCheckpoint,
 ): void {
   const sheet = band.sheet;
-  wb.withBatchedRecalc(() => {
-    restoreSheetCells(wb, sheet, checkpoint.cells);
-    restoreFormulaCells(wb, checkpoint.externalFormulas);
-  });
+  restoreCheckpointCells(wb, sheet, checkpoint.cells, checkpoint.externalFormulas);
   if (checkpoint.style !== null && !wb.restoreRangeStyle(sheet, checkpoint.style)) {
     throw new Error('cell shift: failed to restore band styles');
   }
@@ -358,20 +351,29 @@ function restoreEngineShiftCheckpoint(
     }
   }
   if (wb.capabilities.conditionalFormatMutate) {
-    wb.clearConditionalFormats(sheet);
-    for (const rule of checkpoint.conditionalFormats) {
-      if (wb.addConditionalFormat(sheet, rule) < 0) {
-        throw new Error('cell shift: failed to restore a conditional format');
-      }
-    }
+    restoreRulesById(
+      {
+        list: () => wb.getConditionalFormats(sheet),
+        removeAt: (index) => wb.removeConditionalFormatAt(sheet, index),
+        update: (rule, current) =>
+          wb.updateConditionalFormat(sheet, rule.id, conditionalFormatPatch(current, rule)),
+        add: (rule) => wb.addConditionalFormat(sheet, rule) >= 0,
+      },
+      checkpoint.conditionalFormats,
+      'conditional format',
+    );
   }
   if (wb.capabilities.dataValidation) {
-    wb.clearValidations(sheet);
-    for (const rule of checkpoint.validations) {
-      if (!wb.addValidationEntry(sheet, { ...rule, type: rule.type as ValidationType })) {
-        throw new Error('cell shift: failed to restore a validation');
-      }
-    }
+    restoreRulesById(
+      {
+        list: () => wb.getValidationRules(sheet),
+        removeAt: (index) => wb.removeValidationAt(sheet, index),
+        update: (rule) => wb.updateValidationRule(sheet, rule.id, rule),
+        add: (rule) => wb.addValidationRule(sheet, rule),
+      },
+      checkpoint.validations,
+      'validation',
+    );
   }
   const names = new Map(listNames(wb).map((name) => [`${name.localSheetId}:${name.name}`, name]));
   for (const name of checkpoint.definedNames) {
@@ -397,6 +399,85 @@ function restoreEngineShiftCheckpoint(
     }
   }
   wb.recalcAuto();
+}
+
+/** Engine writes over one sheet's id-keyed rules (conditional formats or validations). */
+interface RuleWriter<R extends { readonly id: string }> {
+  list(): readonly R[];
+  removeAt(index: number): boolean;
+  update(rule: R, current: R): boolean;
+  add(rule: R): boolean;
+}
+
+/** Bring the sheet's rules to `target` by id: rules missing from it are removed,
+ *  changed ones updated in place, gone ones added back. A refused write puts the
+ *  rules back as they were, then throws. */
+function restoreRulesById<R extends { readonly id: string }>(
+  writer: RuleWriter<R>,
+  target: readonly R[],
+  what: string,
+): void {
+  const before = writer.list();
+  if (reconcileRules(writer, before, target)) return;
+  reconcileRules(writer, writer.list(), before);
+  throw new Error(`cell shift: failed to restore a ${what}`);
+}
+
+/** False at the first write the engine refuses. */
+function reconcileRules<R extends { readonly id: string }>(
+  writer: RuleWriter<R>,
+  current: readonly R[],
+  target: readonly R[],
+): boolean {
+  const wanted = new Set(target.map((rule) => rule.id));
+  const present = new Map(current.map((rule) => [rule.id, rule]));
+  // Highest index first so the earlier positions stay valid.
+  const removals = current.flatMap((rule, index) => (wanted.has(rule.id) ? [] : [index])).reverse();
+  const updates = target.flatMap((rule) => {
+    const now = present.get(rule.id);
+    return now && JSON.stringify(now) !== JSON.stringify(rule) ? [{ rule, now }] : [];
+  });
+  const additions = target.filter((rule) => !present.has(rule.id));
+  return (
+    removals.every((index) => writer.removeAt(index)) &&
+    updates.every(({ rule, now }) => writer.update(rule, now)) &&
+    additions.every((rule) => writer.add(rule))
+  );
+}
+
+/** The keys of a CF update: a rule's type and id never change. */
+const CF_PATCH_KEYS = [
+  'ranges',
+  'priority',
+  'stopIfTrue',
+  'dxfIndex',
+  'operator',
+  'formula1',
+  'formula2',
+  'colorScale',
+  'dataBar',
+  'iconSet',
+  'rank',
+  'percent',
+  'bottom',
+  'aboveAverage',
+  'equalAverage',
+  'stdDev',
+  'text',
+  'timePeriod',
+] as const satisfies readonly (keyof ConditionalFormat)[];
+
+/** The keys of `target` that differ from `current`; a key the rule's kind does
+ *  not use reads null on both and is left out, as the engine requires. */
+function conditionalFormatPatch(
+  current: ConditionalFormat,
+  target: ConditionalFormat,
+): ConditionalFormatPatch {
+  const patch: Record<string, unknown> = {};
+  for (const key of CF_PATCH_KEYS) {
+    if (JSON.stringify(current[key]) !== JSON.stringify(target[key])) patch[key] = target[key];
+  }
+  return patch as ConditionalFormatPatch;
 }
 
 /** Bring the store in line with an engine shift of `range`. The engine is
@@ -570,22 +651,21 @@ function collectExternalFormulaCells(wb: WorkbookHandle, editedSheet: number): C
   return formulas;
 }
 
-function restoreSheetCells(wb: WorkbookHandle, sheet: number, cells: readonly CellRecord[]): void {
-  const existing = Array.from(wb.physicalCells(sheet));
-  wb.withBatchedRecalc(() => {
-    for (const cell of existing) wb.setBlank(cell.addr);
-    for (const cell of cells) writeCell(wb, cell.addr, cell.value, cell.formula);
-  });
-  wb.recalcAuto();
-}
-
-function restoreFormulaCells(wb: WorkbookHandle, cells: readonly CellRecord[]): void {
-  wb.withBatchedRecalc(() => {
-    for (const cell of cells) {
-      if (cell.formula) wb.setFormula(cell.addr, cell.formula);
-    }
-  });
-  wb.recalcAuto();
+/** Put the cells of `sheet` and the formulas of the other sheets back as one
+ *  engine transaction: a refused write leaves every cell as it was. */
+function restoreCheckpointCells(
+  wb: WorkbookHandle,
+  sheet: number,
+  cells: readonly CellRecord[],
+  externalFormulas: readonly CellRecord[],
+): void {
+  const kept = new Set(cells.map((cell) => addrKey(cell.addr)));
+  const blanks = Array.from(wb.physicalCells(sheet)).flatMap<CellPatch>((cell) =>
+    kept.has(addrKey(cell.addr))
+      ? []
+      : [{ addr: cell.addr, value: { kind: 'blank' }, formula: null }],
+  );
+  wb.applyCellPatchAtomic([...cells, ...blanks, ...externalFormulas]);
 }
 
 function collectEngineComments(

@@ -1,5 +1,7 @@
 import type {
   ComparisonOperator,
+  DataValidation,
+  DataValidationPatch,
   ErrorCode,
   ValidationErrorStyle,
   ValidationType,
@@ -172,6 +174,31 @@ export abstract class WorkbookHandleValidationMethods {
     return attemptWrite(() => {
       ws(this, sheet).addValidation(dv);
     });
+  }
+
+  /** The engine's validation rules on `sheet`, ids included. Empty when
+   *  `capabilities.dataValidation` is off or the engine returns none. */
+  getValidationRules(sheet: number): readonly DataValidation[] {
+    assertAlive(this);
+    if (!this.capabilities.dataValidation) return [];
+    return orFallback([], () => [...ws(this, sheet).listValidations()]);
+  }
+
+  /** Append a rule as `getValidationRules` read it; the engine gives it a new id. */
+  addValidationRule(sheet: number, rule: DataValidationInput): boolean {
+    assertAlive(this);
+    if (!this.capabilities.dataValidation) return false;
+    return attemptWrite(() => {
+      ws(this, sheet).addValidation(rule);
+    });
+  }
+
+  /** Update the rule `id` on `sheet` with the keys `patch` names; a rule read
+   *  back from `getValidationRules` passes as is. */
+  updateValidationRule(sheet: number, id: string, patch: DataValidationPatch): boolean {
+    assertAlive(this);
+    if (!this.capabilities.dataValidation) return false;
+    return attemptWrite(() => ws(this, sheet).updateValidation(id, patch));
   }
 
   /** Remove the validation rule at `index` on `sheet`. */
