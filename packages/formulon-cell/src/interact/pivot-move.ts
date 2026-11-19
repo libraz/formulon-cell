@@ -1,4 +1,4 @@
-import { type History, recordingHistory } from '../commands/history.js';
+import { type History, recordingHistory, transactIn } from '../commands/history.js';
 import type { OperationEffect } from '../commands/interaction-policy.js';
 import {
   type PivotAuthorization,
@@ -101,51 +101,56 @@ function moveReport(
     return moved ? selectExtent(deps, source.sheet, source.pivotIndex) : null;
   }
 
-  const txn = history?.begin();
-  let sheet: number;
-  let at: { row: number; col: number };
-  if (target === 'new-sheet') {
-    const added = addSheet(store, wb, history);
-    if (added < 0) {
-      if (history && txn) history.end(txn);
-      return null;
-    }
-    // The new sheet sits right after the report's sheet.
-    sheet = added;
-    const slot = source.sheet + 1;
-    if (added !== slot && moveSheet(store, wb, added, slot, history)) sheet = slot;
-    at = PIVOT_NEW_SHEET_ANCHOR;
-  } else {
-    sheet = target.sheet;
-    at = target;
-  }
-  const anchor = { row: at.row + anchorOffset, col: at.col };
-  const refresh = (...sheets: number[]): void => {
-    for (const s of sheets) reloadSheetIfShown(store, wb, s);
-  };
-  const oldAnchor = { row: bounds.r0 + anchorOffset, col: bounds.c0 };
-  wb.removePivotTable(source.sheet, source.pivotIndex);
-  let created = recreatePivotTable(wb, sheet, anchor, definition);
-  if (created < 0) {
-    recreatePivotTable(wb, source.sheet, oldAnchor, definition);
-    refresh(source.sheet);
-    if (history && txn) history.abort(txn);
-    return null;
-  }
-  let removed = source.pivotIndex;
-  history?.push({
-    undo: () => {
-      wb.removePivotTable(sheet, created);
-      removed = recreatePivotTable(wb, source.sheet, oldAnchor, definition);
-      refresh(sheet, source.sheet);
+  const placed = transactIn(
+    history,
+    (): { sheet: number; created: number } | null => {
+      let sheet: number;
+      let at: { row: number; col: number };
+      if (target === 'new-sheet') {
+        const added = addSheet(store, wb, history);
+        if (added < 0) return null;
+        // The new sheet sits right after the report's sheet.
+        sheet = added;
+        const slot = source.sheet + 1;
+        if (added !== slot && moveSheet(store, wb, added, slot, history)) sheet = slot;
+        at = PIVOT_NEW_SHEET_ANCHOR;
+      } else {
+        sheet = target.sheet;
+        at = target;
+      }
+      const anchor = { row: at.row + anchorOffset, col: at.col };
+      const refresh = (...sheets: number[]): void => {
+        for (const s of sheets) reloadSheetIfShown(store, wb, s);
+      };
+      const oldAnchor = { row: bounds.r0 + anchorOffset, col: bounds.c0 };
+      wb.removePivotTable(source.sheet, source.pivotIndex);
+      let created = recreatePivotTable(wb, sheet, anchor, definition);
+      if (created < 0) {
+        recreatePivotTable(wb, source.sheet, oldAnchor, definition);
+        refresh(source.sheet);
+        return null;
+      }
+      const placedSheet = sheet;
+      const placedIndex = created;
+      let removed = source.pivotIndex;
+      history?.push({
+        undo: () => {
+          wb.removePivotTable(placedSheet, created);
+          removed = recreatePivotTable(wb, source.sheet, oldAnchor, definition);
+          refresh(placedSheet, source.sheet);
+        },
+        redo: () => {
+          wb.removePivotTable(source.sheet, removed);
+          created = recreatePivotTable(wb, placedSheet, anchor, definition);
+          refresh(placedSheet, source.sheet);
+        },
+      });
+      return { sheet: placedSheet, created: placedIndex };
     },
-    redo: () => {
-      wb.removePivotTable(source.sheet, removed);
-      created = recreatePivotTable(wb, sheet, anchor, definition);
-      refresh(sheet, source.sheet);
-    },
-  });
-  if (history && txn) history.end(txn);
+    { keep: (result) => result !== null },
+  );
+  if (!placed) return null;
+  const { sheet, created } = placed;
   mutators.setSheetIndex(store, sheet);
   refreshPivotReportsAfterEdit(store, wb);
   return selectExtent(deps, sheet, created);

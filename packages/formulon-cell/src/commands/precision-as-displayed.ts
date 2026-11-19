@@ -1,7 +1,7 @@
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { NumFmt, SpreadsheetStore } from '../store/store.js';
-import type { History } from './history.js';
+import { type History, transactIn } from './history.js';
 
 /** Round half away from zero at `decimals`. The scaled value is first cut to
  *  15 significant digits so a binary 1.005 rounds up to 1.01 the way the
@@ -57,14 +57,11 @@ export function applyPrecisionAsDisplayed(
     }
   }
   if (writes.length === 0) return 0;
-  history?.begin();
-  try {
+  transactIn(history, () => {
     wb.withBatchedRecalc(() => {
       for (const { addr, value } of writes) wb.setNumber(addr, value);
     });
-  } finally {
-    history?.end();
-  }
+  });
   return writes.length;
 }
 
@@ -88,18 +85,13 @@ export function setPrecisionAsDisplayed(
     writePrecisionFlag(wb, store, false);
     return;
   }
-  const record = history !== null && !history.isReplaying();
-  if (record) history.begin();
-  try {
-    applyPrecisionAsDisplayed(wb, store, record ? history : null);
+  const recording = history !== null && !history.isReplaying() ? history : null;
+  transactIn(recording, () => {
+    applyPrecisionAsDisplayed(wb, store, recording);
     writePrecisionFlag(wb, store, true);
-    if (record) {
-      history.push({
-        undo: () => writePrecisionFlag(wb, store, false),
-        redo: () => writePrecisionFlag(wb, store, true),
-      });
-    }
-  } finally {
-    if (record) history.end();
-  }
+    recording?.push({
+      undo: () => writePrecisionFlag(wb, store, false),
+      redo: () => writePrecisionFlag(wb, store, true),
+    });
+  });
 }

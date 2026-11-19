@@ -3,7 +3,7 @@ import type { Addr, Range } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../../store/store.js';
 import { defaultObjectNames, type TableOverlay, updateTableOverlay } from '../format-as-table.js';
-import type { History } from '../history.js';
+import { type History, transactIn } from '../history.js';
 import { recordTablesChange } from '../slice-history.js';
 import { applyPatchesAtomic } from './apply-patches-atomic.js';
 
@@ -99,8 +99,7 @@ export function extendTablesForEntry(
       if (addrKey(cell) !== addrKey(addr) && !isBlank(wb, cell)) return;
     }
   }
-  const transaction = history?.begin();
-  try {
+  transactIn(history, () => {
     if (header && isBlank(wb, header)) {
       const name = nextHeaderName(wb, t);
       applyPatchesAtomic(wb, [{ addr: header, value: { kind: 'text', value: name } }], history);
@@ -110,7 +109,5 @@ export function extendTablesForEntry(
     recordTablesChange(history, store, () => {
       updateTableOverlay(store, table.id, { range });
     });
-  } finally {
-    if (transaction !== undefined) history?.end(transaction);
-  }
+  });
 }

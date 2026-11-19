@@ -6,7 +6,7 @@ import { mutators, type SparklineKind, type SpreadsheetStore } from '../store/st
 import type { SelectionStats } from './aggregate.js';
 import { blockDataTableCells } from './data-table-guard.js';
 import { formatAsTable as applyFormatAsTable } from './format-as-table.js';
-import type { History } from './history.js';
+import { type History, transactIn } from './history.js';
 import { objectChangeAllowed } from './object-actions.js';
 import {
   isCellWritable,
@@ -407,14 +407,11 @@ function commitTotalWrites(
   ) {
     return { ok: false, reason: 'protected' };
   }
-  if (history) history.begin();
-  try {
+  transactIn(history, () => {
     wb.withBatchedRecalc(() => {
       for (const write of writes) wb.setFormula(write.addr, write.formula);
     });
-  } finally {
-    if (history) history.end();
-  }
+  });
   return { ok: true, kind: 'formula', count: writes.length };
 }
 
@@ -541,8 +538,7 @@ function clearAnalysisFormatting(input: QuickAnalysisExecuteInput): QuickAnalysi
     warnProtected(locked);
     return { ok: false, reason: 'protected' };
   }
-  if (history) history.begin();
-  try {
+  transactIn(history, () => {
     recordFormatChange(history, store, () => {
       store.setState((s) => {
         const formats = new Map(s.format.formats);
@@ -571,9 +567,7 @@ function clearAnalysisFormatting(input: QuickAnalysisExecuteInput): QuickAnalysi
         mutators.clearTableOverlaysInRange(store, range);
       });
     }
-  } finally {
-    if (history) history.end();
-  }
+  });
   return { ok: true, kind: 'clear-format', count: 1 };
 }
 

@@ -12,7 +12,7 @@ import { safeFontFamily } from '../../format/font-family.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../../store/store.js';
 import { escapeHtml } from '../../text-escape.js';
 import { formatNumber } from '../format.js';
-import type { History } from '../history.js';
+import { type History, transactIn } from '../history.js';
 import { type ChangeBatchResult, refusedBatch } from '../interaction-policy.js';
 import { recordFormatChange } from '../slice-history.js';
 import { pasteTSV } from './paste.js';
@@ -183,8 +183,7 @@ export function pasteHtml(
   const rows = parseHtmlTable(html);
   if (!rows || rows.length === 0)
     return refusedBatch({ code: 'invalid', reason: 'nothing to paste' });
-  const transaction = history?.begin();
-  try {
+  return transactIn(history, () => {
     const result = pasteTSV(
       state,
       store,
@@ -203,9 +202,7 @@ export function pasteHtml(
       });
     }
     return result;
-  } finally {
-    if (transaction !== undefined) history?.end(transaction);
-  }
+  });
 }
 
 /** Marks the HTML this workbook writes to the system clipboard. That HTML

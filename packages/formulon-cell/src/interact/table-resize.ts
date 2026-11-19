@@ -4,6 +4,7 @@ import {
   type TableOverlay,
   updateTableOverlay,
 } from '../commands/format-as-table.js';
+import { transactIn } from '../commands/history.js';
 import { recordTablesChange } from '../commands/slice-history.js';
 import {
   type TableActionContext,
@@ -110,28 +111,26 @@ const resizeTable = (
 ): boolean => {
   const { store, history, workbook: wb } = ctx;
   const old = table.range;
-  const transaction = history && !history.isReplaying() ? history.begin() : undefined;
   let ok = false;
-  try {
-    if (range.c1 > old.c1 && table.showHeader) {
-      const { column } = defaultObjectNames(wb);
-      let previous = wb.getValue({ sheet: old.sheet, row: old.r0, col: old.c1 });
-      for (let col = old.c1 + 1; col <= range.c1; col += 1) {
-        const prevText = previous.kind === 'text' ? previous.value : '';
-        const name = nextHeaderName(prevText, `${column}${col - old.c0 + 1}`);
-        wb.setText({ sheet: old.sheet, row: old.r0, col }, name);
-        previous = { kind: 'text', value: name };
+  transactIn(
+    history && !history.isReplaying() ? history : null,
+    () => {
+      if (range.c1 > old.c1 && table.showHeader) {
+        const { column } = defaultObjectNames(wb);
+        let previous = wb.getValue({ sheet: old.sheet, row: old.r0, col: old.c1 });
+        for (let col = old.c1 + 1; col <= range.c1; col += 1) {
+          const prevText = previous.kind === 'text' ? previous.value : '';
+          const name = nextHeaderName(prevText, `${column}${col - old.c0 + 1}`);
+          wb.setText({ sheet: old.sheet, row: old.r0, col }, name);
+          previous = { kind: 'text', value: name };
+        }
       }
-    }
-    recordTablesChange(history, store, () => {
-      ok = updateTableOverlay(store, table.id, { range }) !== null;
-    });
-    if (ok) mutators.replaceCells(store, wb.cells(old.sheet));
-  } finally {
-    if (transaction !== undefined) {
-      if (ok) history?.end(transaction);
-      else history?.abort(transaction);
-    }
-  }
+      recordTablesChange(history, store, () => {
+        ok = updateTableOverlay(store, table.id, { range }) !== null;
+      });
+      if (ok) mutators.replaceCells(store, wb.cells(old.sheet));
+    },
+    { keep: () => ok },
+  );
   return ok;
 };

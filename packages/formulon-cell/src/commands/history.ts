@@ -26,6 +26,12 @@ export interface HistoryEntry {
  * onto a single child entry without changing the existing entry contract. */
 type HistoryBeginMetadata = Pick<HistoryEntry, 'replayAuthorization'>;
 
+/** Options for `History.transact`. */
+export interface HistoryTransactOptions<T> extends HistoryBeginMetadata {
+  /** Whether a returned result commits; a rejected one is rolled back like a throw. */
+  keep?: (result: T) => boolean;
+}
+
 interface TransactionFrame {
   id: HistoryTransaction;
   startIndex: number;
@@ -46,7 +52,7 @@ export type HistoryTransaction = symbol;
  * format changes, and layout changes (col widths, row heights, freeze) all
  * push entries here so one Cmd/Ctrl+Z spans the whole instance.
  *
- * Use `begin()` / `end()` to batch multiple entries into one logical step
+ * Use `transact()` to batch multiple entries into one logical step
  * (e.g. paste-special, fill drag).
  */
 export class History {
@@ -113,16 +119,38 @@ export class History {
   }
 
   /**
-   * Runs `fn` inside one transaction frame and closes it even when `fn` throws, so whatever `fn`
-   * recorded before failing stays one undo step. Nested calls flatten into the outermost frame.
+   * Runs `fn` as one undo step. When `fn` throws, everything it recorded is undone and discarded
+   * and the error is rethrown (as an `AggregateError` with the rollback failure when an undo
+   * callback throws too). When it returns, the frame is committed, unless `options.keep` rejects
+   * the result: that refusal is undone and discarded the same way and the result returned. Nested
+   * calls flatten into the outermost frame; a nested failure rolls back only the nested work
+   * before reaching the outer call.
    */
-  transact<T>(fn: () => T, metadata?: HistoryBeginMetadata): T {
-    const token = this.begin(this.txnFrames.length > 0 ? undefined : metadata);
+  transact<T>(fn: () => T, options?: HistoryTransactOptions<T>): T {
+    const replayAuthorization = options?.replayAuthorization;
+    const token = this.begin(
+      this.txnFrames.length > 0 || replayAuthorization === undefined
+        ? undefined
+        : { replayAuthorization },
+    );
+    let result: T;
+    let kept: boolean;
     try {
-      return fn();
-    } finally {
-      this.end(token);
+      result = fn();
+      kept = options?.keep ? options.keep(result) : true;
+    } catch (error) {
+      try {
+        this.abort(token);
+      } catch (rollback) {
+        throw new AggregateError([error, rollback], 'History transaction rollback failed.', {
+          cause: error,
+        });
+      }
+      throw error;
     }
+    if (kept) this.end(token);
+    else this.abort(token);
+    return result;
   }
 
   private withMetadata(entry: HistoryEntry, metadata?: HistoryBeginMetadata): HistoryEntry {
@@ -301,6 +329,15 @@ export class History {
 /** The history a change should record into: none while an undo or redo replays. */
 export function recordingHistory(history: History | null | undefined): History | null {
   return history && !history.isReplaying() ? history : null;
+}
+
+/** `history.transact(fn, options)`, or `fn()` alone when there is no history. */
+export function transactIn<T>(
+  history: History | null | undefined,
+  fn: () => T,
+  options?: HistoryTransactOptions<T>,
+): T {
+  return history ? history.transact(fn, options) : fn();
 }
 
 /** Pull one entry off the undo stack and apply it. */

@@ -163,13 +163,9 @@ export const handleAutoSum = (
   const run = (): boolean => {
     const r = instance.store.getState().selection.range;
     const single = isSingleCell(r);
-    instance.history.begin();
-    let result: ReturnType<typeof autoSum> = null;
-    try {
-      result = autoSum(instance.store.getState(), instance.workbook, functionName);
-    } finally {
-      instance.history.end();
-    }
+    const result = instance.history.transact(() =>
+      autoSum(instance.store.getState(), instance.workbook, functionName),
+    );
     if (!result) return false;
     mutators.replaceCells(instance.store, instance.workbook.cells(result.addr.sheet));
     // A range selection stays as it was; a single cell moves to the new total.

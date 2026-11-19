@@ -93,14 +93,16 @@ const buildScriptAction =
     const command = parseScriptCommand(raw);
     if (!command) return;
     const range = normalizedSelectionRange(instance);
-    instance.history.begin();
-    let count = 0;
-    try {
-      count = applyTextScriptToRange(instance.store.getState(), instance.workbook, range, command);
+    const count = instance.history.transact(() => {
+      const applied = applyTextScriptToRange(
+        instance.store.getState(),
+        instance.workbook,
+        range,
+        command,
+      );
       mutators.replaceCells(instance.store, instance.workbook.cells(range.sheet));
-    } finally {
-      instance.history.end();
-    }
+      return applied;
+    });
     await showInstanceReport(instance, strings.ribbonMenu.automationScriptsTitle, [
       {
         severity: 'info',

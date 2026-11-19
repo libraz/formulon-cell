@@ -20,7 +20,7 @@ import {
 } from '../store/store.js';
 import type { AuthorizedIntentFactory } from './authorized-write.js';
 import { blockDataTableEdit } from './data-table-guard.js';
-import type { History } from './history.js';
+import { type History, transactIn } from './history.js';
 import { sameJsonValue } from './prepared-change.js';
 import { isCellWritable, isSheetProtected, warnProtected } from './protection.js';
 import { recordFormatChange, recordMergesChangeWithEngine } from './slice-history.js';
@@ -426,8 +426,7 @@ export function applyMerge(
     return false;
   }
 
-  if (history) history.begin();
-  try {
+  transactIn(history, () => {
     const content = contentCellsInRange(stateBefore, effective);
     const anchor = { sheet, row: effective.r0, col: effective.c0 };
     const first = content[0];
@@ -445,9 +444,7 @@ export function applyMerge(
     recordMergesChangeWithEngine(history, store, wb, sheet, () => {
       mutators.mergeRange(store, effective);
     });
-  } finally {
-    if (history) history.end();
-  }
+  });
   return true;
 }
 
@@ -473,8 +470,7 @@ export function applyMergeAcross(
     return false;
   }
 
-  if (history) history.begin();
-  try {
+  return transactIn(history, () => {
     if (intersectingMerges(stateBefore, effective).length > 0) {
       if (!applyUnmerge(store, wb, history, effective)) return false;
     }
@@ -492,9 +488,7 @@ export function applyMergeAcross(
       }
     });
     return applied;
-  } finally {
-    if (history) history.end();
-  }
+  });
 }
 
 /**

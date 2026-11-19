@@ -659,64 +659,61 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): Ch
       return unchangedContent;
     }
 
-    const token = history.begin();
+    let cleared: ChangeBatchResult;
     try {
-      const result = clearSelectedContents({
-        store,
-        workbook,
-        history,
-        commands: controller,
-        origin,
-        commandId,
-      });
-      if (result.status === 'refused') {
-        history.abort(token);
-        refreshCells(store, workbook, plan.sheet);
-        return result;
-      }
-
-      // Clear All removes the sparklines of the cleared, unlocked cells (read before the formats reset
-      // their lock); the rest of a group stays.
-      const { selection } = store.getState();
-      for (const range of selectionRangeList(selection)) {
-        clearSparklinesAction({ store, history, origin, commandId }, normalizeRange(range));
-      }
-
-      if (plan.comments.length > 0) {
-        recordCommentChange(history, store, workbook, plan.comments, () => {
-          clearComments(store, plan.comments, workbook);
-        });
-      }
-
-      const formatTargets = plan.formatEntries;
-      if (formatTargets.length > 0) {
-        recordClearFormatEntries(history, store, workbook, plan.sheet, formatTargets, () =>
-          withSelectionFormatOrigin(
+      cleared = history.transact(
+        () => {
+          const result = clearSelectedContents({
             store,
+            workbook,
+            history,
+            commands: controller,
             origin,
-            () => clearPlannedFormats(store, plan, false),
             commandId,
-          ),
-        );
-      }
+          });
+          if (result.status === 'refused') return result;
 
-      if (plan.conditionalRuleIndexes.length > 0) {
-        recordConditionalRulesChange(history, store, () => {
-          clearPlannedConditionalRules(store, plan);
-        });
-      }
+          // Clear All removes the sparklines of the cleared, unlocked cells (read before the formats
+          // reset their lock); the rest of a group stays.
+          const { selection } = store.getState();
+          for (const range of selectionRangeList(selection)) {
+            clearSparklinesAction({ store, history, origin, commandId }, normalizeRange(range));
+          }
 
-      refreshCells(store, workbook, plan.sheet);
-      history.end(token);
-      return result;
+          if (plan.comments.length > 0) {
+            recordCommentChange(history, store, workbook, plan.comments, () => {
+              clearComments(store, plan.comments, workbook);
+            });
+          }
+
+          const formatTargets = plan.formatEntries;
+          if (formatTargets.length > 0) {
+            recordClearFormatEntries(history, store, workbook, plan.sheet, formatTargets, () =>
+              withSelectionFormatOrigin(
+                store,
+                origin,
+                () => clearPlannedFormats(store, plan, false),
+                commandId,
+              ),
+            );
+          }
+
+          if (plan.conditionalRuleIndexes.length > 0) {
+            recordConditionalRulesChange(history, store, () => {
+              clearPlannedConditionalRules(store, plan);
+            });
+          }
+          refreshCells(store, workbook, plan.sheet);
+          return result;
+        },
+        { keep: (result) => result.status !== 'refused' },
+      );
     } catch (error) {
-      try {
-        history.abort(token);
-      } finally {
-        refreshCells(store, workbook, plan.sheet);
-      }
+      refreshCells(store, workbook, plan.sheet);
       throw error;
     }
+    if (cleared.status === 'refused') refreshCells(store, workbook, plan.sheet);
+    return cleared;
   } finally {
     if (resolved.ephemeral) resolved.controller?.dispose();
   }

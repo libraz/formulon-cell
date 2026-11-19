@@ -24,7 +24,7 @@ import {
   tableStyleOptionsById,
   updateTableOverlay,
 } from './format-as-table.js';
-import type { History } from './history.js';
+import { type History, transactIn } from './history.js';
 import { updatePivotStyleInfo } from './pivot-style-info.js';
 import { anySheetProtected } from './protection.js';
 import { recordFormatChange, recordTablesChange } from './slice-history.js';
@@ -54,19 +54,14 @@ export function afterClearingFormatting(
   range: Range,
   change: () => boolean,
 ): boolean {
-  const history = ctx.history;
-  const transaction = history?.begin();
-  let applied = false;
-  try {
-    clearTableRangeFormatting(ctx, range);
-    applied = change();
-    return applied;
-  } finally {
-    if (history && transaction) {
-      if (applied) history.end(transaction);
-      else history.abort(transaction);
-    }
-  }
+  return transactIn(
+    ctx.history,
+    () => {
+      clearTableRangeFormatting(ctx, range);
+      return change();
+    },
+    { keep: (applied) => applied },
+  );
 }
 
 /** Clears the direct formatting of `range` with its own undo entry, the first half of Apply and
@@ -172,12 +167,6 @@ function recordStyleDefaults(
   return true;
 }
 
-/** Runs `fn` as one undo step when there is a history. */
-const inTransaction = (history: History | null, fn: () => void): void => {
-  if (history) history.transact(fn);
-  else fn();
-};
-
 /** Deletes the custom style `name`, as one undo step, as the desktop app does. A style may be
  *  flagged for tables, PivotTables or both. The users of each kind take that kind's workbook
  *  default. A deleted default resets first, to Table Style Medium 2 / PivotTable Style Light 16.
@@ -195,8 +184,7 @@ export function deleteCustomStyle(
   if (!forTables && !forPivots) return refused('notFound');
   if (anySheetProtected(state)) return refused('workbookHasProtectedSheet');
   const history = ctx.history;
-  const transaction = history?.begin();
-  try {
+  transactIn(history, () => {
     // The engine moves the style's users to the defaults, and resets a default naming it, when the
     // style goes. Undo restores the style first, then what was captured here.
     const defaults = workbook?.getTableStyleDefaults() ?? null;
@@ -231,9 +219,7 @@ export function deleteCustomStyle(
     });
     repaint();
     if (!replaying && pivots.length > 0) history.push({ undo: () => undefined, redo: repaint });
-  } finally {
-    if (history && transaction) history.end(transaction);
-  }
+  });
   return { ok: true };
 }
 
@@ -265,7 +251,7 @@ export function modifyCustomStyle(
   if (!label || customStyleNameError(state, label, { exceptLabel: name }))
     return refused('invalidName');
   if (anySheetProtected(state)) return refused('workbookHasProtectedSheet');
-  inTransaction(ctx.history, () => {
+  transactIn(ctx.history, () => {
     // The engine resets a default whose style it removes: a default naming the old name moves
     // first, and a ticked one is set again once the style is back.
     const workbook = defaults?.workbook;
@@ -325,7 +311,7 @@ export function createCustomStyle(
   const label = value.name.trim();
   if (!label || customStyleNameError(ctx.store.getState(), label)) return false;
   const look = { elements: value.elements, stripeSizes: value.stripeSizes };
-  inTransaction(ctx.history, () => {
+  transactIn(ctx.history, () => {
     if (kind === 'table') createTableStyleFromActiveTable(ctx.store, ctx.history, label, look);
     else createPivotTableStyleFromActivePivot(ctx.store, ctx.history, label, look);
     if (value.setAsDefault) setStyleDefault(workbook, kind, label, ctx.history);
@@ -347,8 +333,7 @@ export function applyPivotStyle(
     return applyPivotTableStyleById(ctx.store, ctx.history, at, styleId);
   }
   const history = ctx.history;
-  const transaction = history?.begin();
-  try {
+  return transactIn(history, () => {
     const applied = updatePivotStyleInfo({ store: ctx.store, workbook, history }, at, {
       name: styleId,
     });
@@ -357,9 +342,7 @@ export function applyPivotStyle(
       recordTablesChange(history, ctx.store, () => mutators.removePivotTableStyle(ctx.store, at));
     }
     return applied;
-  } finally {
-    if (history && transaction) history.end(transaction);
-  }
+  });
 }
 
 /** Makes the style `name` (a built-in name or a custom style's label) its kind's workbook default,

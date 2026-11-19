@@ -210,13 +210,10 @@ const insertSymbolAtActiveCell = (instance: SpreadsheetInstance, symbol: string)
       return;
     }
     if (blockDataTableCells(instance.workbook, [target])) return;
-    instance.history.begin();
-    try {
+    instance.history.transact(() => {
       instance.workbook.setText(target, symbol);
       mutators.replaceCells(instance.store, instance.workbook.cells(target.sheet));
-    } finally {
-      instance.history.end();
-    }
+    });
   });
 };
 

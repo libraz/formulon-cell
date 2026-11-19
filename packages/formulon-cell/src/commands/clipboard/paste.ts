@@ -14,7 +14,7 @@ import {
   dataTableGuardAlert,
   tableFunctionAlert,
 } from '../data-table-guard.js';
-import type { History } from '../history.js';
+import { type History, transactIn } from '../history.js';
 import { appliedBatch, type ChangeBatchResult, refusedBatch } from '../interaction-policy.js';
 import { blockPivotEdit, pivotGuardAlert } from '../pivot-guard.js';
 import { isCellWritable, isSheetProtected } from '../protection.js';
@@ -80,32 +80,32 @@ export function pasteTSV(
   if (blockTableFunction(wb, formulas))
     return refusedBatch({ code: 'invalid', reason: tableFunctionAlert(wb).message });
 
-  const transaction = history?.begin();
-  const { changed } = wb.trackChangedCells(() => {
-    if (history) {
-      applyPatchesAtomic(
-        wb,
-        writes.map(({ addr, input }) => coercedInputToPatch(addr, input)),
-        history,
-      );
-    } else {
-      wb.withBatchedRecalc(() => {
-        for (const { addr, input } of writes) writeCoerced(wb, addr, input);
-      });
-    }
-  });
+  return transactIn(history, () => {
+    const { changed } = wb.trackChangedCells(() => {
+      if (history) {
+        applyPatchesAtomic(
+          wb,
+          writes.map(({ addr, input }) => coercedInputToPatch(addr, input)),
+          history,
+        );
+      } else {
+        wb.withBatchedRecalc(() => {
+          for (const { addr, input } of writes) writeCoerced(wb, addr, input);
+        });
+      }
+    });
 
-  const writtenRange: Range = {
-    sheet,
-    r0: origin.row,
-    c0: origin.col,
-    r1: origin.row + rows.length - 1,
-    c1: origin.col + Math.max(0, maxCols - 1),
-  };
-  applyImplicitFormats(store, history, writes);
-  extendTablesForPaste(store, history, writtenRange);
-  if (transaction !== undefined) history?.end(transaction);
-  return appliedBatch(changed, writtenRange);
+    const writtenRange: Range = {
+      sheet,
+      r0: origin.row,
+      c0: origin.col,
+      r1: origin.row + rows.length - 1,
+      c1: origin.col + Math.max(0, maxCols - 1),
+    };
+    applyImplicitFormats(store, history, writes);
+    extendTablesForPaste(store, history, writtenRange);
+    return appliedBatch(changed, writtenRange);
+  });
 }
 
 /** Whether every cell of `range` is writable under sheet protection. */

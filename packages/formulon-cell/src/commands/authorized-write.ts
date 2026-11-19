@@ -56,23 +56,12 @@ export function authorizedWrite<T>(request: AuthorizedWriteRequest<T>): Authoriz
   const { store, history, intents, origin, write } = request;
   const decision = authorizeWrite(store, intents, origin);
   if (!decision.allowed) return { ok: false, decision };
-  const token = history.begin(
+  const value = history.transact(
+    write,
     history.isInTransaction()
       ? undefined
       : { replayAuthorization: { undo: intents('undo'), redo: intents('redo') } },
   );
-  let value: T;
-  try {
-    value = write();
-  } catch (error) {
-    try {
-      history.abort(token);
-    } catch (rollback) {
-      throw new AggregateError([error, rollback], 'Authorized write rollback failed.');
-    }
-    throw error;
-  }
-  history.end(token);
   return { ok: true, value };
 }
 

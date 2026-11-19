@@ -107,7 +107,7 @@ describe('History stack', () => {
   });
 
   describe('transactions', () => {
-    it('transact commits what the closure recorded as one step, even when it throws', () => {
+    it('transact undoes and discards what the closure recorded when it throws', () => {
       const log: string[] = [];
       const record = (name: string): void =>
         h.push({ undo: () => log.push(`undo ${name}`), redo: () => log.push(`redo ${name}`) });
@@ -119,8 +119,90 @@ describe('History stack', () => {
           throw boom;
         }),
       ).toThrow(boom);
-      expect(h.undo()).toBe(true);
       expect(log).toEqual(['undo b', 'undo a']);
+      expect(h.canUndo()).toBe(false);
+      expect(h.isInTransaction()).toBe(false);
+    });
+
+    it('a throw inside a nested transact aborts the whole outer frame once', () => {
+      const log: string[] = [];
+      const record = (name: string): void =>
+        h.push({ undo: () => log.push(`undo ${name}`), redo: () => log.push(`redo ${name}`) });
+      const boom = new Error('boom');
+      expect(() =>
+        h.transact(() => {
+          record('a');
+          h.transact(() => {
+            record('b');
+            throw boom;
+          });
+          record('never');
+        }),
+      ).toThrow(boom);
+      expect(log).toEqual(['undo b', 'undo a']);
+      expect(h.canUndo()).toBe(false);
+      expect(h.isInTransaction()).toBe(false);
+    });
+
+    it('a nested transact whose throw the outer closure swallows keeps the outer work', () => {
+      const log: string[] = [];
+      const record = (name: string): void =>
+        h.push({ undo: () => log.push(`undo ${name}`), redo: () => log.push(`redo ${name}`) });
+      h.transact(() => {
+        record('a');
+        try {
+          h.transact(() => {
+            record('b');
+            throw new Error('inner');
+          });
+        } catch {
+          // The caller decides the inner failure is not fatal.
+        }
+        record('c');
+      });
+      expect(log).toEqual(['undo b']);
+      expect(h.undo()).toBe(true);
+      expect(log).toEqual(['undo b', 'undo c', 'undo a']);
+      expect(h.canUndo()).toBe(false);
+    });
+
+    it('transact reports a failed rollback together with the original error', () => {
+      h.push({ undo: () => undefined, redo: () => undefined });
+      const boom = new Error('boom');
+      const rollback = new Error('rollback');
+      let caught: unknown;
+      try {
+        h.transact(() => {
+          h.push({
+            undo: () => {
+              throw rollback;
+            },
+            redo: () => undefined,
+          });
+          throw boom;
+        });
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(AggregateError);
+      expect((caught as AggregateError).errors).toEqual([boom, rollback]);
+      expect(h.isInTransaction()).toBe(false);
+      // The step committed before the transaction is untouched.
+      expect(h.undo()).toBe(true);
+      expect(h.canUndo()).toBe(false);
+    });
+
+    it('transact aborts a result its keep predicate rejects and returns it', () => {
+      const log: string[] = [];
+      const result = h.transact(
+        () => {
+          h.push({ undo: () => log.push('undo a'), redo: () => log.push('redo a') });
+          return 'refused';
+        },
+        { keep: (value) => value !== 'refused' },
+      );
+      expect(result).toBe('refused');
+      expect(log).toEqual(['undo a']);
       expect(h.canUndo()).toBe(false);
     });
 

@@ -8,7 +8,7 @@ import {
   replaceAll,
   replaceOne,
 } from '../commands/find.js';
-import type { History } from '../commands/history.js';
+import { type History, transactIn } from '../commands/history.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { addrKey, formatA1Cell } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
@@ -545,9 +545,8 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     const restricted = navigationRestricted();
     const targets = findAll(store.getState(), o).map((m) => rangeOfAddr(m.addr));
     if (deferForAllowedRangeUnlock(store, targets, doReplaceAll)) return;
-    if (history) history.begin();
     let n = 0;
-    try {
+    transactIn(history, () => {
       if (!restricted) {
         n = replaceAll(store.getState(), wb, o, replaceInput.value, store);
       } else if (o.lookIn === 'comments' || o.lookIn === 'notes') {
@@ -563,9 +562,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
           }
         });
       }
-    } finally {
-      if (history) history.end();
-    }
+    });
     if (n > 0) deps.onAfterCommit?.();
     currentMatch = null;
     clearResults();

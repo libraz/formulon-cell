@@ -174,18 +174,18 @@ export function createMacRibbonActions(instance: SpreadsheetInstance): MacRibbon
       } as const;
       const sheet = instance.store.getState().data.sheetIndex;
       // One undo step; a refused slicer rolls back the ones already added.
-      const token = instance.history.begin();
-      let added: SlicerSpec[] | null = null;
-      try {
-        added = objectWrite(ctx, sheet, null, () =>
-          inputs.map((input) => instance.addSlicer(input)),
-        );
-      } catch {
-        added = null;
-      }
-      if (added) instance.history.end(token);
-      else instance.history.abort(token);
-      return added;
+      return instance.history.transact(
+        (): SlicerSpec[] | null => {
+          try {
+            return objectWrite(ctx, sheet, null, () =>
+              inputs.map((input) => instance.addSlicer(input)),
+            );
+          } catch {
+            return null;
+          }
+        },
+        { keep: (added) => added !== null },
+      );
     },
   });
   SPARKLINE_DIALOGS.set(instance, sparkline);

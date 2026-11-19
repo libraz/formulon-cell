@@ -12,7 +12,7 @@ import { withSparklineMembers } from '../store/sparkline-slice.js';
 import { type LayoutSlice, mutators, type SpreadsheetStore } from '../store/store.js';
 import type { OutlineSummary } from '../store/types.js';
 import { isMacChrome } from './chrome-platform.js';
-import type { History } from './history.js';
+import { type History, transactIn } from './history.js';
 import { isWorkbookStructureProtected } from './protection.js';
 import { recordLayoutChangeWithEngine, recordSparklineChange } from './slice-history.js';
 import { findSlicerTable } from './slicers.js';
@@ -207,15 +207,12 @@ export function addSheetAfterActive(
   history?: History | null,
 ): number {
   const active = store.getState().data.sheetIndex;
-  history?.begin();
-  try {
+  return transactIn(history, () => {
     const added = addSheet(store, wb, history);
     const target = active + 1;
     if (added < 0 || target >= added) return added;
     return moveSheet(store, wb, added, target, history) ? target : added;
-  } finally {
-    history?.end();
-  }
+  });
 }
 
 /** Longest sheet name the desktop spreadsheet accepts. */
@@ -254,8 +251,7 @@ export function renameSheet(
   const ok = wb.renameSheet(idx, name);
   if (!ok) return false;
   recalcAndRefresh(store, wb);
-  history?.begin();
-  try {
+  transactIn(history, () => {
     if (store && beforeName) {
       // Sparkline sources name their sheet, so they follow the rename.
       recordSparklineChange(history ?? null, store, () => {
@@ -283,9 +279,7 @@ export function renameSheet(
         },
       });
     }
-  } finally {
-    history?.end();
-  }
+  });
   return true;
 }
 

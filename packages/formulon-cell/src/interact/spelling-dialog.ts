@@ -121,46 +121,43 @@ function writeTexts(
   const { history, store, workbook } = instance;
   const cells = edits.filter((edit) => edit.target.source === 'cell');
   const notes = edits.filter((edit) => edit.target.source === 'note');
-  const token = history.begin();
-  let written = false;
-  try {
-    if (cells.length > 0) {
-      const result = instance.commands.execute({
-        type: 'cellBatch',
-        operation: 'valueEdit',
-        origin: 'ribbon',
-        commandId: COMMAND_ID,
-        changes: cells.map((edit) => ({
-          addr: edit.target.addr,
-          value: { kind: 'text', value: edit.text },
-          formula: null,
-        })),
-      });
-      if (result.status !== 'applied') {
-        const rejection = result.rejections[0];
-        return rejection
-          ? localizedDecisionReason(rejection, instance.i18n.strings)
-          : localizedDecisionReason({ code: 'operationDenied' }, instance.i18n.strings);
+  return history.transact(
+    (): string | null => {
+      if (cells.length > 0) {
+        const result = instance.commands.execute({
+          type: 'cellBatch',
+          operation: 'valueEdit',
+          origin: 'ribbon',
+          commandId: COMMAND_ID,
+          changes: cells.map((edit) => ({
+            addr: edit.target.addr,
+            value: { kind: 'text', value: edit.text },
+            formula: null,
+          })),
+        });
+        if (result.status !== 'applied') {
+          const rejection = result.rejections[0];
+          return rejection
+            ? localizedDecisionReason(rejection, instance.i18n.strings)
+            : localizedDecisionReason({ code: 'operationDenied' }, instance.i18n.strings);
+        }
       }
-    }
-    const authorization = { origin: 'ribbon', commandId: COMMAND_ID } as const;
-    for (const edit of notes) {
-      const noted = recordCommentChange(
-        history,
-        store,
-        workbook,
-        [edit.target.addr],
-        () => setComment(store, edit.target.addr, edit.text, workbook, authorization),
-        authorization,
-      );
-      if (!noted) return '';
-    }
-    written = true;
-    return null;
-  } finally {
-    if (written) history.end(token);
-    else history.abort(token);
-  }
+      const authorization = { origin: 'ribbon', commandId: COMMAND_ID } as const;
+      for (const edit of notes) {
+        const noted = recordCommentChange(
+          history,
+          store,
+          workbook,
+          [edit.target.addr],
+          () => setComment(store, edit.target.addr, edit.text, workbook, authorization),
+          authorization,
+        );
+        if (!noted) return '';
+      }
+      return null;
+    },
+    { keep: (refusal) => refusal === null },
+  );
 }
 
 /** Opens Review > Spelling at the active cell. Nothing opens when there is nothing to flag. */

@@ -6,7 +6,7 @@ import {
   fillRange,
 } from '../commands/fill.js';
 
-import type { History } from '../commands/history.js';
+import { type History, transactIn } from '../commands/history.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { applyRangeDrop, type RangeDropAction } from '../commands/range-drop.js';
 import { addrKey, formatA1Range, parseAddrKey } from '../engine/address.js';
@@ -233,13 +233,9 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
   /** Run one fill from `src` into `dest` as a single undo step and select the result. */
   const runFill = (src: Range, dest: Range, fillOpts: FillOptions, retry: () => void): boolean => {
     if (deferForAllowedRangeUnlock(store, [fillOutputRange(src, dest)], retry)) return false;
-    if (history) history.begin();
-    let wrote = false;
-    try {
-      wrote = fillRange(store.getState(), wb, src, dest, { ...fillOpts, store });
-    } finally {
-      if (history) history.end();
-    }
+    const wrote = transactIn(history, () =>
+      fillRange(store.getState(), wb, src, dest, { ...fillOpts, store }),
+    );
     if (wrote) {
       deps.onAfterCommit?.();
       mutators.setActive(store, { sheet: dest.sheet, row: dest.r0, col: dest.c0 });

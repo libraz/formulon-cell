@@ -10,7 +10,7 @@ import {
   planDataTableSelection,
 } from './data-table-guard.js';
 import { rowHiddenByFilter } from './filter-visible.js';
-import { History, recordingHistory } from './history.js';
+import { History, recordingHistory, transactIn } from './history.js';
 import { InteractionController, interactionControllerFor } from './interaction-controller.js';
 import {
   appliedBatch,
@@ -131,32 +131,30 @@ export const clearSelectedContents = (options: ClearSelectedContentsOptions): Ch
   // Deleting a whole report or data table and clearing the rest of the
   // selection undo together.
   const history = recordingHistory(options.history);
-  const txn = removesObjects ? history?.begin() : undefined;
-  if (pivotPlan.whole.length > 0) {
-    const removed = deletePivotTables(
-      {
-        store,
-        workbook,
-        history,
-        origin: options.origin ?? 'keyboard',
-        commandId: options.commandId ?? 'clear-contents',
-      },
-      store.getState().selection.range.sheet,
-      pivotPlan.whole,
-    );
-    if (!removed) {
-      if (history && txn) history.abort(txn);
-      return rejectPivotEdit();
-    }
-  }
-  if (dataTablePlan.whole.length > 0) {
-    deleteDataTables({ store, workbook, history }, dataTablePlan.whole);
-  }
-  const cleared = clearCollectedContents(options, commands);
-  if (history && txn) {
-    if (cleared.status === 'refused') history.abort(txn);
-    else history.end(txn);
-  }
+  const cleared = transactIn(
+    removesObjects ? history : null,
+    (): ChangeBatchResult => {
+      if (pivotPlan.whole.length > 0) {
+        const removed = deletePivotTables(
+          {
+            store,
+            workbook,
+            history,
+            origin: options.origin ?? 'keyboard',
+            commandId: options.commandId ?? 'clear-contents',
+          },
+          store.getState().selection.range.sheet,
+          pivotPlan.whole,
+        );
+        if (!removed) return rejectPivotEdit();
+      }
+      if (dataTablePlan.whole.length > 0) {
+        deleteDataTables({ store, workbook, history }, dataTablePlan.whole);
+      }
+      return clearCollectedContents(options, commands);
+    },
+    { keep: (result) => result.status !== 'refused' },
+  );
   // The clear targets the selection, whichever of its cells held content.
   return cleared.status === 'applied'
     ? { ...cleared, range: selectionBounds(store.getState()) }

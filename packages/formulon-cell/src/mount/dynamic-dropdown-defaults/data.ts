@@ -25,8 +25,7 @@ const buildTextToColumnsAction =
     const range = normalizedSelectionRange(instance);
     const targets = textToColumnsTargets(instance.store.getState(), range, delimiter);
     runAfterAllowedRangeUnlock(instance.store, targets, () => {
-      instance.history.begin();
-      try {
+      instance.history.transact(() => {
         textToColumns(
           instance.store.getState(),
           instance.store,
@@ -35,9 +34,7 @@ const buildTextToColumnsAction =
           delimiter,
         );
         mutators.replaceCells(instance.store, instance.workbook.cells(range.sheet));
-      } finally {
-        instance.history.end();
-      }
+      });
       focusSheet(instance.host);
     });
   };
@@ -104,8 +101,7 @@ const buildTextToColumnsCustom =
       splitOptions,
     );
     runAfterAllowedRangeUnlock(instance.store, targets, () => {
-      instance.history.begin();
-      try {
+      instance.history.transact(() => {
         textToColumns(
           instance.store.getState(),
           instance.store,
@@ -115,9 +111,7 @@ const buildTextToColumnsCustom =
           splitOptions,
         );
         mutators.replaceCells(instance.store, instance.workbook.cells(selected.sheet));
-      } finally {
-        instance.history.end();
-      }
+      });
       focusSheet(instance.host);
     });
   };

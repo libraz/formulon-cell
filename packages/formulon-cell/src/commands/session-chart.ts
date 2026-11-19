@@ -41,7 +41,7 @@ import {
   type SpreadsheetStore,
 } from '../store/store.js';
 import { formatSheetAbsoluteRange } from '../wrappers/toolbar-a1.js';
-import type { History } from './history.js';
+import { type History, transactIn } from './history.js';
 import type { InteractionOrigin, OperationIntent } from './interaction-policy.js';
 import { objectChangeAllowed, objectWrite } from './object-actions.js';
 import {
@@ -993,15 +993,12 @@ export function clearSessionChartsInRange(
   if (charts.length === 0 || !wb.capabilities.charts) return 0;
   const intent = chartIntent(charts.flatMap(chartCells), 'chartDelete', authorization);
   return writeChart(store, history, intent, 0, () => {
-    let count = 0;
-    history?.begin();
-    try {
+    return transactIn(history, () => {
+      let count = 0;
       for (const chart of charts) {
         if (removeChart(store, chart, history, wb)) count += 1;
       }
-    } finally {
-      history?.end();
-    }
-    return count;
+      return count;
+    });
   });
 }

@@ -18,7 +18,7 @@ import { blockDataTableEdit } from './data-table-guard.js';
 import { restrictedFillChanges } from './fill-plan.js';
 import { rowHiddenByFilter, rowsVisibleToFilter } from './filter-visible.js';
 import { applyFlashFill, inferFlashFillPattern } from './flash-fill.js';
-import type { History } from './history.js';
+import { type History, transactIn } from './history.js';
 import { interactionControllerFor } from './interaction-controller.js';
 import { appliedBatch, type ChangeBatchResult, refusedBatch } from './interaction-policy.js';
 import { applyUnmerge } from './merge.js';
@@ -969,17 +969,14 @@ function justifyInto(deps: JustifySelectionDeps): boolean {
     }
   }
   lines.push(line);
-  history.begin();
-  try {
+  history.transact(() => {
     workbook.withBatchedRecalc(() => {
       for (const cell of textCells) workbook.setBlank({ sheet: range.sheet, ...cell });
       lines.forEach((text, index) => {
         workbook.setText({ sheet: range.sheet, row: range.r0 + index, col: range.c0 }, text);
       });
     });
-  } finally {
-    history.end();
-  }
+  });
   mutators.replaceCells(store, workbook.cells(range.sheet));
   return true;
 }
@@ -1068,8 +1065,7 @@ const executeRibbonFlashFill = (
       pattern,
       pending.map((entry) => entry.input),
     );
-    history.begin();
-    try {
+    history.transact(() => {
       workbook.withBatchedRecalc(() => {
         pending.forEach((entry, index) => {
           const value = filled[index];
@@ -1077,9 +1073,7 @@ const executeRibbonFlashFill = (
             workbook.setText({ sheet: range.sheet, row: entry.row, col: range.c0 }, value);
         });
       });
-    } finally {
-      history.end();
-    }
+    });
     mutators.replaceCells(store, workbook.cells(range.sheet));
     return true;
   }
@@ -1137,8 +1131,7 @@ const ribbonFillInto = (deps: ExecuteRibbonFillActionDeps): Range | null => {
 
   const isDateSeries = DATE_SERIES_ACTIONS.has(action);
   let changed = false;
-  history.begin();
-  try {
+  history.transact(() => {
     recordFormatChange(history, store, () => {
       changed = fillRange(store.getState(), workbook, src, range, {
         copyOnly: action === 'down' || action === 'right' || action === 'up' || action === 'left',
@@ -1147,9 +1140,7 @@ const ribbonFillInto = (deps: ExecuteRibbonFillActionDeps): Range | null => {
         store,
       });
     });
-  } finally {
-    history.end();
-  }
+  });
   if (changed) mutators.replaceCells(store, workbook.cells(range.sheet));
   return changed ? range : null;
 };
@@ -1180,9 +1171,8 @@ export function executeFillHandle(deps: FillHandleDeps): ChangeBatchResult {
     });
     return result.status === 'applied' ? { ...result, range: dest } : result;
   }
-  return fillBatch(workbook, () => {
-    if (history) history.begin();
-    try {
+  return fillBatch(workbook, () =>
+    transactIn(history, () => {
       // Fill cannot tear merged rectangles apart silently.
       applyUnmerge(store, workbook, history, dest);
       // Re-read the state: the unmerge above changed the merge maps the fill checks.
@@ -1192,8 +1182,6 @@ export function executeFillHandle(deps: FillHandleDeps): ChangeBatchResult {
         store,
       });
       return wrote ? dest : null;
-    } finally {
-      if (history) history.end();
-    }
-  });
+    }),
+  );
 }

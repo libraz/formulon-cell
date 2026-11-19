@@ -722,6 +722,8 @@ export class InteractionController {
     applied: readonly Addr[],
   ): void {
     if (!applied.some((addr) => addrKey(addr) === addrKey(candidate.addr))) return;
+    // Its replay authorization needs an outer frame of its own, so an open caller frame skips it.
+    if (this.history.isInTransaction()) return;
     try {
       if (this.getWb() !== originalWorkbook) return;
       const bridge = formatHistoryBridgeFor(this.store);
@@ -788,19 +790,18 @@ export class InteractionController {
         undo: [intent('format', 'undo'), intent('hyperlink', 'undo')],
         redo: [intent('format', 'redo'), intent('hyperlink', 'redo')],
       } as const;
-      const transaction = this.history.begin({ replayAuthorization });
-      try {
-        recordAuthorizedFormatChange(
-          this.history,
-          this.store,
-          () => {
-            mutators.setCellFormat(this.store, candidate.addr, patch);
-          },
-          replayAuthorization,
-        );
-      } finally {
-        this.history.end(transaction);
-      }
+      this.history.transact(
+        () =>
+          recordAuthorizedFormatChange(
+            this.history,
+            this.store,
+            () => {
+              mutators.setCellFormat(this.store, candidate.addr, patch);
+            },
+            replayAuthorization,
+          ),
+        { replayAuthorization },
+      );
     } catch {
       // The value commit is primary; the format recorder restores its own partial work first.
     }

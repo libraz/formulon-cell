@@ -33,7 +33,6 @@ import { executeRibbonClearAction } from '../../commands/ribbon-clear.js';
 import { recordFormatChange } from '../../commands/slice-history.js';
 import {
   inferSortHasHeader,
-  type RemoveDuplicatesResult,
   removeDuplicates,
   sortActiveColumnAuto,
   sortRangeWithHistory,
@@ -146,8 +145,7 @@ const buildFillSeries = (instance: SpreadsheetInstance): DynamicDropdownsCtx['ap
         ? choice.mode
         : undefined;
     runAfterAllowedRangeUnlock(instance.store, [fillOutputRange(src, range)], () => {
-      instance.history.begin();
-      try {
+      instance.history.transact(() => {
         recordFormatChange(instance.history, instance.store, () => {
           fillRange(instance.store.getState(), instance.workbook, src, range, {
             copyOnly: choice.mode === 'copy',
@@ -158,9 +156,7 @@ const buildFillSeries = (instance: SpreadsheetInstance): DynamicDropdownsCtx['ap
             store: instance.store,
           });
         });
-      } finally {
-        instance.history.end();
-      }
+      });
       focusSheet(instance.host);
     });
   };
@@ -530,20 +526,16 @@ const buildSortMenuAction =
         return;
       }
       runAfterAllowedRangeUnlock(instance.store, [range], () => {
-        instance.history.begin();
-        let outcome: RemoveDuplicatesResult;
-        try {
-          outcome = removeDuplicates(
+        const outcome = instance.history.transact(() =>
+          removeDuplicates(
             instance.store.getState(),
             instance.store,
             instance.workbook,
             range,
             { columns: result.columns.map(Number), hasHeader: result.hasHeader },
             instance.history,
-          );
-        } finally {
-          instance.history.end();
-        }
+          ),
+        );
         mutators.replaceCells(instance.store, instance.workbook.cells(range.sheet));
         if (!outcome.ok && (outcome.reason === 'too-large' || outcome.reason === 'engine-failed')) {
           void showCommandRefusal({

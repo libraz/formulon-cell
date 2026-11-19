@@ -78,7 +78,7 @@ import { recordFilterChange } from './filter.js';
 import { filterVisibleRowRuns } from './filter-visible.js';
 import { collectAllFormulas, type FormulaRecord } from './formula-records.js';
 import { adjustFormulaForRowColEdit } from './formula-refs.js';
-import type { History } from './history.js';
+import { type History, transactIn } from './history.js';
 import { alertPivotEdit, axisEditCrossesPivot } from './pivot-guard.js';
 import { blockedByProtection, isBandUnlocked, sheetPermits } from './protection.js';
 import {
@@ -1247,8 +1247,7 @@ function editAxis(
   let restoreAfterFailedReplay: ((phase: 'redo' | 'undo') => void) | undefined;
   const replayCheckpoint = outerReplayCheckpoint ?? {};
 
-  if (history) history.begin();
-  try {
+  return transactIn(history, () => {
     // 1. shift cells & rewrite formula refs.
     if (nativeAxisOp) {
       if (
@@ -1408,9 +1407,7 @@ function editAxis(
     }
     if (selectionGrown) mutators.setRange(store, selectionGrown);
     return true;
-  } finally {
-    if (history) history.end();
-  }
+  });
 }
 
 /** The selection widened to every merge it touches, or null when it already
@@ -1497,16 +1494,13 @@ export function deleteVisibleRows(
   if (runs.length === 1 && first && first[0] === atRow && first[1] === atRow + count - 1) {
     return editAxis(store, wb, history, 'row', 'delete', atRow, count, replayCheckpoint);
   }
-  const txn = history?.begin();
-  let ok = true;
-  try {
+  return transactIn(history, () => {
+    let ok = true;
     for (const [r0, r1] of [...runs].reverse()) {
       ok = editAxis(store, wb, history, 'row', 'delete', r0, r1 - r0 + 1) && ok;
     }
-  } finally {
-    if (txn !== undefined) history?.end(txn);
-  }
-  return ok;
+    return ok;
+  });
 }
 
 export function insertCols(

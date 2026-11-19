@@ -12,7 +12,7 @@ import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { AutofitOptions } from './autofit-measurement.js';
 import { currentRegion } from './current-region.js';
 import { defaultObjectNames } from './format-as-table.js';
-import { type History, recordingHistory } from './history.js';
+import { type History, recordingHistory, transactIn } from './history.js';
 import type { InteractionOrigin, OperationEffect } from './interaction-policy.js';
 import {
   type PivotAuthorization,
@@ -618,61 +618,58 @@ function createPlacedReport(
 ): CreatePlacedPivotResult {
   const { store, workbook: wb } = deps;
   const history = recordingHistory(deps.history);
-  const txn = history?.begin();
-  let source = opts.source;
-  let destination = {
-    sheet: source.sheet,
-    ...(placement === 'new-sheet' ? PIVOT_NEW_SHEET_ANCHOR : placement),
-  };
-  let addedSheet = -1;
-  if (placement === 'new-sheet') {
-    addedSheet = addSheet(store, wb, history);
-    if (addedSheet < 0) {
-      if (history && txn) history.end(txn);
-      return { ok: false, reason: 'sheet-failed' };
-    }
-    // The new sheet takes the source sheet's slot, pushing the source right.
-    if (moveSheet(store, wb, addedSheet, source.sheet, history)) {
-      destination = { ...destination, sheet: source.sheet };
-      source = { ...source, sheet: source.sheet + 1 };
-    } else {
-      destination = { ...destination, sheet: addedSheet };
-    }
-  }
-  const create = (): CreatePivotTableResult =>
-    createPivotTableFromRange(wb, { ...opts, source, destination });
-  const result = create();
-  if (!result.ok) {
-    if (history && txn) {
-      if (addedSheet >= 0) history.abort(txn);
-      else history.end(txn);
-    } else if (addedSheet >= 0) {
-      removeSheet(store, wb, addedSheet);
-    }
-    return result;
-  }
-  if (history && txn) {
-    let current = result;
-    const refresh = (): void => {
-      if (store.getState().data.sheetIndex === destination.sheet) {
-        finishPivotReportUpdate(store, wb, deps.autofit);
+  return transactIn(
+    history,
+    (): CreatePlacedPivotResult => {
+      let source = opts.source;
+      let destination = {
+        sheet: source.sheet,
+        ...(placement === 'new-sheet' ? PIVOT_NEW_SHEET_ANCHOR : placement),
+      };
+      let addedSheet = -1;
+      if (placement === 'new-sheet') {
+        addedSheet = addSheet(store, wb, history);
+        if (addedSheet < 0) return { ok: false, reason: 'sheet-failed' };
+        // The new sheet takes the source sheet's slot, pushing the source right.
+        if (moveSheet(store, wb, addedSheet, source.sheet, history)) {
+          destination = { ...destination, sheet: source.sheet };
+          source = { ...source, sheet: source.sheet + 1 };
+        } else {
+          destination = { ...destination, sheet: addedSheet };
+        }
       }
-    };
-    history.push({
-      undo: () => {
-        wb.removePivotTable(destination.sheet, current.pivotIndex);
-        if (!current.sharedCache) wb.removePivotCache(current.cacheId);
-        refresh();
-      },
-      redo: () => {
-        const again = create();
-        if (again.ok) current = again;
-        refresh();
-      },
-    });
-    history.end(txn);
-  }
-  return { ok: true, cacheId: result.cacheId, pivotIndex: result.pivotIndex, destination };
+      const create = (): CreatePivotTableResult =>
+        createPivotTableFromRange(wb, { ...opts, source, destination });
+      const result = create();
+      if (!result.ok) {
+        // A history rolls the added sheet back with the rest of the step.
+        if (!history && addedSheet >= 0) removeSheet(store, wb, addedSheet);
+        return result;
+      }
+      if (history) {
+        let current = result;
+        const refresh = (): void => {
+          if (store.getState().data.sheetIndex === destination.sheet) {
+            finishPivotReportUpdate(store, wb, deps.autofit);
+          }
+        };
+        history.push({
+          undo: () => {
+            wb.removePivotTable(destination.sheet, current.pivotIndex);
+            if (!current.sharedCache) wb.removePivotCache(current.cacheId);
+            refresh();
+          },
+          redo: () => {
+            const again = create();
+            if (again.ok) current = again;
+            refresh();
+          },
+        });
+      }
+      return { ok: true, cacheId: result.cacheId, pivotIndex: result.pivotIndex, destination };
+    },
+    { keep: (placed) => placed.ok },
+  );
 }
 
 /** Rebuild a report on its original pivot cache from a stored definition.

@@ -31,62 +31,56 @@ export function convertNotesToThreads(
   const { store, workbook: wb, history } = ctx;
   if (!workbookHasNotes(wb)) return 0;
   const authorization = { origin: ctx.origin, commandId: ctx.commandId };
-  const transaction = history.begin();
   let converted = 0;
   let lost = false;
-  try {
-    for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
-      const notes = wb.getComments(sheet).filter((note) => note.text.length > 0);
-      if (notes.length === 0) continue;
-      // The store mirrors the active sheet's notes only; the note commands read them there.
-      hydrateCommentsAndHyperlinksFromEngine(wb, store, sheet);
-      const cells: Addr[] = notes.map((note) => ({ sheet, row: note.row, col: note.col }));
-      commentWrite(ctx, cells, undefined, () =>
-        recordCommentChange(
-          history,
-          store,
-          wb,
-          cells,
-          () => {
-            for (const cell of cells) clearComment(store, cell, wb, authorization);
-          },
-          authorization,
-        ),
-      );
-      const cleared = notes.filter((note) => !wb.getComment(sheet, note.row, note.col));
-      const before = converted;
-      threadWrite(ctx, cells, undefined, () =>
-        recordThreadedChange(
-          history,
-          store,
-          wb,
-          sheet,
-          () => {
-            for (const note of cleared) {
-              const cell = { sheet, row: note.row, col: note.col };
-              const added = addThreadedComment(store, cell, note.text, wb, {
-                author: note.author ?? '',
-                authorization,
-              });
-              if (added) converted += 1;
-            }
-          },
-          authorization,
-        ),
-      );
-      if (converted - before < cleared.length) {
-        lost = true;
-        break;
+  history.transact(
+    () => {
+      for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
+        const notes = wb.getComments(sheet).filter((note) => note.text.length > 0);
+        if (notes.length === 0) continue;
+        // The store mirrors the active sheet's notes only; the note commands read them there.
+        hydrateCommentsAndHyperlinksFromEngine(wb, store, sheet);
+        const cells: Addr[] = notes.map((note) => ({ sheet, row: note.row, col: note.col }));
+        commentWrite(ctx, cells, undefined, () =>
+          recordCommentChange(
+            history,
+            store,
+            wb,
+            cells,
+            () => {
+              for (const cell of cells) clearComment(store, cell, wb, authorization);
+            },
+            authorization,
+          ),
+        );
+        const cleared = notes.filter((note) => !wb.getComment(sheet, note.row, note.col));
+        const before = converted;
+        threadWrite(ctx, cells, undefined, () =>
+          recordThreadedChange(
+            history,
+            store,
+            wb,
+            sheet,
+            () => {
+              for (const note of cleared) {
+                const cell = { sheet, row: note.row, col: note.col };
+                const added = addThreadedComment(store, cell, note.text, wb, {
+                  author: note.author ?? '',
+                  authorization,
+                });
+                if (added) converted += 1;
+              }
+            },
+            authorization,
+          ),
+        );
+        if (converted - before < cleared.length) {
+          lost = true;
+          break;
+        }
       }
-    }
-  } catch (error) {
-    history.abort(transaction);
-    throw error;
-  }
-  if (lost) {
-    history.abort(transaction);
-    return 0;
-  }
-  history.end(transaction);
-  return converted;
+    },
+    { keep: () => !lost },
+  );
+  return lost ? 0 : converted;
 }

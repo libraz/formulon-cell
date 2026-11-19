@@ -23,7 +23,7 @@ import {
   writeCoerced,
 } from '../coerce-input.js';
 import { blockDataTableShift, blockTableFunction } from '../data-table-guard.js';
-import type { History } from '../history.js';
+import { type History, transactIn } from '../history.js';
 import { appliedBatch, type ChangeBatchResult, refusedBatch } from '../interaction-policy.js';
 import { alertPivotEdit, axisEditCrossesPivot } from '../pivot-guard.js';
 import { blockedByProtection, isCellWritable, isSheetProtected } from '../protection.js';
@@ -153,26 +153,27 @@ function insertCutCells(
       restoreShiftReplayCheckpoint(wb, store, span, checkpoint);
     }
   };
-  const transaction = history?.begin();
-  let result: InsertCopiedCellsResult | null = null;
+  let result: InsertCopiedCellsResult | null;
   try {
-    if (deleteCells(store, wb, history, source, direction === 'down' ? 'up' : 'left')) {
-      mutators.setActive(store, target);
-      result = insertCellsAtActive(store, wb, history, text, direction, snapshot);
-    }
+    result = transactIn(
+      history,
+      (): InsertCopiedCellsResult | null => {
+        if (!deleteCells(store, wb, history, source, direction === 'down' ? 'up' : 'left'))
+          return null;
+        mutators.setActive(store, target);
+        const inserted = insertCellsAtActive(store, wb, history, text, direction, snapshot);
+        if (!inserted) return null;
+        mutators.setCopyRange(store, null);
+        mutators.setCopyRanges(store, null);
+        return inserted;
+      },
+      { keep: (inserted) => inserted !== null },
+    );
   } catch (error) {
-    if (transaction !== undefined) history?.abort(transaction);
     rollback();
     throw error;
   }
-  if (!result) {
-    if (transaction !== undefined) history?.abort(transaction);
-    rollback();
-    return null;
-  }
-  mutators.setCopyRange(store, null);
-  mutators.setCopyRanges(store, null);
-  if (transaction !== undefined) history?.end(transaction);
+  if (!result) rollback();
   return result;
 }
 
@@ -240,9 +241,7 @@ function insertCellsAtActive(
         .map((raw) => canonicalizeLocalizedFormulaForInput(wb, raw.trim(), inputLocale));
   if (blockTableFunction(wb, pastedFormulas)) return null;
 
-  const transaction = history?.begin();
-  let transactionClosed = false;
-  try {
+  const shifted = transactIn(history, () => {
     // The engine shift is one step; the paste below is a separate one.
     const inserted: Range = {
       sheet,
@@ -251,7 +250,7 @@ function insertCellsAtActive(
       r1: origin.row + height - 1,
       c1: origin.col + width - 1,
     };
-    if (!shiftCellsViaEngine(store, wb, history, inserted, direction)) return null;
+    if (!shiftCellsViaEngine(store, wb, history, inserted, direction)) return false;
 
     wb.withBatchedRecalc(() => {
       if (snapshot) {
@@ -273,23 +272,9 @@ function insertCellsAtActive(
     });
     copySnapshotMerges(store, wb, history, origin, snapshot);
     wb.recalcAuto();
-  } catch (error) {
-    if (transaction !== undefined) {
-      transactionClosed = true;
-      try {
-        history?.abort(transaction);
-      } catch (abortError) {
-        throw new AggregateError(
-          [error, abortError],
-          'insert copied cells: initial transaction rollback failed',
-          { cause: error },
-        );
-      }
-    }
-    throw error;
-  } finally {
-    if (transaction !== undefined && !transactionClosed) history?.end(transaction);
-  }
+    return true;
+  });
+  if (!shifted) return null;
 
   return {
     writtenRange: {
@@ -499,9 +484,7 @@ function insertCopiedBandInto(
     history && !history.isReplaying()
       ? createStructureReplayCheckpointRef(store, wb, targetSheet)
       : undefined;
-  const transaction = history?.begin();
-  let transactionClosed = false;
-  try {
+  return transactIn(history, () => {
     const inserted = wholeRows
       ? insertRows(store, wb, history, insertionAt, count, structureReplayCheckpoint)
       : insertCols(store, wb, history, insertionAt, count, structureReplayCheckpoint);
@@ -563,23 +546,7 @@ function insertCopiedBandInto(
       });
     }
     return { writtenRange: band };
-  } catch (error) {
-    if (transaction !== undefined) {
-      transactionClosed = true;
-      try {
-        history?.abort(transaction);
-      } catch (abortError) {
-        throw new AggregateError(
-          [error, abortError],
-          'formulon-cell: copied band initial transaction rollback failed',
-          { cause: error },
-        );
-      }
-    }
-    throw error;
-  } finally {
-    if (transaction !== undefined && !transactionClosed) history?.end(transaction);
-  }
+  });
 }
 
 function sourceAxisMatchesTarget(
