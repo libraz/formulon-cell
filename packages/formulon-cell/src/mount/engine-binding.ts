@@ -28,6 +28,7 @@ import {
   hydrateProtectedRangesFromEngine,
   hydrateProtectionFromEngine,
 } from '../engine/protection-sync.js';
+import { refreshSheetPrFromEngine } from '../engine/sheet-pr-sync.js';
 import { hydrateSlicersFromEngine } from '../engine/slicer-sync.js';
 import { hydrateSparklinesFromEngine } from '../engine/sparkline-sync.js';
 import { hydrateTableOverlaysFromEngine } from '../engine/table-sync.js';
@@ -114,6 +115,7 @@ const FACADE_HYDRATORS: Readonly<Record<FacadeChangeKind, readonly SliceHydrator
   view: [
     (wb, store) => hydrateViewStateFromEngine(wb, store, { followActiveSheet: false }),
     hydrateLayoutFromEngine,
+    refreshSheetPrFromEngine,
   ],
   names: [],
   table: [(wb, store) => hydrateTableOverlaysFromEngine(wb, store), hydrateAutoFilterFromEngine],

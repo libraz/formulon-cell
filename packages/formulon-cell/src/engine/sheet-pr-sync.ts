@@ -80,13 +80,17 @@ export function syncSheetPrToEngine(
   if (Object.keys(change).length === 0) return { ok: true };
   const written = wb.setSheetPr(sheet, change);
   if (!written.ok) {
-    wb.withEngineSyncMuted(() => revertSheetPrFromEngine(wb, store, sheet));
+    wb.withEngineSyncMuted(() => refreshSheetPrFromEngine(wb, store, sheet));
   }
   return written;
 }
 
 /** Set the store's tab colour and outline summary position for `sheet` to what `<sheetPr>` holds. */
-function revertSheetPrFromEngine(wb: WorkbookHandle, store: SpreadsheetStore, sheet: number): void {
+export function refreshSheetPrFromEngine(
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  sheet: number,
+): void {
   const pr = wb.getSheetPr(sheet);
   if (!pr) return;
   mutators.setSheetTabColor(store, sheet, pr.tabColor ? tabColorToCss(wb, pr.tabColor) : null);
