@@ -82,7 +82,7 @@ describe('seven-language translation dictionary contract', () => {
   });
 
   it('uses Microsoft Excel French terminology for date and color rules', () => {
-    expect(dictionaries.fr.conditionalMenu.dateOccurring).toBe('Date se produisant…');
+    expect(dictionaries.fr.conditionalMenu.dateOccurring).toBe('Date se produisant...');
     expect(dictionaries.fr.conditionalDialog.kindDateOccurring).toBe('Date se produisant');
     expect(dictionaries.fr.conditionalMenu.colorScaleGreenYellowRed).toBe(
       'Nuances de couleurs vert-jaune-rouge',
