@@ -4,6 +4,7 @@ import {
   commitCellInput,
   inputOperation,
   protectedCellAlert,
+  selectRefusedSpan,
 } from '../commands/cell-input-commit.js';
 import { replaceFormulaSelectionWithWorkbookF9 } from '../commands/f9-preview.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
@@ -441,13 +442,14 @@ export class InlineEditor {
     if (result.status === 'rejected') {
       // Keep the editor open with the offending value so the user can correct.
       this.input.focus();
-      this.input.select();
+      if (!selectRefusedSpan(this.input, result.selection)) this.input.select();
       this.deps.onValidation?.(result.alert ?? operationDeniedAlert());
       return;
     }
     if (result.status === 'failed') {
       console.warn('formulon-cell: editor write failed', result.error);
       this.input.focus();
+      selectRefusedSpan(this.input, result.selection);
       this.deps.onValidation?.(refusalAlert({ code: 'invalid', reasonKey: 'valueNotWritten' }));
       return;
     } else if (result.notice) {

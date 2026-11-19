@@ -6,6 +6,8 @@
 import { addrKey } from '../engine/address.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
+import { engineFormulaText } from '../engine/function-locale.js';
+import { isFormulonError } from '../engine/result.js';
 import type { Addr } from '../engine/types.js';
 import { sheetFontPatchFor } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -25,6 +27,7 @@ import {
 import { dataTableGuardAlert, dataTableOccupies, tableFunctionAlert } from './data-table-guard.js';
 import { interactionControllerFor, nativeAxisFontFormatFor } from './interaction-controller.js';
 import { mergeAnchorFor, mergeCellsFor } from './interaction-effects.js';
+import type { FormulaSpan } from './interaction-policy.js';
 import type { RefusalLike } from './permission-reasons.js';
 import { pivotGuardAlert } from './pivot-guard.js';
 import { isCellWritable, warnProtected } from './protection.js';
@@ -56,11 +59,19 @@ export const protectedCellAlert = (): CellInputAlert => ({
  * - `applied`: written; `notice` is a non-blocking validation alert to surface.
  * - `rejected`: nothing written; `alert` is null when the controller gave no reason.
  * - `failed`: the write threw.
+ *
+ * `selection` marks, in the entered text, the span the engine refused to parse; it is set only
+ * when the engine was handed exactly that text.
  */
 export type CellInputCommitResult =
   | { status: 'applied'; notice: CellInputAlert | null }
-  | { status: 'rejected'; operation: CellInputOperation; alert: CellInputAlert | null }
-  | { status: 'failed'; operation: CellInputOperation; error: unknown };
+  | {
+      status: 'rejected';
+      operation: CellInputOperation;
+      alert: CellInputAlert | null;
+      selection?: FormulaSpan;
+    }
+  | { status: 'failed'; operation: CellInputOperation; error: unknown; selection?: FormulaSpan };
 
 export interface CellInputCommit {
   store: SpreadsheetStore;
@@ -106,6 +117,41 @@ const validationAlert = (
   title: validation?.errorTitle,
   message: outcome.message,
 });
+
+/**
+ * `span` when the engine's formula text for `entered` is `entered` itself, so offsets into the
+ * former are offsets into the latter; undefined when any step between the editor and the engine
+ * (AutoCorrect, trimming, locale or R1C1 rewriting, function-name canonicalization) changes it.
+ */
+const spanInEnteredText = (
+  span: FormulaSpan | undefined,
+  wb: WorkbookHandle,
+  state: ReturnType<SpreadsheetStore['getState']>,
+  anchor: Addr,
+  entered: string,
+  raw: string,
+): FormulaSpan | undefined => {
+  if (!span || span.start < 0 || span.start > span.end || span.end > entered.length) {
+    return undefined;
+  }
+  try {
+    const coerced = coerceInputForCell(state, anchor, raw, inputLocaleForWorkbook(wb), wb);
+    if (coerced.kind !== 'formula') return undefined;
+    return engineFormulaText(wb, coerced.text) === entered ? span : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/** Select `span` in an entry field (a caret when it is empty); false when there is none. */
+export const selectRefusedSpan = (
+  input: HTMLInputElement | HTMLTextAreaElement,
+  selection: FormulaSpan | undefined,
+): boolean => {
+  if (!selection) return false;
+  input.setSelectionRange(selection.start, selection.end);
+  return true;
+};
 
 /** Write one typed entry to the active cell. */
 export function commitCellInput({
@@ -184,12 +230,14 @@ export function commitCellInput({
       });
       if (result.status === 'refused') {
         const rejection = result.rejections[0];
+        const selection = spanInEnteredText(rejection?.parseSpan, wb, state, anchor, entered, raw);
         return {
           status: 'rejected',
           operation,
           alert: rejection?.reason
             ? { severity: 'stop', message: rejection.reason, refusal: rejection }
             : null,
+          ...(selection ? { selection } : {}),
         };
       }
       if (raw !== '') extendTablesForEntry(store, wb, controller.history, anchor);
@@ -202,7 +250,16 @@ export function commitCellInput({
       notice = alert;
     }
   } catch (error) {
-    return { status: 'failed', operation, error };
+    const parseError = isFormulonError(error) ? error.parseError : undefined;
+    const selection = spanInEnteredText(
+      parseError && { start: parseError.start, end: parseError.end },
+      wb,
+      state,
+      anchor,
+      entered,
+      raw,
+    );
+    return { status: 'failed', operation, error, ...(selection ? { selection } : {}) };
   }
   if (directInputAxis) {
     try {

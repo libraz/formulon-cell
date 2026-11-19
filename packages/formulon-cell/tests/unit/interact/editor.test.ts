@@ -1,3 +1,4 @@
+import { FormulonError, StatusCode } from '@libraz/formulon';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import {
@@ -1754,6 +1755,102 @@ describe('InlineEditor', () => {
       warn.mockRestore();
       surface.cancel();
     });
+  });
+
+  describe('refused formula span', () => {
+    const parseFailure = (start: number, end: number) =>
+      new FormulonError(StatusCode.InvalidArgument, 'refused', '', {
+        code: 1000,
+        start,
+        end,
+        line: 1,
+        column: start + 1,
+      } as never);
+
+    const open = (raw: string) => {
+      const onValidation = vi.fn();
+      const surface = new InlineEditor({ host, grid, store, wb, onAfterCommit, onValidation });
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      surface.begin('');
+      const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+      input.value = raw;
+      return { onValidation, surface, input };
+    };
+
+    const paths = {
+      'standalone write': (error: unknown) => {
+        wb.setFormula = () => {
+          throw error;
+        };
+        return () => {};
+      },
+      'controller write': (error: unknown) => {
+        const controller = new InteractionController({
+          store,
+          getWb: () => wb,
+          history: new History(),
+        });
+        const unregister = registerInteractionController(store, controller);
+        wb.applyCellPatchAtomic = () => {
+          throw error;
+        };
+        return unregister;
+      },
+    } as const;
+
+    for (const [name, arm] of Object.entries(paths)) {
+      describe(name, () => {
+        let release: () => void;
+        afterEach(() => release());
+
+        it('selects the span the engine refused', () => {
+          release = arm(parseFailure(5, 7));
+          const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+          const { onValidation, surface, input } = open('=SUM(1,,)');
+          surface.commit('none');
+          expect(input.selectionStart).toBe(5);
+          expect(input.selectionEnd).toBe(7);
+          expect(onValidation).toHaveBeenCalledTimes(1);
+          expect(surface.isActive()).toBe(true);
+          warn.mockRestore();
+          surface.cancel();
+        });
+
+        it('puts the caret at an empty span', () => {
+          release = arm(parseFailure(4, 4));
+          const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+          const { surface, input } = open('=SUM(1,,)');
+          surface.commit('none');
+          expect(input.selectionStart).toBe(4);
+          expect(input.selectionEnd).toBe(4);
+          warn.mockRestore();
+          surface.cancel();
+        });
+
+        it('selects nothing when the engine was handed different text', () => {
+          release = arm(parseFailure(5, 7));
+          const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+          const { surface, input } = open('  =SUM(1,,)');
+          surface.commit('none');
+          expect([input.selectionStart, input.selectionEnd]).not.toEqual([5, 7]);
+          warn.mockRestore();
+          surface.cancel();
+        });
+
+        it('leaves the selection alone without a parse position', () => {
+          release = arm(new FormulonError(StatusCode.InvalidArgument, 'refused', ''));
+          const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+          const { onValidation, surface, input } = open('=SUM(1,,)');
+          input.setSelectionRange(9, 9);
+          surface.commit('none');
+          expect(onValidation).toHaveBeenCalledTimes(1);
+          expect(input.selectionStart).not.toBe(5);
+          expect(surface.isActive()).toBe(true);
+          warn.mockRestore();
+          surface.cancel();
+        });
+      });
+    }
   });
 
   describe('single-cell commit write path', () => {

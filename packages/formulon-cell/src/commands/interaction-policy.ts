@@ -167,6 +167,12 @@ export interface CellBatchCommand {
   readonly changes: readonly CellChangeInput[];
 }
 
+/** A span of the text handed to the engine, in UTF-16 code units; `start === end` marks a point. */
+export interface FormulaSpan {
+  readonly start: number;
+  readonly end: number;
+}
+
 /** The refusal that decided a batch: the cell it fell on (`null` when it concerns no single
  *  cell), its code and why. */
 export interface BatchRejection {
@@ -176,6 +182,9 @@ export interface BatchRejection {
   readonly reason: string;
   /** Set when the refusal is built in; see `PermissionDecision`. */
   readonly reasonKey?: PermissionReasonKey;
+  /** Set when the engine refused a formula that did not parse: where it failed in the formula text
+   *  the engine was given. */
+  readonly parseSpan?: FormulaSpan;
 }
 
 /** A cell a batch wrote. */
@@ -210,6 +219,7 @@ export interface CellRefusal {
   readonly code: PermissionCode;
   readonly reason?: string;
   readonly reasonKey?: PermissionReasonKey;
+  readonly parseSpan?: FormulaSpan;
 }
 
 /** The rectangle around `cells`, or null when there are none or they span sheets. */
@@ -246,6 +256,7 @@ export const refusedBatch = (refusal: CellRefusal): ChangeBatchResult => ({
       code: refusal.code,
       reason: refusal.reason ?? refusal.code,
       ...(refusal.reasonKey ? { reasonKey: refusal.reasonKey } : {}),
+      ...(refusal.parseSpan ? { parseSpan: refusal.parseSpan } : {}),
     },
   ],
   range: null,

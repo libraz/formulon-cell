@@ -208,3 +208,12 @@ export function canonicalizeFormulaForEngine(
     return canonical;
   });
 }
+
+/** The formula text the engine is handed for `formula` under `wb`'s active profile. */
+export function engineFormulaText(wb: WorkbookHandle, formula: string): string {
+  return canonicalizeFormulaForEngine(
+    wb,
+    formula,
+    localeOrdinalForSpreadsheetProfile(wb.spreadsheetProfileId()),
+  );
+}

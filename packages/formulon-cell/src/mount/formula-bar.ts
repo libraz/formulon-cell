@@ -4,9 +4,11 @@ import {
   commitCellInput,
   inputOperation,
   protectedCellAlert,
+  selectRefusedSpan,
 } from '../commands/cell-input-commit.js';
 import { replaceFormulaSelectionWithWorkbookF9 } from '../commands/f9-preview.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import type { FormulaSpan } from '../commands/interaction-policy.js';
 import { localizedDecisionReason } from '../commands/permission-reasons.js';
 import {
   deferForAllowedRangeUnlock,
@@ -647,10 +649,14 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     title?: string,
     code?: CellInputAlert['code'],
     refusal?: CellInputAlert['refusal'],
+    selection?: FormulaSpan,
   ): void => {
     commitRejected = true;
     // Focusing the bar under an adopted draft would blur and close the palette.
-    if (!detached && !externalDraft?.lease) fxInput.focus();
+    if (!detached && !externalDraft?.lease) {
+      fxInput.focus();
+      selectRefusedSpan(fxInput, selection);
+    }
     if (onValidation) notifyValidation({ severity: 'stop', title, message, code, refusal });
     else console.warn(`formulon-cell: formula-bar commit rejected: ${message}`);
   };
@@ -810,6 +816,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
         result.alert?.title,
         result.alert?.code,
         result.alert?.refusal,
+        draft ? undefined : result.selection,
       );
       return false;
     }
@@ -817,6 +824,10 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       console.warn('formulon-cell: formula-bar write failed', result.error);
       showCommitFailure(
         localizedDecisionReason({ code: 'invalid', reasonKey: 'valueNotWritten' }, getStrings()),
+        undefined,
+        undefined,
+        undefined,
+        draft ? undefined : result.selection,
       );
       return false;
     }

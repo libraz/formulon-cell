@@ -889,8 +889,14 @@ export class InteractionController {
     } catch (error) {
       if (isFormulonError(error)) {
         const reasonKey = engineRefusalReasonKey(error.parseError);
+        const { parseError } = error;
         return this.rejectResult([
-          { code: 'invalid', reason: PERMISSION_REASONS[reasonKey], reasonKey },
+          {
+            code: 'invalid',
+            reason: PERMISSION_REASONS[reasonKey],
+            reasonKey,
+            ...(parseError ? { parseSpan: { start: parseError.start, end: parseError.end } } : {}),
+          },
         ]);
       }
       const reason = error instanceof Error ? error.message : 'cell patch failed';

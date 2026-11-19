@@ -1,3 +1,4 @@
+import { FormulonError, StatusCode } from '@libraz/formulon';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setProtectedSheet } from '../../../../src/commands/protection.js';
 import { addrKey } from '../../../../src/engine/address.js';
@@ -53,6 +54,67 @@ describe('mount/formula-bar — native commit result', () => {
     );
     expect(harness.controller.isEditing()).toBe(true);
     harness.detach();
+  });
+
+  describe('refused formula span', () => {
+    const parseFailure = (start: number, end: number) =>
+      new FormulonError(StatusCode.InvalidArgument, 'refused', '', {
+        code: 1000,
+        start,
+        end,
+        line: 1,
+        column: start + 1,
+      } as never);
+
+    const commit = (text: string, error: FormulonError, caret?: number) => {
+      const onValidation = vi.fn();
+      const harness = attachFormulaBarHarness(sheet, onValidation);
+      mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 0 });
+      vi.spyOn(sheet.workbook, 'applyCellPatchAtomic').mockImplementation(() => {
+        throw error;
+      });
+      harness.fxInput.focus();
+      harness.fxInput.dispatchEvent(new FocusEvent('focus'));
+      harness.fxInput.value = text;
+      harness.fxInput.dispatchEvent(new Event('input'));
+      if (caret !== undefined) harness.fxInput.setSelectionRange(caret, caret);
+      expect(harness.controller.commitFx('none')).toBe(false);
+      expect(onValidation).toHaveBeenCalledTimes(1);
+      expect(harness.controller.isEditing()).toBe(true);
+      return harness;
+    };
+
+    it('selects the span the engine refused', () => {
+      const harness = commit('=SUM(1,,)', parseFailure(5, 7));
+      expect(harness.fxInput.selectionStart).toBe(5);
+      expect(harness.fxInput.selectionEnd).toBe(7);
+      harness.detach();
+    });
+
+    it('puts the caret at an empty span', () => {
+      const harness = commit('=SUM(1,,)', parseFailure(4, 4));
+      expect(harness.fxInput.selectionStart).toBe(4);
+      expect(harness.fxInput.selectionEnd).toBe(4);
+      harness.detach();
+    });
+
+    it('selects nothing when the engine was handed different text', () => {
+      const harness = commit('  =SUM(1,,)', parseFailure(5, 7), 11);
+      expect(harness.fxInput.selectionStart).toBe(11);
+      expect(harness.fxInput.selectionEnd).toBe(11);
+      harness.detach();
+    });
+
+    it('leaves the selection alone without a parse position', () => {
+      const harness = commit(
+        '=SUM(1,,)',
+        new FormulonError(StatusCode.InvalidArgument, 'refused', ''),
+        9,
+      );
+      expect(harness.fxInput.selectionStart).toBe(9);
+      expect(harness.fxInput.selectionEnd).toBe(9);
+      harness.detach();
+    });
   });
 
   it('raises one alert per commit attempt on a protected cell', () => {

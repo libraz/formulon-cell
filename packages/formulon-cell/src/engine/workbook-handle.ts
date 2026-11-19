@@ -15,7 +15,7 @@ import {
   saveDiagnosticsFromEngine,
 } from './file-diagnostics.js';
 import {
-  canonicalizeFormulaForEngine,
+  engineFormulaText,
   localeOrdinalForSpreadsheetProfile,
   localizeFormula,
 } from './function-locale.js';
@@ -1330,11 +1330,7 @@ export class WorkbookHandle {
    * formulas.
    */
   private formulaForEngine(formula: string): string {
-    return canonicalizeFormulaForEngine(
-      this,
-      formula,
-      localeOrdinalForSpreadsheetProfile(this.spreadsheetProfileId()),
-    );
+    return engineFormulaText(this, formula);
   }
 
   /** Capture before/after, run the mutation, and push to the active history.

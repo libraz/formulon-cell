@@ -86,6 +86,7 @@ export type {
   ChangeBatchResult,
   EditableCells,
   EditablePredicateContext,
+  FormulaSpan,
   InteractionOperation,
   InteractionOrigin,
   InteractionPolicy,

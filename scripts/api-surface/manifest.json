@@ -63,6 +63,7 @@
         "FormatPainterHandle": "type",
         "FormulaHint": "type",
         "FormulaHints": "type",
+        "FormulaSpan": "type",
         "FunctionArgumentHelp": "type",
         "FunctionArgumentHelpProvider": "type",
         "FunctionCallAtCaret": "type",
