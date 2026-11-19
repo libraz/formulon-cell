@@ -86,11 +86,4 @@ describe('facade journal layout', () => {
     expect(row?.heightPt).toBe(30);
     expect(row?.hidden).toBe(false);
   });
-
-  it('leaves structural writes unjournaled', async () => {
-    const inst = await mountSheet();
-    const s = inst.workbook.sheet(0);
-    s.insertRows(0, 1);
-    expect(inst.history.canUndo).toBe(false);
-  });
 });

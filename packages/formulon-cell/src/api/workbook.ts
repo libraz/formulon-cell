@@ -20,6 +20,7 @@ import {
 } from '@libraz/formulon';
 import { type HistoryEntry, recordingHistory, transactIn } from '../commands/history.js';
 import type { InteractionOrigin } from '../commands/interaction-policy.js';
+import { resetHistoryAfterSheetRemoval } from '../commands/sheet-mutate.js';
 import { WORKBOOK_SAVE_FORMATS, type WorkbookSaveFormat } from '../commands/workbook-save.js';
 import {
   emptyLoadDiagnostics,
@@ -63,6 +64,12 @@ import {
   type Restore,
   resolveJournal,
 } from './journal/index.js';
+import {
+  captureSheetName,
+  isIndexShifting,
+  sheetAddedEntry,
+  sheetMovedEntry,
+} from './journal/structure.js';
 import { Lifecycle } from './lifecycle.js';
 import { SHEET_OOXML_MEMBERS, SheetOoxml, WORKBOOK_OOXML_MEMBERS, WorkbookOoxml } from './ooxml.js';
 import { PIVOT_MEMBERS, Pivot, SHEET_PIVOT_MEMBERS } from './pivot.js';
@@ -389,8 +396,11 @@ export class Workbook {
   /**
    * Runs `fn` as one operation: one recalc at the end (none under manual calculation), one `change`
    * event, and one undo step when the workbook is mounted. Cell content writes are atomic: if `fn`
-   * throws, every cell it wrote is restored. Other writes made before the throw stay applied and
-   * their events still fire; the error is rethrown. Nested batches join the outermost.
+   * throws, every cell it wrote is restored, except cells written before a write that shifts
+   * addresses (`insertRows`, `deleteRows`, `insertColumns`, `deleteColumns`, `insertCells`,
+   * `deleteCells`, `addSheet`, `Sheet.move`, `Sheet.copy`, `Pivot.showDetails`): that write ends the
+   * span the rollback covers. Other writes made before the throw stay applied and their events
+   * still fire; the error is rethrown. Nested batches join the outermost.
    */
   batch<T>(fn: () => T): T {
     return this.#run(stateOf(this), fn);
@@ -439,9 +449,17 @@ export class Workbook {
   /** Appends a sheet; with no name the engine picks the next free `SheetN`. */
   addSheet(name?: string | null, options?: AddSheetOptions): Sheet {
     const state = stateOf(this);
+    const ctx = workbookContext(this);
     return this.#run(state, () => {
-      const added = state.handle.engineWorkbook().addSheet(name ?? null, options);
-      state.handle.noteSheetChange({ kind: 'sheet-add', index: added.index, name: added.name });
+      const added = ctx.sheetStep(
+        () => ctx.engine.addSheet(name ?? null, options),
+        (sheet) => ({ kind: 'sheet-add', index: sheet.index, name: sheet.name }),
+        (at) =>
+          ctx.engine.addSheet(
+            at.name,
+            at.insertBefore !== undefined ? { insertBefore: at.insertBefore } : undefined,
+          ),
+      );
       return this.#sheetFacade(state, added);
     });
   }
@@ -456,6 +474,8 @@ export class Workbook {
       engineWb.removeSheet(target);
       state.sheets.delete(target);
       state.handle.noteSheetChange({ kind: 'sheet-remove', index });
+      // Entries recorded before the removal hold indexes of the old sheet list.
+      state.batch.reset = true;
     });
   }
 
@@ -530,27 +550,16 @@ export class Workbook {
       batch.segment = newSegment();
       batch.sealed = [];
       batch.reset = false;
-      // The frame is closed here; clearing inside it would drop it.
-      if (reset && history && !history.isInTransaction()) history.clear();
+      if (reset) resetHistoryAfterSheetRemoval(history);
       // A failed batch still reports what stayed applied.
       this.#flush(state);
     }
   }
 
-  /** Seals the segment being written into a history entry; a segment with nothing to undo adds none. */
-  #seal(state: WorkbookState): void {
-    const batch = state.batch;
-    const segment = batch.segment;
-    batch.segment = newSegment();
-    if (!recordingHistory(state.handle.attachedHistory()) || batch.reset) return;
-    const entry = sealedEntry(state, segment);
-    if (entry) batch.sealed.push(entry);
-  }
-
   /** Records the batch's writes as one undo step: every sealed segment's entry joins the open frame. */
   #commitJournal(state: WorkbookState, history: ReturnType<typeof recordingHistory>): void {
     if (!history) return;
-    this.#seal(state);
+    seal(state);
     if (state.batch.reset) return;
     for (const entry of state.batch.sealed) history.push(entry);
   }
@@ -662,6 +671,20 @@ const sealedEntry = (state: WorkbookState, segment: Segment): HistoryEntry | nul
   };
 };
 
+/** Seals the segment being written into a history entry; a segment with nothing to undo adds none. */
+const seal = (state: WorkbookState): void => {
+  const batch = state.batch;
+  const segment = batch.segment;
+  batch.segment = newSegment();
+  if (!recordingHistory(state.handle.attachedHistory()) || batch.reset) return;
+  const entry = sealedEntry(state, segment);
+  if (entry) batch.sealed.push(entry);
+};
+
+/** Whether the running batch journals into a History. */
+const journaling = (state: WorkbookState): boolean =>
+  !state.batch.reset && recordingHistory(state.handle.attachedHistory()) !== null;
+
 /** Captures the before-state of the slice a non-cell write touches, when the workbook records into
  *  a History. Returns what to call once the write succeeded, or `null` when nothing is journaled. */
 const openRecord = (
@@ -716,11 +739,30 @@ const workbookContext = (wb: Workbook): WorkbookContext => {
     change: (kind, sheet, fn, range, journal) =>
       run(() => {
         const change: FacadeChange = range ? { kind, sheet, range } : { kind, sheet };
+        const shifting = isIndexShifting(journal);
+        if (shifting) seal(state);
         const record = openRecord(state, change, change, journal);
         const result = fn();
         record?.();
+        if (shifting) seal(state);
         state.handle.noteFacadeChange(change);
         return result;
+      }),
+    sheetStep: (write, announce, repeat) =>
+      run(() => {
+        const countBefore = state.handle.engineWorkbook().listSheets().length;
+        const record = journaling(state);
+        if (record) seal(state);
+        const added = write();
+        state.handle.noteSheetChange(announce(added));
+        if (record) {
+          const { index, name } = added;
+          const insertBefore = index < countBefore ? index : undefined;
+          state.batch.sealed.push(
+            sheetAddedEntry(state.handle, index, announce, () => repeat({ name, insertBefore })),
+          );
+        }
+        return added;
       }),
     sheet: (engine) => wb.sheet(engine.index),
     facade: (engine, cls) => facadeOf(wb, engine, cls),
@@ -801,23 +843,36 @@ export class Sheet {
   /** Renames the sheet; formulas that reference it follow. */
   rename(newName: string): void {
     const ctx = sheetContext(this);
+    const state = stateOf(ctx.workbook);
     ctx.run(() => {
+      const index = ctx.sheetEngine.index;
+      const before = journaling(state) ? captureSheetName(ctx.handle, index) : null;
       ctx.sheetEngine.rename(newName);
-      ctx.handle.noteSheetChange({
-        kind: 'sheet-rename',
-        index: ctx.sheetEngine.index,
-        name: ctx.sheetEngine.name,
-      });
+      ctx.handle.noteSheetChange({ kind: 'sheet-rename', index, name: ctx.sheetEngine.name });
+      const { parts } = state.batch.segment;
+      const key = `sheet-name:${index}`;
+      if (before && !parts.has(key)) {
+        parts.set(key, {
+          change: null,
+          before,
+          capture: () => captureSheetName(ctx.handle, index),
+        });
+      }
     });
   }
 
   /** Moves the sheet in front of `insertBefore`, or to the end for `null`. */
   move(insertBefore: SheetRef | null): void {
     const ctx = sheetContext(this);
+    const state = stateOf(ctx.workbook);
     ctx.run(() => {
+      const recording = journaling(state);
+      if (recording) seal(state);
       const from = ctx.sheetEngine.index;
       ctx.sheetEngine.move(insertBefore === null ? null : engineSheetRef(insertBefore));
-      ctx.handle.noteSheetChange({ kind: 'sheet-move', from, to: ctx.sheetEngine.index });
+      const to = ctx.sheetEngine.index;
+      ctx.handle.noteSheetChange({ kind: 'sheet-move', from, to });
+      if (recording) state.batch.sealed.push(sheetMovedEntry(ctx.handle, from, to));
     });
   }
 
@@ -829,16 +884,19 @@ export class Sheet {
     return ctx.run(() => {
       const source = ctx.sheetEngine.index;
       const { insertBefore, newName } = options;
-      const copied = ctx.engine.copySheet(ctx.sheetEngine, {
-        ...(insertBefore != null ? { insertBefore: engineSheetRef(insertBefore) } : {}),
-        ...(newName !== undefined ? { newName } : {}),
-      });
-      ctx.handle.noteSheetChange({
-        kind: 'sheet-copy',
-        source,
-        index: copied.index,
-        name: copied.name,
-      });
+      const copied = ctx.sheetStep(
+        () =>
+          ctx.engine.copySheet(ctx.sheetEngine, {
+            ...(insertBefore != null ? { insertBefore: engineSheetRef(insertBefore) } : {}),
+            ...(newName !== undefined ? { newName } : {}),
+          }),
+        (sheet) => ({ kind: 'sheet-copy', source, index: sheet.index, name: sheet.name }),
+        (at) =>
+          ctx.engine.copySheet(ctx.engine.sheet(source), {
+            ...(at.insertBefore !== undefined ? { insertBefore: at.insertBefore } : {}),
+            newName: at.name,
+          }),
+      );
       return ctx.sheet(copied);
     });
   }

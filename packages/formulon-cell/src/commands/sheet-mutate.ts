@@ -283,6 +283,13 @@ export function renameSheet(
   return true;
 }
 
+/** Drops every undo and redo entry once a sheet is removed: entries hold sheet indexes and would
+ *  replay onto the wrong sheet. Call it after the removing write's frame has closed; clearing inside
+ *  a frame would drop it, so a history that is replaying or in a transaction is left alone. */
+export function resetHistoryAfterSheetRemoval(history: History | null | undefined): void {
+  if (history && !history.isReplaying() && !history.isInTransaction()) history.clear();
+}
+
 /** Remove the sheet at `idx`. When the active sheet is affected, the store's
  *  `sheetIndex` is corrected to point at a still-valid neighbor:
  *  - removing an index *before* the active: active shifts down by 1

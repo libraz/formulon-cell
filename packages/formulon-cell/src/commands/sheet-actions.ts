@@ -12,6 +12,7 @@ import {
   moveSheet,
   removeSheet,
   renameSheet,
+  resetHistoryAfterSheetRemoval,
   setSheetHidden,
   setSheetTabVisibility,
 } from './sheet-mutate.js';
@@ -71,7 +72,9 @@ export function copySheetAction(ctx: SheetActionContext, source: number, before:
 
 /** Delete the sheet at `idx`. */
 export function deleteSheetAction(ctx: SheetActionContext, idx: number): boolean {
-  return run(ctx, 'deleteSheet', false, () => removeSheet(ctx.store, ctx.workbook, idx));
+  const removed = run(ctx, 'deleteSheet', false, () => removeSheet(ctx.store, ctx.workbook, idx));
+  if (removed) resetHistoryAfterSheetRemoval(ctx.history);
+  return removed;
 }
 
 /** Rename the sheet at `idx`. */

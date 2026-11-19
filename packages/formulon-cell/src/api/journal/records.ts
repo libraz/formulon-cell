@@ -20,7 +20,7 @@ const sheetCodec = (
   capture: (scope) => capture(sheetOf(scope), scope),
 });
 
-const CF: JournalCodec = sheetCodec('cf', (sheet) => {
+export const CF: JournalCodec = sheetCodec('cf', (sheet) => {
   const rules = sheet.listCfRules();
   return () => {
     sheet.clearCfRules();
@@ -28,7 +28,7 @@ const CF: JournalCodec = sheetCodec('cf', (sheet) => {
   };
 });
 
-const VALIDATION: JournalCodec = sheetCodec('validation', (sheet) => {
+export const VALIDATION: JournalCodec = sheetCodec('validation', (sheet) => {
   const rules = sheet.listValidations();
   return () => {
     sheet.clearValidations();
@@ -36,7 +36,7 @@ const VALIDATION: JournalCodec = sheetCodec('validation', (sheet) => {
   };
 });
 
-const SHEET_PROT: JournalCodec = sheetCodec('sheet-prot', (sheet) => {
+export const SHEET_PROT: JournalCodec = sheetCodec('sheet-prot', (sheet) => {
   const protection = sheet.getSheetProtection();
   const ranges = sheet.listProtectedRanges();
   return () => {
@@ -55,7 +55,7 @@ const WB_PROT: JournalCodec = {
   },
 };
 
-const PRINT: JournalCodec = sheetCodec('print', (sheet) => {
+export const PRINT: JournalCodec = sheetCodec('print', (sheet) => {
   const headerFooter = sheet.ooxml.getHeaderFooterXml();
   const margins = sheet.ooxml.getPageMarginsXml();
   const setup = sheet.ooxml.getPageSetupXml();
@@ -77,7 +77,7 @@ const PRINT: JournalCodec = sheetCodec('print', (sheet) => {
   };
 });
 
-const SHEET_CHROME: JournalCodec = sheetCodec('sheet-chrome', (sheet) => {
+export const SHEET_CHROME: JournalCodec = sheetCodec('sheet-chrome', (sheet) => {
   const color = sheet.getTabColor();
   const visibility = sheet.getVisibility();
   const sheetPr = sheet.ooxml.getSheetPrXml();
@@ -88,7 +88,7 @@ const SHEET_CHROME: JournalCodec = sheetCodec('sheet-chrome', (sheet) => {
   };
 });
 
-const NAMES: JournalCodec = {
+export const NAMES: JournalCodec = {
   id: 'names',
   scopeKey: () => 'names',
   capture: ({ handle }) => {
@@ -97,7 +97,7 @@ const NAMES: JournalCodec = {
   },
 };
 
-const COMMENTS: JournalCodec = sheetCodec('comments', (sheet) => {
+export const COMMENTS: JournalCodec = sheetCodec('comments', (sheet) => {
   const notes = sheet.listComments().map((note) => ({
     note,
     visible: sheet.getCommentVisible(note.cell.row, note.cell.col),
@@ -117,7 +117,7 @@ const COMMENTS: JournalCodec = sheetCodec('comments', (sheet) => {
   };
 });
 
-const THREADS: JournalCodec = sheetCodec('threads', (sheet) => {
+export const THREADS: JournalCodec = sheetCodec('threads', (sheet) => {
   const threads: readonly ThreadedComment[] = sheet.listThreadedComments();
   return () => {
     // Replies follow their opening comment, so removing back to front never orphans one.
@@ -146,7 +146,7 @@ const PEOPLE: JournalCodec = {
   },
 };
 
-const SPARKLINES: JournalCodec = {
+export const SPARKLINES: JournalCodec = {
   id: 'sparklines',
   scopeKey: sheetKey('sparklines'),
   capture: ({ handle, sheet }) => captureSheetSparklineGroups(handle, sheet as number),
@@ -161,7 +161,7 @@ const hiddenRows = (sheet: EngineSheet): Set<number> =>
       .map((row) => row.row),
   );
 
-const AUTOFILTER: JournalCodec = sheetCodec('autofilter', (sheet) => {
+export const AUTOFILTER: JournalCodec = sheetCodec('autofilter', (sheet) => {
   const xml = sheet.ooxml.getAutoFilterXml();
   const tables = sheet.listTables().map((table) => ({ table, filter: table.getAutoFilter() }));
   const hidden = hiddenRows(sheet);

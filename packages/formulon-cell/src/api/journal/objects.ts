@@ -57,7 +57,7 @@ const captureTableEdges = (
 };
 
 /** Tables of a sheet: properties, style and filter of each, restored by name. */
-const TABLES: JournalCodec = {
+export const TABLES: JournalCodec = {
   id: 'tables',
   scopeKey: (scope) => `sheet:${scope.sheet}`,
   capture(scope) {
@@ -133,7 +133,7 @@ type DrawingBefore =
   | { readonly id: number; readonly restore: () => boolean };
 
 /** Every drawing object of a sheet, restored under its id and stacking slot. */
-const DRAWINGS: JournalCodec = {
+export const DRAWINGS: JournalCodec = {
   id: 'drawings',
   scopeKey: (scope) => `sheet:${scope.sheet}`,
   capture(scope) {
@@ -170,7 +170,7 @@ interface PivotBefore {
 }
 
 /** Pivot tables of a sheet, rebuilt from their stored definitions. */
-const PIVOTS: JournalCodec = {
+export const PIVOTS: JournalCodec = {
   id: 'pivots',
   scopeKey: (scope) => `sheet:${scope.sheet}`,
   capture(scope) {

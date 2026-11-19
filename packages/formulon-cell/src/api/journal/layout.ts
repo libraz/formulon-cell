@@ -2,7 +2,7 @@ import type { Sheet } from '@libraz/formulon';
 import type { JournalChoice, JournalCodec, JournalFamily, JournalScope } from './index.js';
 
 /** Merges plus row and column overrides of one sheet. */
-const rowsColsCodec: JournalCodec = {
+export const rowsColsCodec: JournalCodec = {
   id: 'rows-cols',
   scopeKey: (scope) => `rows-cols:${scope.sheet}`,
   capture: (scope: JournalScope) => {

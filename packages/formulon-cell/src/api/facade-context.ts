@@ -4,7 +4,11 @@ import type {
   Sheet as EngineSheet,
   Workbook as EngineWorkbook,
 } from '@libraz/formulon';
-import type { FacadeChangeKind, WorkbookHandle } from '../engine/workbook-handle.js';
+import type {
+  FacadeChangeKind,
+  ChangeEvent as HandleChangeEvent,
+  WorkbookHandle,
+} from '../engine/workbook-handle.js';
 import type { JournalSpec } from './journal/index.js';
 import type { Sheet, Workbook } from './workbook.js';
 
@@ -31,6 +35,16 @@ export interface WorkbookContext {
     range?: CellRect,
     journal?: JournalSpec,
   ): T;
+  /** Runs `write`, which adds one sheet to the list, as an undo segment of its own and announces
+   *  it as `announce` says. Undo removes the sheet; redo runs `repeat` with the added sheet's name
+   *  and the position it went in front of (`undefined` when it was appended). */
+  sheetStep(
+    write: () => EngineSheet,
+    announce: (
+      added: EngineSheet,
+    ) => Extract<HandleChangeEvent, { kind: 'sheet-add' | 'sheet-copy' }>,
+    repeat: (at: { name: string; insertBefore: number | undefined }) => EngineSheet,
+  ): EngineSheet;
   /** The facade of an engine sheet handle. */
   sheet(engine: EngineSheet): Sheet;
   /** The facade of an engine object handle (a table, a picture, …): one facade per handle. */

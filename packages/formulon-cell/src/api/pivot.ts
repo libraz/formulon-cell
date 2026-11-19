@@ -99,10 +99,17 @@ export const PIVOT_MEMBERS: MemberSpec<HandleContext<EnginePivot>> = {
     cache: (ctx: HandleContext<EnginePivot>): PivotCache => pivotCacheOf(ctx, ctx.target.cache()),
     showDetails: (ctx: HandleContext<EnginePivot>, ...at: (number | string)[]): Sheet =>
       ctx.run(() => {
-        const added = (
-          ctx.target.showDetails as (...args: unknown[]) => ReturnType<EnginePivot['showDetails']>
-        )(...at);
-        ctx.handle.noteSheetChange({ kind: 'sheet-add', index: added.index, name: added.name });
+        const show = (pivot: EnginePivot) =>
+          (pivot.showDetails as (...args: unknown[]) => ReturnType<EnginePivot['showDetails']>)(
+            ...at,
+          );
+        const { index } = ctx.target;
+        const sheetIndex = ctx.target.sheet.index;
+        const added = ctx.sheetStep(
+          () => show(ctx.target),
+          (sheet) => ({ kind: 'sheet-add', index: sheet.index, name: sheet.name }),
+          () => show(ctx.engine.sheet(sheetIndex).listPivots()[index] as EnginePivot),
+        );
         return ctx.sheet(added);
       }),
   },
