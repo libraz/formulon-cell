@@ -1,5 +1,7 @@
 import {
   type CellRect,
+  type Color,
+  ColorKind,
   PageOrientation,
   type PageSetupPatch,
   type Pagination,
@@ -19,6 +21,7 @@ import {
   type EngineSheetPrInput,
   mergeSheetPrFragment,
   readSheetPr,
+  type SheetTabColorSpec,
 } from './sheet-pr-xml.js';
 import type {
   EngineCapabilities,
@@ -32,6 +35,51 @@ import type {
 } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 import { assertAlive, ws } from './workbook-handle-internals.js';
+
+/** The `<tabColor>` spec of an engine colour; null when the tab has none. */
+function tabColorSpec(color: Color | null): SheetTabColorSpec | null {
+  if (!color) return null;
+  const withTint = (spec: SheetTabColorSpec): SheetTabColorSpec => {
+    if (color.tint !== 0) spec.tint = color.tint;
+    return spec;
+  };
+  switch (color.kind) {
+    case ColorKind.Rgb:
+      return { rgb: (color.argb >>> 0).toString(16).toUpperCase().padStart(8, '0') };
+    case ColorKind.Theme:
+      return withTint({ theme: color.theme });
+    case ColorKind.Indexed:
+      return { indexed: color.indexed };
+    case ColorKind.Auto:
+      return { auto: true };
+    default:
+      return null;
+  }
+}
+
+/** The engine colour for a `<tabColor>` spec. */
+function colorOfSpec(spec: SheetTabColorSpec): Color {
+  const base = { argb: 0, theme: 0, tint: 0, indexed: 0 };
+  if (spec.rgb !== undefined) {
+    return { ...base, kind: ColorKind.Rgb, argb: Number.parseInt(spec.rgb, 16) >>> 0 };
+  }
+  if (spec.theme !== undefined) {
+    return { ...base, kind: ColorKind.Theme, theme: spec.theme, tint: spec.tint ?? 0 };
+  }
+  if (spec.indexed !== undefined)
+    return { ...base, kind: ColorKind.Indexed, indexed: spec.indexed };
+  return { ...base, kind: spec.auto ? ColorKind.Auto : ColorKind.None };
+}
+
+const sameTabColor = (a: SheetTabColorSpec | null, b: SheetTabColorSpec | null): boolean =>
+  a === b ||
+  (a !== null &&
+    b !== null &&
+    a.rgb === b.rgb &&
+    a.theme === b.theme &&
+    a.indexed === b.indexed &&
+    (a.auto ?? false) === (b.auto ?? false) &&
+    (a.tint ?? 0) === (b.tint ?? 0));
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
 
@@ -268,29 +316,56 @@ export abstract class WorkbookHandlePrintMethods {
     return attemptWrite(() => ws(this, sheet).updateHeaderFooter(headerFooter));
   }
 
-  /** Tab colour and outline summary position from the raw `<sheetPr>` fragment,
-   *  or null when the engine does not expose it. */
+  /** Tab colour (typed engine accessor, any sheet kind) and outline summary
+   *  position (raw `<sheetPr>` fragment), or null when the engine does not
+   *  expose it. */
   getSheetPr(sheet: number): EngineSheetPr | null {
     assertAlive(this);
     if (!this.capabilities.sheetPrXml) return null;
     if (!sheetHasView(this, sheet)) return null;
-    const read = () => readSheetPr(ws(this, sheet).ooxml.getSheetPrXml() ?? '');
+    const sh = ws(this, sheet);
+    const readXml = () => sh.ooxml.getSheetPrXml() ?? '';
     // A chartsheet's part may not carry the fragment; that reads as none.
-    return isChartsheet(this, sheet) ? orFallback(null, read) : read();
+    const xml = isChartsheet(this, sheet) ? orFallback('', readXml) : readXml();
+    return { ...readSheetPr(xml), tabColor: tabColorSpec(sh.getTabColor()) };
   }
 
-  /** Merge a tab colour and/or outline summary position into `<sheetPr>`. The
-   *  rest of the fragment (code name, filter mode, fit-to-page, ...) is kept.
-   *  `status` is null when no engine call was made. */
+  /** Write a tab colour and/or outline summary position. The tab colour goes
+   *  through the typed setter; the rest of `<sheetPr>` (code name, filter mode,
+   *  fit-to-page, ...) is merged and kept. `status` is null when no engine call
+   *  was made. */
   setSheetPr(sheet: number, change: EngineSheetPrInput): WriteResult {
     assertAlive(this);
     if (!this.capabilities.sheetPrXml) return { ok: false, status: null };
     const sh = ws(this, sheet);
-    const current = sh.ooxml.getSheetPrXml() ?? '';
-    const next = mergeSheetPrFragment(current, change);
-    if (next === null) return { ok: false, status: null };
-    if (next === current) return { ok: true };
-    return attemptWriteStatus(() => sh.ooxml.setSheetPrXml(next || null));
+    const { tabColor, ...outline } = change;
+    const setTab =
+      tabColor !== undefined && !sameTabColor(tabColorSpec(sh.getTabColor()), tabColor);
+    const hasOutline = outline.summaryBelow !== undefined || outline.summaryRight !== undefined;
+    if (hasOutline) {
+      const current = sh.ooxml.getSheetPrXml() ?? '';
+      const next = mergeSheetPrFragment(current, outline);
+      if (next === null) return { ok: false, status: null };
+      if (next === current && !setTab) return { ok: true };
+    } else if (!setTab) {
+      return { ok: true };
+    }
+    // The typed setter rewrites `<sheetPr>`, so the fragment is merged after it.
+    return attemptWriteStatus(() => {
+      const previous = sh.getTabColor();
+      if (setTab) sh.setTabColor(tabColor ? colorOfSpec(tabColor) : null);
+      if (!hasOutline) return;
+      const fresh = sh.ooxml.getSheetPrXml() ?? '';
+      const next = mergeSheetPrFragment(fresh, outline);
+      if (next === null || next === fresh) return;
+      try {
+        sh.ooxml.setSheetPrXml(next || null);
+      } catch (err) {
+        // Keep the write atomic: a refused outline change takes the tab colour back.
+        if (setTab) sh.setTabColor(previous);
+        throw err;
+      }
+    });
   }
 
   /** `_xlnm.Print_Area` as comma-separated A1 ranges; empty when unset. */

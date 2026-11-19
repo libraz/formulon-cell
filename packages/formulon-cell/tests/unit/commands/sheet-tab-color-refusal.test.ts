@@ -9,13 +9,18 @@ import { syncSheetPrToEngine } from '../../../src/engine/sheet-pr-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
+/** Makes every `<sheetPr>` write refuse; returns the tab colour setter spy. */
 const refuse = (wb: WorkbookHandle) => {
-  const ooxml = Object.getPrototypeOf((wb as unknown as { wb: Workbook }).wb.sheet(0).ooxml) as {
+  const sheet = (wb as unknown as { wb: Workbook }).wb.sheet(0);
+  const ooxml = Object.getPrototypeOf(sheet.ooxml) as {
     setSheetPrXml: (xml: string | null) => void;
   };
-  return vi.spyOn(ooxml, 'setSheetPrXml').mockImplementation(() => {
+  const sheetProto = Object.getPrototypeOf(sheet) as { setTabColor: (color: unknown) => void };
+  const refused = () => {
     throw new FormulonError(StatusCode.InvalidArgument, 'refused', '');
-  });
+  };
+  vi.spyOn(ooxml, 'setSheetPrXml').mockImplementation(refused);
+  return vi.spyOn(sheetProto, 'setTabColor').mockImplementation(refused);
 };
 
 describe('sheetPr write refused by the engine', () => {
@@ -103,5 +108,21 @@ describe('sheetPr write refused by the engine', () => {
     expect(onRefused).not.toHaveBeenCalled();
     expect(history.undo()).toBe(true);
     expect(workbook.getSheetPr(0)?.tabColor).toBeNull();
+  });
+
+  it('takes the tab colour back when the outline part of the same write is refused', async () => {
+    const { workbook } = await setup();
+    const ooxml = Object.getPrototypeOf(
+      (workbook as unknown as { wb: Workbook }).wb.sheet(0).ooxml,
+    ) as {
+      setSheetPrXml: (xml: string | null) => void;
+    };
+    vi.spyOn(ooxml, 'setSheetPrXml').mockImplementation(() => {
+      throw new FormulonError(StatusCode.InvalidArgument, 'refused', '');
+    });
+    const written = workbook.setSheetPr(0, { tabColor: { rgb: 'FFFF0000' }, summaryBelow: false });
+    expect(written.ok).toBe(false);
+    expect(workbook.getSheetPr(0)?.tabColor).toBeNull();
+    expect(workbook.getSheetPr(0)?.summaryBelow).toBe(true);
   });
 });
