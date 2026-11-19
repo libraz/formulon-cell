@@ -27,12 +27,11 @@ import { type History, transactIn } from '../history.js';
 import { appliedBatch, type ChangeBatchResult, refusedBatch } from '../interaction-policy.js';
 import { alertPivotEdit, axisEditCrossesPivot } from '../pivot-guard.js';
 import { blockedByProtection, isCellWritable, isSheetProtected } from '../protection.js';
+import { insertCols, insertRows } from '../structure.js';
 import {
   createStructureReplayCheckpointRef,
-  insertCols,
-  insertRows,
   type StructureReplayCheckpointRef,
-} from '../structure.js';
+} from '../structure-checkpoint.js';
 import {
   cloneCellFormat,
   commentsFitAfterInsert,
