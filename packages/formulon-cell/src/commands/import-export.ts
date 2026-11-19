@@ -91,7 +91,11 @@ export function importCSV(
     c1: origin.col + Math.max(0, width - 1),
   };
   if (blockDataTableEdit(wb, target))
-    return refusedBatch({ code: 'protected', reason: dataTableGuardAlert(wb).message });
+    return refusedBatch({
+      code: 'protected',
+      reason: dataTableGuardAlert(wb).message,
+      reasonKey: 'dataTableChangeBlocked',
+    });
   // One write, all or nothing: a target cell the protected sheet refuses refuses the import.
   const refused = firstRefusedCell(state, rows, origin);
   if (refused) {
@@ -104,7 +108,11 @@ export function importCSV(
     .filter((raw) => raw.trim().startsWith('='))
     .map((raw) => canonicalizeLocalizedFormulaForInput(wb, raw.trim(), inputLocale));
   if (blockTableFunction(wb, csvFormulas))
-    return refusedBatch({ code: 'invalid', reason: tableFunctionAlert(wb).message });
+    return refusedBatch({
+      code: 'invalid',
+      reason: tableFunctionAlert(wb).message,
+      reasonKey: 'tableFunctionBlocked',
+    });
 
   const effect: OperationEffect = {
     kind: 'range',

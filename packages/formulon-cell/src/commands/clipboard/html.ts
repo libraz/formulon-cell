@@ -182,7 +182,11 @@ export function pasteHtml(
 ): ChangeBatchResult {
   const rows = parseHtmlTable(html);
   if (!rows || rows.length === 0)
-    return refusedBatch({ code: 'invalid', reason: 'nothing to paste' });
+    return refusedBatch({
+      code: 'invalid',
+      reason: 'nothing to paste',
+      reasonKey: 'clipboardEmpty',
+    });
   return transactIn(history, () => {
     const result = pasteTSV(
       state,

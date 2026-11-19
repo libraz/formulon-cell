@@ -117,7 +117,11 @@ export const clearSelectedContents = (options: ClearSelectedContentsOptions): Ch
     (operationPermission(commands.policy, 'clear') && !commands.policy.editable);
   const rejectPivotEdit = (): ChangeBatchResult => {
     alertPivotEdit(workbook);
-    return refusedBatch({ code: 'protected', reason: pivotGuardAlert(workbook).message });
+    return refusedBatch({
+      code: 'protected',
+      reason: pivotGuardAlert(workbook).message,
+      reasonKey: 'pivotTableChangeBlocked',
+    });
   };
   if (pivotPlan.partial || (pivotPlan.whole.length > 0 && !mayDeleteObjects)) {
     return rejectPivotEdit();
@@ -125,7 +129,11 @@ export const clearSelectedContents = (options: ClearSelectedContentsOptions): Ch
   const dataTablePlan = planDataTableSelection(workbook, store.getState().selection);
   if (dataTablePlan.partial || (dataTablePlan.whole.length > 0 && !mayDeleteObjects)) {
     alertDataTableEdit(workbook);
-    return refusedBatch({ code: 'protected', reason: dataTableGuardAlert(workbook).message });
+    return refusedBatch({
+      code: 'protected',
+      reason: dataTableGuardAlert(workbook).message,
+      reasonKey: 'dataTableChangeBlocked',
+    });
   }
   const removesObjects = pivotPlan.whole.length > 0 || dataTablePlan.whole.length > 0;
   // Deleting a whole report or data table and clearing the rest of the

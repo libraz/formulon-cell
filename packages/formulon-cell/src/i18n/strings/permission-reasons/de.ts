@@ -42,6 +42,8 @@ export const permissionReasonsDe: PermissionReasonsStrings = {
     boundedViewportStructural:
       'Dieser strukturelle Vorgang ist bei einem begrenzten Anzeigebereich nicht verfügbar.',
     restrictedEmbedding: 'In der eingeschränkten Einbettung nicht verfügbar.',
+    clipboardEmpty: 'Die Zwischenablage enthält nichts zum Einfügen.',
+    noLinkToPaste: 'Keine Verknüpfung zum Einfügen.',
     valueNotWritten: 'Der Wert konnte nicht geschrieben werden.',
     cellsNotFilled: 'Die ausgewählten Zellen konnten nicht gefüllt werden.',
     codeReadOnly: 'Die Tabelle ist schreibgeschützt.',

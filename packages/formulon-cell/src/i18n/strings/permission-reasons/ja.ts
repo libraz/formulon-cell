@@ -38,6 +38,8 @@ export const permissionReasonsJa: PermissionReasonsStrings = {
     hostCopyDisabled: 'ホストのポリシーによりコピーは無効になっています。',
     boundedViewportStructural: '表示範囲が制限されているため、この構造変更は使用できません。',
     restrictedEmbedding: '制限された埋め込み環境では使用できません。',
+    clipboardEmpty: 'クリップボードに貼り付けるデータがありません。',
+    noLinkToPaste: 'リンク貼り付けできるデータはありません。',
     valueNotWritten: '値を書き込めませんでした。',
     cellsNotFilled: '選択したセルに入力できませんでした。',
     codeReadOnly: 'スプレッドシートは読み取り専用です。',

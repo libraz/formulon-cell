@@ -36,6 +36,8 @@ export const permissionReasonsZh: PermissionReasonsStrings = {
     hostCopyDisabled: '宿主策略已禁用复制。',
     boundedViewportStructural: '在受限视口下无法进行此结构性操作。',
     restrictedEmbedding: '在受限的嵌入环境中不可用。',
+    clipboardEmpty: '剪贴板中没有可粘贴的内容。',
+    noLinkToPaste: '无链接可粘贴。',
     valueNotWritten: '无法写入该值。',
     cellsNotFilled: '无法填充所选单元格。',
     codeReadOnly: '电子表格为只读。',

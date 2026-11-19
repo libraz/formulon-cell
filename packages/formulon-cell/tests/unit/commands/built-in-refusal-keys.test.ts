@@ -39,21 +39,6 @@ const norm = (literal: string): string => literal.replace(/\s+/g, ' ');
  * host or the user wrote (shown unchanged) or a condition with no built-in reason that says it.
  */
 const ALLOWED: ReadonlyArray<readonly [file: string, fragment: string]> = [
-  ['commands/clear-contents.ts', 'pivotGuardAlert(workbook).message'],
-  ['commands/clear-contents.ts', 'dataTableGuardAlert(workbook).message'],
-  ['commands/import-export.ts', 'dataTableGuardAlert(wb).message'],
-  ['commands/import-export.ts', 'tableFunctionAlert(wb).message'],
-  ['commands/clipboard/paste.ts', "pivotGuardAlert(wb, 'paste').message"],
-  ['commands/clipboard/paste.ts', 'dataTableGuardAlert(wb).message'],
-  ['commands/clipboard/paste.ts', 'tableFunctionAlert(wb).message'],
-  ['commands/clipboard/paste.ts', "reason: 'nothing to paste'"],
-  ['commands/clipboard/paste-actions.ts', "reason: 'nothing to paste'"],
-  ['commands/clipboard/paste-actions.ts', "reason: 'nothing to insert'"],
-  ['commands/clipboard/html.ts', "reason: 'nothing to paste'"],
-  ['commands/clipboard/paste-special.ts', "reason: 'a cut has nothing to link to'"],
-  ['interact/paste-special.ts', "reason: 'nothing to paste'"],
-  ['commands/interaction-controller.ts', 'dataTableGuardAlert(wb).message'],
-  ['commands/interaction-controller.ts', 'reason: alert.message'],
   // Data validation text the workbook author wrote.
   ['commands/interaction-controller.ts', 'reason: outcome.message'],
 ];

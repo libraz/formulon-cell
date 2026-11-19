@@ -737,7 +737,11 @@ export function pasteLink(
   history: History | null = null,
 ): ChangeBatchResult {
   if (snap.mode === 'cut')
-    return refusedBatch({ code: 'invalid', reason: 'a cut has nothing to link to' });
+    return refusedBatch({
+      code: 'invalid',
+      reason: 'a cut has nothing to link to',
+      reasonKey: 'noLinkToPaste',
+    });
   return pasteBatch(wb, () =>
     applyPaste(
       state,

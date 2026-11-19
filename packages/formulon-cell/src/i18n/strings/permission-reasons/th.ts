@@ -37,6 +37,8 @@ export const permissionReasonsTh: PermissionReasonsStrings = {
     hostCopyDisabled: 'การคัดลอกถูกปิดใช้งานโดยนโยบายของโฮสต์',
     boundedViewportStructural: 'ไม่สามารถใช้การดำเนินการเชิงโครงสร้างนี้ได้เมื่อพื้นที่แสดงผลถูกจำกัด',
     restrictedEmbedding: 'ไม่พร้อมใช้งานในการฝังที่ถูกจำกัด',
+    clipboardEmpty: 'ไม่มีข้อมูลในคลิปบอร์ดที่จะวาง',
+    noLinkToPaste: 'ไม่มีลิงก์ที่จะวาง',
     valueNotWritten: 'ไม่สามารถเขียนค่าได้',
     cellsNotFilled: 'ไม่สามารถกรอกเซลล์ที่เลือกได้',
     codeReadOnly: 'สเปรดชีตเป็นแบบอ่านอย่างเดียว',

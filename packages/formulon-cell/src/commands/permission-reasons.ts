@@ -42,6 +42,12 @@ export const PERMISSION_REASONS = {
   readOnlyPolicy: 'instance policy is read-only',
   operationDenied: 'operation is denied',
   valueNotWritten: 'the value could not be written',
+  pivotTableChangeBlocked: 'part of a PivotTable report cannot be changed',
+  pivotTablePasteBlocked: 'the change would affect a PivotTable',
+  dataTableChangeBlocked: 'part of a data table cannot be changed',
+  tableFunctionBlocked: 'the TABLE function cannot be typed in a cell',
+  clipboardEmpty: 'the clipboard has nothing to paste',
+  noLinkToPaste: 'a cut has nothing to link to',
   cellsNotFilled: 'the selected cells could not be filled',
   affectedRangeMalformed: 'affected range is malformed',
   affectedRangeTooLarge: 'affected range exceeds the authorization bound',
@@ -67,7 +73,11 @@ export const PERMISSION_REASON_KEYS = Object.keys(PERMISSION_REASONS) as Permiss
 export type ReferencedPermissionReasonKey =
   | 'sheetProtected'
   | 'cellProtected'
-  | 'workbookStructureProtected';
+  | 'workbookStructureProtected'
+  | 'pivotTableChangeBlocked'
+  | 'pivotTablePasteBlocked'
+  | 'dataTableChangeBlocked'
+  | 'tableFunctionBlocked';
 
 /** Keys the `permissionReasons` dictionary section defines itself. */
 export type OwnPermissionReasonKey = Exclude<PermissionReasonKey, ReferencedPermissionReasonKey>;
@@ -106,6 +116,14 @@ export const permissionReasonText = (strings: Strings, key: PermissionReasonKey)
       return strings.protection.protectedCellEdit;
     case 'workbookStructureProtected':
       return strings.ribbonMenu.workbookStructureProtectedBlocked;
+    case 'pivotTableChangeBlocked':
+      return strings.pivotTableDialog.cannotChange;
+    case 'pivotTablePasteBlocked':
+      return strings.pivotTableDialog.cannotChangePaste;
+    case 'dataTableChangeBlocked':
+      return strings.dataTableDialog.cannotChange;
+    case 'tableFunctionBlocked':
+      return strings.dataTableDialog.tableFunction;
     default:
       return strings.permissionReasons[key];
   }

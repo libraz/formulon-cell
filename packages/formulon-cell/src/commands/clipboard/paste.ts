@@ -45,7 +45,12 @@ export function pasteTSV(
   history: History | null = null,
 ): ChangeBatchResult {
   const rows = text ? parseTSV(text) : [];
-  if (rows.length === 0) return refusedBatch({ code: 'invalid', reason: 'nothing to paste' });
+  if (rows.length === 0)
+    return refusedBatch({
+      code: 'invalid',
+      reason: 'nothing to paste',
+      reasonKey: 'clipboardEmpty',
+    });
 
   const origin: Addr = state.selection.active;
   const sheet = origin.sheet;
@@ -60,9 +65,17 @@ export function pasteTSV(
   if (!rangeWritable(state, pasteArea))
     return refusedBatch({ code: 'protected', reasonKey: 'codeProtected' });
   if (blockPivotEdit(wb, pasteArea, 'paste'))
-    return refusedBatch({ code: 'protected', reason: pivotGuardAlert(wb, 'paste').message });
+    return refusedBatch({
+      code: 'protected',
+      reason: pivotGuardAlert(wb, 'paste').message,
+      reasonKey: 'pivotTablePasteBlocked',
+    });
   if (blockDataTableEdit(wb, pasteArea))
-    return refusedBatch({ code: 'protected', reason: dataTableGuardAlert(wb).message });
+    return refusedBatch({
+      code: 'protected',
+      reason: dataTableGuardAlert(wb).message,
+      reasonKey: 'dataTableChangeBlocked',
+    });
   const inputLocale = inputLocaleForWorkbook(wb);
   let maxCols = 0;
   const writes: { addr: Addr; input: ReturnType<typeof coerceInputForCell> }[] = [];
@@ -79,7 +92,11 @@ export function pasteTSV(
   }
   const formulas = writes.map(({ input }) => (input.kind === 'formula' ? input.text : null));
   if (blockTableFunction(wb, formulas))
-    return refusedBatch({ code: 'invalid', reason: tableFunctionAlert(wb).message });
+    return refusedBatch({
+      code: 'invalid',
+      reason: tableFunctionAlert(wb).message,
+      reasonKey: 'tableFunctionBlocked',
+    });
 
   return transactIn(history, () => {
     const { changed } = wb.trackChangedCells(() => {

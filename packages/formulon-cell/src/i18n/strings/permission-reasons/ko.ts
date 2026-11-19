@@ -38,6 +38,8 @@ export const permissionReasonsKo: PermissionReasonsStrings = {
     hostCopyDisabled: '호스트 정책에 따라 복사가 비활성화되어 있습니다.',
     boundedViewportStructural: '표시 영역이 제한되어 있어 이 구조 변경 작업은 사용할 수 없습니다.',
     restrictedEmbedding: '제한된 임베딩에서는 사용할 수 없습니다.',
+    clipboardEmpty: '클립보드에 붙여 넣을 내용이 없습니다.',
+    noLinkToPaste: '붙여 넣을 연결이 없습니다.',
     valueNotWritten: '값을 쓸 수 없습니다.',
     cellsNotFilled: '선택한 셀을 채울 수 없습니다.',
     codeReadOnly: '스프레드시트가 읽기 전용입니다.',

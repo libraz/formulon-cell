@@ -62,7 +62,12 @@ function runPasteBatch(
   write: () => ChangeBatchResult,
 ): ChangeBatchResult {
   const result = authorizePaste(ctx, intents, write);
-  if (!result) return refusedBatch({ code: 'invalid', reason: 'nothing to paste' });
+  if (!result)
+    return refusedBatch({
+      code: 'invalid',
+      reason: 'nothing to paste',
+      reasonKey: 'clipboardEmpty',
+    });
   return result.ok ? result.value : refusedByDecision(result.decision);
 }
 
@@ -148,7 +153,11 @@ export function insertCopiedBandAction(
   snapshot: ClipboardSnapshot | null | undefined,
   target?: InsertCopiedBandTarget,
 ): ChangeBatchResult {
-  const nothing = refusedBatch({ code: 'invalid', reason: 'nothing to insert' });
+  const nothing = refusedBatch({
+    code: 'invalid',
+    reason: 'nothing to insert',
+    reasonKey: 'clipboardEmpty',
+  });
   if (!snapshot) return nothing;
   const state = ctx.store.getState();
   const at = targetAddress(state, target);
@@ -174,7 +183,12 @@ export function insertCopiedCellsAction(
   snapshot?: ClipboardSnapshot | null,
 ): ChangeBatchResult {
   const block = copiedBlock(text, snapshot);
-  if (!block) return refusedBatch({ code: 'invalid', reason: 'nothing to insert' });
+  if (!block)
+    return refusedBatch({
+      code: 'invalid',
+      reason: 'nothing to insert',
+      reasonKey: 'clipboardEmpty',
+    });
   const state = ctx.store.getState();
   const size = { rows: block.height, cols: block.width };
   const cutSource = snapshot?.mode === 'cut' ? snapshot.range : null;

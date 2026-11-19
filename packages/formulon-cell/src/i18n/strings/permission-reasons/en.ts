@@ -37,6 +37,8 @@ export const permissionReasonsEn: PermissionReasonsStrings = {
     hostCopyDisabled: 'Copying is disabled by the host policy.',
     boundedViewportStructural: 'This structural operation is unavailable with a bounded viewport.',
     restrictedEmbedding: 'Unavailable in restricted embedding.',
+    clipboardEmpty: 'The clipboard has nothing to paste.',
+    noLinkToPaste: 'No link to paste.',
     valueNotWritten: 'The value could not be written.',
     cellsNotFilled: 'The selected cells could not be filled.',
     codeReadOnly: 'The spreadsheet is read-only.',

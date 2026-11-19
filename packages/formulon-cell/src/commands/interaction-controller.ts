@@ -308,7 +308,12 @@ export class InteractionController {
     if (lockedByDataTable) {
       alertDataTableEdit(wb);
       return this.rejectResult([
-        { addr: lockedByDataTable, code: 'protected', reason: dataTableGuardAlert(wb).message },
+        {
+          addr: lockedByDataTable,
+          code: 'protected',
+          reason: dataTableGuardAlert(wb).message,
+          reasonKey: 'dataTableChangeBlocked',
+        },
       ]);
     }
     // TABLE() is the Data Table command's own formula; typing it is refused.
@@ -317,7 +322,12 @@ export class InteractionController {
       const alert = tableFunctionAlert(wb);
       alertDataTableGuard(wb, alert);
       return this.rejectResult([
-        { addr: typedTable.patch.addr, code: 'invalid', reason: alert.message },
+        {
+          addr: typedTable.patch.addr,
+          code: 'invalid',
+          reason: alert.message,
+          reasonKey: 'tableFunctionBlocked',
+        },
       ]);
     }
 

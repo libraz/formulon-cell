@@ -268,7 +268,12 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   ): ChangeBatchResult => {
     if (from) entry = from;
     const snap = currentSnapshot(openOpts);
-    if (!snap) return refusedBatch({ code: 'invalid', reason: 'nothing to paste' });
+    if (!snap)
+      return refusedBatch({
+        code: 'invalid',
+        reason: 'nothing to paste',
+        reasonKey: 'clipboardEmpty',
+      });
     return runPaste(
       snap,
       opts.transpose,
@@ -280,7 +285,12 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
 
   const applyLink = (): ChangeBatchResult => {
     const snap = currentSnapshot();
-    if (!snap) return refusedBatch({ code: 'invalid', reason: 'nothing to paste' });
+    if (!snap)
+      return refusedBatch({
+        code: 'invalid',
+        reason: 'nothing to paste',
+        reasonKey: 'clipboardEmpty',
+      });
     return runPaste(
       snap,
       false,

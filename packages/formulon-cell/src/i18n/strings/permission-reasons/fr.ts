@@ -42,6 +42,8 @@ export const permissionReasonsFr: PermissionReasonsStrings = {
     boundedViewportStructural:
       "Cette opération structurelle n'est pas disponible avec une zone d'affichage limitée.",
     restrictedEmbedding: "Non disponible dans l'intégration restreinte.",
+    clipboardEmpty: 'Le presse-papiers ne contient rien à coller.',
+    noLinkToPaste: 'Aucune liaison à coller.',
     valueNotWritten: 'La valeur n’a pas pu être écrite.',
     cellsNotFilled: 'Les cellules sélectionnées n’ont pas pu être remplies.',
     codeReadOnly: 'La feuille de calcul est en lecture seule.',
