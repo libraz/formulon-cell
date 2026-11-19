@@ -10,7 +10,7 @@ import { formatCell } from '../../engine/value.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import { safeFontFamily } from '../../format/font-family.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../../store/store.js';
-import { escapeHtml } from '../../text-escape.js';
+import { cssString, escapeHtml } from '../../text-escape.js';
 import { formatNumber } from '../format.js';
 import { type History, transactIn } from '../history.js';
 import { type ChangeBatchResult, refusedBatch } from '../interaction-policy.js';
@@ -18,17 +18,6 @@ import { recordFormatChange } from '../slice-history.js';
 import { pasteTSV } from './paste.js';
 import type { ClipboardFormatResolver } from './snapshot.js';
 import { encodeTSV } from './tsv.js';
-
-/** Keep a family name inside one CSS token before the style attribute is
- * HTML-escaped. This preserves ordinary stacks (`Arial, sans-serif`) while
- * making quotes, angle brackets, and declaration separators data. */
-const cssString = (value: string): string =>
-  `"${value
-    .replaceAll('\\', '\\\\')
-    .replaceAll('"', '\\"')
-    .replace(/\r\n?|\n/g, '\\A ')
-    .replaceAll('<', '\\3C ')
-    .replaceAll('>', '\\3E ')}"`;
 
 const MAX_HTML_CLIPBOARD_CELLS = 1_000_000;
 
