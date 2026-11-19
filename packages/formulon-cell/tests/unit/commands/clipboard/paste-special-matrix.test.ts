@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import type { PasteWhat } from '../../../../src/commands/clipboard/paste-kind.js';
 import {
   type PasteOperation,
   type PasteSpecialOptions,
-  type PasteWhat,
   pasteSpecial,
 } from '../../../../src/commands/clipboard/paste-special.js';
 import { captureSnapshot } from '../../../../src/commands/clipboard/snapshot.js';

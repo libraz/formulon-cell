@@ -1,8 +1,8 @@
 import { pasteBatchWrite } from '../commands/clipboard/paste-actions.js';
+import type { PasteWhat } from '../commands/clipboard/paste-kind.js';
 import {
   type PasteOperation,
   type PasteSpecialOptions,
-  type PasteWhat,
   pasteLink,
   pasteSpecial,
   resolvePasteDestination,

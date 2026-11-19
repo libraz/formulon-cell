@@ -4,8 +4,8 @@ import { consumeCutMarquee as clearCutMarquee } from '../commands/clipboard/cut-
 import { createCopyFormatResolver } from '../commands/clipboard/format-resolver.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
 import { pasteBatchWrite, pasteWrite } from '../commands/clipboard/paste-actions.js';
+import type { PasteWhat } from '../commands/clipboard/paste-kind.js';
 import {
-  type PasteWhat,
   pasteLink,
   pasteSpecial,
   resolvePasteDestination,

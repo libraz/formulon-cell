@@ -11,7 +11,8 @@ import {
   pasteSpecialAction,
 } from './clipboard/paste-actions.js';
 import { resolvePasteDestination } from './clipboard/paste-destination.js';
-import { type PasteWhat, pasteLink } from './clipboard/paste-special.js';
+import type { PasteWhat } from './clipboard/paste-kind.js';
+import { pasteLink } from './clipboard/paste-special.js';
 import { captureSnapshotFromCopyResult } from './clipboard/snapshot.js';
 import { inputLocaleForWorkbook, localizeFormulaForClipboard } from './coerce-input.js';
 import { History } from './history.js';

@@ -1,11 +1,4 @@
-import {
-  addrKey,
-  colLetter,
-  MAX_COL,
-  MAX_ROW,
-  parseAddrKey,
-  quoteSheetName,
-} from '../../engine/address.js';
+import { addrKey, colLetter, parseAddrKey, quoteSheetName } from '../../engine/address.js';
 import type { Addr, Range } from '../../engine/types.js';
 import { writeCell } from '../../engine/value.js';
 import type { CellPatch, WorkbookHandle } from '../../engine/workbook-handle.js';
@@ -15,14 +8,11 @@ import {
   isWholeColumnRange,
   isWholeRowRange,
   rangeContainsAddr,
-  rangeContainsRange,
-  rangesIntersect,
   sameRange,
 } from '../../store/selection-geometry.js';
 import {
   type CellBorders,
   type CellFormat,
-  type ConditionalRule,
   mutators,
   type SpreadsheetStore,
   type State,
@@ -37,10 +27,9 @@ import { appliedBatch, type ChangeBatchResult, refusedBatch } from '../interacti
 import { moveDefinedNamesForCut } from '../named-ranges.js';
 import { blockPivotEdit } from '../pivot-guard.js';
 import { pastePivotTableCopy, pivotTableAtRange } from '../pivot-table.js';
-import { blockedByProtection, isCellWritable, isRangeInAllowedEditRange } from '../protection.js';
+import { blockedByProtection, isCellWritable } from '../protection.js';
 import { shiftFormulaRefs } from '../refs.js';
 import {
-  recordConditionalRulesChange,
   recordFormatChange,
   recordLayoutChangeWithEngine,
   recordMergesChangeWithEngine,
@@ -48,36 +37,40 @@ import {
 import { applyPatchesAtomic } from './apply-patches-atomic.js';
 import { consumeCutMarquee } from './cut-band-snapshots.js';
 import {
+  pasteMergedConditionalRules,
+  replaceConditionalRules,
+  translatedConditionalRules,
+} from './paste-conditional-rules.js';
+import {
   bandAxisFor,
   logicalRangeFor,
-  MAX_PASTE_CELLS,
   materializedPasteCells,
   resolvePasteDestination,
 } from './paste-destination.js';
+import type { PasteKind, PasteWhat } from './paste-kind.js';
+import {
+  carriesComments,
+  pastesAll,
+  wantsFormats,
+  wantsFormulas,
+  wantsNumFmt,
+  wantsValues,
+} from './paste-kind.js';
+import {
+  clearSourceFormats,
+  commentAuthor,
+  commentText,
+  formatCommentsOnly,
+  formatWithoutComment,
+  hydrateEngineComments,
+} from './paste-notes.js';
+import { preflight } from './paste-preflight.js';
 import { type ClipboardCell, type ClipboardSnapshot, snapshotSourceRow } from './snapshot.js';
 import { extendTablesForPaste } from './table-extension.js';
 import { transposeFormulaRefs } from './transpose-refs.js';
 
 export type { MaterializedPasteCell } from './paste-destination.js';
 export { materializedPasteCells, resolvePasteDestination } from './paste-destination.js';
-
-export type PasteWhat =
-  | 'all'
-  | 'all-using-source-theme'
-  | 'all-except-borders'
-  | 'all-merging-conditional-formats'
-  | 'values'
-  | 'formulas'
-  | 'formats'
-  | 'comments'
-  | 'validation'
-  | 'column-widths'
-  | 'formulas-and-numfmt'
-  | 'values-and-numfmt';
-
-/** What a paste writes: a Paste Special kind, or the references Paste Link
- *  writes in place of the copied cells. */
-type PasteKind = PasteWhat | 'link';
 
 export type PasteOperation = 'none' | 'add' | 'subtract' | 'multiply' | 'divide';
 
@@ -135,322 +128,6 @@ const FORMATS_PASTE_KEEPS = [
   'hyperlinkLocation',
   'hyperlinkSpan',
 ] as const satisfies readonly (keyof CellFormat)[];
-
-/** The kinds that paste every layer. A paste within one workbook shares its
- *  theme, so the source-theme variant pastes exactly what All does. */
-const pastesAll = (what: PasteKind): boolean =>
-  what === 'all' ||
-  what === 'all-using-source-theme' ||
-  what === 'all-except-borders' ||
-  what === 'all-merging-conditional-formats';
-const wantsValues = (what: PasteKind): boolean =>
-  pastesAll(what) || what === 'values' || what === 'values-and-numfmt';
-const wantsFormulas = (what: PasteKind): boolean =>
-  pastesAll(what) || what === 'formulas' || what === 'formulas-and-numfmt';
-const wantsFormats = (what: PasteKind): boolean => pastesAll(what) || what === 'formats';
-const wantsNumFmt = (what: PasteKind): boolean =>
-  wantsFormats(what) || what === 'values-and-numfmt' || what === 'formulas-and-numfmt';
-const carriesComments = (what: PasteKind): boolean => pastesAll(what) || what === 'comments';
-
-const bandProtectionAllows = (state: State, range: Range): boolean => {
-  if (!state.protection.protectedSheets.has(range.sheet)) return true;
-  // A whole-band operation is atomic. For a protected sheet an explicit
-  // allowed-edit interval must cover the complete band; sparse unlocked cells
-  // cannot prove that the omitted cells are writable without enumerating the
-  // million-cell axis.
-  return isRangeInAllowedEditRange(state, range);
-};
-
-const translateMerges = (
-  snap: ClipboardSnapshot,
-  destination: Range,
-  transpose: boolean,
-): Range[] | null => {
-  const out: Range[] = [];
-  const logical = logicalRangeFor(snap);
-  const bandAxis = !transpose ? bandAxisFor(logical) : null;
-  if (bandAxis && bandAxisFor(destination) === bandAxis) {
-    const addTranslated = (
-      baseRow: number,
-      baseCol: number,
-      merge: NonNullable<ClipboardSnapshot['merges']>[number],
-    ): boolean => {
-      if (
-        !Number.isInteger(merge.r0) ||
-        !Number.isInteger(merge.c0) ||
-        !Number.isInteger(merge.r1) ||
-        !Number.isInteger(merge.c1) ||
-        merge.r0 < 0 ||
-        merge.c0 < 0 ||
-        merge.r1 < merge.r0 ||
-        merge.c1 < merge.c0 ||
-        merge.r1 >= snap.rows ||
-        merge.c1 >= snap.cols ||
-        (merge.sheet !== undefined && merge.sheet !== snap.range.sheet)
-      ) {
-        return false;
-      }
-      const sourceRow0 = snap.range.r0 + merge.r0;
-      const sourceCol0 = snap.range.c0 + merge.c0;
-      const sourceRow1 = snap.range.r0 + merge.r1;
-      const sourceCol1 = snap.range.c0 + merge.c1;
-      const translated: Range = {
-        sheet: destination.sheet,
-        r0: baseRow + sourceRow0 - logical.r0,
-        c0: baseCol + sourceCol0 - logical.c0,
-        r1: baseRow + sourceRow1 - logical.r0,
-        c1: baseCol + sourceCol1 - logical.c0,
-      };
-      if (rangeContainsRange(destination, translated)) out.push(translated);
-      return true;
-    };
-    if (bandAxis === 'column') {
-      const logicalWidth = logical.c1 - logical.c0 + 1;
-      for (let baseCol = destination.c0; baseCol <= destination.c1; baseCol += logicalWidth) {
-        for (const merge of snap.merges ?? []) {
-          if (!addTranslated(destination.r0, baseCol, merge)) return null;
-        }
-      }
-    } else {
-      const logicalHeight = logical.r1 - logical.r0 + 1;
-      for (let baseRow = destination.r0; baseRow <= destination.r1; baseRow += logicalHeight) {
-        for (const merge of snap.merges ?? []) {
-          if (!addTranslated(baseRow, destination.c0, merge)) return null;
-        }
-      }
-    }
-    return out;
-  }
-  const tileRows = transpose ? snap.cols : snap.rows;
-  const tileCols = transpose ? snap.rows : snap.cols;
-  for (let tileRow = destination.r0; tileRow <= destination.r1; tileRow += tileRows) {
-    for (let tileCol = destination.c0; tileCol <= destination.c1; tileCol += tileCols) {
-      for (const merge of snap.merges ?? []) {
-        if (
-          !Number.isInteger(merge.r0) ||
-          !Number.isInteger(merge.c0) ||
-          !Number.isInteger(merge.r1) ||
-          !Number.isInteger(merge.c1) ||
-          merge.r0 < 0 ||
-          merge.c0 < 0 ||
-          merge.r1 < merge.r0 ||
-          merge.c1 < merge.c0 ||
-          merge.r1 >= snap.rows ||
-          merge.c1 >= snap.cols ||
-          (merge.sheet !== undefined && merge.sheet !== snap.range.sheet)
-        ) {
-          return null;
-        }
-        out.push(
-          transpose
-            ? {
-                sheet: destination.sheet,
-                r0: tileRow + merge.c0,
-                c0: tileCol + merge.r0,
-                r1: tileRow + merge.c1,
-                c1: tileCol + merge.r1,
-              }
-            : {
-                sheet: destination.sheet,
-                r0: tileRow + merge.r0,
-                c0: tileCol + merge.c0,
-                r1: tileRow + merge.r1,
-                c1: tileCol + merge.c1,
-              },
-        );
-      }
-    }
-  }
-  return out;
-};
-
-/**
- * Validate every cell and merge touched by a paste before the first mutation.
- * Excel rejects a matrix that would split a destination merge; allowing the
- * write and repairing the merge afterward loses data and makes undo partial.
- */
-const preflight = (
-  state: State,
-  snap: ClipboardSnapshot,
-  destination: Range,
-  what: PasteKind,
-  transpose: boolean,
-): { destination: Range; translatedMerges: Range[]; preservedMerges: Range[] } | null => {
-  const band = bandAxisFor(logicalRangeFor(snap));
-  const bandDestination = band && bandAxisFor(destination) === band;
-  if (bandDestination) {
-    // Do not enumerate a million-cell whole-band range. The operation is
-    // atomic on a protected sheet and therefore requires one allowed-edit
-    // interval covering the complete band.
-    if (!bandProtectionAllows(state, destination)) return null;
-  } else {
-    for (let row = destination.r0; row <= destination.r1; row += 1) {
-      for (let col = destination.c0; col <= destination.c1; col += 1) {
-        if (!isCellWritable(state, { sheet: destination.sheet, row, col })) return null;
-      }
-    }
-  }
-
-  const source = snap.range;
-  if (source.r0 < 0 || source.c0 < 0 || source.r1 > MAX_ROW || source.c1 > MAX_COL) {
-    return null;
-  }
-  if (snap.mode === 'cut') {
-    const sourceLogical = logicalRangeFor(snap);
-    if (bandAxisFor(sourceLogical)) {
-      if (!bandProtectionAllows(state, sourceLogical)) return null;
-    } else {
-      for (let row = source.r0; row <= source.r1; row += 1) {
-        for (let col = source.c0; col <= source.c1; col += 1) {
-          if (!isCellWritable(state, { sheet: source.sheet, row, col })) return null;
-        }
-      }
-    }
-  }
-
-  // Any partially covered merge is ambiguous for a matrix paste. A merge that
-  // is fully contained by the destination can be replaced by the source
-  // topology (or removed for an unmerged All/Formats paste).
-  for (const merge of state.merges.byAnchor.values()) {
-    if (merge.sheet !== destination.sheet || !rangesIntersect(merge, destination)) continue;
-    if (!rangeContainsRange(destination, merge)) return null;
-  }
-  if (snap.mode === 'cut') {
-    for (const merge of state.merges.byAnchor.values()) {
-      if (merge.sheet !== source.sheet || !rangesIntersect(merge, source)) continue;
-      if (!rangeContainsRange(source, merge)) return null;
-    }
-  }
-
-  // A merge the destination cuts off (a cropped or wrapped tile) is not pasted.
-  const translatedMerges = wantsFormats(what)
-    ? (translateMerges(snap, destination, transpose)?.filter((merge) =>
-        rangeContainsRange(destination, merge),
-      ) ?? null)
-    : [];
-  if (translatedMerges === null) return null;
-  // A scalar paste into the exact logical footprint of a merged cell updates
-  // its anchor and keeps the merge; a Formats paste unmerges it. Non-scalar tiles intentionally continue
-  // through the normal topology replacement path (Excel unmerges those
-  // covered cells unless the source carries a matching merge).
-  const preservedMerges =
-    snap.rows === 1 && snap.cols === 1 && what !== 'formats'
-      ? [...state.merges.byAnchor.values()].filter((merge) => sameRange(merge, destination))
-      : [];
-  return { destination, translatedMerges, preservedMerges };
-};
-
-const commentText = (format: CellFormat | undefined): string | null =>
-  typeof format?.comment === 'string' && format.comment.length > 0 ? format.comment : null;
-
-const commentAuthor = (format: CellFormat | undefined): string | null =>
-  commentText(format) && typeof format?.commentAuthor === 'string' ? format.commentAuthor : null;
-
-/** Bring engine-only notes into the store before a format/comment history
- * snapshot is captured. The engine is authoritative for persisted comments,
- * while the store remains the source used by the history helpers. */
-const hydrateEngineComments = (
-  store: SpreadsheetStore,
-  wb: WorkbookHandle,
-  ranges: readonly Range[],
-): void => {
-  if (!wb.capabilities.commentsEnumerable || ranges.length === 0) return;
-  const sheets = new Set(ranges.map((range) => range.sheet));
-  const comments: Array<{
-    sheet: number;
-    row: number;
-    col: number;
-    author: string | null;
-    text: string;
-    visible?: boolean;
-  }> = [];
-  for (const sheet of sheets) {
-    for (const comment of wb.getComments(sheet)) {
-      if (!comment.text) continue;
-      if (
-        ranges.some(
-          (range) =>
-            range.sheet === sheet &&
-            comment.row >= range.r0 &&
-            comment.row <= range.r1 &&
-            comment.col >= range.c0 &&
-            comment.col <= range.c1,
-        )
-      ) {
-        comments.push({ sheet, ...comment });
-      }
-    }
-  }
-  if (comments.length === 0) return;
-  store.setState((s) => {
-    const formats = new Map(s.format.formats);
-    for (const comment of comments) {
-      const key = addrKey({ sheet: comment.sheet, row: comment.row, col: comment.col });
-      formats.set(key, {
-        ...formats.get(key),
-        comment: comment.text,
-        commentAuthor: comment.author || undefined,
-        commentVisible: comment.visible || undefined,
-      });
-    }
-    return { ...s, format: { ...s.format, formats } };
-  });
-};
-
-const formatWithoutComment = (format: CellFormat | undefined): CellFormat | null => {
-  if (!format) return null;
-  const next = { ...format };
-  delete next.comment;
-  delete next.commentAuthor;
-  delete next.commentVisible;
-  return next;
-};
-
-const formatCommentsOnly = (format: CellFormat | undefined): CellFormat | null => {
-  const text = commentText(format);
-  if (!text) return null;
-  const author = commentAuthor(format);
-  return {
-    comment: text,
-    ...(author ? { commentAuthor: author } : {}),
-    ...(format?.commentVisible === true ? { commentVisible: true } : {}),
-  };
-};
-
-const clearSourceFormats = (store: SpreadsheetStore, source: Range): void => {
-  store.setState((s) => {
-    const formats = new Map(s.format.formats);
-    const area = (source.r1 - source.r0 + 1) * (source.c1 - source.c0 + 1);
-    const clear = (key: string): void => {
-      const comments = formatCommentsOnly(formats.get(key));
-      if (comments) formats.set(key, comments);
-      else formats.delete(key);
-    };
-    if (area > MAX_PASTE_CELLS) {
-      for (const key of formats.keys()) {
-        const addr = parseAddrKey(key);
-        if (!addr) continue;
-        const { sheet, row, col } = addr;
-        if (
-          sheet === source.sheet &&
-          row >= source.r0 &&
-          row <= source.r1 &&
-          col >= source.c0 &&
-          col <= source.c1
-        ) {
-          clear(key);
-        }
-      }
-    } else {
-      for (let row = source.r0; row <= source.r1; row += 1) {
-        for (let col = source.c0; col <= source.c1; col += 1) {
-          clear(addrKey({ sheet: source.sheet, row, col }));
-        }
-      }
-    }
-    return { ...s, format: { ...s.format, formats } };
-  });
-};
 
 /** Blank patches for every populated cell of a cut source. */
 const sourceClearPatches = (wb: WorkbookHandle, source: Range): CellPatch[] =>
@@ -550,108 +227,6 @@ const pasteColumnWidths = (
       }
       return { ...s, layout: { ...s.layout, colWidths: next } };
     });
-  });
-};
-
-/** The copied conditional-format rules placed on every pasted tile. */
-const translatedConditionalRules = (
-  snap: ClipboardSnapshot,
-  destination: Range,
-): ConditionalRule[] => {
-  const rules = snap.conditional ?? [];
-  const added: ConditionalRule[] = [];
-  for (let r0 = destination.r0; r0 <= destination.r1; r0 += snap.rows) {
-    for (let c0 = destination.c0; c0 <= destination.c1; c0 += snap.cols) {
-      const dRow = r0 - snap.range.r0;
-      const dCol = c0 - snap.range.c0;
-      for (const rule of rules) {
-        const copy = structuredClone(rule);
-        copy.range = {
-          sheet: destination.sheet,
-          r0: rule.range.r0 + dRow,
-          c0: rule.range.c0 + dCol,
-          r1: rule.range.r1 + dRow,
-          c1: rule.range.c1 + dCol,
-        };
-        if (copy.kind === 'formula') copy.formula = shiftFormulaRefs(copy.formula, dRow, dCol);
-        added.push(copy);
-      }
-    }
-  }
-  return added;
-};
-
-/** All, Merging Conditional Formats: the copied rules land on every pasted
- *  tile ahead of the destination's own rules, which stay (Excel lists a
- *  merged cell's rules source first). */
-const pasteMergedConditionalRules = (
-  store: SpreadsheetStore,
-  history: History | null,
-  snap: ClipboardSnapshot,
-  destination: Range,
-): void => {
-  const added = translatedConditionalRules(snap, destination);
-  if (added.length === 0) return;
-  recordConditionalRulesChange(history, store, () => {
-    store.setState((s) => ({
-      ...s,
-      conditional: { ...s.conditional, rules: [...added, ...s.conditional.rules] },
-    }));
-  });
-};
-
-/** `rule` with `cut` taken out of its range: up to four rules over what is
- *  left, a formula rule re-anchored to each piece's top-left. */
-const subtractFromRule = (rule: ConditionalRule, cut: Range): ConditionalRule[] => {
-  const r = rule.range;
-  if (r.sheet !== cut.sheet || !rangesIntersect(r, cut)) return [rule];
-  const rows0 = Math.max(r.r0, cut.r0);
-  const rows1 = Math.min(r.r1, cut.r1);
-  const pieces: Range[] = [
-    { ...r, r1: cut.r0 - 1 },
-    { ...r, r0: cut.r1 + 1 },
-    { ...r, r0: rows0, r1: rows1, c1: cut.c0 - 1 },
-    { ...r, r0: rows0, r1: rows1, c0: cut.c1 + 1 },
-  ].filter((p) => p.r0 <= p.r1 && p.c0 <= p.c1 && p.r0 >= r.r0 && p.r1 <= r.r1);
-  return pieces.map((piece) => {
-    const copy = structuredClone(rule);
-    copy.range = piece;
-    if (copy.kind === 'formula') {
-      copy.formula = shiftFormulaRefs(copy.formula, piece.r0 - r.r0, piece.c0 - r.c0);
-    }
-    return copy;
-  });
-};
-
-/** All and Formats replace the conditional formats of the pasted cells: the
- *  rules lose every `cleared` range (the destination, and a cut's source) and
- *  the copied rules take the destination (an uncovered source leaves none).
- *  Cells outside keep theirs. */
-const replaceConditionalRules = (
-  store: SpreadsheetStore,
-  history: History | null,
-  added: readonly ConditionalRule[],
-  cleared: readonly Range[],
-): void => {
-  const current = store.getState().conditional.rules;
-  const touched = current.some((rule) =>
-    cleared.some((range) => rangesIntersect(rule.range, range)),
-  );
-  if (added.length === 0 && !touched) return;
-  recordConditionalRulesChange(history, store, () => {
-    store.setState((s) => ({
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          ...cleared.reduce<ConditionalRule[]>(
-            (rules, range) => rules.flatMap((rule) => subtractFromRule(rule, range)),
-            s.conditional.rules,
-          ),
-          ...added,
-        ],
-      },
-    }));
   });
 };
 
