@@ -81,7 +81,7 @@ export const registerJournalOverride = (
 
 /** The journal decision for a write: the member override, else the kind default of its scope. */
 export const resolveJournal = (
-  kind: FacadeChangeKind,
+  kind: FacadeChangeKind | null,
   sheet: number | null,
   range: CellRect | undefined,
   spec: JournalSpec | undefined,
@@ -95,6 +95,8 @@ export const resolveJournal = (
       if (choice) return choice;
     }
   }
+  // A cell-side record has no change kind: only a member override journals it.
+  if (kind === null) return 'none';
   const scopes: JournalScopeKind[] =
     sheet === null ? ['workbook'] : range ? ['range', 'sheet'] : ['sheet'];
   for (const scope of scopes) {

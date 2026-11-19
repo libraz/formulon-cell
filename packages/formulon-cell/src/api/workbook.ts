@@ -159,7 +159,8 @@ export interface WorkbookEvents {
 
 /** One non-cell write's slice of engine state, captured on first touch in a segment. */
 interface JournalRecord {
-  readonly change: FacadeChange;
+  /** The non-cell change undo and redo announce; null for a record whose cells announce it. */
+  readonly change: FacadeChange | null;
   readonly before: Restore;
   /** Captures the slice again at seal time. */
   readonly capture: () => Restore | null;
@@ -646,7 +647,7 @@ const sealedEntry = (state: WorkbookState, segment: Segment): HistoryEntry | nul
         for (let i = parts.length - 1; i >= 0; i -= 1) {
           const part = parts[i] as JournalRecord;
           part.before();
-          handle.noteFacadeChange(part.change);
+          if (part.change) handle.noteFacadeChange(part.change);
         }
         handle.restoreCells(cellsBefore);
       }),
@@ -655,7 +656,7 @@ const sealedEntry = (state: WorkbookState, segment: Segment): HistoryEntry | nul
         handle.restoreCells(cellsAfter);
         parts.forEach((part, i) => {
           (afters[i] as Restore)();
-          handle.noteFacadeChange(part.change);
+          if (part.change) handle.noteFacadeChange(part.change);
         });
       }),
   };
@@ -665,12 +666,13 @@ const sealedEntry = (state: WorkbookState, segment: Segment): HistoryEntry | nul
  *  a History. Returns what to call once the write succeeded, or `null` when nothing is journaled. */
 const openRecord = (
   state: WorkbookState,
-  change: FacadeChange,
+  target: { readonly sheet: number | null; readonly range?: CellRect },
+  change: FacadeChange | null,
   spec: JournalSpec | undefined,
 ): (() => void) | null => {
   const { handle, batch } = state;
   if (batch.reset || !recordingHistory(handle.attachedHistory())) return null;
-  const choice = resolveJournal(change.kind, change.sheet, change.range, spec);
+  const choice = resolveJournal(change?.kind ?? null, target.sheet, target.range, spec);
   if (choice === 'none') return null;
   if (choice === 'reset') {
     return () => {
@@ -681,8 +683,8 @@ const openRecord = (
   const scope: JournalScope = {
     handle,
     engine: handle.engineWorkbook(),
-    sheet: change.sheet,
-    ...(change.range ? { range: change.range } : {}),
+    sheet: target.sheet,
+    ...(target.range ? { range: target.range } : {}),
     hostId: member?.hostId ?? '',
     name: member?.name ?? '',
     args: member?.args ?? [],
@@ -714,7 +716,7 @@ const workbookContext = (wb: Workbook): WorkbookContext => {
     change: (kind, sheet, fn, range, journal) =>
       run(() => {
         const change: FacadeChange = range ? { kind, sheet, range } : { kind, sheet };
-        const record = openRecord(state, change, journal);
+        const record = openRecord(state, change, change, journal);
         const result = fn();
         record?.();
         state.handle.noteFacadeChange(change);
@@ -873,6 +875,13 @@ const sheetContext = (sheet: Sheet): SheetContext => {
       base.run(() => writeCells(state, engine.index, cell, write));
     },
     rangeWrite: (range, write) => base.run(() => writeCells(state, engine.index, range, write)),
+    rangeAnnounce: (range, write, journal) =>
+      base.run(() => {
+        const record = openRecord(state, { sheet: engine.index, range }, null, journal);
+        const result = announceCells(state, rangeAddrs(engine.index, range), write);
+        record?.();
+        return result;
+      }),
     cellAt: (at) => cellOf(base.engine, at),
     rectOf: (range) =>
       typeof range === 'string' ? base.engine.parseReference(range).range : range,
@@ -881,22 +890,31 @@ const sheetContext = (sheet: Sheet): SheetContext => {
 };
 
 /** Journals the cells of `range` for the running batch, then writes them through `write`. */
-const writeCells = <T>(state: WorkbookState, sheet: number, range: CellRect, write: () => T): T => {
+const rangeAddrs = (sheet: number, range: CellRect): Addr[] => {
   const addrs: Addr[] = [];
   for (let row = range.firstRow; row <= range.lastRow; row += 1) {
-    for (let col = range.firstCol; col <= range.lastCol; col += 1) {
-      const addr = { sheet, row, col };
-      addrs.push(addr);
-      const key = cellKey(addr);
-      const { cells } = state.batch.segment;
-      if (!cells.has(key)) cells.set(key, state.handle.captureCell(addr));
-    }
+    for (let col = range.firstCol; col <= range.lastCol; col += 1) addrs.push({ sheet, row, col });
   }
+  return addrs;
+};
+
+/** Runs one engine write over `addrs`, announcing each cell's value afterwards. */
+const announceCells = <T>(state: WorkbookState, addrs: readonly Addr[], write: () => T): T => {
   let result: T | undefined;
   state.handle.writeCellsUnjournaled(addrs, () => {
     result = write();
   });
   return result as T;
+};
+
+const writeCells = <T>(state: WorkbookState, sheet: number, range: CellRect, write: () => T): T => {
+  const addrs = rangeAddrs(sheet, range);
+  const { cells } = state.batch.segment;
+  for (const addr of addrs) {
+    const key = cellKey(addr);
+    if (!cells.has(key)) cells.set(key, state.handle.captureCell(addr));
+  }
+  return announceCells(state, addrs, write);
 };
 
 /** An A1 address or a `{ row, col }` pair as a cell address. */

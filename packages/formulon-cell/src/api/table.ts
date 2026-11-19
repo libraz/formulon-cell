@@ -50,14 +50,21 @@ const tableOf = (ctx: WorkbookContext, engine: EngineTable): Table => ctx.facade
 export const SHEET_TABLE_MEMBERS: MemberSpec<SheetContext> = {
   methods: {
     addTable: (ctx: SheetContext, input: TableInput): Table =>
-      ctx.sheetChange('table', () => tableOf(ctx, ctx.sheetEngine.addTable(input))),
+      ctx.sheetChange('table', () => tableOf(ctx, ctx.sheetEngine.addTable(input)), undefined, {
+        hostId: 'sheet',
+        name: 'addTable',
+        args: [input],
+      }),
     table: (ctx: SheetContext, ref: TableRef): Table =>
       tableOf(ctx, ctx.sheetEngine.table(ctx.engineOf(ref) as EngineTableRef)),
     listTables: (ctx: SheetContext): Table[] =>
       ctx.sheetEngine.listTables().map((engine) => tableOf(ctx, engine)),
     removeTable: (ctx: SheetContext, ref: TableRef): void =>
-      ctx.sheetChange('table', () =>
-        ctx.sheetEngine.removeTable(ctx.engineOf(ref) as EngineTableRef),
+      ctx.sheetChange(
+        'table',
+        () => ctx.sheetEngine.removeTable(ctx.engineOf(ref) as EngineTableRef),
+        undefined,
+        { hostId: 'sheet', name: 'removeTable', args: [ref] },
       ),
   },
 };

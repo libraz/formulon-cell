@@ -47,7 +47,7 @@ const PIVOT_CACHE_READ = [
   'getRecordCount',
   'getRecordValue',
 ] as const;
-const PIVOT_CACHE_CHANGES = {
+export const PIVOT_CACHE_CHANGES = {
   pivot: [
     'refresh',
     'updateOptions',
@@ -78,8 +78,12 @@ export const PIVOT_CACHE_MEMBERS: MemberSpec<HandleContext<EnginePivotCache>> = 
       ctx: HandleContext<EnginePivotCache>,
       source: PivotWorksheetSourceInput | null,
     ): void =>
-      ctx.change('pivot', null, () =>
-        ctx.target.setWorksheetSource(source && engineSource(ctx, source)),
+      ctx.change(
+        'pivot',
+        null,
+        () => ctx.target.setWorksheetSource(source && engineSource(ctx, source)),
+        undefined,
+        'reset',
       ),
   },
 };
@@ -103,7 +107,13 @@ export const WORKBOOK_PIVOT_CACHE_MEMBERS: MemberSpec<WorkbookContext> = {
     addPivotCache: (ctx: WorkbookContext, requestedId?: number | null): PivotCache =>
       ctx.change('pivot', null, () => pivotCacheOf(ctx, ctx.engine.addPivotCache(requestedId))),
     removePivotCache: (ctx: WorkbookContext, ref: PivotCacheRef): void =>
-      ctx.change('pivot', null, () => ctx.engine.removePivotCache(enginePivotCacheRef(ctx, ref))),
+      ctx.change(
+        'pivot',
+        null,
+        () => ctx.engine.removePivotCache(enginePivotCacheRef(ctx, ref)),
+        undefined,
+        'reset',
+      ),
   },
 };
 

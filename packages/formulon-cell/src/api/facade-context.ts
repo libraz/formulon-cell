@@ -57,6 +57,9 @@ export interface SheetContext extends WorkbookContext {
   cellWrite(args: readonly unknown[], write: () => void): void;
   /** Writes every cell of `range` through one engine call. */
   rangeWrite<T>(range: CellRect, write: () => T): T;
+  /** Writes `range` through one engine call and announces its cells, journaled by the member's codec
+   *  instead of the cell map. */
+  rangeAnnounce<T>(range: CellRect, write: () => T, journal: JournalSpec): T;
   /** The cell an A1 address or a `{ row, col }` names, on this sheet. */
   cellAt(at: string | CellAddress): CellAddress;
   /** The rectangle an A1 range or a `CellRect` names, on this sheet. */

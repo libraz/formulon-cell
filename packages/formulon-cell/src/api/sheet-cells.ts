@@ -189,7 +189,12 @@ function setArrayFormula(ctx: SheetContext, input: ArrayFormulaInput): void {
 }
 
 function addDataTable(ctx: SheetContext, spec: DataTableInput): CellAddress {
-  return ctx.rangeWrite(ctx.rectOf(spec.range), () => ctx.sheetEngine.addDataTable(spec));
+  const range = ctx.rectOf(spec.range);
+  return ctx.rangeAnnounce(range, () => ctx.sheetEngine.addDataTable(spec), {
+    hostId: 'sheet',
+    name: 'addDataTable',
+    args: [spec],
+  });
 }
 
 /** `removeDataTable(row, col)` or `removeDataTable(a1)`: the table whose result block holds the cell. */
@@ -201,7 +206,7 @@ function removeDataTable(ctx: SheetContext, ...args: unknown[]): void {
   const remove = (): void => ctx.sheetEngine.removeDataTable(at.row, at.col);
   const table = ctx.sheetEngine.getDataTable(at.row, at.col);
   if (table === null) ctx.run(remove);
-  else ctx.rangeWrite(table.range, remove);
+  else ctx.rangeAnnounce(table.range, remove, { hostId: 'sheet', name: 'removeDataTable', args });
 }
 
 /** Cell values, formulas, evaluation and CSV: engine `Sheet` members of the same name, plus CSV. */
