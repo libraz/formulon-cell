@@ -33,7 +33,7 @@ import type { PasteSpecialOpenOptions } from '../interact/paste-special.js';
 import type { StatusBarUploadStatus } from '../interact/status-bar.js';
 import type { SlicerSpec, SpreadsheetStore } from '../store/store.js';
 import type { SheetProtectionPermissions } from '../store/types.js';
-import type { MountToolbarOptions, ToolbarInstance } from './toolbar.js';
+import type { MountToolbarOptions, ToolbarInstance } from './toolbar-types.js';
 
 export type { FunctionCategory, FxDialogOpenOptions } from '../interact/fx-dialog.js';
 export type {

@@ -1,7 +1,7 @@
 import { spreadsheetFailure } from '../api/errors.js';
 import type { Disposer, Emitter } from '../api/events.js';
 import { canExecuteBuiltInRequest } from '../commands/built-in-command-policy.js';
-import type { ToolbarInstance } from '../mount/toolbar.js';
+import type { ToolbarInstance } from '../mount/toolbar-types.js';
 import type { SpreadsheetInstance as LegacyInstance } from '../mount/types.js';
 import type { RibbonDisplayMode } from './ribbon/render-ribbon.js';
 import type { RibbonTab } from './ribbon-model.js';

@@ -112,7 +112,8 @@ import {
   attachSheetTabsController,
   type SheetTabsController,
 } from './mount/sheet-tabs-controller.js';
-import { type MountToolbarOptions, mountToolbar, type ToolbarInstance } from './mount/toolbar.js';
+import { mountToolbar } from './mount/toolbar.js';
+import type { MountToolbarOptions, ToolbarInstance } from './mount/toolbar-types.js';
 import type { MountOptions, ScreenClipResult, SpreadsheetInstance } from './mount/types.js';
 import { GridRenderer } from './render/grid.js';
 import { createSpreadsheetStore, mutators } from './store/store.js';
@@ -120,12 +121,8 @@ import { resolveTheme } from './theme/resolve.js';
 import { showMessage } from './toolbar/dialogs/prompt.js';
 import { disposeMacRibbonActions } from './toolbar/ribbon/mac/actions.js';
 
-export type {
-  MountToolbarOptions,
-  RibbonDisplayMode,
-  ToolbarInstance,
-} from './mount/toolbar.js';
 export { RIBBON_HOST_MENU_FIRST_COMMANDS } from './mount/toolbar.js';
+export type { MountToolbarOptions, ToolbarInstance } from './mount/toolbar-types.js';
 export type {
   FunctionArgumentHelp,
   FunctionArgumentHelpProvider,
@@ -137,6 +134,7 @@ export type {
   ScreenClipResult,
   SpreadsheetInstance,
 } from './mount/types.js';
+export type { RibbonDisplayMode } from './toolbar/ribbon/render-ribbon.js';
 
 import { disposeDataTableDialog } from './interact/data-table-dialog.js';
 import { disposeMacGoalSeekDialog } from './interact/mac-goal-seek-dialog.js';

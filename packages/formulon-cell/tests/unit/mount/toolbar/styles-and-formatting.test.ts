@@ -5,7 +5,7 @@ import {
   customTableStyleId,
 } from '../../../../src/commands/format-as-table.js';
 import { addrKey } from '../../../../src/engine/address.js';
-import type { MountToolbarOptions } from '../../../../src/mount/toolbar.js';
+import type { MountToolbarOptions } from '../../../../src/mount/toolbar-types.js';
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
 import { RIBBON_BORDERS_MENU_ID } from '../../../../src/toolbar/ribbon/activation.js';

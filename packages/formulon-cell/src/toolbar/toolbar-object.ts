@@ -1,11 +1,11 @@
 import { Emitter } from '../api/events.js';
 import { type Disposable, Lifecycle } from '../api/lifecycle.js';
 import { legacyInstanceOf, type SpreadsheetInstance } from '../api/spreadsheet/instance.js';
-import {
-  type MountToolbarOptions as LegacyToolbarOptions,
-  mountToolbar as mountLegacyToolbar,
-  type ToolbarInstance,
-} from '../mount/toolbar.js';
+import { mountToolbar as mountLegacyToolbar } from '../mount/toolbar.js';
+import type {
+  MountToolbarOptions as LegacyToolbarOptions,
+  ToolbarInstance,
+} from '../mount/toolbar-types.js';
 import type { SpreadsheetInstance as LegacyInstance } from '../mount/types.js';
 import type { RibbonHooks } from './ribbon/apply-ribbon-command.js';
 import type { RibbonDisplayMode } from './ribbon/render-ribbon.js';

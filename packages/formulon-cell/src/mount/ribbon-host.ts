@@ -1,4 +1,5 @@
-import { mountToolbar, type ToolbarInstance } from './toolbar.js';
+import { mountToolbar } from './toolbar.js';
+import type { ToolbarInstance } from './toolbar-types.js';
 import type { SpreadsheetInstance } from './types.js';
 
 export interface RibbonHostDeps {

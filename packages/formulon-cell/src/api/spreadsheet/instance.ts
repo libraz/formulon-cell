@@ -40,8 +40,8 @@ import { focusSheet } from '../../interact/dialog-focus.js';
 import type { FormatPainterHandle } from '../../interact/format-painter.js';
 import type { ViewportOptions } from '../../interact/navigation-policy.js';
 import { shareSpreadsheetInternals, spreadsheetInternals } from '../../mount/internals.js';
-import type { MountToolbarOptions, ToolbarInstance } from '../../mount/toolbar.js';
 import { runRibbonCommand } from '../../mount/toolbar.js';
+import type { MountToolbarOptions, ToolbarInstance } from '../../mount/toolbar-types.js';
 import type {
   SpreadsheetInstance as LegacyInstance,
   MountOptions,
