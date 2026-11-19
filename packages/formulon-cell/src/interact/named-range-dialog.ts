@@ -9,9 +9,7 @@ import {
   deleteDefinedName,
   isSameDefinedName,
   isSameStoredEntry,
-  isValidDefinedName,
   resolveDefinedNameKey,
-  sanitizeName,
   upsertDefinedName,
 } from '../commands/named-ranges.js';
 import type { Addr, Range } from '../engine/types.js';
@@ -40,6 +38,16 @@ import {
   showDialogError,
 } from './dialog-shell.js';
 import { isImeKey } from './mac-dialog-keys.js';
+import {
+  errorMessageFor,
+  type NameFilter,
+  type NameSortKey,
+  newNameSeed,
+  replaceDefinedName,
+  scopeLabel,
+  scopeOptions,
+  selectNameRows,
+} from './named-range-dialog-model.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { attachRangePickerButton } from './range-picker-control.js';
@@ -70,9 +78,6 @@ export interface NamedRangeDialogHandle {
   bindWorkbook(next: WorkbookHandle): void;
 }
 
-type NameFilter = 'all' | 'errors' | 'noErrors' | 'workbook';
-type NameSortKey = 'name' | 'value' | 'formula' | 'scope' | 'comment';
-
 function createNameManagerButton(
   label: string,
   className: string,
@@ -81,21 +86,6 @@ function createNameManagerButton(
   const button = createDialogButton({ label, baseClass: className });
   if (opts.role) button.setAttribute('role', opts.role);
   return button;
-}
-
-const hasFormulaError = (formula: string): boolean =>
-  /#(?:REF|NAME|VALUE|DIV\/0|N\/A|NULL|NUM)!?/i.test(formula);
-
-/** Map a defined-name mutation failure to its inline message. */
-function errorMessageFor(
-  reason: 'empty-name' | 'invalid-name' | 'empty-formula' | 'unsupported' | 'engine-failed',
-  t: Strings['namedRangeDialog'],
-  refusal: Strings['commandRefusal'],
-): string {
-  if (reason === 'invalid-name') return t.errorInvalidName;
-  if (reason === 'empty-name') return t.errorEmptyName;
-  if (reason === 'empty-formula') return t.errorEmptyFormula;
-  return refusal.engineFailed;
 }
 
 /**
@@ -488,18 +478,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     }
     const canMutate = mayMutate();
     const allRows = [...wb.definedNames()].filter((entry) => !entry.hidden);
-    currentRows = allRows.filter((entry) => {
-      if (activeFilter === 'errors') return hasFormulaError(entry.formula);
-      if (activeFilter === 'noErrors') return !hasFormulaError(entry.formula);
-      if (activeFilter === 'workbook') return entry.localSheetId < 0;
-      return true;
-    });
-    currentRows.sort((a, b) => {
-      const left = sortValue(a, sortKey);
-      const right = sortValue(b, sortKey);
-      const result = left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
-      return sortDir === 'asc' ? result : -result;
-    });
+    currentRows = selectNameRows(wb, t, allRows, activeFilter, sortKey, sortDir);
     const count = currentRows.length;
     for (const [rowIndex, entry] of currentRows.entries()) {
       const item = document.createElement('div');
@@ -516,7 +495,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       formulaCell.textContent = definedNameDisplayFormula(entry.formula);
       const scope = document.createElement('span');
       scope.className = 'fc-namedlg__row-scope';
-      scope.textContent = scopeLabel(entry.localSheetId);
+      scope.textContent = scopeLabel(wb, t, entry.localSheetId);
       const comment = document.createElement('span');
       comment.className = 'fc-namedlg__row-comment';
       comment.textContent = entry.comment ?? '';
@@ -579,32 +558,6 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     filterBtn.textContent =
       activeFilter === 'all' ? t.filterButton : `${t.filterButton}: ${filterLabel(activeFilter)}`;
   };
-
-  const sortValue = (entry: DefinedNameEntry, key: NameSortKey): string => {
-    switch (key) {
-      case 'formula':
-        return entry.formula;
-      case 'scope':
-        return scopeLabel(entry.localSheetId);
-      case 'value':
-        return definedNameValueText(wb, entry);
-      case 'comment':
-        return entry.comment ?? '';
-      default:
-        return wb.localizeDefinedName(entry.name);
-    }
-  };
-
-  const scopeLabel = (localSheetId: number): string =>
-    localSheetId < 0 ? t.workbookScope : wb.sheetName(localSheetId);
-
-  const scopeOptions = (): { value: string; label: string }[] => [
-    { value: '-1', label: t.workbookScope },
-    ...Array.from({ length: wb.sheetCount }, (_, sheet) => ({
-      value: String(sheet),
-      label: wb.sheetName(sheet),
-    })),
-  ];
 
   const selectedScopeId = (): number => {
     const value = Number(scopeSelect.value);
@@ -693,7 +646,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     editorTitle.textContent = title;
     editorShell.setAriaLabel(title);
     scopeSelect.replaceChildren();
-    appendDialogSelectOptions(scopeSelect, scopeOptions());
+    appendDialogSelectOptions(scopeSelect, scopeOptions(wb, t));
     editingEntry = entry ?? null;
     projectDisabledState(scopeSelect, mode === 'edit', null);
     scopeSelect.value = String(entry?.localSheetId ?? -1);
@@ -702,7 +655,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       nameInput.value = wb.localizeDefinedName(entry.name);
       formulaInput.value = definedNameDisplayFormula(entry.formula);
     } else {
-      const seed = newNameSeed();
+      const seed = newNameSeed(wb, deps);
       nameInput.value = seed.name;
       formulaInput.value = seed.formula;
     }
@@ -714,29 +667,6 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     deferInitialFocus(editorShell.overlay, () => {
       focusAndSelectInput(nameInput);
     });
-  };
-
-  const newNameSeed = (): { name: string; formula: string } => {
-    const selection = deps.getSelection?.();
-    if (!selection) return { name: '', formula: deps.getSelectedRangeFormula?.() ?? '' };
-    const { active, range } = selection;
-    const formula = `=${formatSheetAbsoluteRange(wb.sheetName(range.sheet), range)}`;
-    const textAt = (row: number, col: number): string => {
-      if (row < 0 || col < 0) return '';
-      const v = wb.getValue({ sheet: active.sheet, row, col });
-      return v.kind === 'text' ? v.value.trim() : '';
-    };
-    const suggest = (text: string): string => {
-      if (!text) return '';
-      if (isValidDefinedName(text)) return text;
-      const cleaned = sanitizeName(text);
-      return isValidDefinedName(cleaned) ? cleaned : '';
-    };
-    const name =
-      suggest(textAt(active.row, active.col)) ||
-      suggest(textAt(active.row, active.col - 1)) ||
-      suggest(textAt(active.row - 1, active.col));
-    return { name, formula };
   };
 
   function closeDeleteConfirm(): void {
@@ -909,7 +839,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     defineSelected = null;
     defineName.input.value = '';
     // The range seeds as an absolute, sheet-qualified reference: =Sheet!$A$1:$D$7.
-    defineRange.input.value = newNameSeed().formula;
+    defineRange.input.value = newNameSeed(wb, deps).formula;
     clearDialogError(defineError);
     renderDefineNames();
     defineShell.open();
@@ -961,28 +891,6 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     quickInput.focus();
   };
 
-  /** Add `name`; when renaming, drop the entry it replaces so no copy is left behind. */
-  const replaceDefinedName = (
-    previous: DefinedNameEntry | null,
-    name: string,
-    formula: string,
-    scope: number,
-    comment: string,
-  ): ReturnType<typeof upsertDefinedName> => {
-    const key = resolveDefinedNameKey(wb, name, formula, scope);
-    const result = upsertDefinedName(wb, name, formula, scope, { comment });
-    // The entry the write landed on is never removed, whatever spelling it was typed in.
-    if (result.ok && previous !== null && !isSameStoredEntry(previous, key)) {
-      const removed = deleteDefinedName(wb, previous.name, previous.localSheetId);
-      if (!removed.ok) {
-        deleteDefinedName(wb, result.entry.name, result.entry.localSheetId);
-        const status = removed.reason === 'engine-failed' ? removed.status : null;
-        return { ok: false, reason: 'engine-failed', status };
-      }
-    }
-    return result;
-  };
-
   const onSubmit = (e: SubmitEvent): void => {
     e.preventDefault();
     e.stopPropagation();
@@ -1003,7 +911,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       return;
     }
     const written = writeNames(() =>
-      replaceDefinedName(previous, name, formula, scope, commentInput.value.trim()),
+      replaceDefinedName(wb, previous, name, formula, scope, commentInput.value.trim()),
     );
     if (!written.ok) return;
     const result = written.value;
