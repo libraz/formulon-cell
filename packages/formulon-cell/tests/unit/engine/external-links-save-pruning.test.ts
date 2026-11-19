@@ -30,8 +30,7 @@ describe('external links across save', () => {
     }
   });
 
-  // Waits for save to drop a link no formula uses and renumber the rest.
-  it.fails('lists only the book still in use, renumbered to 1', async () => {
+  it('lists only the book still in use, renumbered to 1', async () => {
     const re = await reloadAfterClearingFirstLink();
     try {
       const links = re.getExternalLinks();

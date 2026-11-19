@@ -25,7 +25,7 @@ describe('chartsheet tab colour and protection', () => {
     return wb;
   };
 
-  // Waits for the engine to accept setTabColor on a chartsheet.
+  // Waits for the host to write tab colour through Sheet.setTabColor; a chartsheet refuses <sheetPr> XML.
   it.fails('sets a tab colour through the host path and keeps it across save and reload', async () => {
     const wb = await open();
     expect(wb.sheetKind(0)).toBe(SheetKind.Chartsheet);
@@ -42,8 +42,7 @@ describe('chartsheet tab colour and protection', () => {
     expect(fresh.getState().layout.sheetTabColors.get(0)).toBe('#c00000');
   });
 
-  // Waits for the engine to accept setTabColor on a chartsheet.
-  it.fails('sets a tab colour on the engine chartsheet and reads it back', async () => {
+  it('sets a tab colour on the engine chartsheet and reads it back', async () => {
     const wb = await open();
     const sheet = rawSheet(wb, 0);
     expect(sheet.kind).toBe(SheetKind.Chartsheet);
