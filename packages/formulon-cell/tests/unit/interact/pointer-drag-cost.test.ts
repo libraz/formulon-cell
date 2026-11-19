@@ -112,7 +112,9 @@ describe('pointer drag per-move cost', () => {
     expect(tip?.hidden).toBe(false);
     expect(rectReads).toBe(MOVES);
     expect(vi.mocked(fillModule.fillLastValue).mock.calls.length).toBeLessThanOrEqual(1);
-    expect(vi.mocked(geometry.layoutForView).mock.calls.length).toBeLessThanOrEqual(2 * MOVES);
+    const layouts = vi.mocked(geometry.layoutForView).mock.calls.length;
+    expect(layouts).toBeGreaterThanOrEqual(MOVES);
+    expect(layouts).toBeLessThanOrEqual(2 * MOVES);
     fire(host, 'pointerup', 200, 130);
   });
 
