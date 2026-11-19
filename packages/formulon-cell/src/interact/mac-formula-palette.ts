@@ -45,6 +45,8 @@ import {
   parseOuterCall,
   projectFormulaCallAtCaret,
   replaceProjectedFormulaCall,
+  sameArgs,
+  sameProjectedCall,
 } from './mac-formula-call.js';
 import {
   argumentFieldCount,
@@ -239,24 +241,6 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     return callProjection;
   };
 
-  const sameProjectedCall = (
-    left: ProjectedFormulaCall | null,
-    right: ProjectedFormulaCall | null,
-  ): boolean => {
-    if (left === null || right === null) return left === right;
-    return (
-      left.source === right.source &&
-      left.span.canonicalName === right.span.canonicalName &&
-      left.span.name.start === right.span.name.start &&
-      left.span.name.end === right.span.name.end &&
-      left.span.call.start === right.span.call.start &&
-      left.span.call.end === right.span.call.end &&
-      left.span.openParen === right.span.openParen &&
-      left.span.closeParen === right.span.closeParen &&
-      left.span.complete === right.span.complete
-    );
-  };
-
   const textForEntry = (entry: FunctionCatalogEntry): string =>
     functionDescription(entry, catalogLocaleTag(deps.getLocale()));
 
@@ -385,9 +369,6 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     if (!preview || !selectedEntry) return;
     preview.textContent = previewText(selectedEntry);
   };
-
-  const sameArgs = (left: readonly string[], right: readonly string[]): boolean =>
-    left.length === right.length && left.every((value, index) => value === right[index]);
 
   /** Adopt one authoritative draft snapshot without causing a render loop. */
   const adoptDraftView = (

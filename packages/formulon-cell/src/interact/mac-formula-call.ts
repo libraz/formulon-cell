@@ -179,3 +179,26 @@ export const replaceProjectedFormulaCall = (
     caret: start + replacement.length,
   };
 };
+
+/** Whether two projections name the same call at the same source spans. */
+export const sameProjectedCall = (
+  left: ProjectedFormulaCall | null,
+  right: ProjectedFormulaCall | null,
+): boolean => {
+  if (left === null || right === null) return left === right;
+  return (
+    left.source === right.source &&
+    left.span.canonicalName === right.span.canonicalName &&
+    left.span.name.start === right.span.name.start &&
+    left.span.name.end === right.span.name.end &&
+    left.span.call.start === right.span.call.start &&
+    left.span.call.end === right.span.call.end &&
+    left.span.openParen === right.span.openParen &&
+    left.span.closeParen === right.span.closeParen &&
+    left.span.complete === right.span.complete
+  );
+};
+
+/** Element-wise equality of two argument lists. */
+export const sameArgs = (left: readonly string[], right: readonly string[]): boolean =>
+  left.length === right.length && left.every((value, index) => value === right[index]);
