@@ -94,7 +94,7 @@ export function formulaValueLiteral(v: CellValue | undefined): string {
     case 'number':
       return String(v.value);
     case 'bool':
-      return v.value ? 'TRUE' : 'FALSE';
+      return formatBoolean(v.value);
     case 'text':
       return formulaTextLiteral(v.value);
     case 'error':

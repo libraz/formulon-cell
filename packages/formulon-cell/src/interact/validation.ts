@@ -10,6 +10,7 @@ import { resolveListValues } from '../commands/validate.js';
 import { addrKey } from '../engine/address.js';
 import { fontPointsToCssPx } from '../engine/font-units.js';
 import { makeRangeResolver } from '../engine/range-resolver.js';
+import { formatBoolean } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import { cellRect, layoutForView } from '../render/geometry.js';
@@ -81,7 +82,7 @@ const cellText = (s: State, row: number, col: number): string => {
   const current = s.data.cells.get(addrKey({ sheet: s.data.sheetIndex, row, col }))?.value;
   if (current?.kind === 'text') return current.value;
   if (current?.kind === 'number') return String(current.value);
-  if (current?.kind === 'bool') return current.value ? 'TRUE' : 'FALSE';
+  if (current?.kind === 'bool') return formatBoolean(current.value);
   return '';
 };
 

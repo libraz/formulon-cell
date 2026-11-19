@@ -1,9 +1,10 @@
 import type { CellValue } from '../../engine/types.js';
+import { formatBoolean } from '../../engine/value.js';
 
 const textValue = (value: CellValue): string | null => {
   if (value.kind === 'text') return value.value;
   if (value.kind === 'number') return String(value.value);
-  if (value.kind === 'bool') return value.value ? 'TRUE' : 'FALSE';
+  if (value.kind === 'bool') return formatBoolean(value.value);
   if (value.kind === 'blank') return '';
   return null;
 };

@@ -1,5 +1,6 @@
 import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
+import { formatBoolean } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { excelSerialFromDate, excelSerialToDate } from '../format/date-serial.js';
 import { normalizeRange, rangeArea, rangesIntersect } from '../store/selection-geometry.js';
@@ -826,7 +827,7 @@ export function fillLastValue(
   if (!projected) return null;
   if (projected.kind === 'number') return String(projected.value);
   if (projected.kind === 'text') return projected.value;
-  if (projected.kind === 'bool') return projected.value ? 'TRUE' : 'FALSE';
+  if (projected.kind === 'bool') return formatBoolean(projected.value);
   return null;
 }
 

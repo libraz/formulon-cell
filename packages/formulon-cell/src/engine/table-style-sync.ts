@@ -6,6 +6,7 @@ import {
   type PivotTableStyleAssignment,
   type StripeElement,
 } from '../commands/format-as-table.js';
+import { sameJsonValue } from '../commands/prepared-change.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { nameKey } from '../store/table-names.js';
 import type { CellFormat, TablesSlice } from '../store/types.js';
@@ -162,19 +163,11 @@ type StyleSlices = Pick<
   'customTableStyles' | 'customPivotTableStyles' | 'pivotTableStyles'
 >;
 
-/** JSON with object keys sorted, so equal styles compare equal whatever their key order. */
-const canonical = (value: unknown): string =>
-  JSON.stringify(value, (_key, v) =>
-    v && typeof v === 'object' && !Array.isArray(v)
-      ? Object.fromEntries(Object.entries(v).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)))
-      : v,
-  );
-
 const sameStyle = (a: CustomTableStyle, b: CustomTableStyle | undefined): boolean =>
   !!b &&
   a.label === b.label &&
-  canonical(a.elements) === canonical(b.elements) &&
-  canonical(a.stripeSizes ?? {}) === canonical(b.stripeSizes ?? {});
+  sameJsonValue(a.elements, b.elements) &&
+  sameJsonValue(a.stripeSizes ?? {}, b.stripeSizes ?? {});
 
 const pivotKey = (a: PivotTableStyleAssignment): string => `${a.sheetIndex}:${a.pivotIndex}`;
 

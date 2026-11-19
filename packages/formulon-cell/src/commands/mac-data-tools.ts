@@ -1,6 +1,7 @@
 import { colLetter, formatA1Cell, MAX_COL, MAX_ROW, quoteSheetName } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
+import { formatBoolean } from '../engine/value.js';
 import { type CellSnapshot, WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
@@ -935,7 +936,7 @@ const subtotalFunctionCode = (fn: MacDataFunction): number => {
 const subtotalLabel = (value: CellValue): string => {
   if (value.kind === 'blank') return '';
   if (value.kind === 'number') return String(value.value);
-  if (value.kind === 'bool') return value.value ? 'TRUE' : 'FALSE';
+  if (value.kind === 'bool') return formatBoolean(value.value);
   if (value.kind === 'text') return value.value;
   return value.text;
 };

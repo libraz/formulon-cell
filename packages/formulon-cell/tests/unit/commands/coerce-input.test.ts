@@ -10,7 +10,7 @@ import {
   writeInput,
   writeInputValidated,
 } from '../../../src/commands/coerce-input.js';
-import type { Addr } from '../../../src/engine/types.js';
+import { type Addr, type Value, ValueKind } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
@@ -414,5 +414,23 @@ describe('custom validation literal substitution', () => {
     writeInputValidated(wb, target, '1', { ...validation, formula: '=ISERROR(A3)' });
     expect(seen).toContain('=LEN("say ""hi"" \\ there")>0');
     expect(seen).toContain('=ISERROR(#DIV/0!)');
+  });
+});
+
+describe('custom validation boolean candidate', () => {
+  it('substitutes a typed TRUE / FALSE as a boolean literal and honours the verdict', async () => {
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    const seen: string[] = [];
+    vi.spyOn(wb, 'evalFormula').mockImplementation((formula: string) => {
+      seen.push(formula);
+      return { kind: ValueKind.Bool, boolean: formula === '=TRUE=TRUE' } as Value;
+    });
+    const validation = { kind: 'custom' as const, formula: '=A1=TRUE' };
+    const target = { sheet: 0, row: 0, col: 0 };
+    const accepted = writeInputValidated(wb, target, 'TRUE', validation);
+    const refused = writeInputValidated(wb, target, 'FALSE', validation);
+    expect(seen).toEqual(['=TRUE=TRUE', '=FALSE=TRUE']);
+    expect(accepted.ok).toBe(true);
+    expect(refused.ok).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 import { addrKey, formatA1Cell } from '../engine/address.js';
 import type { CellValue, Range } from '../engine/types.js';
-import { formulaTextLiteral } from '../engine/value.js';
+import { formatBoolean, formulaTextLiteral } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { excelSerialToDate } from '../format/date-serial.js';
 import type {
@@ -841,7 +841,7 @@ function paintAverage(
 function cellText(v: CellValue): string | null {
   if (v.kind === 'text') return v.value;
   if (v.kind === 'number') return String(v.value);
-  if (v.kind === 'bool') return v.value ? 'TRUE' : 'FALSE';
+  if (v.kind === 'bool') return formatBoolean(v.value);
   if (v.kind === 'error') return v.text;
   return null;
 }

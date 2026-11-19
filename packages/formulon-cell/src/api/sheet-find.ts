@@ -10,6 +10,7 @@ import { appliedBatch, refusedBatch } from '../commands/interaction-policy.js';
 import { engineRefusalReasonKey } from '../commands/permission-reasons.js';
 import { isFormulonError } from '../engine/result.js';
 import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
+import { formatBoolean } from '../engine/value.js';
 import type { ChangeBatchResult } from './change-batch.js';
 import type { MemberSpec, SheetContext } from './facade-context.js';
 import { writeCoerced } from './sheet-cells.js';
@@ -56,7 +57,7 @@ const enteredText = (sheet: EngineSheet, row: number, col: number): string => {
     case ValueKind.Number:
       return String(value.number);
     case ValueKind.Bool:
-      return value.boolean ? 'TRUE' : 'FALSE';
+      return formatBoolean(value.boolean);
     case ValueKind.Text:
       return value.text;
     case ValueKind.Error:

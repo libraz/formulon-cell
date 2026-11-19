@@ -12,6 +12,7 @@ import {
   stripEquals,
   syncValidationsToEngine,
 } from '../engine/validation-sync.js';
+import { formatBoolean } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { subtractFromRangeValidations } from '../store/range-validations.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
@@ -396,7 +397,7 @@ function inputAsText(input: Exclude<CoercedInput, { kind: 'formula' }>): string 
     case 'number':
       return String(input.value);
     case 'bool':
-      return input.value ? 'TRUE' : 'FALSE';
+      return formatBoolean(input.value);
     case 'error':
       return input.text;
     case 'text':

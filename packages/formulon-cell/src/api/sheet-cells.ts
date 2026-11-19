@@ -147,11 +147,7 @@ function exportCsv(ctx: SheetContext, options: ExportCsvOptions = {}): string {
       case ValueKind.Text:
         return value.text;
       case ValueKind.Bool:
-        return locale === undefined
-          ? value.boolean
-            ? 'TRUE'
-            : 'FALSE'
-          : formatBoolean(value.boolean, locale);
+        return formatBoolean(value.boolean, locale);
       case ValueKind.Error:
         return sheet.getDisplayText(row, col).text;
       default:

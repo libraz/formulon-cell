@@ -305,9 +305,6 @@ const mergeVisualFormat = (
   return Object.keys(next).length > 0 ? next : undefined;
 };
 
-const sameFormat = (a: CellFormat | undefined, b: CellFormat | undefined): boolean =>
-  sameJsonValue(a, b);
-
 const copyMergeVisualFormats = (store: SpreadsheetStore, range: Range): void => {
   const state = store.getState();
   const anchorFormat = state.format.formats.get(
@@ -327,7 +324,7 @@ const copyMergeVisualFormats = (store: SpreadsheetStore, range: Range): void => 
       if (nextBorders === undefined) delete next.borders;
       else next.borders = nextBorders;
       const final = Object.keys(next).length > 0 ? next : undefined;
-      if (sameFormat(current, final)) continue;
+      if (sameJsonValue(current, final)) continue;
       changed = true;
       if (final === undefined) formats.delete(key);
       else formats.set(key, final);

@@ -4,6 +4,7 @@ import { makeRangeResolver } from '../engine/range-resolver.js';
 import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
 import type { Addr, SpreadsheetProfileId } from '../engine/types.js';
 import {
+  formatBoolean,
   formatError,
   formulaTextLiteral,
   formulaValueLiteral,
@@ -427,7 +428,7 @@ function coercedLiteral(input: CoercedInput): string {
     case 'number':
       return String(input.value);
     case 'bool':
-      return input.value ? 'TRUE' : 'FALSE';
+      return formatBoolean(input.value);
     case 'error':
       return formatError(input.code, input.text);
     case 'text':

@@ -6,7 +6,7 @@ import {
   profileTextKey,
 } from '../engine/profile-text-semantics.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
-import { formatCell, fromEngineValue, writeCell } from '../engine/value.js';
+import { formatBoolean, formatCell, fromEngineValue, writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isDataTableFormula } from '../engine/workbook-handle-data-tables.js';
 import { excelSerialToDateParts } from '../format/date-serial.js';
@@ -1423,6 +1423,6 @@ export const filterValueKey = (v: unknown): string => {
   const cv = v as { kind: string; value?: unknown };
   if (cv.kind === 'number') return String(cv.value);
   if (cv.kind === 'text') return String(cv.value ?? '');
-  if (cv.kind === 'bool') return cv.value ? 'TRUE' : 'FALSE';
+  if (cv.kind === 'bool') return formatBoolean(Boolean(cv.value));
   return '';
 };

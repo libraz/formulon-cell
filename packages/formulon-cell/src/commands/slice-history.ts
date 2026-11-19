@@ -30,6 +30,7 @@ import type {
 } from './format-as-table.js';
 import type { History, HistoryEntry } from './history.js';
 import type { OperationIntent } from './interaction-policy.js';
+import { sameJsonValue } from './prepared-change.js';
 import { deferForAllowedRangeUnlock, selectionEditRanges } from './protection.js';
 
 /* ---------- Snapshot helpers ---------- */
@@ -149,13 +150,10 @@ const sameFormatSnapshot = (a: FormatSnapshot, b: FormatSnapshot): boolean =>
 
 const jsonSnapshot = (value: unknown): string => JSON.stringify(value);
 
-const sameFormatValue = (a: CellFormat | undefined, b: CellFormat | undefined): boolean =>
-  jsonSnapshot(a) === jsonSnapshot(b);
-
 const changedFormatKeys = (before: FormatSnapshot, after: FormatSnapshot): Set<string> => {
   const changed = new Set<string>();
   for (const key of new Set([...before.formats.keys(), ...after.formats.keys()])) {
-    if (!sameFormatValue(before.formats.get(key), after.formats.get(key))) changed.add(key);
+    if (!sameJsonValue(before.formats.get(key), after.formats.get(key))) changed.add(key);
   }
   return changed;
 };
