@@ -2,7 +2,6 @@ import { autoCorrectInput, correctTypedEntry } from '../commands/autocorrect.js'
 import {
   type CellInputAlert,
   commitCellInput,
-  inputOperation,
   protectedCellAlert,
   selectRefusedSpan,
 } from '../commands/cell-input-commit.js';
@@ -55,10 +54,7 @@ import { classifyFormulaReferenceArrow } from '../interact/formula-reference-arr
 import type { ActiveReferenceGesture } from '../interact/formula-reference-gesture.js';
 import { isImeKey } from '../interact/mac-dialog-keys.js';
 import {
-  isNavigationAddrAllowed,
-  navigationBoundsFor,
   navigationPolicyFor,
-  navigationSelectionBoundsFor,
   nextTabStop,
   resolveTabBoundary,
   scrollActiveIntoView,
@@ -75,6 +71,7 @@ import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import type { EditorRefHighlight } from '../store/types.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { moveAfterCommit, tabCaptured } from './formula-bar-advance.js';
 
 interface FormulaBarAutocomplete {
   isOpen(): boolean;
@@ -661,38 +658,6 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     else console.warn(`formulon-cell: formula-bar commit rejected: ${message}`);
   };
 
-  const moveAfterCommit = (advance: CommitAdvance): void => {
-    if (advance === 'none') return;
-    const controller = interactionControllerFor(store);
-    if (controller?.policy?.selection === false) return;
-    const hasTabStops =
-      controller?.policy !== undefined ||
-      navigationBoundsFor(store) !== undefined ||
-      navigationSelectionBoundsFor(store) !== undefined;
-    // Mac Tab honours explicit tab stops ahead of the selected rectangle.
-    if (isMacPlatform() && (advance === 'right' || advance === 'left') && hasTabStops) {
-      const target = nextTabStop(store, store.getState().selection.active, advance === 'left');
-      if (target && isNavigationAddrAllowed(store, target)) mutators.setActive(store, target);
-      return;
-    }
-    advanceAfterCommit(store, advance, isMacPlatform());
-  };
-
-  /** Whether the bar owns Tab: false when the active cell cannot be edited from here. */
-  const tabCaptured = (): boolean => {
-    const controller = interactionControllerFor(store);
-    if (controller?.policy?.selection === false || fxInput.readOnly) return false;
-    const state = store.getState();
-    const a = state.selection.active;
-    if (!isCellWritable(state, a)) return false;
-    if (controller?.policy === undefined) return true;
-    return controller.canExecute({
-      operation: inputOperation(fxInput.value),
-      origin: 'editor',
-      effects: [{ kind: 'cells', cells: [a] }],
-    }).allowed;
-  };
-
   /** Tab / Shift+Tab from the bar: commit any draft and move as the grid's own Tab would. */
   const tabFromBar = (e: KeyboardEvent): void => {
     const reverse = e.shiftKey;
@@ -946,7 +911,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     commitDeferred = false;
     if (!commitRawAt(a, fxInput.value)) return false;
     finishEditing();
-    moveAfterCommit(advance);
+    moveAfterCommit(store, advance, isMacPlatform());
     focusSheet(host);
     showCommittedText();
     return true;
@@ -1321,7 +1286,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       e.stopPropagation();
       commitFx('down');
     } else if (e.key === 'Tab') {
-      if (!tabCaptured()) return;
+      if (!tabCaptured(store, fxInput)) return;
       e.stopPropagation();
       tabFromBar(e);
     } else if (e.key === 'Escape') {
