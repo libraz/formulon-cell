@@ -71,6 +71,9 @@ export type ChangeEvent =
   | { kind: 'sheet-move'; from: number; to: number }
   | { kind: 'sheet-copy'; source: number; index: number; name: string };
 
+/** A store-originated write the engine refused. */
+export type WriteRefusal = { kind: 'sheetPr'; sheet: number };
+
 /** Store slice a non-cell write through the public facade touched; the mount re-hydrates it. */
 export type FacadeChangeKind =
   | 'format'
@@ -197,6 +200,7 @@ export class WorkbookHandle {
 
   private readonly listeners = new Set<ChangeListener>();
 
+  private readonly refusalListeners = new Set<(refusal: WriteRefusal) => void>();
   private readonly facadeListeners = new Set<(change: FacadeChange) => void>();
 
   private disposed = false;
@@ -1198,6 +1202,24 @@ export class WorkbookHandle {
     else this.recalcAuto();
   }
 
+  /** Announces that the engine refused a write the store had accepted; the store is already back at
+   *  the engine's value. */
+  noteWriteRefused(refusal: WriteRefusal): void {
+    for (const fn of [...this.refusalListeners]) {
+      try {
+        fn(refusal);
+      } catch {
+        // Observers are advisory, as for `emit`.
+      }
+    }
+  }
+
+  /** Subscribes to engine refusals of store-originated writes. */
+  subscribeWriteRefusals(fn: (refusal: WriteRefusal) => void): () => void {
+    this.refusalListeners.add(fn);
+    return () => this.refusalListeners.delete(fn);
+  }
+
   /** Subscribes to non-cell facade writes. */
   subscribeFacadeChanges(fn: (change: FacadeChange) => void): () => void {
     this.facadeListeners.add(fn);
@@ -1215,6 +1237,7 @@ export class WorkbookHandle {
     this.disposed = true;
     this.listeners.clear();
     this.facadeListeners.clear();
+    this.refusalListeners.clear();
     this.wb.dispose();
   }
 

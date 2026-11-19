@@ -40,6 +40,7 @@ import type {
   FacadeChange,
   FacadeChangeKind,
   WorkbookHandle,
+  WriteRefusal,
 } from '../engine/workbook-handle.js';
 import type { CellChangeEvent, SpreadsheetEmitter } from '../events.js';
 import type { resolveFlags } from '../extensions/features.js';
@@ -80,6 +81,7 @@ import type { GridRenderer } from '../render/grid.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { resolveTheme } from '../theme/resolve.js';
+import { showCommandRefusal } from '../toolbar/dialogs/command-refusal.js';
 import { confirmMoveOverwrite } from '../toolbar/dialogs/move-overwrite-confirm.js';
 import { hydrateActiveSheetFromEngine, hydrateWorkbookMetadataFromEngine } from './hydration.js';
 import type { SheetTabsController } from './sheet-tabs-controller.js';
@@ -225,6 +227,15 @@ export const WB_REGISTRY_IDS = [
   'findReplace',
   'validation',
 ] as const;
+
+/** The dialog a refused store write belongs to, which titles its notice. */
+function writeRefusalTitle(kind: WriteRefusal['kind'], strings: Strings): string {
+  switch (kind) {
+    // Tab colour is the only sheetPr field with a dialog.
+    case 'sheetPr':
+      return strings.sheetTabs.tabColor;
+  }
+}
 
 export function attachEngineBinding(input: AttachEngineBindingInput): EngineBinding {
   const {
@@ -705,6 +716,16 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     }
   });
 
+  // A store change the engine refused has been reverted; tell the user.
+  const unsubRefusals = wb.subscribeWriteRefusals((refusal) => {
+    void showCommandRefusal({
+      host,
+      strings,
+      title: writeRefusalTitle(refusal.kind, strings),
+      reason: 'engine-failed',
+    });
+  });
+
   // A write through the public facade changes the engine only; bring the store slice it touched
   // back in line so the grid shows it.
   const unsubFacade = wb.subscribeFacadeChanges((change: FacadeChange) => {
@@ -762,6 +783,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       grid.removeEventListener('dblclick', onDblClick);
       unsubWb();
       unsubFacade();
+      unsubRefusals();
       pendingAtomic.clear();
       if (editor.isActive()) editor.cancel();
     },

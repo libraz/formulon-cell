@@ -12,7 +12,7 @@ import {
   mergePageSetupFragment,
   readPageSetupExtras,
 } from './page-setup-xml.js';
-import { attemptWrite, orFallback } from './result.js';
+import { attemptWrite, attemptWriteStatus, orFallback, type WriteResult } from './result.js';
 import { isChartsheet, sheetHasCells, sheetHasView } from './sheet-kind.js';
 import {
   type EngineSheetPr,
@@ -280,15 +280,17 @@ export abstract class WorkbookHandlePrintMethods {
   }
 
   /** Merge a tab colour and/or outline summary position into `<sheetPr>`. The
-   *  rest of the fragment (code name, filter mode, fit-to-page, ...) is kept. */
-  setSheetPr(sheet: number, change: EngineSheetPrInput): boolean {
+   *  rest of the fragment (code name, filter mode, fit-to-page, ...) is kept.
+   *  `status` is null when no engine call was made. */
+  setSheetPr(sheet: number, change: EngineSheetPrInput): WriteResult {
     assertAlive(this);
-    if (!this.capabilities.sheetPrXml) return false;
+    if (!this.capabilities.sheetPrXml) return { ok: false, status: null };
     const sh = ws(this, sheet);
     const current = sh.ooxml.getSheetPrXml() ?? '';
     const next = mergeSheetPrFragment(current, change);
-    if (next === null) return false;
-    return next === current || attemptWrite(() => sh.ooxml.setSheetPrXml(next || null));
+    if (next === null) return { ok: false, status: null };
+    if (next === current) return { ok: true };
+    return attemptWriteStatus(() => sh.ooxml.setSheetPrXml(next || null));
   }
 
   /** `_xlnm.Print_Area` as comma-separated A1 ranges; empty when unset. */

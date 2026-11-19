@@ -91,7 +91,7 @@ describe('sheetPr persistence through the engine', () => {
         true,
       );
       expect(raw.sheet(0).ooxml.getSheetPrXml()).toContain('fitToPage');
-      expect(wb.setSheetPr(0, { tabColor: { rgb: 'FF00B050' } })).toBe(true);
+      expect(wb.setSheetPr(0, { tabColor: { rgb: 'FF00B050' } })).toEqual({ ok: true });
       expect(raw.sheet(0).ooxml.getSheetPrXml()).toContain('fitToPage');
       expect(wb.getSheetPr(0)?.tabColor).toEqual({ rgb: 'FF00B050' });
     } finally {

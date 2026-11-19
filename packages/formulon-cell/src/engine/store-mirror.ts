@@ -314,7 +314,10 @@ export class StoreMirror {
         if (formatPublicationAttempted) advanceNativeFormatEpoch(this.handle);
       }
       for (const sheet of sheetPrSheets) {
-        if (sheet < this.handle.sheetCount) syncSheetPrToEngine(this.handle, store, sheet);
+        if (sheet < this.handle.sheetCount) {
+          const written = syncSheetPrToEngine(this.handle, store, sheet);
+          if (!written.ok) this.handle.noteWriteRefused({ kind: 'sheetPr', sheet });
+        }
       }
       if (filterChanged) syncAutoFilterToEngine(this.handle, state, state.data.sheetIndex, store);
       if (hiddenRowsChanged && previousHiddenRows && !filterChanged) {

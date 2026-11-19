@@ -1,6 +1,7 @@
 import { ColorKind } from '@libraz/formulon';
 import { DEFAULT_OUTLINE_SUMMARY } from '../store/outline-summary.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import type { WriteResult } from './result.js';
 import type { EngineSheetPrInput, SheetTabColorSpec } from './sheet-pr-xml.js';
 import { argbFromCssColor, cssColorFromArgb } from './theme-color.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -49,16 +50,18 @@ export function hydrateSheetPrForSheet(
  * Write the store's tab colour and outline summary position for `sheet` into
  * `<sheetPr>`. A tab colour the file already states in another notation (a
  * theme colour) is left alone while it resolves to the colour the store holds.
+ * When the engine refuses the write the store follows the engine: every field
+ * written here is re-read from `<sheetPr>` and the refusal is returned.
  */
 export function syncSheetPrToEngine(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
   sheet: number,
-): void {
-  if (!wb.capabilities.sheetPrXml) return;
+): WriteResult {
+  if (!wb.capabilities.sheetPrXml) return { ok: true };
   const { layout } = store.getState();
   const current = wb.getSheetPr(sheet);
-  if (!current) return;
+  if (!current) return { ok: true };
   const change: EngineSheetPrInput = {};
 
   const color = layout.sheetTabColors.get(sheet) ?? null;
@@ -74,5 +77,18 @@ export function syncSheetPrToEngine(
   if (summary.below !== current.summaryBelow) change.summaryBelow = summary.below;
   if (summary.right !== current.summaryRight) change.summaryRight = summary.right;
 
-  if (Object.keys(change).length > 0) wb.setSheetPr(sheet, change);
+  if (Object.keys(change).length === 0) return { ok: true };
+  const written = wb.setSheetPr(sheet, change);
+  if (!written.ok) {
+    wb.withEngineSyncMuted(() => revertSheetPrFromEngine(wb, store, sheet));
+  }
+  return written;
+}
+
+/** Set the store's tab colour and outline summary position for `sheet` to what `<sheetPr>` holds. */
+function revertSheetPrFromEngine(wb: WorkbookHandle, store: SpreadsheetStore, sheet: number): void {
+  const pr = wb.getSheetPr(sheet);
+  if (!pr) return;
+  mutators.setSheetTabColor(store, sheet, pr.tabColor ? tabColorToCss(wb, pr.tabColor) : null);
+  mutators.setOutlineSummary(store, sheet, { below: pr.summaryBelow, right: pr.summaryRight });
 }
