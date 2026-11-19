@@ -1,6 +1,7 @@
 import {
   runCopyPasteScenario,
   runCutPasteScenario,
+  runHtmlFontFamilyEscapeScenario,
   runRibbonPasteUndoScenario,
 } from '../../../tests/e2e-shared/scenarios/clipboard.js';
 import { SYSTEM_CLIPBOARD } from '../../../tests/e2e-shared/tags.js';
@@ -32,4 +33,10 @@ test('C05 (react-demo): ribbon Paste click writes the clipboard text into the se
 }, async ({ page, browserName }) => {
   test.skip(browserName === 'webkit', 'WebKit denies the clipboard read an external paste needs');
   await runRibbonPasteUndoScenario(page);
+});
+
+test('C06 (react-demo): a copied font family keeps an ampersand and a quote through the CSS parser', async ({
+  page,
+}) => {
+  await runHtmlFontFamilyEscapeScenario(page);
 });

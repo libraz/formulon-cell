@@ -276,3 +276,39 @@ export async function runRibbonPasteUndoScenario(page: Page): Promise<void> {
       value: 99,
     });
 }
+
+/** A copied font family with an ampersand and a quote reads back unchanged through the
+ *  browser's CSS parser, which decodes the escapes the HTML clipboard writes. */
+export async function runHtmlFontFamilyEscapeScenario(page: Page): Promise<void> {
+  const sp = new SpreadsheetPage(page);
+  await sp.mount();
+  await sp.expectNoStub();
+  const families = await page.evaluate(() => {
+    const w = window as InstanceWindow;
+    if (!w.__fcInst || !w.__fcProbes) return null;
+    const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
+    w.__fcProbes['store/store'].mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { fontFamily: 'R&D "Mono"' },
+    );
+    const html = w.__fcProbes['commands/clipboard/html'].encodeHtml(store.getState(), {
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 0,
+      c1: 0,
+    });
+    const td = new DOMParser().parseFromString(html, 'text/html').querySelector('td');
+    const reference = document.createElement('td');
+    reference.style.fontFamily = '"R&D \\"Mono\\""';
+    return {
+      escaped: html.includes('\\26 '),
+      read: td?.style.fontFamily,
+      reference: reference.style.fontFamily,
+    };
+  });
+  expect(families?.escaped).toBe(true);
+  expect(families?.read).toBe(families?.reference);
+  expect(families?.read).toContain('R&D');
+}

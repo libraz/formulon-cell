@@ -6,6 +6,7 @@
 import * as apiWorkbook from '../../packages/formulon-cell/src/api/workbook.js';
 import * as chartsLayout from '../../packages/formulon-cell/src/charts/layout.js';
 import * as commandsAutofitMeasurement from '../../packages/formulon-cell/src/commands/autofit-measurement.js';
+import * as commandsClipboardHtml from '../../packages/formulon-cell/src/commands/clipboard/html.js';
 import * as commandsFormatAsTable from '../../packages/formulon-cell/src/commands/format-as-table.js';
 import * as commandsPivotReportUpdate from '../../packages/formulon-cell/src/commands/pivot-report-update.js';
 import * as commandsPivotTable from '../../packages/formulon-cell/src/commands/pivot-table.js';
@@ -29,6 +30,7 @@ export const e2eProbes = {
   'api/workbook': apiWorkbook,
   'charts/layout': chartsLayout,
   'commands/autofit-measurement': commandsAutofitMeasurement,
+  'commands/clipboard/html': commandsClipboardHtml,
   'commands/format-as-table': commandsFormatAsTable,
   'commands/pivot-report-update': commandsPivotReportUpdate,
   'commands/pivot-table': commandsPivotTable,
