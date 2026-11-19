@@ -5,7 +5,10 @@ import type {
   Workbook as EngineWorkbook,
 } from '@libraz/formulon';
 import type { FacadeChangeKind, WorkbookHandle } from '../engine/workbook-handle.js';
+import type { JournalSpec } from './journal/index.js';
 import type { Sheet, Workbook } from './workbook.js';
+
+export type { JournalSpec } from './journal/index.js';
 
 /**
  * What a facade member file needs to implement a member: the live engine handles and the write
@@ -20,8 +23,14 @@ export interface WorkbookContext {
   /** Runs `fn` as one facade operation: one recalc, one `change` event, one undo step. */
   run<T>(fn: () => T): T;
   /** Runs a non-cell write and announces the store slice it touched; `range` names the cells a
-   *  range write reached. */
-  change<T>(kind: FacadeChangeKind, sheet: number | null, fn: () => T, range?: CellRect): T;
+   *  range write reached. `journal` overrides how the write is journaled (default: the kind's). */
+  change<T>(
+    kind: FacadeChangeKind,
+    sheet: number | null,
+    fn: () => T,
+    range?: CellRect,
+    journal?: JournalSpec,
+  ): T;
   /** The facade of an engine sheet handle. */
   sheet(engine: EngineSheet): Sheet;
   /** The facade of an engine object handle (a table, a picture, …): one facade per handle. */
@@ -53,7 +62,7 @@ export interface SheetContext extends WorkbookContext {
   /** The rectangle an A1 range or a `CellRect` names, on this sheet. */
   rectOf(range: string | CellRect): CellRect;
   /** `change` on this sheet. */
-  sheetChange<T>(kind: FacadeChangeKind, fn: () => T, range?: CellRect): T;
+  sheetChange<T>(kind: FacadeChangeKind, fn: () => T, range?: CellRect, journal?: JournalSpec): T;
 }
 
 /** A hand-written facade member: receives the context first, then the caller's arguments. */

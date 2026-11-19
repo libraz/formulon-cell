@@ -18,6 +18,7 @@ import {
   type LocaleFacts,
   StatusCode,
 } from '@libraz/formulon';
+import { type HistoryEntry, recordingHistory, transactIn } from '../commands/history.js';
 import type { InteractionOrigin } from '../commands/interaction-policy.js';
 import { WORKBOOK_SAVE_FORMATS, type WorkbookSaveFormat } from '../commands/workbook-save.js';
 import {
@@ -55,6 +56,13 @@ import type {
   SheetContext,
   WorkbookContext,
 } from './facade-context.js';
+import {
+  type JournalCodec,
+  type JournalScope,
+  type JournalSpec,
+  type Restore,
+  resolveJournal,
+} from './journal/index.js';
 import { Lifecycle } from './lifecycle.js';
 import { SHEET_OOXML_MEMBERS, SheetOoxml, WORKBOOK_OOXML_MEMBERS, WorkbookOoxml } from './ooxml.js';
 import { PIVOT_MEMBERS, Pivot, SHEET_PIVOT_MEMBERS } from './pivot.js';
@@ -149,11 +157,33 @@ export interface WorkbookEvents {
   change: WorkbookChange;
 }
 
+/** One non-cell write's slice of engine state, captured on first touch in a segment. */
+interface JournalRecord {
+  readonly change: FacadeChange;
+  readonly before: Restore;
+  /** Captures the slice again at seal time. */
+  readonly capture: () => Restore | null;
+}
+
+/** The writes between two seals; sealed, it becomes one history entry. */
+interface Segment {
+  /** Before-state of each cell written, by `sheet:row:col`. */
+  readonly cells: Map<string, CellSnapshot>;
+  /** Before-state of each journaled slice, by codec id and scope. */
+  readonly parts: Map<string, JournalRecord>;
+}
+
 interface BatchState {
   depth: number;
-  /** Before-state of each cell written in the current batch, by `sheet:row:col`. */
-  cells: Map<string, CellSnapshot>;
+  /** The segment being written. */
+  segment: Segment;
+  /** Entries of the segments already sealed in this batch. */
+  sealed: HistoryEntry[];
+  /** A write that cannot be journaled faithfully ran: History is cleared when the batch ends. */
+  reset: boolean;
 }
+
+const newSegment = (): Segment => ({ cells: new Map(), parts: new Map() });
 
 interface WorkbookState {
   readonly handle: WorkbookHandle;
@@ -256,7 +286,7 @@ export class Workbook {
       life: new Lifecycle('Workbook'),
       events: new Emitter<WorkbookEvents>(),
       sheets: new WeakMap(),
-      batch: { depth: 0, cells: new Map() },
+      batch: { depth: 0, segment: newSegment(), sealed: [], reset: false },
       pending: { cells: new Map(), parts: new Set(), origin: 'instanceApi' },
       sourceFormat: 'xlsx',
       origin: 'instanceApi',
@@ -476,8 +506,10 @@ export class Workbook {
     const batch = state.batch;
     if (batch.depth > 0) return fn();
     batch.depth = 1;
-    batch.cells = new Map();
-    const history = state.handle.attachedHistory();
+    batch.segment = newSegment();
+    batch.sealed = [];
+    batch.reset = false;
+    const history = recordingHistory(state.handle.attachedHistory());
     try {
       const body = (): T => {
         let ok = false;
@@ -486,29 +518,40 @@ export class Workbook {
           ok = true;
           return result;
         } finally {
-          if (ok) this.#commitCells(state);
-          else state.handle.restoreCells([...batch.cells.values()]);
+          if (ok) this.#commitJournal(state, history);
+          else state.handle.restoreCells([...batch.segment.cells.values()]);
         }
       };
-      return state.handle.withBatchedRecalc(() => (history ? history.transact(body) : body()));
+      return state.handle.withBatchedRecalc(() => transactIn(history, body));
     } finally {
+      const reset = batch.reset;
       batch.depth = 0;
-      batch.cells = new Map();
+      batch.segment = newSegment();
+      batch.sealed = [];
+      batch.reset = false;
+      // The frame is closed here; clearing inside it would drop it.
+      if (reset && history && !history.isInTransaction()) history.clear();
       // A failed batch still reports what stayed applied.
       this.#flush(state);
     }
   }
 
-  /** Records the batch's cell writes as one undo entry. */
-  #commitCells(state: WorkbookState): void {
-    const history = state.handle.attachedHistory();
-    const before = [...state.batch.cells.values()];
-    if (!history || before.length === 0) return;
-    const after = before.map((snap) => state.handle.captureCell(snap.addr));
-    history.push({
-      undo: () => state.handle.restoreCells(before),
-      redo: () => state.handle.restoreCells(after),
-    });
+  /** Seals the segment being written into a history entry; a segment with nothing to undo adds none. */
+  #seal(state: WorkbookState): void {
+    const batch = state.batch;
+    const segment = batch.segment;
+    batch.segment = newSegment();
+    if (!recordingHistory(state.handle.attachedHistory()) || batch.reset) return;
+    const entry = sealedEntry(state, segment);
+    if (entry) batch.sealed.push(entry);
+  }
+
+  /** Records the batch's writes as one undo step: every sealed segment's entry joins the open frame. */
+  #commitJournal(state: WorkbookState, history: ReturnType<typeof recordingHistory>): void {
+    if (!history) return;
+    this.#seal(state);
+    if (state.batch.reset) return;
+    for (const entry of state.batch.sealed) history.push(entry);
   }
 
   /** Pins the queued change to the origin in force now; a different origin flushes the earlier one first. */
@@ -580,6 +623,84 @@ const engineSheetRef = (ref: SheetRef): EngineSheet | number | string => {
   return ref;
 };
 
+/** The history entry of a sealed segment: undo and redo restore its slices and cells, announcing
+ *  each part; `null` when there is nothing to undo or a slice cannot be captured. */
+const sealedEntry = (state: WorkbookState, segment: Segment): HistoryEntry | null => {
+  const { handle } = state;
+  const cellsBefore = [...segment.cells.values()];
+  const parts = [...segment.parts.values()];
+  if (cellsBefore.length === 0 && parts.length === 0) return null;
+  const cellsAfter = cellsBefore.map((snap) => handle.captureCell(snap.addr));
+  const afters: Restore[] = [];
+  for (const part of parts) {
+    const after = part.capture();
+    if (!after) {
+      state.batch.reset = true;
+      return null;
+    }
+    afters.push(after);
+  }
+  return {
+    undo: () =>
+      handle.withBatchedRecalc(() => {
+        for (let i = parts.length - 1; i >= 0; i -= 1) {
+          const part = parts[i] as JournalRecord;
+          part.before();
+          handle.noteFacadeChange(part.change);
+        }
+        handle.restoreCells(cellsBefore);
+      }),
+    redo: () =>
+      handle.withBatchedRecalc(() => {
+        handle.restoreCells(cellsAfter);
+        parts.forEach((part, i) => {
+          (afters[i] as Restore)();
+          handle.noteFacadeChange(part.change);
+        });
+      }),
+  };
+};
+
+/** Captures the before-state of the slice a non-cell write touches, when the workbook records into
+ *  a History. Returns what to call once the write succeeded, or `null` when nothing is journaled. */
+const openRecord = (
+  state: WorkbookState,
+  change: FacadeChange,
+  spec: JournalSpec | undefined,
+): (() => void) | null => {
+  const { handle, batch } = state;
+  if (batch.reset || !recordingHistory(handle.attachedHistory())) return null;
+  const choice = resolveJournal(change.kind, change.sheet, change.range, spec);
+  if (choice === 'none') return null;
+  if (choice === 'reset') {
+    return () => {
+      batch.reset = true;
+    };
+  }
+  const member = typeof spec === 'object' ? spec : undefined;
+  const scope: JournalScope = {
+    handle,
+    engine: handle.engineWorkbook(),
+    sheet: change.sheet,
+    ...(change.range ? { range: change.range } : {}),
+    hostId: member?.hostId ?? '',
+    name: member?.name ?? '',
+    args: member?.args ?? [],
+  };
+  const key = `${choice.id}:${choice.scopeKey(scope)}`;
+  const { parts } = batch.segment;
+  if (parts.has(key)) return null;
+  const before = choice.capture(scope);
+  if (!before) {
+    return () => {
+      batch.reset = true;
+    };
+  }
+  return () => {
+    parts.set(key, { change, before, capture: () => (choice as JournalCodec).capture(scope) });
+  };
+};
+
 const workbookContext = (wb: Workbook): WorkbookContext => {
   const state = stateOf(wb);
   const run = <T>(fn: () => T): T => wb.batch(fn);
@@ -590,10 +711,13 @@ const workbookContext = (wb: Workbook): WorkbookContext => {
       return stateOf(wb).handle.engineWorkbook();
     },
     run,
-    change: (kind, sheet, fn, range) =>
+    change: (kind, sheet, fn, range, journal) =>
       run(() => {
+        const change: FacadeChange = range ? { kind, sheet, range } : { kind, sheet };
+        const record = openRecord(state, change, journal);
         const result = fn();
-        state.handle.noteFacadeChange(range ? { kind, sheet, range } : { kind, sheet });
+        record?.();
+        state.handle.noteFacadeChange(change);
         return result;
       }),
     sheet: (engine) => wb.sheet(engine.index),
@@ -752,7 +876,7 @@ const sheetContext = (sheet: Sheet): SheetContext => {
     cellAt: (at) => cellOf(base.engine, at),
     rectOf: (range) =>
       typeof range === 'string' ? base.engine.parseReference(range).range : range,
-    sheetChange: (kind, fn, range) => base.change(kind, engine.index, fn, range),
+    sheetChange: (kind, fn, range, journal) => base.change(kind, engine.index, fn, range, journal),
   };
 };
 
@@ -764,7 +888,8 @@ const writeCells = <T>(state: WorkbookState, sheet: number, range: CellRect, wri
       const addr = { sheet, row, col };
       addrs.push(addr);
       const key = cellKey(addr);
-      if (!state.batch.cells.has(key)) state.batch.cells.set(key, state.handle.captureCell(addr));
+      const { cells } = state.batch.segment;
+      if (!cells.has(key)) cells.set(key, state.handle.captureCell(addr));
     }
   }
   let result: T | undefined;
@@ -788,10 +913,12 @@ const call = (target: object, name: string, args: readonly unknown[]): unknown =
 
 /** How members reach their engine object from a facade instance. */
 interface MemberHost<C> {
+  /** Names the host in the journal registry. */
+  readonly id: string;
   readonly proto: object;
   contextOf(self: unknown): C;
   target(ctx: C): object;
-  change<T>(ctx: C, kind: FacadeChangeKind, fn: () => T): T;
+  change<T>(ctx: C, kind: FacadeChangeKind, fn: () => T, journal?: JournalSpec): T;
 }
 
 /** Installs a member file's pass-through and hand-written members on a facade prototype. */
@@ -812,7 +939,16 @@ const installMembers = <C>(host: MemberHost<C>, spec: MemberSpec<C>): void => {
     for (const name of names ?? []) {
       proto[name] = function (...args) {
         const ctx = host.contextOf(this);
-        return host.change(ctx, kind as FacadeChangeKind, () => call(host.target(ctx), name, args));
+        return host.change(
+          ctx,
+          kind as FacadeChangeKind,
+          () => call(host.target(ctx), name, args),
+          {
+            hostId: host.id,
+            name,
+            args,
+          },
+        );
       };
     }
   }
@@ -840,29 +976,33 @@ const installMembers = <C>(host: MemberHost<C>, spec: MemberSpec<C>): void => {
 };
 
 /** The host of a facade over an engine object handle. */
-const handleHost = <H>(proto: object): MemberHost<HandleContext<H>> => ({
+const handleHost = <H>(id: string, proto: object): MemberHost<HandleContext<H>> => ({
+  id,
   proto,
   contextOf: (self) => handleContext<H>(self),
   target: (ctx) => ctx.target as object,
-  change: (ctx, kind, fn) => ctx.change(kind, ctx.sheetIndex, fn),
+  change: (ctx, kind, fn, journal) => ctx.change(kind, ctx.sheetIndex, fn, undefined, journal),
 });
 
 const SHEET_HOST: MemberHost<SheetContext> = {
+  id: 'sheet',
   proto: Sheet.prototype,
   contextOf: (self) => sheetContext(self as Sheet),
   target: (ctx) => ctx.sheetEngine,
-  change: (ctx, kind, fn) => ctx.sheetChange(kind, fn),
+  change: (ctx, kind, fn, journal) => ctx.sheetChange(kind, fn, undefined, journal),
 };
 
 const WORKBOOK_HOST: MemberHost<WorkbookContext> = {
+  id: 'workbook',
   proto: Workbook.prototype,
   contextOf: (self) => workbookContext(self as Workbook),
   target: (ctx) => ctx.engine,
-  change: (ctx, kind, fn) => ctx.change(kind, null, fn),
+  change: (ctx, kind, fn, journal) => ctx.change(kind, null, fn, undefined, journal),
 };
 
 const WORKBOOK_OOXML_HOST: MemberHost<WorkbookContext> = {
   ...WORKBOOK_HOST,
+  id: 'workbook.ooxml',
   proto: WorkbookOoxml.prototype,
   contextOf: (self) => workbookContext(ooxmlOwner(self) as Workbook),
   target: (ctx) => ctx.engine.ooxml,
@@ -870,6 +1010,7 @@ const WORKBOOK_OOXML_HOST: MemberHost<WorkbookContext> = {
 
 const SHEET_OOXML_HOST: MemberHost<SheetContext> = {
   ...SHEET_HOST,
+  id: 'sheet.ooxml',
   proto: SheetOoxml.prototype,
   contextOf: (self) => sheetContext(ooxmlOwner(self) as Sheet),
   target: (ctx) => ctx.sheetEngine.ooxml,
@@ -887,18 +1028,21 @@ installMembers(WORKBOOK_OOXML_HOST, WORKBOOK_OOXML_MEMBERS);
 installMembers(SHEET_OOXML_HOST, SHEET_OOXML_MEMBERS);
 installMembers(SHEET_HOST, SHEET_TABLE_MEMBERS);
 installMembers(WORKBOOK_HOST, WORKBOOK_TABLE_MEMBERS);
-installMembers(handleHost<EngineTable>(Table.prototype), TABLE_MEMBERS);
+installMembers(handleHost<EngineTable>('table', Table.prototype), TABLE_MEMBERS);
 installMembers(SHEET_HOST, SHEET_DRAWING_MEMBERS);
 installMembers(SHEET_HOST, SHEET_CHART_MEMBERS);
-installMembers(handleHost<EngineDrawing>(Drawing.prototype), DRAWING_MEMBERS);
-installMembers(handleHost<EnginePicture>(Picture.prototype), PICTURE_MEMBERS);
-installMembers(handleHost<EngineShape>(Shape.prototype), SHAPE_MEMBERS);
-installMembers(handleHost<EngineSlicer>(Slicer.prototype), SLICER_MEMBERS);
-installMembers(handleHost<EngineChart>(Chart.prototype), CHART_MEMBERS);
+installMembers(handleHost<EngineDrawing>('drawing', Drawing.prototype), DRAWING_MEMBERS);
+installMembers(handleHost<EnginePicture>('picture', Picture.prototype), PICTURE_MEMBERS);
+installMembers(handleHost<EngineShape>('shape', Shape.prototype), SHAPE_MEMBERS);
+installMembers(handleHost<EngineSlicer>('slicer', Slicer.prototype), SLICER_MEMBERS);
+installMembers(handleHost<EngineChart>('chart', Chart.prototype), CHART_MEMBERS);
 installMembers(SHEET_HOST, SHEET_PIVOT_MEMBERS);
 installMembers(WORKBOOK_HOST, WORKBOOK_PIVOT_CACHE_MEMBERS);
-installMembers(handleHost<EnginePivot>(Pivot.prototype), PIVOT_MEMBERS);
-installMembers(handleHost<EnginePivotCache>(PivotCache.prototype), PIVOT_CACHE_MEMBERS);
+installMembers(handleHost<EnginePivot>('pivot', Pivot.prototype), PIVOT_MEMBERS);
+installMembers(
+  handleHost<EnginePivotCache>('pivotCache', PivotCache.prototype),
+  PIVOT_CACHE_MEMBERS,
+);
 
 /** @internal The engine binding behind a facade workbook. */
 export const workbookHandleOf = (wb: Workbook): WorkbookHandle => stateOf(wb).handle;
