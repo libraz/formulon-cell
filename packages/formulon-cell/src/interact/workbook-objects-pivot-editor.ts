@@ -3,6 +3,7 @@ import { type PivotAuthorization, pivotReportRange } from '../commands/pivot-act
 import { applyPivotEdit, type PivotEditField } from '../commands/pivot-edit.js';
 import { deletePivotTables, pivotCacheFieldIsNumeric } from '../commands/pivot-table.js';
 import { formatA1Cell, parseA1Atom } from '../engine/address.js';
+import type { PivotDefinition } from '../engine/pivot-definition.js';
 import {
   PivotAggregation,
   PivotAxis,
@@ -10,7 +11,6 @@ import {
   PivotReportLayout,
 } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { PivotDefinition } from '../engine/workbook-handle-pivot.js';
 import type { Strings } from '../i18n/strings.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { commitPivotChange } from './pivot-field-settings-dialog-apply.js';

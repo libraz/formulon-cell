@@ -15,6 +15,7 @@ import {
   PIVOT_PLACEHOLDER_ROWS,
   type PivotCellExpansion,
 } from './pivot-cell-kind.js';
+import type { PivotDefinition, PivotSpill, PivotStyleDefinition } from './pivot-definition.js';
 import {
   composeStyleElements,
   PIVOT_ELEMENT_ORDER,
@@ -25,7 +26,6 @@ import { cssColorFromArgb, tintCssColor } from './theme-color.js';
 import type { Range } from './types.js';
 import { PivotAxis } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
-import type { PivotDefinition, PivotSpill, PivotStyleDefinition } from './workbook-handle-pivot.js';
 
 /**
  * PivotTable styles resolved for painting. A report's cells keep their own

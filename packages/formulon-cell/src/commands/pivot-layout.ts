@@ -1,7 +1,7 @@
+import type { PivotDefinition } from '../engine/pivot-definition.js';
 import { pivotFieldFiltered } from '../engine/pivot-style.js';
 import { PivotAxis, type PivotReportLayout } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { PivotDefinition } from '../engine/workbook-handle-pivot.js';
 import { clearPivotFieldFilter } from './pivot-filter.js';
 
 /**

@@ -13,6 +13,7 @@ import {
   restorePivotFieldLayout,
 } from '../commands/pivot-edit.js';
 import { PIVOT_CELL_KIND } from '../engine/pivot-cell-kind.js';
+import type { PivotCellInfo, PivotDefinition } from '../engine/pivot-definition.js';
 import type { Addr } from '../engine/types.js';
 import {
   PivotAggregation,
@@ -23,7 +24,6 @@ import {
   type PivotShowValuesAs as PivotShowValuesAsValue,
 } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { PivotCellInfo, PivotDefinition } from '../engine/workbook-handle-pivot.js';
 import type { Strings } from '../i18n/strings.js';
 import { pivotFieldOfCell } from './pivot-cell-at.js';
 import { pivotShowAsNeedsBaseField, pivotShowAsNeedsBaseItem } from './pivot-field-settings.js';

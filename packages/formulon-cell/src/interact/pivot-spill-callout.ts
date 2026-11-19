@@ -1,4 +1,4 @@
-import type { PivotSpill } from '../engine/workbook-handle-pivot.js';
+import type { PivotSpill } from '../engine/pivot-definition.js';
 import type { Strings } from '../i18n/strings.js';
 import { cellRect, layoutForView } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';

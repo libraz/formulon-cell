@@ -1,12 +1,9 @@
 import { PivotDatePeriod } from '@libraz/formulon';
 import { PIVOT_CELL_KIND } from '../engine/pivot-cell-kind.js';
+import type { PivotCellInfo, PivotDefinition } from '../engine/pivot-definition.js';
+import { dateGroupingOf } from '../engine/pivot-engine-codec.js';
 import { type Addr, PivotCalendar } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import {
-  dateGroupingOf,
-  type PivotCellInfo,
-  type PivotDefinition,
-} from '../engine/workbook-handle-pivot.js';
 import { pivotFieldOfCell } from './pivot-cell-at.js';
 import { commitPivotChange, type PivotCommitContext } from './pivot-field-settings-dialog-apply.js';
 

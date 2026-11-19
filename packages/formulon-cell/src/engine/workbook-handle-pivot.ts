@@ -1,21 +1,17 @@
 import type {
   CivilTime,
   CivilTimeInput,
-  ErrorCode,
   Formulon,
-  NativeValue,
   Pivot,
   PivotCache,
   PivotCacheField,
   PivotCacheOptions,
   PivotCacheOptionsPatch,
-  PivotFilter,
-  PivotFilterInput,
   PivotOptions,
   PivotOptionsPatch,
   PivotWorksheetSourceInput,
 } from '@libraz/formulon';
-import { PivotDatePeriod, StatusCode } from '@libraz/formulon';
+import { StatusCode } from '@libraz/formulon';
 import { rangeOfRect } from './address.js';
 import {
   isEmptyPivotLayout,
@@ -24,6 +20,26 @@ import {
   PIVOT_PLACEHOLDER_ROWS,
   type PivotCellExpansion,
 } from './pivot-cell-kind.js';
+import type {
+  PivotCellInfo,
+  PivotDefinition,
+  PivotFieldDefinition,
+  PivotFieldItem,
+  PivotItemDefinition,
+  PivotNumericGroupSpec,
+  PivotSpill,
+  PivotStyleDefinition,
+} from './pivot-definition.js';
+import {
+  DATE_GROUPING_PERIOD,
+  dateGroupingOf,
+  fromNativeValue,
+  pivotCellItemLabel,
+  toCacheValue,
+  toDataFieldInput,
+  toFilterInput,
+  toFilterSpec,
+} from './pivot-engine-codec.js';
 import { isFormulonError, orFallback } from './result.js';
 import { type SpillOccupantSource, spillBlockers, spillOccupancy } from './spill-blockers.js';
 import type {
@@ -42,14 +58,11 @@ import type {
 import {
   type PivotAggregation,
   type PivotAxis,
-  PivotDateGrouping,
+  type PivotDateGrouping,
   PivotShowValuesAs,
   type PivotSortOrder,
-  ValueKind,
 } from './types.js';
-import { formatError } from './value.js';
 import type { WorkbookHandle } from './workbook-handle.js';
-import type { PivotStyleInfo } from './workbook-handle-table-styles.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
 type WorkbookHandleInternals = {
@@ -58,93 +71,6 @@ type WorkbookHandleInternals = {
   capabilities: WorkbookHandle['capabilities'];
   assertAlive(): void;
 };
-/** One member of a pivot field, paired with the cache index that addresses it.
- *  The blank member's `label` is empty — it has no label of its own, and the
- *  index is the only way to name it. */
-export interface PivotFieldItem {
-  readonly label: string;
-  readonly cacheIndex: number;
-}
-
-/** One member of a pivot field's item list, as stored on the report. */
-export interface PivotItemDefinition {
-  /** The item's own label; empty for an item bound only by cache index. */
-  readonly label: string;
-  /** Index into the bound cache field's shared items, -1 for a label-only item. */
-  readonly cacheIndex: number;
-  readonly visible: boolean;
-  /** Whether the item's detail (the items under it) shows; false for a collapsed item. */
-  readonly showDetail: boolean;
-}
-
-/** A pivot field as stored on the report, whichever axis (if any) it sits on. */
-export interface PivotFieldDefinition {
-  readonly index: number;
-  readonly sourceName: string;
-  readonly customName: string;
-  /** Null for a field that sits on no axis. */
-  readonly axis: PivotAxis | null;
-  readonly subtotalTop: boolean;
-  /** Whether the automatic subtotal shows; false whenever `subtotalFns` is non-empty. */
-  readonly defaultSubtotal: boolean;
-  /** Custom subtotal functions that replace the automatic one. */
-  readonly subtotalFns: readonly PivotAggregation[];
-  /** Number format code, empty for none. */
-  readonly numberFormat: string;
-  readonly cacheFieldIndex: number;
-  readonly sortOrder: PivotSortOrder;
-  readonly sortByField: string;
-  /** A bound of -1 follows the field's data (automatic). */
-  readonly dateGroup: {
-    /** The finest of `periods`. */
-    readonly granularity: PivotDateGrouping;
-    /** Every period the field is grouped by, an OR of `PivotDatePeriod` bits. */
-    readonly periods: number;
-    readonly calendar: PivotCalendar;
-    readonly startYear: number;
-    readonly endYear: number;
-    readonly intervalDays: number;
-    readonly startSerial: number;
-    readonly endSerial: number;
-  } | null;
-  /** For a group field, the index of the field it groups; `null` otherwise. */
-  readonly groupBaseIndex: number | null;
-  /** Numeric grouping; a `null` bound follows the field's data. */
-  readonly numericGroup: PivotNumericGroupSpec | null;
-  readonly items: readonly PivotItemDefinition[];
-  /** Whether every item of the field is expanded. */
-  readonly showDetail: boolean;
-}
-
-/** Numeric grouping of a pivot field into ranges of `interval`; a `null` bound is automatic. */
-export interface PivotNumericGroupSpec {
-  readonly interval: number;
-  readonly start: number | null;
-  readonly end: number | null;
-}
-
-/** Table style and toggles of a PivotTable; `name` is empty for a style element without a named style. */
-export type PivotStyleDefinition = Required<PivotStyleInfo>;
-
-/** The stored definition of a PivotTable, read back from the engine. */
-export interface PivotDefinition {
-  readonly name: string;
-  readonly cacheId: number;
-  readonly grandTotals: { readonly rows: boolean; readonly cols: boolean };
-  readonly layout: PivotReportLayout | null;
-  /** Pivot field indices of the row / column axes, in display order. */
-  readonly rowFieldOrder: readonly number[];
-  readonly colFieldOrder: readonly number[];
-  readonly fields: readonly PivotFieldDefinition[];
-  /** Value fields in display order; `fieldIndex` is a pivot field index. */
-  readonly dataFields: readonly PivotDataFieldSpec[];
-  /** Listed filters: those added in this session and the loaded caption, value,
-   *  top-N and date ones. Other loaded kinds are kept verbatim by the engine and
-   *  survive `clearPivotFilters`, but are not listed. */
-  readonly filters: readonly PivotFilterSpec[];
-  /** Table style, null when the definition has no style element. */
-  readonly style: PivotStyleDefinition | null;
-}
 
 declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandlePivotMethods {}
@@ -190,17 +116,6 @@ function rawWb(handle: unknown): Workbook {
   return internals(handle).wb;
 }
 
-/** A report held at #SPILL! because cells are in the way of the area it lays
- *  out over. */
-export interface PivotSpill {
-  pivotIndex: number;
-  anchor: Addr;
-  /** The area the report needs. */
-  needed: Range;
-  /** Non-empty cells inside `needed` that hold the report back. */
-  blockers: Addr[];
-}
-
 /** One layout cell with its value converted for the cell layer. */
 interface LayoutCell {
   row: number;
@@ -214,17 +129,6 @@ interface LayoutCell {
   expansion: PivotCellExpansion | null;
 }
 
-/** A report layout cell as `pivotCellInfo` reports it. */
-export interface PivotCellInfo {
-  pivotIndex: number;
-  kind: number;
-  fieldName: string;
-  fieldIndex: number;
-  /** Cache bound to the report, -1 when the engine cannot say. */
-  cacheId: number;
-  isValue: boolean;
-}
-
 /** A report's layout as an anchor and extent; an extent of 0 spans no cell. */
 interface RawPivotLayout {
   top: number;
@@ -232,15 +136,6 @@ interface RawPivotLayout {
   rows: number;
   cols: number;
   cells: readonly LayoutCell[];
-}
-
-function fromNativeValue(v: NativeValue): CellValue {
-  if (v === null) return { kind: 'blank' };
-  if (typeof v === 'number') return { kind: 'number', value: v };
-  if (typeof v === 'boolean') return { kind: 'bool', value: v };
-  if (typeof v === 'string') return { kind: 'text', value: v };
-  if ('code' in v) return { kind: 'error', code: v.code, text: formatError(v.code, '#ERR!') };
-  return { kind: 'blank' };
 }
 
 /** The engine's layout of a report, or null when it cannot be read. */
@@ -1364,55 +1259,6 @@ export abstract class WorkbookHandlePivotMethods {
   }
 }
 
-function pivotCellItemLabel(value: CellValue): string {
-  if (value.kind === 'text') return value.value.trim();
-  if (value.kind === 'number') return String(value.value);
-  if (value.kind === 'bool') return value.value ? 'TRUE' : 'FALSE';
-  if (value.kind === 'error') return `#${value.code}`;
-  return '';
-}
-
-/** A cell-layer value as a pivot cache value. */
-function toCacheValue(value: CellValue):
-  | number
-  | string
-  | boolean
-  | null
-  | {
-      kind: typeof ValueKind.Error;
-      errorCode: ErrorCode;
-    } {
-  if (value.kind === 'blank') return null;
-  if (value.kind === 'error') {
-    return { kind: ValueKind.Error, errorCode: value.code as ErrorCode };
-  }
-  return value.value;
-}
-
-/** The period bit each cell-layer granularity groups by. */
-const DATE_GROUPING_PERIOD: Record<PivotDateGrouping, number> = {
-  [PivotDateGrouping.Day]: PivotDatePeriod.Days,
-  [PivotDateGrouping.Month]: PivotDatePeriod.Months,
-  [PivotDateGrouping.Quarter]: PivotDatePeriod.Quarters,
-  [PivotDateGrouping.Year]: PivotDatePeriod.Years,
-  [PivotDateGrouping.Days]: PivotDatePeriod.Days,
-  [PivotDateGrouping.Hour]: PivotDatePeriod.Hours,
-  [PivotDateGrouping.Minute]: PivotDatePeriod.Minutes,
-  [PivotDateGrouping.Second]: PivotDatePeriod.Seconds,
-};
-
-/** The granularity of a date group's finest period; null for an ungrouped field. */
-export function dateGroupingOf(periods: number): PivotDateGrouping | null {
-  if (periods & PivotDatePeriod.Seconds) return PivotDateGrouping.Second;
-  if (periods & PivotDatePeriod.Minutes) return PivotDateGrouping.Minute;
-  if (periods & PivotDatePeriod.Hours) return PivotDateGrouping.Hour;
-  if (periods & PivotDatePeriod.Days) return PivotDateGrouping.Day;
-  if (periods & PivotDatePeriod.Months) return PivotDateGrouping.Month;
-  if (periods & PivotDatePeriod.Quarters) return PivotDateGrouping.Quarter;
-  if (periods & PivotDatePeriod.Years) return PivotDateGrouping.Year;
-  return null;
-}
-
 /** A date group bound from a serial, else from a year; null leaves it automatic. */
 function dateBound(
   handle: unknown,
@@ -1428,31 +1274,6 @@ function dateBound(
     return edge === 'start' ? { year, month: 1, day: 1 } : { year, month: 12, day: 31 };
   }
   return null;
-}
-
-function toDataFieldInput(spec: PivotDataFieldSpec) {
-  return {
-    // An absent name lets the engine name the field; "" is an empty caption, as the spreadsheet saves it.
-    ...(spec.name !== undefined ? { name: spec.name } : {}),
-    fieldIndex: spec.fieldIndex,
-    aggregation: spec.aggregation,
-    ...(spec.numberFormat !== undefined ? { numberFormat: spec.numberFormat.trim() || null } : {}),
-    ...(spec.showValuesAs !== undefined ? { showAs: spec.showValuesAs } : {}),
-    ...(spec.showAsBaseField !== undefined ? { showAsBaseField: spec.showAsBaseField } : {}),
-    ...(spec.showAsBaseItem !== undefined ? { showAsBaseItem: spec.showAsBaseItem } : {}),
-  };
-}
-
-/** A cell-layer filter spec as the engine's filter input; the field is named
- *  by its source name and the axis is the field's own. */
-function toFilterInput(spec: PivotFilterSpec): PivotFilterInput {
-  return {
-    fieldIndex: spec.fieldName,
-    kind: spec.kind,
-    ...(spec.dataFieldIndex !== undefined ? { dataFieldIndex: spec.dataFieldIndex } : {}),
-    ...(spec.value !== undefined ? { value: spec.value } : {}),
-    ...(spec.valueHigh !== undefined ? { valueHigh: spec.valueHigh } : {}),
-  };
 }
 
 /**
@@ -1510,23 +1331,6 @@ function pivotFilterSpecs(
     if (spec) out.push(spec);
   }
   return out;
-}
-
-/** A stored filter in the cell layer's shape; null when its field has no axis or name. */
-function toFilterSpec(
-  filter: PivotFilter,
-  axis: PivotAxis | null,
-  fieldName: string,
-): PivotFilterSpec | null {
-  if (axis === null || fieldName.trim().length === 0) return null;
-  return {
-    axis,
-    fieldName: fieldName.trim(),
-    kind: filter.kind,
-    ...(filter.dataFieldIndex > 0 ? { dataFieldIndex: filter.dataFieldIndex } : {}),
-    ...(filter.value !== null ? { value: filter.value } : {}),
-    ...(filter.valueHigh !== null ? { valueHigh: filter.valueHigh } : {}),
-  };
 }
 
 function pivotCellEntry(

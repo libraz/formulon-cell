@@ -1,12 +1,12 @@
 import { StatusCode } from '@libraz/formulon';
 import { rangeOfRect, rectOfRange } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
+import type { PivotDefinition, PivotSpill } from '../engine/pivot-definition.js';
 import { lastPivotStyleLayer, pivotStyleLayer } from '../engine/pivot-style.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { CellValue, PivotFilterSpec, Range } from '../engine/types.js';
 import { PivotAggregation, PivotAxis, PivotShowValuesAs, PivotSortOrder } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { PivotDefinition, PivotSpill } from '../engine/workbook-handle-pivot.js';
 import { sameRange } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { AutofitOptions } from './autofit-measurement.js';

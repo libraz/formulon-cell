@@ -1,5 +1,5 @@
+import type { PivotStyleDefinition } from '../engine/pivot-definition.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { PivotStyleDefinition } from '../engine/workbook-handle-pivot.js';
 import type { PivotStyleInfo } from '../engine/workbook-handle-table-styles.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { type History, recordingHistory } from './history.js';

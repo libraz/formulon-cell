@@ -1,6 +1,6 @@
+import type { PivotCellInfo, PivotDefinition } from '../engine/pivot-definition.js';
 import type { Addr, CellValue } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { PivotCellInfo, PivotDefinition } from '../engine/workbook-handle-pivot.js';
 
 /** The report layout entry at `addr`, or undefined when no report draws a cell there. */
 export function pivotCellEntryAt(

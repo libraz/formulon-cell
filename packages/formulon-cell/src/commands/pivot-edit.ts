@@ -1,3 +1,4 @@
+import type { PivotDefinition } from '../engine/pivot-definition.js';
 import {
   type PivotAggregation,
   PivotAxis,
@@ -6,7 +7,6 @@ import {
   type PivotReportLayout,
 } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { PivotDefinition } from '../engine/workbook-handle-pivot.js';
 import { sameJsonValue } from './prepared-change.js';
 
 /** One field's settings as submitted from the pivot edit form. */

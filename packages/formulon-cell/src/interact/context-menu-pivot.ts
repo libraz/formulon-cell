@@ -8,9 +8,9 @@ import {
 import { applyPivotGrandTotals } from '../commands/pivot-layout.js';
 import { deletePivotTables } from '../commands/pivot-table.js';
 import { PIVOT_CELL_KIND, pivotItemText } from '../engine/pivot-cell-kind.js';
+import type { PivotCellInfo } from '../engine/pivot-definition.js';
 import { type Addr, PivotAxis, PivotSortOrder } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { PivotCellInfo } from '../engine/workbook-handle-pivot.js';
 import type { Strings } from '../i18n/strings.js';
 import { selectionRangeList } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
