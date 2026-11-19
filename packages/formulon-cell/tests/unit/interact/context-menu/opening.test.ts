@@ -397,6 +397,40 @@ describe('attachContextMenu', () => {
       expect(sub?.style.top).toBe('26px');
     });
 
+    it('places a non-flipping submenu overlapping its parent row and level with its top', () => {
+      const restoreViewport = setWindowViewport(1280, 900);
+      try {
+        detach = attachContextMenu({
+          getLocale: () => 'en-US',
+          strings: ja,
+          host,
+          store,
+          wb,
+          onAfterCommit,
+        });
+        fireContextMenu(host, 200, 70);
+        const trigger = document.querySelector<HTMLButtonElement>(
+          '[data-fc-submenu="pasteSpecialMenu"]',
+        );
+        const sub = document.querySelector<HTMLElement>('.fc-ctxmenu__sub');
+        expect(trigger).toBeTruthy();
+        expect(sub).toBeTruthy();
+        if (trigger) trigger.getBoundingClientRect = vi.fn(() => rect(50, 100, 140, 30));
+        if (sub) {
+          Object.defineProperty(sub, 'offsetWidth', { configurable: true, value: 180 });
+          Object.defineProperty(sub, 'offsetHeight', { configurable: true, value: 130 });
+        }
+
+        trigger?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+
+        expect(sub?.style.display).toBe('block');
+        expect(sub?.style.left).toBe('188px'); // r.right - 2
+        expect(sub?.style.top).toBe('96px'); // r.top - 4
+      } finally {
+        restoreViewport();
+      }
+    });
+
     it.each([
       { key: 'ContextMenu', shiftKey: false },
       { key: 'F10', shiftKey: true },

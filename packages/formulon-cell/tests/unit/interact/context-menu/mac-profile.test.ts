@@ -457,5 +457,56 @@ describe('context menu on the Mac platform profile', () => {
       fireContextMenu(host, 3800, 1280);
       expect(position()).toEqual({ x: 3800 - 287, y: 1526 - 650 - 6 });
     });
+
+    describe('submenu', () => {
+      const openPasteSpecial = (viewportWidth: number, left = 50): HTMLElement | null => {
+        vi.stubGlobal('innerWidth', viewportWidth);
+        vi.stubGlobal('innerHeight', 900);
+        attach();
+        fireContextMenu(host, 200, 70);
+        const trigger = document.querySelector<HTMLButtonElement>(
+          '[data-fc-submenu="pasteSpecialMenu"]',
+        );
+        const sub = document.querySelector<HTMLElement>('.fc-ctxmenu__sub');
+        expect(trigger).toBeTruthy();
+        expect(sub).toBeTruthy();
+        const top = 100;
+        const width = 140;
+        const height = 30;
+        if (trigger) {
+          trigger.getBoundingClientRect = vi.fn(
+            () =>
+              ({
+                x: left,
+                y: top,
+                left,
+                top,
+                right: left + width,
+                bottom: top + height,
+                width,
+                height,
+              }) as DOMRect,
+          );
+        }
+        if (sub) {
+          Object.defineProperty(sub, 'offsetWidth', { configurable: true, value: 180 });
+          Object.defineProperty(sub, 'offsetHeight', { configurable: true, value: 130 });
+        }
+        trigger?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+        return sub;
+      };
+
+      it('opens flush against the parent row and centres its first row on it', () => {
+        const sub = openPasteSpecial(1280);
+        expect(sub?.style.left).toBe('190px'); // r.right
+        expect(sub?.style.top).toBe('97px'); // r.top + r.height / 2 - 18
+      });
+
+      it('flips to the parent left edge, flush, at the right viewport edge', () => {
+        const sub = openPasteSpecial(600, 400);
+        expect(sub?.style.left).toBe('220px'); // r.left - sw
+        expect(sub?.style.top).toBe('97px'); // r.top + r.height / 2 - 18
+      });
+    });
   });
 });
