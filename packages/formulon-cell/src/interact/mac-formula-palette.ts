@@ -509,6 +509,11 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     guardedUnavailable ||
     (selectedEntry !== null && isFunctionUnavailableForInsertion(selectedEntry.availability));
 
+  const releaseRecentSubscription = (): void => {
+    recentUnsubscribe?.();
+    recentUnsubscribe = null;
+  };
+
   /** Tear the session down to its closed state, releasing the mirror and the recent-list subscription. */
   const closeSessionState = (): void => {
     mode = 'closed';
@@ -516,8 +521,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     resetPickerSelection();
     postCommit = null;
     notifyMirror(null);
-    recentUnsubscribe?.();
-    recentUnsubscribe = null;
+    releaseRecentSubscription();
     pickerRefs = null;
     argumentsRefs = null;
     clearRoot();
@@ -1250,6 +1254,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     resetPickerSelection();
     postCommit = null;
     notifyMirror(null);
+    releaseRecentSubscription();
     render();
     // A restored edit takes focus back; otherwise the sheet does, as after a dialog.
     const restored = connectedElement(restoredFocusTarget);
@@ -1272,8 +1277,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     resetPickerSelection();
     postCommit = null;
     notifyMirror(null);
-    recentUnsubscribe?.();
-    recentUnsubscribe = null;
+    releaseRecentSubscription();
     render();
     restoredFocusTarget = null;
     sessionWb = null;
@@ -1301,7 +1305,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       lease.userCancel()?.focus();
       if (isClosed()) return;
     }
-    recentUnsubscribe?.();
+    releaseRecentSubscription();
     recentUnsubscribe = subscribeRecentFunctions(deps.store, () => {
       if (mode === 'picker') updatePickerList();
     });
@@ -1347,8 +1351,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     closing = true;
     if (activeDraft) activeDraft.handle.discard();
     closing = false;
-    recentUnsubscribe?.();
-    recentUnsubscribe = null;
+    releaseRecentSubscription();
     notifyMirror(null);
     detachPaneEscape();
     root.remove();
