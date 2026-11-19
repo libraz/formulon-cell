@@ -48,10 +48,8 @@ import {
 } from '../commands/slice-history.js';
 import { formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { syncLayoutSizesToEngine } from '../engine/layout-sync.js';
-import { pivotStyleLayer } from '../engine/pivot-style.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { isMacHost } from '../extensions/ui-options.js';
 import type { GridPopupsStrings } from '../i18n/strings/grid-popups/types.js';
 import { defaultStrings } from '../i18n/strings.js';
 import {
@@ -64,18 +62,18 @@ import {
   hitTest,
   hitZone,
   layoutForView,
-  pointPx,
   type Rect,
   rowHeight,
 } from '../render/geometry.js';
 import type { PageBreakHandle, RulerHandle } from '../render/grid/page-view.js';
 import { gridHitState } from '../render/grid.js';
 import { filterButtonRect } from '../render/painters/filter-button.js';
-import { type PivotCellButton, pivotCellButtonAt } from '../render/painters/pivot-cell-buttons.js';
-import { visualZoom } from '../render/painters/text.js';
 import { renderScale } from '../store/render-scale.js';
 import { isRowHidden } from '../store/row-visibility.js';
 import {
+  axisSelectionRange,
+  cloneSelection,
+  fullSheetRange,
   isWholeColumnRange,
   isWholeRowRange,
   type SelectionGestureMode,
@@ -97,7 +95,7 @@ import { resizeCursor } from './grid-cursors.js';
 import { followHyperlink, type HyperlinkFollowDeps } from './hyperlink-follow.js';
 import {
   isNavigationAddrAllowed,
-  navigationBoundsFor,
+  isNavigationRangeAllowed,
   navigationSelectionBoundsFor,
   scrollActiveIntoView,
 } from './navigation-policy.js';
@@ -112,9 +110,11 @@ import {
   marginInchesFor,
   pageBandAt,
   pageBreakHandleAt,
+  pivotButtonAt,
   type RefBoxCorner,
   refBoxHitAt,
   rulerHandleAt,
+  selectionBorderEdgeAt,
   updateCursor,
 } from './pointer-targets.js';
 import { type RangeInsertTarget, rangeRefOf, refOf } from './range-insert.js';
@@ -204,43 +204,6 @@ type DragMode =
       r1c1: boolean;
     };
 
-const fullSheetRange = (sheet: number): Range => ({
-  sheet,
-  r0: 0,
-  c0: 0,
-  r1: MAX_ROW,
-  c1: MAX_COL,
-});
-
-const cloneSelection = (selection: SelectionSlice): SelectionSlice => ({
-  active: { ...selection.active },
-  anchor: { ...selection.anchor },
-  range: { ...selection.range },
-  extraRanges: (selection.extraRanges ?? []).map((range) => ({ ...range })),
-});
-
-const axisSelectionRange = (
-  bounds: Range,
-  axis: 'row' | 'col',
-  start: number,
-  tip: number,
-): Range =>
-  axis === 'row'
-    ? {
-        sheet: bounds.sheet,
-        r0: Math.min(start, tip),
-        c0: bounds.c0,
-        r1: Math.max(start, tip),
-        c1: bounds.c1,
-      }
-    : {
-        sheet: bounds.sheet,
-        r0: bounds.r0,
-        c0: Math.min(start, tip),
-        r1: bounds.r1,
-        c1: Math.max(start, tip),
-      };
-
 type SelectionMarqueeDrag = Extract<DragMode, { kind: 'selection-marquee' }>;
 
 const lastVisibleCol = (s: State): number =>
@@ -257,18 +220,6 @@ const lastVisibleRow = (s: State): number =>
     s.viewport.navigationRange?.r1 ?? MAX_ROW,
   );
 
-const isNavigationRangeAllowed = (store: SpreadsheetStore, range: Range): boolean => {
-  const bounds = navigationBoundsFor(store);
-  if (!bounds) return true;
-  return (
-    range.sheet === bounds.sheet &&
-    range.r0 >= bounds.r0 &&
-    range.c0 >= bounds.c0 &&
-    range.r1 <= bounds.r1 &&
-    range.c1 <= bounds.c1
-  );
-};
-
 export interface PointerDeps {
   store: SpreadsheetStore;
   wb: WorkbookHandle;
@@ -279,39 +230,6 @@ export interface PointerDeps {
   history?: History | null;
 }
 
-/** The report button under (x, y) in the cell at (row, col): a caption's drop-down or a row
- *  label's expand/collapse button, placed as the grid draws it. */
-function pivotButtonAt(
-  s: State,
-  wb: WorkbookHandle,
-  host: HTMLElement,
-  row: number,
-  col: number,
-  x: number,
-  y: number,
-): PivotCellButton | null {
-  const view = layoutForView(s);
-  return pivotCellButtonAt(
-    pivotStyleLayer(wb, s),
-    row,
-    col,
-    cellRect(view, s.viewport, row, col),
-    {
-      mac: isMacHost(host),
-      zoom: visualZoom(s.viewport.zoom),
-      ptPx: pointPx(view, s.viewport),
-      dpr: host.ownerDocument.defaultView?.devicePixelRatio ?? 1,
-      rtl: s.ui.rightToLeft === true,
-    },
-    x,
-    y,
-  );
-}
-
-/** Half-width of the band along the selection border that the Mac desktop
- *  treats as the border itself: wide enough to hit, narrow enough that a click
- *  just past the edge still selects the neighbour. */
-const SELECTION_BORDER_BAND = 2;
 /** A press on a link cell held at least this long selects instead of following (measured 0.5-0.6 s). */
 const HYPERLINK_HOLD_SELECT_MS = 500;
 
@@ -328,40 +246,6 @@ function topLeftVisibleCell(s: State): { row: number; col: number } {
     row: s.layout.freezeRows > 0 ? 0 : s.viewport.rowStart,
     col: s.layout.freezeCols > 0 ? 0 : s.viewport.colStart,
   };
-}
-
-type SelectionBorderEdge = 'top' | 'bottom' | 'left' | 'right' | 'corner';
-
-/** The visual edge of a single-range selection that `(x, y)` lies on, on the
- *  Mac host only. */
-function selectionBorderEdgeAt(
-  host: HTMLElement,
-  s: State,
-  x: number,
-  y: number,
-): SelectionBorderEdge | null {
-  if (!isMacHost(host)) return null;
-  if ((s.selection.extraRanges?.length ?? 0) > 0) return null;
-  const { r0, c0, r1, c1 } = s.selection.range;
-  const layout = layoutForView(s);
-  const first = cellRect(layout, s.viewport, r0, c0);
-  const last = cellRect(layout, s.viewport, r1, c1);
-  const left = Math.min(first.x, last.x);
-  const right = Math.max(first.x + first.w, last.x + last.w);
-  const top = first.y;
-  const bottom = last.y + last.h;
-  const band = SELECTION_BORDER_BAND;
-  const near = (value: number, edge: number): boolean => Math.abs(value - edge) <= band;
-  const withinX = x >= left - band && x <= right + band;
-  const withinY = y >= top - band && y <= bottom + band;
-  const onHorizontal = withinX && (near(y, bottom) || near(y, top));
-  const onVertical = withinY && (near(x, right) || near(x, left));
-  if (onHorizontal && onVertical) return 'corner';
-  if (withinX && near(y, bottom)) return 'bottom';
-  if (withinX && near(y, top)) return 'top';
-  if (withinY && near(x, right)) return 'right';
-  if (withinY && near(x, left)) return 'left';
-  return null;
 }
 
 /** The range a reference-box drag produces with the pointer over `cell`: an edge

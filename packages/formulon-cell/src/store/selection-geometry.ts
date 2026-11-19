@@ -235,3 +235,40 @@ export const applySelectionRectangle = (
       .map(({ range }) => cloneRange(range)),
   };
 };
+
+export const fullSheetRange = (sheet: number): Range => ({
+  sheet,
+  r0: 0,
+  c0: 0,
+  r1: MAX_ROW,
+  c1: MAX_COL,
+});
+
+export const cloneSelection = (selection: SelectionSlice): SelectionSlice => ({
+  active: { ...selection.active },
+  anchor: { ...selection.anchor },
+  range: { ...selection.range },
+  extraRanges: (selection.extraRanges ?? []).map((range) => ({ ...range })),
+});
+
+export const axisSelectionRange = (
+  bounds: Range,
+  axis: 'row' | 'col',
+  start: number,
+  tip: number,
+): Range =>
+  axis === 'row'
+    ? {
+        sheet: bounds.sheet,
+        r0: Math.min(start, tip),
+        c0: bounds.c0,
+        r1: Math.max(start, tip),
+        c1: bounds.c1,
+      }
+    : {
+        sheet: bounds.sheet,
+        r0: bounds.r0,
+        c0: Math.min(start, tip),
+        r1: bounds.r1,
+        c1: Math.max(start, tip),
+      };

@@ -673,3 +673,15 @@ export function scrollActiveIntoView(store: SpreadsheetStore, addr: Addr): void 
     return { ...s, layout, viewport: { ...s.viewport, rowStart, colStart } };
   });
 }
+
+export const isNavigationRangeAllowed = (store: SpreadsheetStore, range: Range): boolean => {
+  const bounds = navigationBoundsFor(store);
+  if (!bounds) return true;
+  return (
+    range.sheet === bounds.sheet &&
+    range.r0 >= bounds.r0 &&
+    range.c0 >= bounds.c0 &&
+    range.r1 <= bounds.r1 &&
+    range.c1 <= bounds.c1
+  );
+};

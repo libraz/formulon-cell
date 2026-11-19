@@ -1,9 +1,13 @@
 import { headerFilterRanges, hiddenFilterButtonTest } from '../commands/filter-ranges.js';
+import { pivotStyleLayer } from '../engine/pivot-style.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import {
+  cellRect,
   hitZone,
   layoutForView,
   mirrorX,
+  pointPx,
   type Rect,
   rangeRects,
   type ViewLayout,
@@ -16,6 +20,8 @@ import {
   type RulerHandle,
 } from '../render/grid/page-view.js';
 import { type GridHitState, gridHitState } from '../render/grid.js';
+import { type PivotCellButton, pivotCellButtonAt } from '../render/painters/pivot-cell-buttons.js';
+import { visualZoom } from '../render/painters/text.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { MAC_GRID_CURSORS, resizeCursor } from './grid-cursors.js';
@@ -272,3 +278,71 @@ export const refBoxHitAt = (s: State, x: number, y: number): RefBoxHit | null =>
   }
   return null;
 };
+
+/** The report button under (x, y) in the cell at (row, col): a caption's drop-down or a row
+ *  label's expand/collapse button, placed as the grid draws it. */
+export function pivotButtonAt(
+  s: State,
+  wb: WorkbookHandle,
+  host: HTMLElement,
+  row: number,
+  col: number,
+  x: number,
+  y: number,
+): PivotCellButton | null {
+  const view = layoutForView(s);
+  return pivotCellButtonAt(
+    pivotStyleLayer(wb, s),
+    row,
+    col,
+    cellRect(view, s.viewport, row, col),
+    {
+      mac: isMacHost(host),
+      zoom: visualZoom(s.viewport.zoom),
+      ptPx: pointPx(view, s.viewport),
+      dpr: host.ownerDocument.defaultView?.devicePixelRatio ?? 1,
+      rtl: s.ui.rightToLeft === true,
+    },
+    x,
+    y,
+  );
+}
+
+/** Half-width of the band along the selection border that the Mac desktop
+ *  treats as the border itself: wide enough to hit, narrow enough that a click
+ *  just past the edge still selects the neighbour. */
+const SELECTION_BORDER_BAND = 2;
+
+type SelectionBorderEdge = 'top' | 'bottom' | 'left' | 'right' | 'corner';
+
+/** The visual edge of a single-range selection that `(x, y)` lies on, on the
+ *  Mac host only. */
+export function selectionBorderEdgeAt(
+  host: HTMLElement,
+  s: State,
+  x: number,
+  y: number,
+): SelectionBorderEdge | null {
+  if (!isMacHost(host)) return null;
+  if ((s.selection.extraRanges?.length ?? 0) > 0) return null;
+  const { r0, c0, r1, c1 } = s.selection.range;
+  const layout = layoutForView(s);
+  const first = cellRect(layout, s.viewport, r0, c0);
+  const last = cellRect(layout, s.viewport, r1, c1);
+  const left = Math.min(first.x, last.x);
+  const right = Math.max(first.x + first.w, last.x + last.w);
+  const top = first.y;
+  const bottom = last.y + last.h;
+  const band = SELECTION_BORDER_BAND;
+  const near = (value: number, edge: number): boolean => Math.abs(value - edge) <= band;
+  const withinX = x >= left - band && x <= right + band;
+  const withinY = y >= top - band && y <= bottom + band;
+  const onHorizontal = withinX && (near(y, bottom) || near(y, top));
+  const onVertical = withinY && (near(x, right) || near(x, left));
+  if (onHorizontal && onVertical) return 'corner';
+  if (withinX && near(y, bottom)) return 'bottom';
+  if (withinX && near(y, top)) return 'top';
+  if (withinY && near(x, right)) return 'right';
+  if (withinY && near(x, left)) return 'left';
+  return null;
+}
