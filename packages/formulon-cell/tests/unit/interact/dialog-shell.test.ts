@@ -15,6 +15,7 @@ import {
   createDialogToggleButton,
   deferInitialFocus,
   focusAndSelectInput,
+  returnFocus,
   showDialogError,
 } from '../../../src/interact/dialog-shell.js';
 import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
@@ -983,6 +984,34 @@ describe('interact/dialog-shell', () => {
     }
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  describe('returnFocus', () => {
+    it('falls back to the host when the opener is detached', () => {
+      const sheet = document.createElement('div');
+      sheet.tabIndex = -1;
+      const surface = document.createElement('div');
+      const opener = document.createElement('button');
+      document.body.append(sheet, surface, opener);
+      opener.remove();
+      returnFocus(opener, surface, sheet);
+      expect(document.activeElement).toBe(sheet);
+      sheet.remove();
+      surface.remove();
+    });
+
+    it('returns to a connected opener outside the surface', () => {
+      const sheet = document.createElement('div');
+      sheet.tabIndex = -1;
+      const surface = document.createElement('div');
+      const opener = document.createElement('button');
+      document.body.append(sheet, surface, opener);
+      returnFocus(opener, surface, sheet);
+      expect(document.activeElement).toBe(opener);
+      sheet.remove();
+      surface.remove();
+      opener.remove();
+    });
   });
 
   describe('deferInitialFocus', () => {

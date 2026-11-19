@@ -8,6 +8,7 @@ import {
 } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { placeMacMenu } from './context-menu-placement.js';
+import { focusOpenerOrSheet } from './dialog-focus.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { placePanel } from './overlay-position.js';
@@ -87,7 +88,7 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
     const closed = onClose;
     onClose = null;
     closed?.();
-    if (restoreFocus && target?.isConnected) target.focus({ preventScroll: true });
+    if (restoreFocus) focusOpenerOrSheet(target, host);
   };
 
   root.addEventListener('keydown', (event) => {

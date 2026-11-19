@@ -13,6 +13,34 @@ describe('createObjectMenu', () => {
     document.body.replaceChildren();
   });
 
+  describe('restoring focus on close', () => {
+    const open = () => {
+      const host = document.createElement('div');
+      host.tabIndex = -1;
+      const opener = document.createElement('button');
+      document.body.append(host, opener);
+      const menu = createObjectMenu(host);
+      menu.open(10, 10, [{ id: 'bringToFront', label: 'Bring to Front', run: vi.fn() }], {
+        label: 'Chart 1',
+        restoreFocusTo: opener,
+      });
+      return { host, opener, menu };
+    };
+
+    it('returns focus to a connected opener', () => {
+      const { opener, menu } = open();
+      menu.close(true);
+      expect(document.activeElement).toBe(opener);
+    });
+
+    it('falls back to the sheet when the opener is detached', () => {
+      const { host, opener, menu } = open();
+      opener.remove();
+      menu.close(true);
+      expect(document.activeElement).toBe(host);
+    });
+  });
+
   const setup = (
     entries: readonly ObjectMenuEntry[] = [
       { id: 'bringToFront', label: 'Bring to Front', run: vi.fn() },

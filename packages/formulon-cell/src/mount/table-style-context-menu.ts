@@ -6,7 +6,7 @@ import {
   setStyleDefault,
   type TableStyleKind,
 } from '../commands/table-style-actions.js';
-import { focusSheet } from '../interact/dialog-focus.js';
+import { focusOpenerOrSheet, focusSheet } from '../interact/dialog-focus.js';
 import { onOutsidePress } from '../interact/outside-press.js';
 import { focusMenuItem, handleMenuKeydown, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { menuSeparator, menuTextChip } from '../toolbar/ribbon/menus/general.js';
@@ -44,7 +44,7 @@ export function attachTableStyleContextMenu(
     detachOutside?.();
     detachOutside = null;
     document.removeEventListener('keydown', onKey, true);
-    if (restoreFocus && restore.isConnected) restore.focus({ preventScroll: true });
+    if (restoreFocus) focusOpenerOrSheet(restore, getInstance()?.host ?? host);
   };
   const onKey = (event: KeyboardEvent): void => {
     if (!open) return;

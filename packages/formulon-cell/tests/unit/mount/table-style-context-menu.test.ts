@@ -10,8 +10,10 @@ import { applyTableStyle } from '../../../src/commands/table-style-actions.js';
 import { builtinTableStyleElements } from '../../../src/engine/builtin-table-styles.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
+import { attachTableStyleContextMenu } from '../../../src/mount/table-style-context-menu.js';
+import type { SpreadsheetInstance } from '../../../src/mount/types.js';
 import { Spreadsheet } from '../../../src/mount.js';
-import { mutators } from '../../../src/store/store.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
 import { scaledTimeout } from '../../timeouts.js';
 import { stubHelpers } from './toolbar/fixtures.js';
@@ -278,5 +280,57 @@ describe('table style gallery context menu', () => {
     host.querySelector<HTMLButtonElement>('[data-ribbon-command="tableQuickStyles"]')?.click();
     rightClick('#menu-table-quick-styles [data-table-style="TableStyleLight2"]');
     expect(items()).toHaveLength(0);
+  });
+});
+
+describe('attachTableStyleContextMenu focus restore', () => {
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  const setup = () => {
+    const sheet = document.createElement('div');
+    sheet.tabIndex = -1;
+    const strip = document.createElement('div');
+    const chip = document.createElement('button');
+    chip.dataset.tableQuickStyle = 'TableStyleLight1';
+    strip.appendChild(chip);
+    document.body.append(sheet, strip);
+    const instance = {
+      host: sheet,
+      store: createSpreadsheetStore(),
+      i18n: { strings: en },
+      workbook: { capabilities: {} },
+    } as unknown as SpreadsheetInstance;
+    attachTableStyleContextMenu(
+      strip,
+      () => instance,
+      () => {},
+    );
+    chip.dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 5, clientY: 5 }),
+    );
+    const menu = document.querySelector<HTMLElement>('.fc-tb__tablestyle-ctx');
+    if (!menu) throw new Error('context menu did not open');
+    return { sheet, chip, menu };
+  };
+
+  const pressEscape = (menu: HTMLElement): void => {
+    menu.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    );
+  };
+
+  it('returns focus to the connected chip on Escape', () => {
+    const { chip, menu } = setup();
+    pressEscape(menu);
+    expect(document.activeElement).toBe(chip);
+  });
+
+  it('falls back to the sheet when the chip is detached', () => {
+    const { sheet, chip, menu } = setup();
+    chip.remove();
+    pressEscape(menu);
+    expect(document.activeElement).toBe(sheet);
   });
 });

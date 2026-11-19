@@ -116,6 +116,15 @@ export function focusSheet(host: HTMLElement, options?: FocusOptions): void {
 }
 
 /**
+ * Hands focus back to the control a menu opened from while it is still attached; a detached
+ * opener (its row re-rendered, say) gives focus to the sheet of `host` rather than the page.
+ */
+export function focusOpenerOrSheet(opener: HTMLElement | null, host: HTMLElement): void {
+  if (opener?.isConnected) opener.focus({ preventScroll: true });
+  else focusSheetAfterDialog(host);
+}
+
+/**
  * Hands focus to the sheet after a dialog closes, as the desktop app does: not
  * back to the control that opened it, and never to the document body.
  */
