@@ -11,6 +11,7 @@ import { sameAddr } from './direct-format.js';
 import {
   applySelectionRectangle,
   cloneRange,
+  fullSheetRange,
   isValidRange,
   normalizeRange,
   rangeContainsAddr,
@@ -80,14 +81,6 @@ const exactSelectionAddr = (store: SpreadsheetStore, addr: Addr): boolean => {
   const accepted = permittedAddr(store, addr);
   return !!accepted && sameAddr(accepted, addr) && isNavigationAddrAllowed(store, addr);
 };
-
-const fullSheetRange = (sheet: number): Range => ({
-  sheet,
-  r0: 0,
-  c0: 0,
-  r1: MAX_ROW,
-  c1: MAX_COL,
-});
 
 /** `value` clamped into `lo..hi`, or `lo` when absent. */
 const clampInto = (value: number | undefined, lo: number, hi: number): number =>
