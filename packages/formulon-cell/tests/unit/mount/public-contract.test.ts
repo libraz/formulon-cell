@@ -1,8 +1,10 @@
+import { mount, Workbook } from '@libraz/formulon-cell';
+import type { Extension as PublicExtension } from '@libraz/formulon-cell/extensions';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { workbookOf } from '../../../src/api/workbook.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import type { Extension } from '../../../src/extensions/types.js';
-import { Spreadsheet } from '../../../src/mount.js';
+import { spreadsheetInternals } from '../../../src/mount/internals.js';
 import { mutators } from '../../../src/store/store.js';
 import { createHostElement, installDomStubs, uninstallDomStubs } from '../../test-utils/dom.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/index.js';
@@ -19,26 +21,23 @@ describe('mount/public contract', () => {
   it('runs the demo seed hook for a default-owned workbook without adding undo history', async () => {
     installDomStubs();
     const { host, cleanup } = createHostElement();
-    const seed = vi.fn((wb: WorkbookHandle) => {
-      wb.setNumber({ sheet: 0, row: 0, col: 0 }, 123);
+    const seed = vi.fn((wb: Workbook) => {
+      wb.sheet(0).setNumber(0, 0, 123);
     });
-    const instance = await Spreadsheet.mount(host, { seed });
+    const instance = await mount(host, { seed });
 
     try {
       expect(seed).toHaveBeenCalledTimes(1);
-      expect(instance.workbook.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
+      expect(instance.workbook.sheet(0).getValue(0, 0)).toBe(123);
+      expect(
+        spreadsheetInternals(instance).store.getState().data.cells.get('0:0:0')?.value,
+      ).toEqual({
         kind: 'number',
         value: 123,
       });
-      expect(instance.store.getState().data.cells.get('0:0:0')?.value).toEqual({
-        kind: 'number',
-        value: 123,
-      });
-      expect(instance.undo()).toBe(false);
-      expect(instance.workbook.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
-        kind: 'number',
-        value: 123,
-      });
+      expect(instance.history.canUndo).toBe(false);
+      instance.history.undo();
+      expect(instance.workbook.sheet(0).getValue(0, 0)).toBe(123);
     } finally {
       instance.dispose();
       cleanup();
@@ -72,17 +71,24 @@ describe('mount/public contract', () => {
       .mockReturnValueOnce({ src: 'blob:two', alt: 'Selected report area' })
       .mockReturnValueOnce('')
       .mockReturnValueOnce(undefined);
-    sheet = await mountStubSheet({ captureScreenClip });
+    installDomStubs();
+    const { host, cleanup } = createHostElement();
+    const instance = await mount(host, { host: { captureScreenClip } });
 
-    await expect(sheet.instance.captureScreenClip()).resolves.toEqual({
-      src: 'data:image/png;base64,one',
-    });
-    await expect(sheet.instance.captureScreenClip()).resolves.toEqual({
-      src: 'blob:two',
-      alt: 'Selected report area',
-    });
-    await expect(sheet.instance.captureScreenClip()).resolves.toBeNull();
-    await expect(sheet.instance.captureScreenClip()).resolves.toBeNull();
+    try {
+      await expect(instance.captureScreenClip()).resolves.toEqual({
+        src: 'data:image/png;base64,one',
+      });
+      await expect(instance.captureScreenClip()).resolves.toEqual({
+        src: 'blob:two',
+        alt: 'Selected report area',
+      });
+      await expect(instance.captureScreenClip()).resolves.toBeNull();
+      await expect(instance.captureScreenClip()).resolves.toBeNull();
+    } finally {
+      instance.dispose();
+      cleanup();
+    }
   });
 
   it('keeps the previous printer profile list when a host refresh has no update', async () => {
@@ -113,7 +119,7 @@ describe('mount/public contract', () => {
     await expect(sheet.instance.refreshPrinterProfiles()).resolves.toEqual([nextProfile]);
   });
 
-  it('rebases public instance state when the workbook is replaced', async () => {
+  it('rebases internal instance state when the workbook is replaced', async () => {
     const rebindWorkbook = vi.fn();
     const extension: Extension = {
       id: 'rebind-probe',
@@ -141,5 +147,51 @@ describe('mount/public contract', () => {
     expect(rebindWorkbook).toHaveBeenCalledWith(workbookOf(next));
     expect(onWorkbookChange).toHaveBeenCalledTimes(1);
     expect(onWorkbookChange).toHaveBeenCalledWith({ workbook: next });
+  });
+
+  it('rebases public instance state when update replaces the workbook', async () => {
+    installDomStubs();
+    const { host, cleanup } = createHostElement();
+    const rebindWorkbook = vi.fn();
+    const extension: PublicExtension = {
+      id: 'rebind-probe',
+      setup(ctx) {
+        const stop = ctx.spreadsheet.on('workbook', ({ workbook }) => rebindWorkbook(workbook));
+        return { dispose: stop };
+      },
+    };
+    const instance = await mount(host, { extensions: [extension] });
+    instance.workbook.addSheet('Second');
+    instance.selection.set('Second!A1');
+    const next = await Workbook.createDefault();
+    next.sheet(0).setNumber(1, 1, 42);
+    const onWorkbook = vi.fn();
+    const swapped = new Promise<void>((resolve) =>
+      instance.on('workbook', (event) => {
+        onWorkbook(event);
+        resolve();
+      }),
+    );
+
+    try {
+      instance.update({ workbook: next });
+      await swapped;
+
+      expect(instance.workbook).toBe(next);
+      expect(instance.selection.get().sheet).toBe(0);
+      expect(
+        spreadsheetInternals(instance).store.getState().data.cells.get('0:1:1')?.value,
+      ).toEqual({
+        kind: 'number',
+        value: 42,
+      });
+      expect(rebindWorkbook).toHaveBeenCalledWith(next);
+      expect(onWorkbook).toHaveBeenCalledTimes(1);
+      expect(onWorkbook).toHaveBeenCalledWith({ workbook: next });
+    } finally {
+      instance.dispose();
+      next.dispose();
+      cleanup();
+    }
   });
 });

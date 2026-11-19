@@ -1,3 +1,4 @@
+import { mount, Workbook } from '@libraz/formulon-cell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { Spreadsheet } from '../../../src/mount.js';
@@ -46,7 +47,7 @@ describe('mount/pre-ready click handling', () => {
     // We feed a pre-resolved workbook through `opts.workbook` to keep the
     // test synchronous-ish. The point is to observe the state transition,
     // not to race the loader.
-    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    const wb = await Workbook.createDefault({ engine: 'stub' });
 
     // Wrap mount in a Promise we can inspect mid-flight by attaching a
     // microtask checkpoint.
@@ -59,7 +60,7 @@ describe('mount/pre-ready click handling', () => {
     // the workbook.
     queueMicrotask(observe);
 
-    const instance = await Spreadsheet.mount(host, { workbook: wb });
+    const instance = await mount(host, { workbook: wb });
     try {
       // After mount resolves, state is 'ready' (or 'ready-stub' for the stub).
       const finalState = host.dataset.fcEngineState;
@@ -76,14 +77,14 @@ describe('mount/pre-ready click handling', () => {
   });
 
   it('clicks issued during the loading window do not throw post-mount', async () => {
-    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    const wb = await Workbook.createDefault({ engine: 'stub' });
 
     // Pre-dispatch a click before mount completes. The host is still inert.
     host.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     host.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
 
     // Mount should complete normally and the host should end in a usable state.
-    const instance = await Spreadsheet.mount(host, { workbook: wb });
+    const instance = await mount(host, { workbook: wb });
     try {
       expect(
         host.dataset.fcEngineState === 'ready' || host.dataset.fcEngineState === 'ready-stub',
@@ -122,8 +123,8 @@ describe('mount/pre-ready click handling', () => {
     // A real user can navigate away mid-mount. The host must survive that
     // by clearing its state — the next mount on the same host should still
     // work.
-    const wb = await WorkbookHandle.createDefault({ preferStub: true });
-    const mountPromise = Spreadsheet.mount(host, { workbook: wb });
+    const wb = await Workbook.createDefault({ engine: 'stub' });
+    const mountPromise = mount(host, { workbook: wb });
     const instance = await mountPromise;
 
     expect(() => instance.dispose()).not.toThrow();

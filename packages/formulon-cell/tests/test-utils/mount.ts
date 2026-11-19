@@ -1,3 +1,4 @@
+// Internal-behaviour tests use this internal mount; tests that pin the public contract use `mount` from '@libraz/formulon-cell', the shape consumers get.
 import { WorkbookHandle } from '../../src/engine/workbook-handle.js';
 import type { MountOptions, SpreadsheetInstance } from '../../src/mount/types.js';
 import { Spreadsheet } from '../../src/mount.js';

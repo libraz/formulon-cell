@@ -1,3 +1,4 @@
+import { mount } from '@libraz/formulon-cell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { WorkbookHandle } from '../../src/engine/workbook-handle.js';
@@ -35,5 +36,17 @@ describe('Spreadsheet.mount error handling', () => {
 
     expect(host.dataset.fcEngineState).toBe('error');
     expect(host.querySelector('.fc-mount-error')).toBeNull();
+  });
+
+  it('rejects a public mount with the engine failure and renders no built-in panel', async () => {
+    const err = new Error('boom');
+    vi.spyOn(WorkbookHandle, 'createDefault').mockRejectedValue(err);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    await expect(mount(host)).rejects.toThrow('boom');
+
+    expect(host.querySelector('.fc-mount-error')).toBeNull();
+    expect(host.children.length).toBe(0);
   });
 });

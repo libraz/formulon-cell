@@ -1,11 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  legacyInstanceOf,
-  mount,
-  type SpreadsheetInstance,
-} from '../../../src/api/spreadsheet/instance.js';
+import { mount, type SpreadsheetInstance } from '../../../src/api/spreadsheet/instance.js';
 import type { ViewportConfig } from '../../../src/api/spreadsheet/types.js';
 import { isNavigationAddrAllowed } from '../../../src/interact/navigation-policy.js';
+import { spreadsheetInternals } from '../../../src/mount/internals.js';
 import { mutators } from '../../../src/store/store.js';
 import { createHostElement, installDomStubs, uninstallDomStubs } from '../../test-utils/dom.js';
 import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
@@ -30,7 +27,7 @@ describe('viewport option', () => {
 
   const mountWith = async (viewport: ViewportConfig) => {
     instance = await mount(host, { viewport });
-    return legacyInstanceOf(instance).store;
+    return spreadsheetInternals(instance).store;
   };
 
   const tab = (): KeyboardEvent => {

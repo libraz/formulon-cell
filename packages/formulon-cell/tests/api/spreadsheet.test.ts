@@ -20,8 +20,8 @@ import {
 } from '@libraz/formulon-cell';
 import { ribbon } from '@libraz/formulon-cell/toolbar';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { legacyInstanceOf } from '../../src/api/spreadsheet/instance.js';
 import { workbookHandleOf } from '../../src/api/workbook.js';
+import { correctTypedEntry } from '../../src/commands/autocorrect.js';
 import { setComment } from '../../src/commands/comment.js';
 import { executeNoteVisibilityAction } from '../../src/commands/ribbon-comment.js';
 import { spreadsheetInternals } from '../../src/mount/internals.js';
@@ -257,14 +257,23 @@ describe('spreadsheet: update', () => {
   });
 
   it('reports a theme or language the user picks as a user update, and update() as the api', async () => {
-    const sheet = await mountSheet({ theme: 'paper' });
+    const sheet = await mountSheet({
+      theme: 'paper',
+      toolbar: ribbon(),
+      ui: { features: { localeSwitcher: true } },
+    });
     const updates = vi.fn();
     sheet.on('update', updates);
-    // The Page Layout theme picker and the language menu run these.
-    legacyInstanceOf(sheet).setTheme('ink');
+    // The Page Layout theme picker and the language menu are the user's way to these.
+    sheet.toolbar?.update({ activeTab: 'pageLayout' });
+    sheet.host.querySelector<HTMLElement>('[data-ribbon-command="pageTheme"]')?.click();
+    sheet.host.querySelector<HTMLElement>('[data-page-theme-action="ink"]')?.click();
     expect(updates).toHaveBeenLastCalledWith({ keys: ['theme'], source: 'user' });
     expect(sheet.options.theme).toBe('ink');
-    expect(legacyInstanceOf(sheet).setLocale('ja')).toBe(true);
+    const select = sheet.host.querySelector<HTMLSelectElement>('[data-fc-locale-select]');
+    if (!select) throw new Error('No language selector.');
+    select.value = 'ja';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
     expect(updates).toHaveBeenLastCalledWith({ keys: ['locale'], source: 'user' });
     expect(sheet.options.locale).toBe('ja');
 
@@ -302,16 +311,25 @@ describe('spreadsheet: update', () => {
   it('spelling hands Review > Spelling the host checker, replaced by update and reset by null', async () => {
     const check = vi.fn((word: string) => word !== 'zork');
     const sheet = await mountSheet({ spelling: { check, suggest: () => [] } });
-    const legacy = legacyInstanceOf(sheet);
-    expect(legacy.spellingService().check('zork', 'en')).toBe(false);
+    const flagged = (): string | null => {
+      sheet.dialogs.open('spelling');
+      const word = document.querySelector<HTMLInputElement>(
+        '.fc-spelling:not([hidden]) #fc-spelling-word',
+      );
+      sheet.dialogs.close('spelling');
+      return word ? word.value : null;
+    };
+    sheet.workbook.sheet(0).setText(0, 0, 'zork');
+    sheet.selection.set('A1');
+    expect(flagged()).toBe('zork');
     expect(check).toHaveBeenCalledWith('zork', 'en');
 
-    const next = { check: () => true, suggest: () => [] };
-    sheet.update({ spelling: next });
-    expect(legacy.spellingService()).toBe(next);
+    sheet.update({ spelling: { check: () => true, suggest: () => [] } });
+    expect(flagged()).toBeNull();
     sheet.update({ spelling: null });
-    expect(legacy.spellingService().check('teh', 'en')).toBe(false);
-    expect(legacy.spellingService().check('zork', 'en')).toBe(true);
+    expect(flagged()).toBeNull();
+    sheet.workbook.sheet(0).setText(0, 0, 'teh');
+    expect(flagged()).toBe('teh');
   });
 
   it('autoCorrect is configuration: user edits update options and report update from the user', async () => {
@@ -325,18 +343,37 @@ describe('spreadsheet: update', () => {
     });
     const updates = vi.fn();
     sheet.on('update', updates);
-    const autoCorrect = legacyInstanceOf(sheet).autoCorrect;
-    expect(autoCorrect.state()).toEqual({
-      entries: [{ from: 'teh', to: 'the' }],
-      exceptions: { firstLetter: ['approx'], initialCaps: [] },
-      replaceAsYouType: true,
-      replaceHyperlinks: false,
-      correctTwoInitialCapitals: true,
-      capitalizeSentences: false,
-      capitalizeDays: true,
-    });
-    expect(autoCorrect.correct('teh end. monday')).toBe('the end. Monday');
-    autoCorrect.add('adn', 'and');
+    const { store } = spreadsheetInternals(sheet);
+    const checks = (): boolean[] => {
+      sheet.dialogs.open('autoCorrect');
+      const boxes = [
+        ...document.querySelectorAll<HTMLInputElement>('.fc-autocorrect__check input'),
+      ].map((box) => box.checked);
+      sheet.dialogs.close('autoCorrect');
+      return boxes;
+    };
+    // Hyperlinks, days, two capitals, sentences, as you type.
+    expect(checks()).toEqual([false, true, true, false, true]);
+    expect(correctTypedEntry(store, 'teh end. monday')).toBe('the end. Monday');
+
+    sheet.dialogs.open('autoCorrect');
+    const entries = (): string[] =>
+      [...document.querySelectorAll('.fc-autocorrect__entry')].map(
+        (entry) => entry.textContent ?? '',
+      );
+    expect(entries()).toEqual(['tehthe']);
+    const [from, to] = document.querySelectorAll<HTMLInputElement>('.fc-autocorrect__field input');
+    if (!from || !to) throw new Error('No AutoCorrect fields.');
+    from.value = 'adn';
+    from.dispatchEvent(new Event('input', { bubbles: true }));
+    to.value = 'and';
+    to.dispatchEvent(new Event('input', { bubbles: true }));
+    const add = [
+      ...document.querySelectorAll<HTMLButtonElement>('.fc-autocorrect__actions button'),
+    ][0];
+    add?.click();
+    expect(entries()).toEqual(['tehthe', 'adnand']);
+    sheet.dialogs.close('autoCorrect');
     expect(sheet.options.autoCorrect?.entries?.en).toEqual([
       { from: 'teh', to: 'the' },
       { from: 'adn', to: 'and' },
@@ -345,10 +382,7 @@ describe('spreadsheet: update', () => {
 
     // An update replaces the configuration and is reported as the API's.
     sheet.update({ autoCorrect: null });
-    expect(autoCorrect.state()).toMatchObject({
-      replaceHyperlinks: true,
-      capitalizeSentences: true,
-    });
+    expect(checks()).toEqual([true, true, true, true, true]);
     expect(updates).toHaveBeenLastCalledWith(
       expect.objectContaining({ keys: ['autoCorrect'], source: 'api' }),
     );

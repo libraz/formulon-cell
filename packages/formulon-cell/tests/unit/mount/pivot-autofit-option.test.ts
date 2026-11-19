@@ -1,16 +1,13 @@
 import { PivotAggregation, PivotAxis } from '@libraz/formulon';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  legacyInstanceOf,
-  mount,
-  type SpreadsheetInstance,
-} from '../../../src/api/spreadsheet/instance.js';
+import { mount, type SpreadsheetInstance } from '../../../src/api/spreadsheet/instance.js';
 import { workbookHandleOf } from '../../../src/api/workbook.js';
 import { History } from '../../../src/commands/history.js';
 import { finishPivotReportUpdate } from '../../../src/commands/pivot-table.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
 import { openPivotOptions } from '../../../src/interact/pivot-options-dialog.js';
+import { spreadsheetInternals } from '../../../src/mount/internals.js';
 import { mutators, type SpreadsheetStore } from '../../../src/store/store.js';
 import { createHostElement, installDomStubs, uninstallDomStubs } from '../../test-utils/dom.js';
 
@@ -30,7 +27,7 @@ describe('PivotTable "autofit column widths on update" option', () => {
     ({ host, cleanup } = createHostElement());
     instance = await mount(host);
     wb = workbookHandleOf(instance.workbook);
-    store = legacyInstanceOf(instance).store;
+    store = spreadsheetInternals(instance).store;
   });
   afterEach(() => {
     instance.dispose();

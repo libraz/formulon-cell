@@ -1,3 +1,4 @@
+import { mount, Workbook } from '@libraz/formulon-cell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { WorkbookHandle } from '../../src/engine/workbook-handle.js';
@@ -27,32 +28,39 @@ describe('integration: workbook and extension lifecycle', () => {
     }
   });
   it('shows a localized bounded-print error without creating a print iframe', async () => {
-    const sheet = await mountStubSheet({ locale: 'ja' });
+    installDomStubs();
+    const { host, cleanup } = createHostElement();
+    const workbook = await Workbook.createDefault({ engine: 'stub' });
+    const sheet = await mount(host, { locale: 'ja', workbook });
     try {
-      sheet.workbook.setNumber({ sheet: 0, row: 1000, col: 1000 }, 1);
-      expect(() => sheet.instance.print()).not.toThrow();
+      workbook.sheet(0).setNumber(1000, 1000, 1);
+      expect(() => sheet.print()).not.toThrow();
       expect(document.querySelector('[role="alertdialog"] .fc-tb__dlg__message')?.textContent).toBe(
         dictionaries.ja.pageSetup.printRangeTooLarge,
       );
-      expect(sheet.host.querySelector('iframe[data-fc-print-mode]')).toBeNull();
+      expect(host.querySelector('iframe[data-fc-print-mode]')).toBeNull();
       document
         .querySelector<HTMLButtonElement>('[role="alertdialog"] .fc-fmtdlg__footer button')
         ?.click();
     } finally {
       sheet.dispose();
-      sheet.workbook.dispose();
+      workbook.dispose();
+      cleanup();
     }
   });
   it('rejects late workbook replacement after disposal without adopting the incoming handle', async () => {
-    const sheet = await mountStubSheet();
-    const next = await WorkbookHandle.createDefault({ preferStub: true });
+    installDomStubs();
+    const { host, cleanup } = createHostElement();
+    const sheet = await mount(host);
+    const next = await Workbook.createDefault();
     try {
-      sheet.instance.dispose();
-      await expect(sheet.instance.setWorkbook(next)).rejects.toThrow('disposed');
-      expect(next.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'blank' });
+      sheet.dispose();
+      expect(() => sheet.update({ workbook: next })).toThrow('disposed');
+      expect(next.sheet(0).getValue(0, 0)).toBeNull();
     } finally {
       sheet.dispose();
       next.dispose();
+      cleanup();
     }
   });
 
@@ -60,22 +68,28 @@ describe('integration: workbook and extension lifecycle', () => {
     installDomStubs();
     const owned = await WorkbookHandle.createDefault({ preferStub: true });
     const createDefault = vi.spyOn(WorkbookHandle, 'createDefault').mockResolvedValueOnce(owned);
+    const cleanupError = new Error('cleanup failed');
     const dispose = vi.spyOn(owned, 'dispose').mockImplementationOnce(() => {
-      throw new Error('cleanup failed');
+      throw cleanupError;
     });
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // The public mount reports a cleanup failure instead of letting it replace the seed's.
+    const reportError = vi.fn();
+    vi.stubGlobal('reportError', reportError);
     const { host, cleanup } = createHostElement();
     const seedError = new Error('original seed failed');
     try {
       await expect(
-        Spreadsheet.mount(host, {
+        mount(host, {
           seed: () => {
             throw seedError;
           },
         }),
       ).rejects.toBe(seedError);
       expect(dispose).toHaveBeenCalledTimes(1);
+      expect(reportError).toHaveBeenCalledWith(cleanupError);
     } finally {
+      vi.unstubAllGlobals();
       createDefault.mockRestore();
       dispose.mockRestore();
       log.mockRestore();
@@ -110,6 +124,38 @@ describe('integration: workbook and extension lifecycle', () => {
       ).rejects.toBe(setupError);
       expect(onError).toHaveBeenCalledTimes(1);
       expect(onError).toHaveBeenCalledWith(setupError);
+      expect(dispose).toHaveBeenCalledTimes(1);
+      expect(host.children.length).toBe(0);
+      expect(host.classList.contains('fc-host')).toBe(false);
+    } finally {
+      createDefault.mockRestore();
+      dispose.mockRestore();
+      owned.dispose();
+      cleanup();
+    }
+  });
+
+  it('rejects a public mount with the extension setup error and releases the host and workbook', async () => {
+    installDomStubs();
+    const owned = await WorkbookHandle.createDefault({ preferStub: true });
+    const createDefault = vi.spyOn(WorkbookHandle, 'createDefault').mockResolvedValueOnce(owned);
+    const dispose = vi.spyOn(owned, 'dispose');
+    const setupError = new Error('extension setup failed');
+    const { host, cleanup } = createHostElement();
+
+    try {
+      await expect(
+        mount(host, {
+          extensions: [
+            {
+              id: 'throws-during-setup',
+              setup() {
+                throw setupError;
+              },
+            },
+          ],
+        }),
+      ).rejects.toBe(setupError);
       expect(dispose).toHaveBeenCalledTimes(1);
       expect(host.children.length).toBe(0);
       expect(host.classList.contains('fc-host')).toBe(false);
@@ -212,6 +258,40 @@ describe('integration: workbook and extension lifecycle', () => {
     }
   });
 
+  it('runs every extension disposer on a public dispose and reports the failure instead of throwing', async () => {
+    installDomStubs();
+    const { host, cleanup } = createHostElement();
+    const calls: string[] = [];
+    const firstError = new Error('first disposer failed');
+    const reportError = vi.fn();
+    vi.stubGlobal('reportError', reportError);
+    const sheet = await mount(host, {
+      extensions: [
+        {
+          id: 'first',
+          setup: () => ({
+            dispose() {
+              calls.push('first');
+              throw firstError;
+            },
+          }),
+        },
+        { id: 'second', setup: () => ({ dispose: () => void calls.push('second') }) },
+      ],
+    });
+
+    try {
+      expect(() => sheet.dispose()).not.toThrow();
+      expect(calls).toEqual(['first', 'second']);
+      expect(reportError).toHaveBeenCalledWith(firstError);
+      expect(host.children.length).toBe(0);
+      expect(host.classList.contains('fc-host')).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+      cleanup();
+    }
+  });
+
   it('disposes an owned workbook when seed rejects before mount returns', async () => {
     installDomStubs();
     const owned = await WorkbookHandle.createDefault({ preferStub: true });
@@ -221,7 +301,7 @@ describe('integration: workbook and extension lifecycle', () => {
 
     try {
       await expect(
-        Spreadsheet.mount(host, {
+        mount(host, {
           seed: () => {
             throw seedError;
           },
