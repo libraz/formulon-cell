@@ -756,7 +756,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     deleteShell.open();
   };
 
-  // ── Mac 名前の定義: names list with + / -, a name and a range field ──
+  // ── Mac Define Name: names list with + / -, a name and a range field ──
   const defineShell = createDialogShell({
     host,
     className: 'fc-namedlg-define',
@@ -1101,7 +1101,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
         return;
       }
       applyPlatform();
-      // The Mac app opens its own 名前の定義 dialog rather than the New Name editor.
+      // The Mac app opens its own Define Name dialog rather than the New Name editor.
       if (mac) {
         openDefine();
         return;
