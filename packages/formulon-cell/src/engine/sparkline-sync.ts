@@ -231,6 +231,21 @@ export class SparklineMirror {
   }
 }
 
+/** Capture one sheet's sparkline groups, an empty list included. The restorer puts them back in
+ *  the engine only; `null` when the engine has no sparkline surface. */
+export function captureSheetSparklineGroups(
+  wb: WorkbookHandle,
+  sheet: number,
+): (() => void) | null {
+  if (!wb.capabilities.sparklines) return null;
+  const captured = wb.listSparklineGroups(sheet);
+  return () => {
+    const count = wb.listSparklineGroups(sheet).length;
+    for (let index = count - 1; index >= 0; index -= 1) wb.removeSparklineGroup(sheet, index);
+    for (const group of captured) wb.addSparklineGroup(sheet, group);
+  };
+}
+
 /** Capture every sheet's sparkline groups ahead of a delete that may drop some.
  *  The restorer puts the captured groups back and re-reads the store. */
 export function captureSparklineGroups(

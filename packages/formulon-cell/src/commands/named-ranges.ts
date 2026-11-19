@@ -200,7 +200,7 @@ const attrsOf = (entry: DefinedNameEntry): DefinedNameAttrs => ({
   hidden: !!entry.hidden,
 });
 
-const captureDefinedNamesSnapshot = (wb: WorkbookHandle): DefinedNamesSnapshot =>
+export const captureDefinedNamesSnapshot = (wb: WorkbookHandle): DefinedNamesSnapshot =>
   new Map(listDefinedNames(wb).map((entry) => [snapshotKey(entry), { ...entry }]));
 
 const sameDefinedNamesSnapshot = (a: DefinedNamesSnapshot, b: DefinedNamesSnapshot): boolean => {
@@ -221,7 +221,7 @@ const sameDefinedNamesSnapshot = (a: DefinedNamesSnapshot, b: DefinedNamesSnapsh
   return true;
 };
 
-const applyDefinedNamesSnapshot = (wb: WorkbookHandle, snap: DefinedNamesSnapshot): void => {
+export const applyDefinedNamesSnapshot = (wb: WorkbookHandle, snap: DefinedNamesSnapshot): void => {
   for (const entry of listDefinedNames(wb)) {
     if (!snap.has(snapshotKey(entry))) wb.setDefinedNameEntry(entry.name, '', entry.localSheetId);
   }
