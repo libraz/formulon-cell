@@ -1,7 +1,6 @@
 import { autoCorrectInput, correctTypedEntry } from '../commands/autocorrect.js';
 import {
   type CellInputAlert,
-  commitCellInput,
   protectedCellAlert,
   selectRefusedSpan,
 } from '../commands/cell-input-commit.js';
@@ -59,11 +58,6 @@ import {
   resolveTabBoundary,
   scrollActiveIntoView,
 } from '../interact/navigation-policy.js';
-import {
-  buildSelectionInputBatch,
-  SELECTION_INPUT_LIMIT_REFUSAL,
-  writeSelectionInput,
-} from '../interact/selection-input.js';
 import { advanceAfterCommit, type CommitAdvance } from '../interact/selection-navigation.js';
 import { sameAddr } from '../store/direct-format.js';
 import { rangeOfAddr } from '../store/selection-geometry.js';
@@ -72,6 +66,7 @@ import { mutators } from '../store/store.js';
 import type { EditorRefHighlight } from '../store/types.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { moveAfterCommit, tabCaptured } from './formula-bar-advance.js';
+import { fillSelectionFromFormulaBar, writeFormulaBarEntry } from './formula-bar-entry-write.js';
 
 interface FormulaBarAutocomplete {
   isOpen(): boolean;
@@ -711,70 +706,19 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     commitDeferred = false;
     const anchor = state.selection.active;
     const raw = correctTypedEntry(store, fxInput.value);
-    const batch = buildSelectionInputBatch(state, raw, anchor);
-    if (!batch) {
-      showCommitFailure(localizedDecisionReason(SELECTION_INPUT_LIMIT_REFUSAL, getStrings()));
+    const filled = fillSelectionFromFormulaBar(store, wb, state, raw, anchor, getStrings);
+    if (filled.status === 'refused') {
+      showCommitFailure(filled.message, filled.title);
       return;
     }
-    const controller = interactionControllerFor(store);
-    if (!controller) {
-      // The direct path serves only hosts without a registered controller.
-      const written = writeSelectionInput(wb(), store, state, raw, anchor);
-      if (written.status === 'limitExceeded') {
-        showCommitFailure(localizedDecisionReason(SELECTION_INPUT_LIMIT_REFUSAL, getStrings()));
-        return;
-      }
-      if (written.status === 'rejected') {
-        showCommitFailure(written.outcome.message, written.outcome.title);
-        return;
-      }
-      mutators.refreshActiveSheetCells(store, wb());
-      finishEditing();
-      focusSheet(host);
-      return;
-    }
-
-    let result: ReturnType<typeof controller.execute>;
-    try {
-      result = controller.execute({
-        type: 'cellBatch',
-        operation: batch.operation,
-        origin: 'formulaBar',
-        changes: batch.changes,
-      });
-    } catch (err) {
-      console.warn('formulon-cell: formula-bar selection fill failed', err);
-      showCommitFailure(
-        localizedDecisionReason({ code: 'invalid', reasonKey: 'cellsNotFilled' }, getStrings()),
-      );
-      return;
-    }
-    if (result.status === 'refused') {
-      const [rejection] = result.rejections;
-      showCommitFailure(
-        rejection
-          ? localizedDecisionReason(rejection, getStrings())
-          : localizedDecisionReason({ code: 'operationDenied' }, getStrings()),
-      );
-      return;
-    }
-
-    const currentWb = wb();
-    mutators.refreshActiveSheetCells(store, currentWb);
+    mutators.refreshActiveSheetCells(store, filled.wb);
     finishEditing();
     focusSheet(host);
   };
 
   const commitRawAt = (a: Addr, raw: string, draft?: ExternalDraftState): boolean => {
     const currentWb = wb();
-    const result = commitCellInput({
-      store,
-      wb: currentWb,
-      addr: a,
-      raw,
-      origin: 'formulaBar',
-      typed: true,
-    });
+    const result = writeFormulaBarEntry(store, currentWb, a, raw);
     if (result.status === 'rejected') {
       showCommitFailure(
         result.alert?.message ?? localizedDecisionReason({ code: 'operationDenied' }, getStrings()),
@@ -786,7 +730,6 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       return false;
     }
     if (result.status === 'failed') {
-      console.warn('formulon-cell: formula-bar write failed', result.error);
       showCommitFailure(
         localizedDecisionReason({ code: 'invalid', reasonKey: 'valueNotWritten' }, getStrings()),
         undefined,
