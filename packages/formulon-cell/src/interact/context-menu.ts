@@ -7,7 +7,6 @@ import { parseTSV } from '../commands/clipboard/tsv.js';
 import { clearComment, commentAt, recordCommentChange } from '../commands/comment.js';
 import { commentWrite } from '../commands/comment-actions.js';
 import { withSelectionFormatOrigin } from '../commands/format.js';
-import { tableForCell } from '../commands/format-as-table.js';
 import type { History } from '../commands/history.js';
 import { hyperlinkAt, isFollowableHyperlinkTarget } from '../commands/hyperlinks.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
@@ -20,12 +19,11 @@ import type {
 import { mergeAt } from '../commands/merge.js';
 import { pivotReportEffects, pivotWrite } from '../commands/pivot-actions.js';
 import { refreshPivotTable } from '../commands/pivot-cache-source.js';
-import { deferForAllowedRangeUnlock, noteChangePermitted } from '../commands/protection.js';
+import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { executeNoteVisibilityAction } from '../commands/ribbon-comment.js';
 import { runColumnWidthDialog, runRowHeightDialog } from '../commands/row-col-dimension.js';
 import { hiddenExtentInSelection } from '../commands/row-col-layout.js';
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
-import { rowDeleteHitsTableHeader } from '../commands/table-rows.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -36,6 +34,7 @@ import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { showDimensionDialog } from '../toolbar/dialogs/dimension.js';
 import { isMenuItemDisabled, onPointerArrive } from '../toolbar/menu-a11y.js';
 import { canReadClipboard, createContextMenuClipboard } from './context-menu-clipboard.js';
+import { composeBuiltInEntries } from './context-menu-composition.js';
 import {
   createContextMenuDisabledState,
   setContextMenuItemDisabled,
@@ -57,7 +56,6 @@ import {
 import {
   type ContextMenuInsertCopiedContext,
   runContextMenuInsertCopiedCells,
-  wholeBandAxisFor,
 } from './context-menu-insert-copied.js';
 import type {
   ContextMenuContext,
@@ -66,29 +64,15 @@ import type {
   ContextMenuOptions,
 } from './context-menu-options.js';
 import { createContextMenuPermissions } from './context-menu-permissions.js';
-import { pivotMenuTarget, runContextMenuPivotItem } from './context-menu-pivot.js';
+import { runContextMenuPivotItem } from './context-menu-pivot.js';
 import { keyboardMenuPoint, placeMacMenu, placeSubmenu } from './context-menu-placement.js';
 import {
-  buildCellEntries,
-  buildColEntries,
-  buildMacCellEntries,
-  buildMacColEntries,
-  buildMacCornerEntries,
-  buildMacRowEntries,
-  buildPivotEntries,
-  buildRowEntries,
-  compactMenuEntries,
   type DialogMenuItemId,
   type ItemId,
   isBuiltinItemId,
-  isDialogMenuItemId,
   type MenuKind,
   menuEntryToContextItem,
   PASTE_QUICK_IDS,
-  PLAIN_INSERT_IDS,
-  toMacBandEntries,
-  withoutMenuItems,
-  withTableInsertMenu,
 } from './context-menu-spec.js';
 import {
   type ContextMenuStructureContext,
@@ -581,103 +565,20 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     // Menus measured apart may differ in metrics; the stylesheet tells them apart by this.
     root.dataset.fcMenu = pivot ? 'pivot' : kind;
     sub.dataset.fcMenu = root.dataset.fcMenu;
-    const raw = pivot
-      ? buildPivotEntries(
-          strings,
-          pivotMenuTarget(
-            wb,
-            { addr: pivotAddr, info: pivot },
-            !!deps.onOpenPivotFieldList,
-            deps.isPivotFieldListOpen ? !deps.isPivotFieldListOpen() : undefined,
-          ),
-          mac ? 'mac' : 'default',
-        )
-      : kind === 'row'
-        ? mac
-          ? buildMacRowEntries(strings)
-          : buildRowEntries(strings)
-        : kind === 'col'
-          ? mac
-            ? buildMacColEntries(strings)
-            : buildColEntries(strings)
-          : mac
-            ? (corner ? buildMacCornerEntries : buildMacCellEntries)(strings, hasNote)
-            : buildCellEntries(strings, hasNote);
-    const stateNow = store.getState();
-    const bandRange = stateNow.selection.range;
-    const inTable =
-      kind === 'cell' && !pivot && !stateNow.ui.copyRange
-        ? tableForCell(stateNow.tables.tables, activeAddr.sheet, activeAddr.row, activeAddr.col)
-        : null;
-    const baseEntries = mac && pivot ? toMacBandEntries(raw, strings) : raw;
-    const platformEntries = inTable
-      ? withTableInsertMenu(baseEntries, strings, {
-          rows: !(inTable.showHeader && bandRange.r0 === inTable.range.r0),
-        })
-      : baseEntries;
-    const hasCopiedCells = !!store.getState().ui.copyRange;
-    const pendingSnapshot = hasCopiedCells ? clipboard.snapshot() : null;
-    const pendingCutBand =
-      pendingSnapshot?.mode === 'cut' && wholeBandAxisFor(pendingSnapshot) === kind;
-    const watched = !!deps.isWatched?.(activeAddr);
-    const entries = compactMenuEntries(
-      withoutMenuItems(
-        platformEntries,
-        (id) => isDialogMenuItemId(id) && deps.dialogAttached?.(id) === false,
-      )
-        .filter(
-          (e) => !(e.kind === 'item' && e.id === 'insertHyperlink' && !deps.onInsertHyperlink),
-        )
-        .filter((e) => !(e.kind === 'item' && e.id === 'openHyperlink' && !deps.onOpenHyperlink))
-        // A pending copy swaps the plain insert entries for "Insert Copied
-        // Cells" — the desktop menus never show both at once.
-        .filter((e) => !(e.kind === 'item' && e.id === 'insertCopiedCells' && !hasCopiedCells))
-        .filter((e) => !(e.kind === 'item' && hasCopiedCells && PLAIN_INSERT_IDS.includes(e.id)))
-        .filter((e) => !(e.kind === 'item' && e.id === 'insertComment' && !deps.onEditComment))
-        .filter((e) => !(e.kind === 'item' && e.id === 'pickFromList' && !deps.onPickFromList))
-        .filter(
-          (e) => !(e.kind === 'item' && e.id === 'newComment' && !wb.capabilities.threadedComments),
-        )
-        .filter((e) => !(e.kind === 'item' && e.id === 'showHideNote' && !hasNote))
-        // A protected sheet without Edit objects drops a note's edit and delete rows entirely,
-        // and on the Mac New Note as well.
-        .filter(
-          (e) =>
-            !(
-              e.kind === 'item' &&
-              (e.id === 'insertComment' || e.id === 'deleteComment') &&
-              (mac || hasNote) &&
-              !noteChangePermitted(store.getState(), activeAddr)
-            ),
-        )
-        .filter((e) => !(e.kind === 'item' && e.id === 'toggleWatch' && !deps.onToggleWatch))
-        .filter((e) => !(e.kind === 'item' && e.id === 'defineName' && !deps.onDefineName))
-        .map((e) => {
-          if (e.kind === 'item' && e.id === 'toggleWatch') {
-            return {
-              ...e,
-              label: watched ? strings.contextMenu.removeWatch : strings.contextMenu.addWatch,
-            };
-          }
-          // No delete is offered over a table's header row.
-          if (
-            e.kind === 'item' &&
-            e.id === 'rowDelete' &&
-            rowDeleteHitsTableHeader(
-              store,
-              bandRange.sheet,
-              bandRange.r0,
-              bandRange.r1 - bandRange.r0 + 1,
-            )
-          ) {
-            return { ...e, disabled: true };
-          }
-          if (e.kind === 'item' && e.id === 'insertCopiedCells' && pendingCutBand) {
-            return { ...e, label: strings.contextMenu.insertCutCells };
-          }
-          return e;
-        }),
-    );
+    const entries = composeBuiltInEntries({
+      kind,
+      corner,
+      mac,
+      pivot,
+      pivotAddr,
+      activeAddr,
+      hasNote,
+      strings,
+      wb,
+      store,
+      clipboard,
+      deps,
+    });
     const defaultItems = entries.map(menuEntryToContextItem);
     let visibleItems = disabledState.decorate(defaultItems);
     const builtInOptions = options?.mode === 'builtIn' ? options : undefined;
