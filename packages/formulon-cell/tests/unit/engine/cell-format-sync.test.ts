@@ -1,3 +1,4 @@
+import { BorderStyle, FontScheme } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import { effectiveCellFormat } from '../../../src/engine/cell-format-projection.js';
 import {
@@ -775,5 +776,297 @@ describe('hydrateCellFormatsFromEngine', () => {
     expect(
       store.getState().format.formats.get(addrKey({ sheet: 0, row: 3, col: 1 }))?.numFmt,
     ).toEqual({ kind: 'fixed', decimals: 2 });
+  });
+});
+
+describe('hydrateCellFormatsFromEngine replaces engine-modelled fields', () => {
+  const A1 = addrKey({ sheet: 0, row: 0, col: 0 });
+  const B1 = addrKey({ sheet: 0, row: 0, col: 1 });
+  const C3 = addrKey({ sheet: 0, row: 2, col: 2 });
+  const plainFont = (patch: Partial<FontRecord>): FontRecord => ({
+    name: 'Calibri',
+    sizePt: 11,
+    bold: false,
+    italic: false,
+    strike: false,
+    underline: 0,
+    color: rgb(0xff000000),
+    ...patch,
+  });
+  const emptyFill: FillRecord = { pattern: 0, foreground: rgb(0), background: rgb(0) };
+  const noSide = { style: BorderStyle.None, color: rgb(0xff000000) };
+  const emptyBorder: BorderRecord = {
+    left: noSide,
+    right: noSide,
+    top: noSide,
+    bottom: noSide,
+    diagonal: noSide,
+    diagonalDown: false,
+    diagonalUp: false,
+  };
+  const plainRecords = () => ({
+    fills: new Map([[0, emptyFill]]),
+    borders: new Map([[0, emptyBorder]]),
+  });
+  const storeWith = (entries: [string, CellFormat][]) => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({ ...s, format: { ...s.format, formats: new Map(entries) } }));
+    return store;
+  };
+
+  it('clears a field the engine no longer states', () => {
+    const { wb } = makeFake({
+      xfIndices: new Map([[A1, 7]]),
+      xfTable: new Map([[7, xfRecord({ fontIndex: 1 })]]),
+      fonts: new Map([[1, plainFont({ italic: true })]]),
+      ...plainRecords(),
+    });
+    const store = storeWith([[A1, { bold: true, italic: true, align: 'center' }]]);
+    hydrateCellFormatsFromEngine(wb, store, 0);
+    expect(store.getState().format.formats.get(A1)).toEqual({ italic: true });
+  });
+
+  it('keeps fields the engine does not model on a cell it no longer lists', () => {
+    const { wb } = makeFake();
+    const store = storeWith([
+      [
+        A1,
+        {
+          bold: true,
+          fill: '#ff0000',
+          comment: 'note',
+          hyperlink: 'https://example.com/',
+          validation: { kind: 'list', source: ['a', 'b'] },
+        },
+      ],
+    ]);
+    hydrateCellFormatsFromEngine(wb, store, 0);
+    expect(store.getState().format.formats.get(A1)).toEqual({
+      comment: 'note',
+      hyperlink: 'https://example.com/',
+      validation: { kind: 'list', source: ['a', 'b'] },
+    });
+  });
+
+  it('removes an entry left with no fields', () => {
+    const { wb } = makeFake({ cells: [{ sheet: 0, row: 0, col: 0 }] });
+    const store = storeWith([
+      [A1, { bold: true }],
+      [B1, { borders: { top: { style: 'thin' } } }],
+    ]);
+    hydrateCellFormatsFromEngine(wb, store, 0);
+    expect(store.getState().format.formats.size).toBe(0);
+  });
+
+  it('leaves cells outside the range untouched', () => {
+    const { wb } = makeFake({
+      xfIndices: new Map([[C3, 7]]),
+      xfTable: new Map([[7, xfRecord({ fontIndex: 1 })]]),
+      fonts: new Map([[1, plainFont({ italic: true })]]),
+      ...plainRecords(),
+    });
+    const other = addrKey({ sheet: 1, row: 0, col: 0 });
+    const store = storeWith([
+      [A1, { bold: true }],
+      [B1, { bold: true }],
+      [other, { bold: true }],
+    ]);
+    hydrateCellFormatsFromEngine(wb, store, 0, {
+      firstRow: 0,
+      firstCol: 0,
+      lastRow: 0,
+      lastCol: 0,
+    });
+    const formats = store.getState().format.formats;
+    expect(formats.has(A1)).toBe(false);
+    expect(formats.get(B1)).toEqual({ bold: true });
+    expect(formats.get(other)).toEqual({ bold: true });
+    // An engine-stated cell outside the range is not hydrated either.
+    expect(formats.has(C3)).toBe(false);
+  });
+
+  it('merges without clearing when an XF record cannot be read', () => {
+    const { wb } = makeFake({ xfIndices: new Map([[A1, 9]]) });
+    const store = storeWith([[A1, { bold: true }]]);
+    hydrateCellFormatsFromEngine(wb, store, 0);
+    expect(store.getState().format.formats.get(A1)).toEqual({ bold: true });
+  });
+
+  it('clears every field it hydrated once the engine drops the cell', () => {
+    const cells: Addr[] = [{ sheet: 0, row: 0, col: 0 }];
+    const xfIndices = new Map([
+      [A1, 7],
+      [B1, 8],
+    ]);
+    const { wb } = makeFake({
+      cells,
+      xfIndices,
+      xfTable: new Map([
+        [
+          7,
+          xfRecord({
+            fontIndex: 1,
+            fillIndex: 2,
+            borderIndex: 3,
+            numFmtId: 164,
+            styleXfIndex: 5,
+            horizontal: 1,
+            vertical: 1,
+            wrapText: true,
+            justifyLastLine: true,
+            textRotation: 45,
+            indent: 2,
+            shrinkToFit: true,
+            readingOrder: 1,
+            locked: false,
+            hidden: true,
+          }),
+        ],
+        [8, xfRecord({ fillIndex: 4 })],
+      ]),
+      fonts: new Map([
+        [0, plainFont({})],
+        [
+          1,
+          plainFont({
+            name: 'Arial',
+            scheme: FontScheme.Minor,
+            sizePt: 14,
+            bold: true,
+            italic: true,
+            strike: true,
+            underline: 1,
+            vertAlign: 1,
+            color: rgb(0xffff0000),
+            outline: true,
+            shadow: true,
+            condense: true,
+            extend: true,
+          }),
+        ],
+      ]),
+      fills: new Map<number, FillRecord>([
+        [0, { pattern: 0, foreground: rgb(0), background: rgb(0) }],
+        [2, { pattern: 2, foreground: rgb(0xff00ff00), background: rgb(0xff0000ff) }],
+        [
+          4,
+          {
+            pattern: 0,
+            foreground: rgb(0),
+            background: rgb(0),
+            gradient: {
+              type: 0,
+              angleDeg: 90,
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              stops: [
+                { position: 0, color: rgb(0xffffffff) },
+                { position: 1, color: rgb(0xff000000) },
+              ],
+            },
+          } as FillRecord,
+        ],
+      ]),
+      borders: new Map<number, BorderRecord>(
+        [0, 3].map((index) => [
+          index,
+          {
+            left: { style: index === 3 ? 1 : 0, color: rgb(0xff000000) },
+            right: { style: 0, color: rgb(0xff000000) },
+            top: { style: 0, color: rgb(0xff000000) },
+            bottom: { style: 0, color: rgb(0xff000000) },
+            diagonal: { style: 0, color: rgb(0xff000000) },
+            diagonalDown: false,
+            diagonalUp: false,
+          },
+        ]),
+      ),
+      numFmts: new Map([[164, '0.00']]),
+    });
+    let engineHasA1 = true;
+    Object.assign(wb.capabilities, {
+      cellStyles: true,
+      phoneticRuns: true,
+      phoneticProperties: true,
+      showPhonetic: true,
+    });
+    Object.assign(wb, {
+      getNamedCellStyles: () => [{ xfId: 5, builtinId: 3, name: 'Comma' }],
+      getCellPhoneticRuns: (_s: number, row: number, col: number) =>
+        engineHasA1 && row === 0 && col === 0 ? [{ start: 0, end: 2, text: 'かな' }] : null,
+      getCellPhoneticProperties: (_s: number, row: number, col: number) =>
+        engineHasA1 && row === 0 && col === 0
+          ? { present: true, fontId: 0, type: 2, alignment: 1 }
+          : null,
+      getCellShowPhonetic: (_s: number, row: number, col: number) =>
+        engineHasA1 && row === 0 && col === 0,
+    });
+    const store = storeWith([[A1, { comment: 'kept' }]]);
+    hydrateCellFormatsFromEngine(wb, store, 0);
+    const hydrated = store.getState().format.formats;
+    const storeOwned = new Set([
+      'hyperlink',
+      'hyperlinkDisplay',
+      'hyperlinkTooltip',
+      'hyperlinkLocation',
+      'hyperlinkSpan',
+      'comment',
+      'commentAuthor',
+      'commentVisible',
+      'validation',
+    ]);
+    const emitted = new Set(
+      [...hydrated.values()]
+        .flatMap((format) => Object.keys(format))
+        .filter((k) => !storeOwned.has(k)),
+    );
+    // The fixture states every field the hydrator can produce.
+    expect([...emitted].sort()).toEqual(
+      [
+        'cellStyle',
+        'numFmt',
+        'bold',
+        'italic',
+        'underline',
+        'strike',
+        'fontVertAlign',
+        'fontOutline',
+        'fontShadow',
+        'fontCondense',
+        'fontExtend',
+        'phonetic',
+        'phoneticProperties',
+        'showPhonetic',
+        'align',
+        'vAlign',
+        'wrap',
+        'justifyLastLine',
+        'shrinkToFit',
+        'indent',
+        'rotation',
+        'textDirection',
+        'borders',
+        'color',
+        'fill',
+        'fillPattern',
+        'fillPatternColor',
+        'fillGradient',
+        'fontFamily',
+        'fontScheme',
+        'fontSize',
+        'locked',
+        'formulaHidden',
+      ].sort(),
+    );
+
+    engineHasA1 = false;
+    cells.splice(0);
+    xfIndices.clear();
+    hydrateCellFormatsFromEngine(wb, store, 0);
+    const cleared = store.getState().format.formats;
+    expect(cleared.get(A1)).toEqual({ comment: 'kept' });
+    expect(cleared.has(B1)).toBe(false);
   });
 });

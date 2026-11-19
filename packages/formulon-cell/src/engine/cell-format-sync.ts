@@ -2,7 +2,7 @@ import { sameStructuredValue } from '../commands/prepared-change.js';
 import type { CellFormat, SheetAxisLocks, SpreadsheetStore } from '../store/store.js';
 import { addrKey, parseAddrKey } from './address.js';
 import { syncAxisFormatOverrides } from './axis-format-sync.js';
-import { cellFormatFromXf } from './cell-format-projection.js';
+import { cellFormatFromXfWithStatus } from './cell-format-projection.js';
 import {
   cellStyleKeysByXfId,
   importedCustomCellStyles,
@@ -25,7 +25,7 @@ import {
 import { axisLocksFromEngine, inheritsUnlocked } from './protection-sync.js';
 import { strictSyncError } from './strict-sync-error.js';
 import { formattedKeySet, seedSyncedFormatKeys } from './synced-format-keys.js';
-import type { Addr, CellValue } from './types.js';
+import type { Addr, CellRect, CellValue } from './types.js';
 import { syncValidationsToEngine } from './validation-sync.js';
 import { sheetFontPatchFor, syncWholeSheetFontOverrides } from './whole-sheet-font-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -295,22 +295,97 @@ export function syncCellFormatsToEngine(
   for (const key of current) previous.add(key);
 }
 
+/** Engine surface that states each CellFormat field on hydrate; `null` marks a
+ *  field held by the store or by another sync. Exhaustive over CellFormat, so a
+ *  new field does not compile until it is classified here. */
+type FormatFieldSource =
+  | 'xf'
+  | 'cellStyle'
+  | 'phonetic'
+  | 'phoneticProperties'
+  | 'showPhonetic'
+  | null;
+
+const FORMAT_FIELD_SOURCES = {
+  cellStyle: 'cellStyle',
+  numFmt: 'xf',
+  bold: 'xf',
+  italic: 'xf',
+  underline: 'xf',
+  strike: 'xf',
+  fontVertAlign: 'xf',
+  fontOutline: 'xf',
+  fontShadow: 'xf',
+  fontCondense: 'xf',
+  fontExtend: 'xf',
+  phonetic: 'phonetic',
+  phoneticProperties: 'phoneticProperties',
+  showPhonetic: 'showPhonetic',
+  align: 'xf',
+  vAlign: 'xf',
+  wrap: 'xf',
+  justifyLastLine: 'xf',
+  shrinkToFit: 'xf',
+  indent: 'xf',
+  rotation: 'xf',
+  textDirection: 'xf',
+  borders: 'xf',
+  color: 'xf',
+  fill: 'xf',
+  fillPattern: 'xf',
+  fillPatternColor: 'xf',
+  fillGradient: 'xf',
+  fontFamily: 'xf',
+  fontScheme: 'xf',
+  fontSize: 'xf',
+  hyperlink: null,
+  hyperlinkDisplay: null,
+  hyperlinkTooltip: null,
+  hyperlinkLocation: null,
+  hyperlinkSpan: null,
+  comment: null,
+  commentAuthor: null,
+  commentVisible: null,
+  validation: null,
+  locked: 'xf',
+  formulaHidden: 'xf',
+} as const satisfies Record<keyof CellFormat, FormatFieldSource>;
+
+/** Fields this engine states on hydrate; a surface it cannot read is left to the store. */
+function engineModelledFormatKeys(wb: WorkbookHandle): readonly (keyof CellFormat)[] {
+  const caps = wb.capabilities;
+  const phonetic = caps.phonetic === true || caps.phoneticRuns === true;
+  const live: Record<NonNullable<FormatFieldSource>, boolean> = {
+    xf: true,
+    cellStyle: caps.cellStyles === true,
+    phonetic,
+    phoneticProperties: phonetic && caps.phoneticProperties === true,
+    showPhonetic: caps.showPhonetic === true,
+  };
+  return (Object.keys(FORMAT_FIELD_SOURCES) as (keyof CellFormat)[]).filter((key) => {
+    const source = FORMAT_FIELD_SOURCES[key];
+    return source !== null && live[source];
+  });
+}
+
 /**
- * Hydrate FormatSlice from engine XF entries on `sheet`. For every populated
- * cell, read its xfIndex, resolve to the underlying records, translate back
- * into CellFormat, and merge into the existing FormatSlice entry (preserving
- * any field the engine doesn't model — e.g. cell-level `validation`,
- * `comment`, `hyperlink` that the dedicated syncs already wrote).
+ * Hydrate FormatSlice from engine XF entries on `sheet`, within `range` when
+ * given. For each cell in scope the fields the engine models are replaced by
+ * what it states now — set when stated, removed when not, including cells the
+ * engine no longer lists — while fields it does not model (cell-level
+ * `validation`, `comment`, `hyperlink` from the dedicated syncs) are kept. An
+ * entry left with no fields is removed. A cell whose XF records cannot be read
+ * in full is only merged into, never cleared.
  *
- * Skipped entirely when `capabilities.cellFormatting` is off, or when an XF
- * resolves to the default record (xfIndex 0 with all defaults). Workbook
- * default font/size are stripped so we do not pollute the store with
- * defaults that the renderer would already show.
+ * Skipped entirely when `capabilities.cellFormatting` is off. Workbook default
+ * font/size are stripped so the store does not hold defaults the renderer
+ * would already show.
  */
 export function hydrateCellFormatsFromEngine(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
   sheet: number,
+  range?: CellRect,
 ): void {
   if (!wb.capabilities.cellFormatting) return;
   const workbookDefaultFont = wb.workbookDefaultFont;
@@ -326,7 +401,15 @@ export function hydrateCellFormatsFromEngine(
       },
     }));
   }
-  const updates: Array<{ key: string; patch: Partial<CellFormat> }> = [];
+  const inScope = (addr: Addr): boolean =>
+    !range ||
+    (addr.row >= range.firstRow &&
+      addr.row <= range.lastRow &&
+      addr.col >= range.firstCol &&
+      addr.col <= range.lastCol);
+  // What the engine states per listed cell; `mergeOnly` cells could not be read in full.
+  const stated = new Map<string, Partial<CellFormat>>();
+  const mergeOnly = new Set<string>();
   let axes: SheetAxisLocks | null | undefined;
   const axisLocks = (): SheetAxisLocks | null => {
     if (axes === undefined) axes = axisLocksFromEngine(wb, sheet);
@@ -335,29 +418,39 @@ export function hydrateCellFormatsFromEngine(
   // Styled blanks are absent from the physical cells; visit each address once.
   const xfByKey = new Map<string, { addr: Addr; value: CellValue; xfIndex: number }>();
   for (const { addr, xfIndex } of wb.cellXfIndices(sheet)) {
-    xfByKey.set(addrKey(addr), { addr, value: { kind: 'blank' }, xfIndex });
+    if (inScope(addr)) xfByKey.set(addrKey(addr), { addr, value: { kind: 'blank' }, xfIndex });
   }
   for (const c of wb.physicalCells ? wb.physicalCells(sheet) : wb.cells(sheet)) {
+    if (!inScope(c.addr)) continue;
     const key = addrKey(c.addr);
     xfByKey.set(key, { addr: c.addr, value: c.value, xfIndex: xfByKey.get(key)?.xfIndex ?? 0 });
   }
   // A blank whose only state is the Show Phonetic flag is in neither list above.
   for (const addr of wb.showPhoneticCells(sheet)) {
     const key = addrKey(addr);
-    if (!xfByKey.has(key)) xfByKey.set(key, { addr, value: { kind: 'blank' }, xfIndex: 0 });
+    if (inScope(addr) && !xfByKey.has(key)) {
+      xfByKey.set(key, { addr, value: { kind: 'blank' }, xfIndex: 0 });
+    }
   }
   for (const c of xfByKey.values()) {
+    const key = addrKey(c.addr);
     const phonetic = readPhoneticRuns(wb, c.addr, c.value);
     const xfIndex = c.xfIndex;
     if (xfIndex === null || xfIndex <= 0) {
       const patch = withShowPhonetic(wb, c.addr, phonetic ? { phonetic } : {});
       if (phonetic) withPhoneticProperties(wb, c.addr, patch);
-      if (Object.keys(patch).length > 0) updates.push({ key: addrKey(c.addr), patch });
+      stated.set(key, patch);
       continue;
     }
     const xf = wb.getCellXf(xfIndex);
-    if (!xf) continue;
-    const patch = cellFormatFromXf(wb, xf, workbookDefaultFont, styleKeys);
+    if (!xf) {
+      stated.set(key, {});
+      mergeOnly.add(key);
+      continue;
+    }
+    const projection = cellFormatFromXfWithStatus(wb, xf, workbookDefaultFont, styleKeys);
+    const patch = projection.format;
+    if (!projection.complete) mergeOnly.add(key);
     // A cell's own XF with no protection element is locked whatever its row or column style says;
     // where that style is unlocked, the entry says so explicitly instead of inheriting it.
     if (
@@ -371,34 +464,70 @@ export function hydrateCellFormatsFromEngine(
       withPhoneticProperties(wb, c.addr, patch);
     }
     withShowPhonetic(wb, c.addr, patch);
-    if (Object.keys(patch).length > 0) {
-      updates.push({ key: addrKey(c.addr), patch });
-    }
+    stated.set(key, patch);
   }
   // A report's look comes from its PivotTable style at paint time; only the
   // value fields' number formats land on the cells.
   if (wb.pivotCells) {
     for (const c of wb.pivotCells(sheet)) {
+      if (!inScope(c.addr)) continue;
       const patch = pivotFormatPatch(c.numberFormat);
-      if (Object.keys(patch).length > 0) updates.push({ key: addrKey(c.addr), patch });
+      if (Object.keys(patch).length === 0) continue;
+      const key = addrKey(c.addr);
+      stated.set(key, { ...stated.get(key), ...patch });
     }
   }
-  if (updates.length === 0) return;
+  const statedKeys: string[] = [];
+  for (const [key, patch] of stated) {
+    if (Object.keys(patch).length > 0) statedKeys.push(key);
+  }
   // Seed the high-water mark so that clearing a format that was loaded from the
   // workbook (not authored in-session) still resets the engine XF.
-  seedSyncedFormatKeys(
-    wb,
-    sheet,
-    updates.map((u) => u.key),
-  );
+  if (statedKeys.length > 0) seedSyncedFormatKeys(wb, sheet, statedKeys);
+
+  const modelled = engineModelledFormatKeys(wb);
+  const hasModelled = (format: CellFormat): boolean =>
+    modelled.some((k) => Object.hasOwn(format, k));
+  const current = store.getState().format.formats;
+  const changes = new Map<string, CellFormat | null>();
+  // One pass over the store: entries in scope the engine no longer lists lose its fields.
+  const sheetPrefix = `${sheet}:`;
+  for (const [key, prev] of current) {
+    if (stated.has(key) || !key.startsWith(sheetPrefix)) continue;
+    const addr = parseAddrKey(key);
+    if (!addr || !inScope(addr) || !hasModelled(prev)) continue;
+    changes.set(key, replaceModelledFields(prev, {}, modelled));
+  }
+  for (const [key, patch] of stated) {
+    const prev = current.get(key);
+    const hasPatch = Object.keys(patch).length > 0;
+    if (mergeOnly.has(key)) {
+      if (hasPatch) changes.set(key, { ...prev, ...patch });
+    } else if (hasPatch || (prev && hasModelled(prev))) {
+      changes.set(key, replaceModelledFields(prev ?? {}, patch, modelled));
+    }
+  }
+  if (changes.size === 0) return;
   store.setState((s) => {
     const formats = new Map(s.format.formats);
-    for (const u of updates) {
-      const prev = formats.get(u.key) ?? {};
-      formats.set(u.key, { ...prev, ...u.patch });
+    for (const [key, next] of changes) {
+      if (next) formats.set(key, next);
+      else formats.delete(key);
     }
     return { ...s, format: { ...s.format, formats } };
   });
+}
+
+/** `prev` with every engine-modelled field replaced by `patch`; null when nothing is left. */
+function replaceModelledFields(
+  prev: CellFormat,
+  patch: Partial<CellFormat>,
+  modelled: readonly (keyof CellFormat)[],
+): CellFormat | null {
+  const next: CellFormat = { ...prev };
+  for (const key of modelled) delete next[key];
+  Object.assign(next, patch);
+  return Object.keys(next).length > 0 ? next : null;
 }
 
 function pivotFormatPatch(numberFormat: string): Partial<CellFormat> {
