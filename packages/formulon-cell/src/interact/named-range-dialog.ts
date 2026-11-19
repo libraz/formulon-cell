@@ -8,7 +8,9 @@ import {
   definedNameValueText,
   deleteDefinedName,
   isSameDefinedName,
+  isSameStoredEntry,
   isValidDefinedName,
+  resolveDefinedNameKey,
   sanitizeName,
   upsertDefinedName,
 } from '../commands/named-ranges.js';
@@ -505,7 +507,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       item.setAttribute('role', 'option');
       const name = document.createElement('span');
       name.className = 'fc-namedlg__row-name';
-      name.textContent = entry.name;
+      name.textContent = wb.localizeDefinedName(entry.name);
       const value = document.createElement('span');
       value.className = 'fc-namedlg__row-value';
       value.textContent = definedNameValueText(wb, entry);
@@ -589,7 +591,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       case 'comment':
         return entry.comment ?? '';
       default:
-        return entry.name;
+        return wb.localizeDefinedName(entry.name);
     }
   };
 
@@ -697,7 +699,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     scopeSelect.value = String(entry?.localSheetId ?? -1);
     commentInput.value = entry?.comment ?? '';
     if (entry) {
-      nameInput.value = entry.name;
+      nameInput.value = wb.localizeDefinedName(entry.name);
       formulaInput.value = definedNameDisplayFormula(entry.formula);
     } else {
       const seed = newNameSeed();
@@ -746,7 +748,10 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     const entry = currentRows[selectedNameIndex];
     if (!entry || deleteBtn.disabled) return;
     pendingDeleteName = entry;
-    deleteMessage.textContent = t.confirmDeleteMessage.replace('{name}', entry.name);
+    deleteMessage.textContent = t.confirmDeleteMessage.replace(
+      '{name}',
+      wb.localizeDefinedName(entry.name),
+    );
     opener.focus({ preventScroll: true });
     deleteShell.open();
   };
@@ -832,13 +837,13 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
         const option = document.createElement('div');
         option.setAttribute('role', 'option');
         option.dataset.name = entry.name;
-        option.textContent = entry.name;
+        option.textContent = wb.localizeDefinedName(entry.name);
         const selected =
           defineSelected !== null && isSameDefinedName(defineSelected.name, entry.name);
         option.setAttribute('aria-selected', String(selected));
         option.addEventListener('click', () => {
           defineSelected = entry;
-          defineName.input.value = entry.name;
+          defineName.input.value = wb.localizeDefinedName(entry.name);
           defineRange.input.value = definedNameDisplayFormula(entry.formula);
           renderDefineNames();
         });
@@ -964,24 +969,15 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     scope: number,
     comment: string,
   ): ReturnType<typeof upsertDefinedName> => {
-    const renamed = previous !== null && previous.name !== name.trim();
-    // A case-only rename addresses the same engine entry, so the old one goes first.
-    const caseOnly = renamed && isSameDefinedName(previous.name, name);
-    if (renamed && caseOnly) deleteDefinedName(wb, previous.name, scope);
+    const key = resolveDefinedNameKey(wb, name, formula, scope);
     const result = upsertDefinedName(wb, name, formula, scope, { comment });
-    if (!result.ok && renamed && caseOnly) {
-      upsertDefinedName(wb, previous.name, previous.formula, scope, {
-        comment: previous.comment ?? '',
-      });
-    }
-    if (renamed && !caseOnly) {
-      if (result.ok) {
-        const removed = deleteDefinedName(wb, previous.name, scope);
-        if (!removed.ok) {
-          deleteDefinedName(wb, result.entry.name, scope);
-          const status = removed.reason === 'engine-failed' ? removed.status : null;
-          return { ok: false, reason: 'engine-failed', status };
-        }
+    // The entry the write landed on is never removed, whatever spelling it was typed in.
+    if (result.ok && previous !== null && !isSameStoredEntry(previous, key)) {
+      const removed = deleteDefinedName(wb, previous.name, previous.localSheetId);
+      if (!removed.ok) {
+        deleteDefinedName(wb, result.entry.name, result.entry.localSheetId);
+        const status = removed.reason === 'engine-failed' ? removed.status : null;
+        return { ok: false, reason: 'engine-failed', status };
       }
     }
     return result;
@@ -999,8 +995,9 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     }
     const scope = selectedScopeId();
     const previous = editorMode === 'edit' ? editingEntry : null;
-    const isSameEntry = previous !== null && isSameDefinedName(previous.name, name);
-    if (!isSameEntry && definedNameExists(wb, name, scope)) {
+    const key = resolveDefinedNameKey(wb, name, formula, scope);
+    const isSameEntry = previous !== null && isSameStoredEntry(previous, key);
+    if (!isSameEntry && definedNameExists(wb, key.name, key.localSheetId)) {
       showError(t.errorDuplicateName);
       focusAndSelectInput(nameInput);
       return;

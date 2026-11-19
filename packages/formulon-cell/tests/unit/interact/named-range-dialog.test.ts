@@ -114,6 +114,12 @@ interface MutableWb {
   sheetIndexByName(name: string): number | null;
   getValue(addr: { sheet: number; row: number; col: number }): FakeCellValue;
   setDefinedNameEntry(name: string, formula: string, localSheetId?: number): WriteResult;
+  resolveDefinedNameKey(
+    name: string,
+    formula: string,
+    localSheetId?: number,
+  ): { ok: true; name: string; localSheetId: number };
+  localizeDefinedName(name: string): string;
   recalc(): void;
   recalcAuto(): void;
 }
@@ -152,6 +158,12 @@ const makeMutableWb = (): {
     getValue(addr) {
       return values.get(`${addr.sheet}:${addr.row}:${addr.col}`) ?? { kind: 'blank' };
     },
+    resolveDefinedNameKey: (name, _formula, localSheetId = -1) => ({
+      ok: true,
+      name,
+      localSheetId,
+    }),
+    localizeDefinedName: (name) => name,
     setDefinedNameEntry(name: string, formula: string, localSheetId = -1): WriteResult {
       calls.push({ name, formula, localSheetId });
       if (formula === '') registry.delete(name);

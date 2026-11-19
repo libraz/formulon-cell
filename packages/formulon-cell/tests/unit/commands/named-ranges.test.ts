@@ -27,6 +27,11 @@ interface MutableWb {
   capabilities: { definedNameMutate: boolean };
   definedNames(): IterableIterator<{ name: string; formula: string; localSheetId: number }>;
   setDefinedNameEntry(name: string, formula: string, localSheetId?: number): WriteResult;
+  resolveDefinedNameKey(
+    name: string,
+    formula: string,
+    localSheetId?: number,
+  ): { ok: true; name: string; localSheetId: number };
   setFormula?(addr: Addr, formula: string): void;
   recalc(): void;
   recalcAuto(): void;
@@ -54,6 +59,11 @@ const makeWb = (
         yield { name: entry.name, formula: entry.formula, localSheetId };
       }
     },
+    resolveDefinedNameKey: (name, _formula, localSheetId = -1) => ({
+      ok: true,
+      name,
+      localSheetId,
+    }),
     setDefinedNameEntry(name, formula, localSheetId = -1) {
       calls.push({ name, formula, localSheetId });
       if (!writeOk) return { ok: false, status: StatusCode.InvalidArgument };

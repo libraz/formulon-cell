@@ -1,5 +1,6 @@
 import { FormulonError, StatusCode } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
+import { upsertDefinedName } from '../../../src/commands/named-ranges.js';
 import { loadFormulon } from '../../../src/engine/loader.js';
 import type { Formulon, Workbook } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -188,5 +189,40 @@ describe('WorkbookHandle engine failures', () => {
     expect(wb.calcMode()).toBeNull();
     wb.recalcAuto();
     expect(recalcCalls).toBe(1);
+  });
+});
+
+describe('WorkbookHandle defined-name key resolution', () => {
+  it('surfaces a real engine refusal instead of falling back to the typed key', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      const key = wb.resolveDefinedNameKey('Broken', '=(', -1);
+      expect(key.ok).toBe(false);
+      if (key.ok) return;
+      expect(key.status).not.toBeNull();
+      expect(key.status).not.toBe(StatusCode.NotImplemented);
+
+      const upsert = upsertDefinedName(wb, 'Broken', '=(', -1);
+      expect(upsert).toEqual({ ok: false, reason: 'engine-failed', status: key.status });
+      expect([...wb.definedNames()]).toHaveLength(0);
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('falls back to the typed key only for a stub resolver', () => {
+    const wb = makeHandle({
+      resolveDefinedNameKey: () => {
+        throw new FormulonError(StatusCode.NotImplemented, 'stub');
+      },
+    });
+    Object.defineProperty(wb, 'capabilities', {
+      value: { ...wb.capabilities, definedNameMutate: true },
+    });
+    expect(wb.resolveDefinedNameKey('print_area', '=Sheet1!$A$1', -1)).toEqual({
+      ok: true,
+      name: 'print_area',
+      localSheetId: -1,
+    });
   });
 });

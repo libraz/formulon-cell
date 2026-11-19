@@ -145,6 +145,24 @@ const nameKey = (name: string): string => foldName(name.trim()).toLowerCase();
 /** Whether two names are the same defined name (ignoring case and width). */
 export const isSameDefinedName = (a: string, b: string): boolean => nameKey(a) === nameKey(b);
 
+/** The stored key a write of `name` with `formula` in `localSheetId` lands on. The typed key
+ *  stands in where the engine cannot resolve it; the write then reports the failure. */
+export function resolveDefinedNameKey(
+  wb: WorkbookHandle,
+  name: string,
+  formula: string,
+  localSheetId = -1,
+): { name: string; localSheetId: number } {
+  const key = wb.resolveDefinedNameKey(name.trim(), formula.trim(), localSheetId);
+  return key.ok ? { name: key.name, localSheetId: key.localSheetId } : { name, localSheetId };
+}
+
+/** Whether a listed entry is the entry stored under `key` (name ignoring case and width, same scope). */
+export const isSameStoredEntry = (
+  entry: { name: string; localSheetId: number },
+  key: { name: string; localSheetId: number },
+): boolean => entry.localSheetId === key.localSheetId && isSameDefinedName(entry.name, key.name);
+
 /** Whether `wb` already has a name equal to `name` (ignoring case and width) in the given scope. */
 export function definedNameExists(wb: WorkbookHandle, name: string, localSheetId = -1): boolean {
   return findDefinedName(wb, name, localSheetId) !== undefined;
@@ -373,22 +391,30 @@ export function upsertDefinedName(
   const trimmedName = name.trim();
   const trimmedFormula = formula.trim();
   if (!trimmedName) return { ok: false, reason: 'empty-name' };
-  if (!isValidDefinedName(trimmedName)) return { ok: false, reason: 'invalid-name' };
+  // The validator judges typed input; a name already stored under exactly this spelling
+  // (such as `_xlnm.Print_Area`) is a stored key being edited.
+  const editsStored = listDefinedNames(wb).some(
+    (e) => e.localSheetId === localSheetId && e.name === trimmedName,
+  );
+  if (!editsStored && !isValidDefinedName(trimmedName))
+    return { ok: false, reason: 'invalid-name' };
   if (!trimmedFormula) return { ok: false, reason: 'empty-formula' };
   if (!wb.capabilities.definedNameMutate) return { ok: false, reason: 'unsupported' };
+  const resolved = wb.resolveDefinedNameKey(trimmedName, trimmedFormula, localSheetId);
+  if (!resolved.ok) return { ok: false, reason: 'engine-failed', status: resolved.status };
+  const key = { name: resolved.name, localSheetId: resolved.localSheetId };
   // Redefining a name under another casing renames it to the new spelling
   // (Excel: adding `DUP` over `dup` stores `DUP`); its note and hidden flag stay.
   const previous = listDefinedNames(wb).find(
-    (e) =>
-      e.localSheetId === localSheetId &&
-      isSameDefinedName(e.name, trimmedName) &&
-      e.name !== trimmedName,
+    (e) => isSameStoredEntry(e, key) && e.name !== key.name,
   );
-  const removed = previous ? wb.setDefinedNameEntry(previous.name, '', localSheetId) : null;
+  const removed = previous
+    ? wb.setDefinedNameEntry(previous.name, '', previous.localSheetId)
+    : null;
   if (removed && !removed.ok) return { ok: false, reason: 'engine-failed', status: removed.status };
   const written = wb.setDefinedNameEntry(trimmedName, trimmedFormula, localSheetId);
   if (!written.ok) {
-    if (previous) wb.setDefinedNameEntry(previous.name, previous.formula, localSheetId);
+    if (previous) wb.setDefinedNameEntry(previous.name, previous.formula, previous.localSheetId);
     return { ok: false, reason: 'engine-failed', status: written.status };
   }
   const keptAttrs: DefinedNameAttrs = {
@@ -400,7 +426,7 @@ export function upsertDefinedName(
     wb.capabilities.definedNameAttrs &&
     (keptAttrs.comment !== undefined || keptAttrs.hidden !== undefined)
   ) {
-    const attrsWritten = wb.setDefinedNameAttrs(trimmedName, localSheetId, keptAttrs);
+    const attrsWritten = wb.setDefinedNameAttrs(key.name, key.localSheetId, keptAttrs);
     if (!attrsWritten.ok) {
       return { ok: false, reason: 'engine-failed', status: attrsWritten.status };
     }
@@ -409,13 +435,13 @@ export function upsertDefinedName(
   // so dependent cells and a subsequent save reflect the new target.
   wb.recalcAuto();
   // The entry is the name as the engine stored it, read back: its formula may be respelled.
-  const stored = findDefinedName(wb, trimmedName, localSheetId);
+  const stored = findDefinedName(wb, key.name, key.localSheetId);
   return {
     ok: true,
     entry: {
-      name: stored?.name ?? trimmedName,
+      name: stored?.name ?? key.name,
       formula: stored?.formula ?? trimmedFormula.replace(/^=/, ''),
-      localSheetId,
+      localSheetId: key.localSheetId,
       ...(stored?.comment ? { comment: stored.comment } : {}),
       ...(stored?.hidden ? { hidden: true } : {}),
     },

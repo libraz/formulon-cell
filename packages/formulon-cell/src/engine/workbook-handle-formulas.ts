@@ -1,4 +1,4 @@
-import { type CalcMode, type ProfileId, RefMode } from '@libraz/formulon';
+import { type CalcMode, type ProfileId, RefMode, StatusCode } from '@libraz/formulon';
 import { cloneAddr, rangeOfRect } from './address.js';
 import { CALC_MODE_MANUAL, type CalcModeCode, type CompatibilityVersionCode } from './calc-mode.js';
 import {
@@ -15,7 +15,13 @@ import {
   localeTag,
   mergeFunctionMetadata,
 } from './function-metadata.js';
-import { attemptWrite, attemptWriteStatus, orFallback, type WriteResult } from './result.js';
+import {
+  attemptWrite,
+  attemptWriteStatus,
+  isFormulonError,
+  orFallback,
+  type WriteResult,
+} from './result.js';
 import { computeEngineSpillRanges } from './spill.js';
 import {
   type EngineSpreadsheetProfileId,
@@ -695,17 +701,61 @@ export abstract class WorkbookHandleFormulasMethods {
     const scope = localSheetId < 0 ? null : localSheetId;
     const w = wb(this);
     if (formula.length === 0) return attemptWriteStatus(() => w.removeDefinedName(name, scope));
-    // The engine replaces every attribute; a formula edit keeps the note and flag.
-    const existing = orFallback(null, () => w.getDefinedName(name, scope));
+    // The engine replaces every attribute; a formula edit keeps the note and flag of the
+    // entry the write lands on, which is the resolved key rather than the typed one.
+    const input = { name, formula, scope };
+    const key = this.resolveDefinedNameKey(name, formula, localSheetId);
+    const existing = orFallback(null, () =>
+      key.ok
+        ? w.getDefinedName(key.name, key.localSheetId < 0 ? null : key.localSheetId)
+        : w.getDefinedName(name, scope),
+    );
     return attemptWriteStatus(() =>
       w.setDefinedName({
-        name,
-        formula,
-        scope,
+        ...input,
         comment: existing?.comment ?? null,
         hidden: existing?.hidden ?? false,
       }),
     );
+  }
+
+  /** The key `setDefinedNameEntry(name, formula, localSheetId)` would store the name under: a
+   *  locale spelling of a built-in becomes `_xlnm.<name>` and `Print_Area` / `Print_Titles` move
+   *  to the sheet the formula names. Changes nothing. A failure carries the engine status the
+   *  write would fail with. The typed key comes back unchanged when the engine cannot store
+   *  names or has no resolver. */
+  resolveDefinedNameKey(
+    name: string,
+    formula: string,
+    localSheetId = -1,
+  ): { ok: true; name: string; localSheetId: number } | { ok: false; status: StatusCode | null } {
+    assertAlive(this);
+    const typed = { ok: true, name, localSheetId } as const;
+    if (!this.capabilities.definedNameMutate) return typed;
+    const w = wb(this);
+    if (typeof w.resolveDefinedNameKey !== 'function') return typed;
+    const scope = localSheetId < 0 ? null : localSheetId;
+    try {
+      const key = w.resolveDefinedNameKey({ name, formula, scope });
+      return { ok: true, name: key.name, localSheetId: key.scope ?? -1 };
+    } catch (e) {
+      if (!isFormulonError(e)) throw e;
+      // An engine whose resolver is a stub stores names as typed.
+      if (e.code === StatusCode.NotImplemented) return typed;
+      return { ok: false, status: e.code };
+    }
+  }
+
+  /** The spelling the Name Manager shows for the stored defined name `name` under the active
+   *  profile (`_xlnm.Print_Area` is de `Druckbereich`). `name` comes back unchanged when the
+   *  engine has no profile or no localizer. */
+  localizeDefinedName(name: string): string {
+    assertAlive(this);
+    const profile = this.spreadsheetProfileId();
+    if (!profile || !this.capabilities.definedNameMutate) return name;
+    const m = moduleOf(this);
+    if (typeof m.localizeDefinedName !== 'function') return name;
+    return orFallback(null, () => m.localizeDefinedName(name, engineProfile(profile))) ?? name;
   }
 
   /** Set the comment and/or hidden flag of an existing defined name; an
