@@ -18,7 +18,7 @@ import { gridHitState } from '../render/grid.js';
 import { validationAt } from '../store/range-validations.js';
 import { renderScale } from '../store/render-scale.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
-import { pickFromListValues } from './autocomplete.js';
+import { pickFromListValues } from './column-pick-list.js';
 import { appendDialogButton, createDialogShell, returnFocus } from './dialog-shell.js';
 import { onOutsidePress } from './outside-press.js';
 import { overlayPortalFor } from './overlay-portal.js';

@@ -3,12 +3,9 @@ import type { CatalogLocaleOrdinal } from '../commands/function-categories.js';
 import { FUNCTION_SIGNATURES, findActiveSignature } from '../commands/refs.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { ArgHelperDeps } from './arg-helper.js';
-import {
-  type AutocompleteDeps,
-  caretSplitsToken,
-  collectLambdaFunctions,
-  completeFunctionNames,
-} from './autocomplete.js';
+import { type AutocompleteDeps, completeFunctionNames } from './autocomplete.js';
+import { collectLambdaFunctions } from './autocomplete-names.js';
+import { caretSplitsToken } from './autocomplete-suggestions.js';
 import { resolveFormulaHelperDetails } from './formula-helper-catalog.js';
 import {
   catalogLocaleOrdinal,

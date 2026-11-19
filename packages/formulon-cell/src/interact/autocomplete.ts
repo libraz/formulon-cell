@@ -1,15 +1,25 @@
-import { formulaCaretContext, formulaIdentifierPrefix } from '../commands/formula-edit-context.js';
 import { FUNCTION_SIGNATURES, suggestFunctions } from '../commands/refs.js';
-import type { Addr, CellValue } from '../engine/types.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
+import type { AutocompleteName, AutocompleteTable } from './autocomplete-names.js';
+import {
+  type AutocompleteGroup,
+  type AutocompleteSuggestionKind,
+  caretSplitsToken,
+  existingFunctionParenLength,
+  partitionByPrefix,
+  type SuggestionContext,
+  sortCaseless,
+  suggestColumnHistory,
+  suggestCustomFunctions,
+  suggestNames,
+  suggestStructuredRef,
+} from './autocomplete-suggestions.js';
 import { createInteractionButton } from './chip-button.js';
 import { createFormulaCaretPositioner } from './formula-helper-position.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { viewportSize } from './overlay-position.js';
 
 let autocompleteSeq = 0;
-
-export type AutocompleteSuggestionKind = 'function' | 'tableColumn' | 'column' | 'history' | 'name';
 
 export interface AutocompleteInsertOutcome {
   kind: AutocompleteSuggestionKind;
@@ -52,93 +62,6 @@ export interface AutocompleteLabels {
   namedRanges: string;
   /** Header of the table name group in a grouped list. */
   structuredReferences: string;
-}
-
-/** Subset of `WorkbookHandle.getTables()` consumed by the structured-ref
- *  suggestion path. Only `name` and `columns` are needed. */
-export interface AutocompleteTable {
-  name: string;
-  columns: string[];
-}
-
-/** A defined or table name offered next to function names. `detail` is the
- *  secondary line (the name's refers-to text); `table` marks a table name. */
-export interface AutocompleteName {
-  name: string;
-  detail: string;
-  table?: boolean;
-}
-
-type AutocompleteDefinedName = {
-  name: string;
-  formula: string;
-  localSheetId: number;
-  hidden?: boolean;
-};
-
-/** The parameter names of a `LAMBDA(…)` formula, or null when the formula is not a LAMBDA. */
-export function lambdaParameters(formula: string): string[] | null {
-  const head = /^\s*=?\s*LAMBDA\s*\(/iu.exec(formula);
-  if (!head) return null;
-  const args: string[] = [];
-  let depth = 0;
-  let start = head[0].length;
-  let quoted = false;
-  for (let i = start; i < formula.length; i += 1) {
-    const ch = formula[i];
-    if (quoted) {
-      // A doubled quote is a literal quote inside the string.
-      if (ch === '"' && formula[i + 1] === '"') i += 1;
-      else if (ch === '"') quoted = false;
-      continue;
-    }
-    if (ch === '"') quoted = true;
-    else if (ch === '(' || ch === '{' || ch === '[') depth += 1;
-    else if (depth > 0 && (ch === ')' || ch === '}' || ch === ']')) depth -= 1;
-    else if (depth === 0 && (ch === ',' || ch === ';')) {
-      args.push(formula.slice(start, i).trim());
-      start = i + 1;
-    } else if (depth === 0 && ch === ')') {
-      // The last argument is the body; the ones before it are the parameters.
-      return args;
-    }
-  }
-  return null;
-}
-
-const visibleFrom = (dn: AutocompleteDefinedName, sheetIndex: number): boolean =>
-  dn.name.trim() !== '' && !dn.hidden && (dn.localSheetId === -1 || dn.localSheetId === sheetIndex);
-
-/** Names usable from `sheetIndex`: workbook-scoped and that sheet's own names,
- *  plus table names. Names scoped to another sheet are excluded, and so are
- *  LAMBDA names, which complete as functions (`collectLambdaFunctions`). */
-export function collectAutocompleteNames(
-  definedNames: Iterable<AutocompleteDefinedName>,
-  tables: readonly AutocompleteTable[],
-  sheetIndex: number,
-): AutocompleteName[] {
-  const out: AutocompleteName[] = [];
-  for (const dn of definedNames) {
-    if (!visibleFrom(dn, sheetIndex) || lambdaParameters(dn.formula)) continue;
-    out.push({ name: dn.name, detail: dn.formula.startsWith('=') ? dn.formula : `=${dn.formula}` });
-  }
-  for (const t of tables) out.push({ name: t.name, detail: t.columns.join(', '), table: true });
-  return out;
-}
-
-/** LAMBDA names usable from `sheetIndex` with their parameter names, keyed by the
- *  lower-cased name. They complete, insert and show arguments as functions do. */
-export function collectLambdaFunctions(
-  definedNames: Iterable<AutocompleteDefinedName>,
-  sheetIndex: number,
-): Map<string, { name: string; params: string[] }> {
-  const out = new Map<string, { name: string; params: string[] }>();
-  for (const dn of definedNames) {
-    if (!visibleFrom(dn, sheetIndex)) continue;
-    const params = lambdaParameters(dn.formula);
-    if (params) out.set(dn.name.toLocaleLowerCase(), { name: dn.name, params });
-  }
-  return out;
 }
 
 export interface AutocompleteDeps {
@@ -195,36 +118,6 @@ export interface AutocompleteDeps {
    *  desktop does; otherwise names and functions share one alphabetical list. */
   groupNames?: () => boolean;
   labels?: Partial<AutocompleteLabels>;
-}
-
-interface SuggestionContext {
-  matches: string[];
-  /** Character offset where the partial token starts (inclusive). */
-  tokenStart: number;
-  /** Character offset where the partial token ends (exclusive). */
-  tokenEnd: number;
-  /** What gets inserted when the user accepts a match — defaults to `${match}`
-   *  for refs and `${match}(` for functions. */
-  insertSuffix: string;
-  /** The kind drives display labels and badges. */
-  kind: AutocompleteSuggestionKind;
-  /** Per-match kind and detail when the list mixes functions and names. */
-  kinds?: AutocompleteSuggestionKind[];
-  details?: string[];
-  /** Candidate-specific replacement text, used when raw labels need syntax
-   *  encoding before they are inserted. */
-  insertions?: string[];
-  /** Number of existing characters after the replacement that place the caret
-   *  inside a call parenthesis already present in the formula. */
-  existingCallParenLength?: number;
-  /** Headed groups, in list order, when the list is grouped. */
-  groups?: AutocompleteGroup[];
-}
-
-/** A headed run of the list from `start` up to the next group. */
-interface AutocompleteGroup {
-  start: number;
-  kind: 'name' | 'table' | 'function';
 }
 
 const GROUP_LABEL: Readonly<Record<AutocompleteGroup['kind'], (l: AutocompleteLabels) => string>> =
@@ -788,13 +681,6 @@ function computeContext(
   };
 }
 
-/** Suggestions replace the token prefix but leave the suffix in place, so a caret that splits a
- *  token offers nothing: accepting would duplicate the token's remaining text. */
-export function caretSplitsToken(text: string, caret: number): boolean {
-  const next = text[caret] ?? '';
-  return next !== '' && /[\p{L}\p{N}_.\\]/u.test(next);
-}
-
 /** The functions a formula can call matching the identifier before `caret`: the custom
  *  functions first, then the built-ins, keeping the first spelling on a case-insensitive clash;
  *  names starting with the token come first, then those only containing it, each run
@@ -832,346 +718,5 @@ export function completeFunctionNames(
     token,
     tokenStart,
     names: partitionByPrefix(sorted, (label) => label, upper),
-  };
-}
-
-function existingFunctionParenLength(text: string, caret: number): number | null {
-  const context = formulaCaretContext(text, caret);
-  if (context !== 'function' && context !== 'expression') return null;
-  const { token } = formulaIdentifierPrefix(text, caret);
-  if (!/^[\p{L}_]/u.test(token)) return null;
-  const openParen = /^\s*\(/u.exec(text.slice(caret))?.[0];
-  if (!openParen) return null;
-  if (context === 'function' || openParen.length > 1) return openParen.length;
-  return null;
-}
-
-/** Plain-text values above `beforeRow` in column `col` for the "pick from
- *  list" popover: text-only (formulas, numbers, blanks all skip), deduped,
- *  nearest-first, at most ten. Takes the sheet's populated cells in one pass
- *  rather than probing each row — per-row `cellFormula` lookups are O(n) and
- *  would run on every keystroke. */
-export function pickListValues(
-  cells: Iterable<{ addr: Addr; value: CellValue; formula: string | null }>,
-  col: number,
-  beforeRow: number,
-): string[] {
-  const hits: { row: number; text: string }[] = [];
-  for (const e of cells) {
-    if (e.addr.col !== col) continue;
-    if (e.addr.row >= beforeRow) continue;
-    // Formulas don't contribute — the pick-list is verbatim text only.
-    if (e.formula !== null) continue;
-    if (e.value.kind !== 'text') continue;
-    const text = e.value.value;
-    if (text.length === 0) continue;
-    hits.push({ row: e.addr.row, text });
-  }
-  // Nearest-first: highest row index wins.
-  hits.sort((a, b) => b.row - a.row);
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const h of hits) {
-    if (seen.has(h.text)) continue;
-    seen.add(h.text);
-    out.push(h.text);
-    if (out.length >= 10) break;
-  }
-  return out;
-}
-
-/** Pick From Drop-down List: the text entries of the column's block of filled cells around
- *  `row` (stopping at the first blank, the active cell left out), folded case-insensitively with
- *  the topmost spelling kept, sorted. Numbers and formulas are left out. */
-export function pickFromListValues(
-  cells: Iterable<{ addr: Addr; value: CellValue; formula: string | null }>,
-  col: number,
-  row: number,
-): string[] {
-  const byRow = new Map<number, { value: CellValue; formula: string | null }>();
-  for (const e of cells) {
-    if (e.addr.col === col && e.value.kind !== 'blank') byRow.set(e.addr.row, e);
-  }
-  let top = row;
-  while (top > 0 && byRow.has(top - 1)) top -= 1;
-  let bottom = row;
-  while (byRow.has(bottom + 1)) bottom += 1;
-  const byFold = new Map<string, string>();
-  for (let r = top; r <= bottom; r += 1) {
-    const entry = r === row ? undefined : byRow.get(r);
-    if (!entry || entry.formula !== null || entry.value.kind !== 'text') continue;
-    const text = entry.value.value;
-    const fold = text.toLocaleLowerCase();
-    if (text.length > 0 && !byFold.has(fold)) byFold.set(fold, text);
-  }
-  return [...byFold.values()].sort((a, b) =>
-    a.localeCompare(b, undefined, { sensitivity: 'base' }),
-  );
-}
-
-/** column-history autocomplete: when editing a plain-text cell, match
- *  what the user has typed so far against the values already entered above in
- *  the same column. `values` must already be deduped, blanks excluded, in
- *  nearest-first order (caller's responsibility). The whole input acts as the
- *  partial token — desktop spreadsheets replaces the entire cell text on accept, never just
- *  a fragment. Returns null when the input is empty or no value prefix-matches. */
-export function suggestColumnHistory(
-  text: string,
-  caret: number,
-  values: readonly string[],
-): SuggestionContext | null {
-  // Only suggest when caret is at end and the input is a non-empty token. A
-  // shorter caret (mid-edit) means the user is correcting earlier characters,
-  // not extending the tail — spreadsheets don't pop the list there either.
-  if (caret !== text.length) return null;
-  if (text.length === 0) return null;
-  const lower = text.toLowerCase();
-  const matches: string[] = [];
-  for (const v of values) {
-    if (v.length === text.length) continue; // skip exact-length (would be no-op)
-    if (v.toLowerCase().startsWith(lower)) matches.push(v);
-    if (matches.length >= 10) break;
-  }
-  if (matches.length === 0) return null;
-  return {
-    matches,
-    tokenStart: 0,
-    tokenEnd: text.length,
-    insertSuffix: '',
-    kind: 'column',
-  };
-}
-
-/** Filter the consumer's custom function list against the partial token at
- *  `caret`. Mirrors `suggestFunctions` but against a runtime-supplied list. */
-function suggestCustomFunctions(
-  text: string,
-  caret: number,
-  names: readonly string[],
-): { token: string; tokenStart: number; matches: string[] } | null {
-  if (!text.startsWith('=') || names.length === 0) return null;
-  const caretContext = formulaCaretContext(text, caret);
-  if (caretContext !== 'expression' && caretContext !== 'function') return null;
-  const { token, tokenStart } = formulaIdentifierPrefix(text, caret);
-  if (token.length < 1 || !/^[\p{L}_]/u.test(token)) return null;
-  const upper = token.toLocaleUpperCase();
-  const matches = names.filter((n) => startsWithFolded(n, upper));
-  if (matches.length === 0) return null;
-  return { token, tokenStart, matches };
-}
-
-/** Case-insensitive prefix test; `upperToken` is already upper-cased. */
-const startsWithFolded = (label: string, upperToken: string): boolean =>
-  label.toLocaleUpperCase().startsWith(upperToken);
-
-/** The items whose label starts with `upperToken` first, the rest after, each keeping its order. */
-const partitionByPrefix = <T>(
-  items: readonly T[],
-  label: (item: T) => string,
-  upperToken: string,
-): T[] => [
-  ...items.filter((item) => startsWithFolded(label(item), upperToken)),
-  ...items.filter((item) => !startsWithFolded(label(item), upperToken)),
-];
-
-/** Stable sort by lowercased label, lowercasing each label once. */
-const sortCaseless = <T>(items: readonly T[], label: (item: T) => string): T[] =>
-  items
-    .map((item) => ({ item, key: label(item).toLocaleLowerCase() }))
-    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
-    .map((d) => d.item);
-
-/** Filter defined/table names against the partial token at `caret`. The match
- *  is a case-insensitive prefix, so Japanese names work the same way. */
-function suggestNames(
-  text: string,
-  caret: number,
-  names: readonly AutocompleteName[],
-): { tokenStart: number; matches: AutocompleteName[] } | null {
-  if (!text.startsWith('=') || names.length === 0) return null;
-  if (formulaCaretContext(text, caret) !== 'expression') return null;
-  const { token, tokenStart } = formulaIdentifierPrefix(text, caret);
-  if (token.length < 1 || !/^[\p{L}_\\]/u.test(token)) return null;
-  const upper = token.toLocaleUpperCase();
-  const seen = new Set<string>();
-  const matches = names.filter((n) => {
-    const key = n.name.toLocaleUpperCase();
-    if (!key.startsWith(upper) || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  return matches.length === 0 ? null : { tokenStart, matches };
-}
-
-const STRUCTURED_REF_EXTRA_BRACKET_CHARS = new Set([
-  '\t',
-  '\n',
-  '\r',
-  ',',
-  ':',
-  '.',
-  '[',
-  ']',
-  '#',
-  "'",
-  '"',
-  '{',
-  '}',
-  '$',
-  '^',
-  '&',
-  '*',
-  '+',
-  '=',
-  '-',
-  '>',
-  '<',
-  '/',
-  '@',
-  '\\',
-  '!',
-  '(',
-  ')',
-  '%',
-  '?',
-  '`',
-  ';',
-  '~',
-  '_',
-]);
-
-const STRUCTURED_REF_ESCAPED_CHARS = new Set(['[', ']', '#', "'", '@']);
-
-/** Offsets of the `[` still open at `caret`. Outside brackets, "..." and '...' spans are
- *  skipped; inside brackets, `'` escapes the next special character. */
-function openStructuredRefBrackets(text: string, caret: number): number[] {
-  const opens: number[] = [];
-  let inString = false;
-  let inSheet = false;
-  let i = text.startsWith('=') ? 1 : 0;
-  const stop = Math.max(i, Math.min(caret, text.length));
-
-  while (i < stop) {
-    const ch = text[i] ?? '';
-    const next = text[i + 1] ?? '';
-    if (inString) {
-      if (ch === '"') {
-        if (next === '"') {
-          i += 2;
-          continue;
-        }
-        inString = false;
-      }
-      i += 1;
-      continue;
-    }
-    if (inSheet) {
-      if (ch === "'") {
-        if (next === "'") {
-          i += 2;
-          continue;
-        }
-        inSheet = false;
-      }
-      i += 1;
-      continue;
-    }
-    if (opens.length > 0) {
-      if (ch === "'" && STRUCTURED_REF_ESCAPED_CHARS.has(next)) {
-        i += 2;
-        continue;
-      }
-      if (ch === '[') opens.push(i);
-      else if (ch === ']') opens.pop();
-      i += 1;
-      continue;
-    }
-    if (ch === '"') {
-      inString = true;
-      i += 1;
-      continue;
-    }
-    if (ch === "'") {
-      inSheet = true;
-      i += 1;
-      continue;
-    }
-    if (ch === '[') opens.push(i);
-    i += 1;
-  }
-  return opens;
-}
-
-function decodeStructuredRefPartial(partial: string): string {
-  let decoded = '';
-  for (let i = 0; i < partial.length; i += 1) {
-    const ch = partial[i] ?? '';
-    const next = partial[i + 1] ?? '';
-    // A dangling escape still identifies a useful prefix (`A'` before the escaped `]` in `A]B`).
-    if (ch === "'" && i === partial.length - 1) continue;
-    if (ch === "'" && STRUCTURED_REF_ESCAPED_CHARS.has(next)) {
-      decoded += next;
-      i += 1;
-    } else {
-      decoded += ch;
-    }
-  }
-  return decoded;
-}
-
-function encodeStructuredRefColumn(header: string, openBracketCount: number): string {
-  const escaped = [...header]
-    .map((ch) => (STRUCTURED_REF_ESCAPED_CHARS.has(ch) ? `'${ch}` : ch))
-    .join('');
-  const needsExtraBracket = [...header].some((ch) => STRUCTURED_REF_EXTRA_BRACKET_CHARS.has(ch));
-  const addInnerBracket = needsExtraBracket && openBracketCount === 1;
-  const closeCount = openBracketCount + (addInnerBracket ? 1 : 0);
-  return `${addInnerBracket ? '[' : ''}${escaped}${']'.repeat(closeCount)}`;
-}
-
-/** Detect a `TableName[partial` token immediately before the caret and return
- *  matching column names. The token is allowed to contain spaces inside the
- *  bracket so multi-word column names work. Returns null when the caret is
- *  outside such a token. */
-export function suggestStructuredRef(
-  text: string,
-  caret: number,
-  tables: readonly AutocompleteTable[],
-): SuggestionContext | null {
-  if (!text.startsWith('=') || tables.length === 0) return null;
-  const caretContext = formulaCaretContext(text, caret);
-  if (caretContext === 'string' || caretContext === 'sheet') return null;
-  const next = text[caret] ?? '';
-  if (next && /[\p{L}\p{N}_.\\\]]/u.test(next)) return null;
-  const openBrackets = openStructuredRefBrackets(text, caret);
-  if (openBrackets.length === 0) return null;
-  const tableBracket = openBrackets[0];
-  const columnBracket = openBrackets[openBrackets.length - 1];
-  if (tableBracket === undefined || columnBracket === undefined) return null;
-  const { token: tableName } = formulaIdentifierPrefix(text, tableBracket);
-  if (tableName.length === 0 || !/^[\p{L}_\\]/u.test(tableName)) return null;
-  const foldedTableName = tableName.toLocaleLowerCase();
-  const table = tables.find((t) => t.name.toLocaleLowerCase() === foldedTableName);
-  if (!table || table.columns.length === 0) return null;
-  const partial = decodeStructuredRefPartial(text.slice(columnBracket + 1, caret));
-  const lower = partial.toLocaleLowerCase();
-  const seen = new Set<string>();
-  const matches = sortCaseless(
-    table.columns.filter((c) => {
-      const key = c.toLocaleLowerCase();
-      if (!key.startsWith(lower) || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }),
-    (c) => c,
-  );
-  if (matches.length === 0) return null;
-  return {
-    matches,
-    tokenStart: columnBracket + 1,
-    tokenEnd: caret,
-    insertSuffix: ']',
-    kind: 'tableColumn',
-    insertions: matches.map((header) => encodeStructuredRefColumn(header, openBrackets.length)),
   };
 }

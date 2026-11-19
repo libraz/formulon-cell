@@ -24,9 +24,9 @@ import {
   type AutocompleteInsertOutcome,
   type AutocompleteLabels,
   attachAutocomplete,
-  collectAutocompleteNames,
-  pickListValues,
 } from './autocomplete.js';
+import { collectAutocompleteNames } from './autocomplete-names.js';
+import { pickListValues } from './column-pick-list.js';
 import { focusSheet } from './dialog-focus.js';
 import { caretIndexAtClientX } from './editor-caret.js';
 import {

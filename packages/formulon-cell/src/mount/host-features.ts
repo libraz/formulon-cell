@@ -26,11 +26,8 @@ import {
   attachAccessibilityPane,
 } from '../interact/accessibility-pane.js';
 import { attachArgHelper } from '../interact/arg-helper.js';
-import {
-  type AutocompleteInsertOutcome,
-  attachAutocomplete,
-  collectAutocompleteNames,
-} from '../interact/autocomplete.js';
+import { type AutocompleteInsertOutcome, attachAutocomplete } from '../interact/autocomplete.js';
+import { collectAutocompleteNames } from '../interact/autocomplete-names.js';
 import { attachBorderDraw, type BorderDrawHandle } from '../interact/border-draw.js';
 import { attachCommentDialog } from '../interact/comment-dialog.js';
 import { attachCommentsPane } from '../interact/comments-pane.js';

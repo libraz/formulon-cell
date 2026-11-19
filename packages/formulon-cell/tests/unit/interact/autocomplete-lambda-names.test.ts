@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachArgHelper } from '../../../src/interact/arg-helper.js';
+import { attachAutocomplete } from '../../../src/interact/autocomplete.js';
 import {
-  attachAutocomplete,
   collectAutocompleteNames,
   collectLambdaFunctions,
   lambdaParameters,
-} from '../../../src/interact/autocomplete.js';
+} from '../../../src/interact/autocomplete-names.js';
 import { workbookCustomFunctions } from '../../../src/interact/workbook-function-catalog.js';
 
 const DEFINED = [

@@ -2,13 +2,13 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
+import { attachAutocomplete } from '../../../src/interact/autocomplete.js';
+import { collectAutocompleteNames } from '../../../src/interact/autocomplete-names.js';
 import {
-  attachAutocomplete,
-  collectAutocompleteNames,
-  pickListValues,
   suggestColumnHistory,
   suggestStructuredRef,
-} from '../../../src/interact/autocomplete.js';
+} from '../../../src/interact/autocomplete-suggestions.js';
+import { pickListValues } from '../../../src/interact/column-pick-list.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const liveHandles = new Set<ReturnType<typeof attachAutocomplete>>();

@@ -7,7 +7,7 @@ import {
   upsertDefinedName,
 } from '../../../src/commands/named-ranges.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { collectAutocompleteNames } from '../../../src/interact/autocomplete.js';
+import { collectAutocompleteNames } from '../../../src/interact/autocomplete-names.js';
 import { rangeDefinedNames, resolveAreaText } from '../../../src/mount/ref-utils.js';
 
 const canLoadWasm = (): boolean => typeof WebAssembly !== 'undefined';

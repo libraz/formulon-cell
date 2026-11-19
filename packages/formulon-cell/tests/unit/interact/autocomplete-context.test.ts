@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  type AutocompleteHandle,
-  attachAutocomplete,
-  suggestStructuredRef,
-} from '../../../src/interact/autocomplete.js';
+import { type AutocompleteHandle, attachAutocomplete } from '../../../src/interact/autocomplete.js';
+import { suggestStructuredRef } from '../../../src/interact/autocomplete-suggestions.js';
 
 const table = { name: 'Sales', columns: ['Region', 'Revenue'] };
 
