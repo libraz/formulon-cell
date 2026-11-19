@@ -8,6 +8,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Changed
 
+- `SpreadsheetInstance.refreshPrinterProfiles()` resolves with the printer profiles in effect after the refresh: the host's new list, the previous list when the host has no update, or `null` when no list was ever supplied.
 - **Breaking:** Requires `@libraz/formulon` 0.19.0, whose model the engine passthrough follows. Engine failures surface as `FormulonError`; optional list reads (merges, hyperlinks, conditional formats, tables, external links, passthrough parts) still fall back to an empty list.
   - Records are the engine's own types and field names: font `sizePt`, fill `foreground` / `background` colours, `color.argb`, `EffectiveStyle`, `WorkbookTheme`, `Pagination`, `AutoFilterEval`.
   - Absent values read as `null` rather than `-1` or `''`; a chart without a title reads `null`.

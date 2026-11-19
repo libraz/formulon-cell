@@ -1,3 +1,4 @@
+import type { PrinterProfile } from '@libraz/formulon-cell';
 import { mount, Workbook } from '@libraz/formulon-cell';
 import type { Extension as PublicExtension } from '@libraz/formulon-cell/extensions';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -107,16 +108,40 @@ describe('mount/public contract', () => {
       printableBounds: { left: 0, top: 0, right: 279, bottom: 216 },
     } as const;
     const refreshPrinterProfiles = vi
-      .fn<() => readonly [typeof nextProfile] | undefined>()
-      .mockReturnValueOnce(undefined)
+      .fn<() => readonly [typeof nextProfile] | null>()
+      .mockReturnValueOnce(null)
+      .mockReturnValueOnce(null)
       .mockReturnValueOnce([nextProfile]);
-    sheet = await mountStubSheet({
-      printerProfiles: [firstProfile],
-      refreshPrinterProfiles,
+    installDomStubs();
+    const { host, cleanup } = createHostElement();
+    const instance = await mount(host, {
+      host: { printerProfiles: [firstProfile], refreshPrinterProfiles },
     });
 
-    await expect(sheet.instance.refreshPrinterProfiles()).resolves.toEqual([firstProfile]);
-    await expect(sheet.instance.refreshPrinterProfiles()).resolves.toEqual([nextProfile]);
+    try {
+      const kept = await instance.refreshPrinterProfiles();
+      expect(kept).toEqual([firstProfile]);
+      // The result is a copy: emptying it leaves the list in effect intact.
+      (kept as PrinterProfile[]).length = 0;
+      await expect(instance.refreshPrinterProfiles()).resolves.toEqual([firstProfile]);
+      await expect(instance.refreshPrinterProfiles()).resolves.toEqual([nextProfile]);
+    } finally {
+      instance.dispose();
+      cleanup();
+    }
+  });
+
+  it('resolves a printer refresh with null when no list was ever supplied', async () => {
+    installDomStubs();
+    const { host, cleanup } = createHostElement();
+    const instance = await mount(host);
+
+    try {
+      await expect(instance.refreshPrinterProfiles()).resolves.toBeNull();
+    } finally {
+      instance.dispose();
+      cleanup();
+    }
   });
 
   it('rebases internal instance state when the workbook is replaced', async () => {

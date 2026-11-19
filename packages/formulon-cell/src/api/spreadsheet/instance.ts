@@ -22,6 +22,7 @@ import type {
   InteractionOperation,
 } from '../../commands/interaction-policy.js';
 import { refusedBatch } from '../../commands/interaction-policy.js';
+import type { PrinterProfile } from '../../commands/printer-profile.js';
 import { sheetPermits } from '../../commands/protection.js';
 import type { SpellingService } from '../../commands/spelling.js';
 import { clearTraceArrows, traceDependents, tracePrecedents } from '../../commands/traces.js';
@@ -625,11 +626,13 @@ export class SpreadsheetInstance {
     return stateOf(this).legacy.printDocument();
   }
 
-  /** Re-reads the printer list through `host.refreshPrinterProfiles`. */
-  refreshPrinterProfiles(): Promise<void> {
+  /** Re-reads the printer list through `host.refreshPrinterProfiles` and resolves with the list in
+   *  effect: the host's new list, the previous one when the host has no update, or `null` when no
+   *  list was ever supplied. The result is a copy. */
+  refreshPrinterProfiles(): Promise<readonly PrinterProfile[] | null> {
     return stateOf(this)
       .legacy.refreshPrinterProfiles()
-      .then(() => undefined);
+      .then((profiles) => (profiles ? structuredClone(profiles) : null));
   }
 
   /** Captures a screen region through `host.captureScreenClip`. */
