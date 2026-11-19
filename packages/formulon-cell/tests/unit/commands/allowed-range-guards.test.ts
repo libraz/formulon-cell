@@ -175,3 +175,57 @@ describe('undo and redo of protection changes', () => {
     expect(store.getState().protection.unlockedAllowedRanges?.has(id) ?? false).toBe(false);
   });
 });
+
+describe('deferForAllowedRangeUnlock settling', () => {
+  const guarded = (ui: AllowedRangeUnlockUi) => {
+    const store = createSpreadsheetStore();
+    mutators.addAllowedEditRange(store, {
+      title: 'G',
+      range: area(0, 0, 0, 0),
+      legacyPasswordHash: legacySheetPasswordHash('pw'),
+    });
+    setProtectedSheet(store, 0, true);
+    registerAllowedRangeUnlockUi(store, ui);
+    return store;
+  };
+
+  it('settles once and drops the edit when the password prompt rejects', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const store = guarded({
+      askPassword: vi.fn(async () => {
+        throw new Error('boom');
+      }),
+      reportIncorrect: vi.fn(async () => {}),
+    });
+    const run = vi.fn();
+    const onSettled = vi.fn();
+    expect(deferForAllowedRangeUnlock(store, [area(0, 0, 0, 0)], run, onSettled)).toBe(true);
+    await settle();
+    expect(onSettled).toHaveBeenCalledTimes(1);
+    expect(run).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('settles once without running when the unlock is cancelled', async () => {
+    const store = guarded(fakeUi([null]));
+    const run = vi.fn();
+    const onSettled = vi.fn();
+    deferForAllowedRangeUnlock(store, [area(0, 0, 0, 0)], run, onSettled);
+    await settle();
+    await settle();
+    expect(onSettled).toHaveBeenCalledTimes(1);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('settles once and runs the edit when the unlock succeeds', async () => {
+    const store = guarded(fakeUi(['pw']));
+    const run = vi.fn();
+    const onSettled = vi.fn();
+    deferForAllowedRangeUnlock(store, [area(0, 0, 0, 0)], run, onSettled);
+    await settle();
+    await settle();
+    expect(onSettled).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+});

@@ -670,7 +670,7 @@ async function unlockPending(store: SpreadsheetStore, ranges: readonly Range[]):
  *  call `run` once unlocked (a wrong or cancelled password drops it). Returns
  *  true when the edit was deferred or blocked, false when it can go ahead now.
  *  `onSettled` fires first on every deferred or blocked outcome (synchronously
- *  when blocked), never when this returns false. */
+ *  when blocked, and also when the unlock fails), never when this returns false. */
 export function deferForAllowedRangeUnlock(
   store: SpreadsheetStore,
   ranges: readonly Range[],
@@ -687,10 +687,17 @@ export function deferForAllowedRangeUnlock(
     onSettled?.();
     return true;
   }
-  void requestAllowedRangeUnlock(store, ranges).then((ok) => {
-    onSettled?.();
-    if (ok) run();
-  });
+  requestAllowedRangeUnlock(store, ranges).then(
+    (ok) => {
+      onSettled?.();
+      if (ok) run();
+    },
+    (err: unknown) => {
+      onSettled?.();
+      // eslint-disable-next-line no-console
+      console.warn('formulon-cell: allowed-range unlock failed', err);
+    },
+  );
   return true;
 }
 
