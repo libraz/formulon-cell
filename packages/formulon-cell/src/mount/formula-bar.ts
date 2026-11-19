@@ -67,6 +67,17 @@ import type { EditorRefHighlight } from '../store/types.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { moveAfterCommit, tabCaptured } from './formula-bar-advance.js';
 import { fillSelectionFromFormulaBar, writeFormulaBarEntry } from './formula-bar-entry-write.js';
+import {
+  type ExternalDraftState,
+  type ExternalFormulaDraftHandle,
+  type ExternalFormulaDraftHooks,
+  type ExternalFormulaDraftOutcome,
+  type ExternalFormulaDraftView,
+  externalDraftStale,
+  externalDraftWorkbookCurrent,
+  publishExternalDraftView,
+  workbookLive,
+} from './formula-bar-external-draft.js';
 
 interface FormulaBarAutocomplete {
   isOpen(): boolean;
@@ -100,47 +111,6 @@ interface AttachFormulaBarInput {
   store: SpreadsheetStore;
   updateChrome: () => void;
   wb: () => WorkbookHandle;
-}
-
-export interface ExternalFormulaDraftView {
-  raw: string;
-  caret: {
-    start: number;
-    end: number;
-    direction: HTMLTextAreaElement['selectionDirection'];
-  };
-}
-
-type ExternalFormulaDraftOutcome = 'committed' | 'cancelled' | 'discarded';
-
-export interface ExternalFormulaDraftHooks {
-  onFinish(outcome: ExternalFormulaDraftOutcome, restoredFocusTarget?: HTMLElement | null): void;
-}
-
-export interface ExternalFormulaDraftHandle {
-  readonly anchor: Addr;
-  value(): string;
-  snapshot(): ExternalFormulaDraftView | null;
-  setValue(raw: string, caret?: number): void;
-  commit(): boolean;
-  cancel(): void;
-  discard(): void;
-  subscribe(fn: (view: ExternalFormulaDraftView) => void): () => void;
-}
-
-type ExternalDraftStatus = 'open' | 'committing' | 'committed' | 'cancelled' | 'discarded';
-
-interface ExternalDraftState {
-  anchor: Addr;
-  workbook: WorkbookHandle;
-  restoreValue: string;
-  hooks: ExternalFormulaDraftHooks;
-  listeners: Set<(view: ExternalFormulaDraftView) => void>;
-  lastNotifiedView: ExternalFormulaDraftView | null;
-  status: ExternalDraftStatus;
-  cancelRequested: boolean;
-  cancelMode: 'restore' | 'discard' | null;
-  lease: FormulaEditLease | null;
 }
 
 export interface FormulaBarController {
@@ -426,21 +396,6 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     return lease;
   };
 
-  const workbookLive = (workbook: WorkbookHandle): boolean =>
-    Number.isInteger(workbook.sheetCount) && workbook.sheetCount >= 0;
-
-  const externalDraftWorkbookCurrent = (draft: ExternalDraftState): boolean => {
-    try {
-      const current = wb();
-      return current === draft.workbook && workbookLive(current);
-    } catch {
-      return false;
-    }
-  };
-
-  const externalDraftStale = (draft: ExternalDraftState): boolean =>
-    !externalDraftWorkbookCurrent(draft) || (draft.lease !== null && !draft.lease.valid());
-
   const currentExternalDraftView = (draft: ExternalDraftState): ExternalFormulaDraftView | null => {
     if (detached || externalDraft !== draft || draft.status !== 'open') return null;
     if (guardStaleDraft()) return null;
@@ -555,21 +510,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     if (detached || draft?.status !== 'open') return;
     const view = currentExternalDraftView(draft);
     if (!view || draft.listeners.size === 0) return;
-    const last = draft.lastNotifiedView;
-    if (
-      last &&
-      last.raw === view.raw &&
-      last.caret.start === view.caret.start &&
-      last.caret.end === view.caret.end &&
-      last.caret.direction === view.caret.direction
-    )
-      return;
-    draft.lastNotifiedView = view;
-    for (const listener of [...draft.listeners]) {
-      if (draft.status !== 'open' || externalDraft !== draft || draft.lastNotifiedView !== view)
-        break;
-      listener(view);
-    }
+    publishExternalDraftView(draft, view, () => externalDraft === draft);
   };
 
   const syncFormulaBarInputState = (notify = true): void => {
@@ -611,7 +552,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   /** Discard the external draft when its workbook or lease went stale; true when it did. */
   const guardStaleDraft = (): boolean => {
     const draft = externalDraft;
-    if (!draft || !externalDraftStale(draft)) return false;
+    if (!draft || !externalDraftStale(draft, wb)) return false;
     discardDraft(draft);
     return true;
   };
@@ -752,7 +693,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       (detached ||
         externalDraft !== draft ||
         draft.cancelMode === 'discard' ||
-        !externalDraftWorkbookCurrent(draft))
+        !externalDraftWorkbookCurrent(draft, wb))
     ) {
       return true;
     }
@@ -779,7 +720,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       detached ||
       externalDraft !== draft ||
       draft.cancelMode === 'discard' ||
-      externalDraftStale(draft);
+      externalDraftStale(draft, wb);
     if (contextDiscarded) {
       discardDraft(draft);
       return committed;

@@ -16,11 +16,11 @@ import type { Addr } from '../engine/types.js';
 import { formatCell, fromEngineValue } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
+import type { FormulaBarController } from '../mount/formula-bar.js';
 import type {
   ExternalFormulaDraftHandle,
   ExternalFormulaDraftView,
-  FormulaBarController,
-} from '../mount/formula-bar.js';
+} from '../mount/formula-bar-external-draft.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { visibleFocusReturn } from '../toolbar/ribbon/fit-ribbon.js';
