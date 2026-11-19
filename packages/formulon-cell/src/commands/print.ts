@@ -1,4 +1,4 @@
-import type { Pagination, PaginationPage } from '@libraz/formulon';
+import type { PaginationPage } from '@libraz/formulon';
 import { colLetter, formatA1Cell, parseAddrKey } from '../engine/address.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import { numFmtToFormatCode } from '../engine/format-writeback.js';
@@ -17,13 +17,8 @@ import type { CellValue } from '../engine/types.js';
 // `iframe.contentWindow.print()`, then removes the iframe once focus
 // returns to the host window. We never spawn third-party PDF libs — the
 // browser's print pipeline is the entire export path.
-import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
-import { safeFontFamily } from '../format/font-family.js';
-import { numberFormatPaint } from '../format/number-format.js';
-import { gradientFillCss } from '../render/gradient-fill-css.js';
-import { cellFontFamily } from '../render/painters/text.js';
 import { directCellFormat } from '../store/direct-format.js';
 import { hiddenRowsOf } from '../store/row-visibility.js';
 import {
@@ -32,7 +27,6 @@ import {
   getPageSetup,
   type PageMargins,
   type PageSetup,
-  type PrintCellErrorsMode,
   type SpreadsheetStore,
 } from '../store/store.js';
 import { escapeHtml } from '../text-escape.js';
@@ -44,6 +38,8 @@ import {
   splitPrintRegionIntoTiles,
 } from './page-geometry.js';
 import { paginationFor } from './pagination.js';
+import { cellDisplay, inlineCellStyle } from './print-cell.js';
+import { buildPageRule, type HeaderFooterContext } from './print-page-rule.js';
 import {
   orderPrintRegionsForPageOrder,
   type PrintAreaBounds,
@@ -52,7 +48,6 @@ import {
   parsePrintTitleRows,
 } from './print-ranges.js';
 import { type PrinterProfile, resolvePrinterProfileBounds } from './printer-profile.js';
-import { formatA1FormulaAsR1C1 } from './refs.js';
 
 export type { AxisBand, PrintableMarginAdjustment, SplitAxisOptions } from './page-geometry.js';
 export {
@@ -111,326 +106,6 @@ export class PrintResourceLimitError extends Error {
     );
     this.name = 'PrintResourceLimitError';
   }
-}
-
-/** Escape a dynamic value for a CSS string. `<` and `>` are escaped even
- * inside quotes because the complete stylesheet is an HTML raw-text node. */
-const cssString = (value: string): string =>
-  `"${value
-    .replaceAll('\\', '\\\\')
-    .replaceAll('"', '\\"')
-    .replace(/\r\n?|\n/g, '\\A ')
-    .replaceAll('&', '\\26 ')
-    .replaceAll('<', '\\3C ')
-    .replaceAll('>', '\\3E ')}"`;
-
-const PRINT_FONT_FALLBACK = 'system-ui, -apple-system, "Segoe UI", sans-serif';
-
-const cellDisplay = (
-  value: CellValue,
-  formula: string | null,
-  showFormulas: boolean,
-  addr?: { row: number; col: number },
-  r1c1 = false,
-  cellErrorsAs: PrintCellErrorsMode = 'displayed',
-  nativeR1C1Formula?: string | null,
-  nativeDisplay?: string | null,
-  format?: CellFormat,
-): string => {
-  if (showFormulas && formula) {
-    if (!r1c1) return formula;
-    return nativeR1C1Formula ?? (addr ? formatA1FormulaAsR1C1(formula, addr) : formula);
-  }
-  if (value.kind === 'blank') return format?.hyperlinkDisplay ?? '';
-  if (value.kind === 'error') {
-    if (cellErrorsAs === 'blank') return '';
-    if (cellErrorsAs === 'dash') return '--';
-    if (cellErrorsAs === 'na') return '#N/A';
-  }
-  if (nativeDisplay !== null && nativeDisplay !== undefined) return nativeDisplay;
-  return formatCell(value);
-};
-
-const fillPatternCss = (pattern: CellFormat['fillPattern'], color = '#000000'): string => {
-  switch (pattern) {
-    case 'gray0625':
-      return `radial-gradient(${color} 0.4px, transparent 0.4px)`;
-    case 'gray125':
-      return `radial-gradient(${color} 0.6px, transparent 0.6px)`;
-    case 'gray25':
-      return `radial-gradient(${color} 1px, transparent 1px)`;
-    case 'gray50':
-      return `repeating-linear-gradient(45deg, ${color} 0 2px, transparent 2px 4px)`;
-    case 'gray75':
-      return `repeating-linear-gradient(45deg, ${color} 0 3px, transparent 3px 4px)`;
-    case 'horizontal':
-    case 'darkHorizontal':
-      return `repeating-linear-gradient(0deg, ${color} 0 1px, transparent 1px 4px)`;
-    case 'lightHorizontal':
-      return `repeating-linear-gradient(0deg, ${color} 0 1px, transparent 1px 7px)`;
-    case 'vertical':
-    case 'darkVertical':
-      return `repeating-linear-gradient(90deg, ${color} 0 1px, transparent 1px 4px)`;
-    case 'lightVertical':
-      return `repeating-linear-gradient(90deg, ${color} 0 1px, transparent 1px 7px)`;
-    case 'diagonalDown':
-    case 'darkDown':
-      return `repeating-linear-gradient(45deg, ${color} 0 1px, transparent 1px 5px)`;
-    case 'diagonalUp':
-    case 'darkUp':
-      return `repeating-linear-gradient(135deg, ${color} 0 1px, transparent 1px 5px)`;
-    case 'lightDown':
-      return `repeating-linear-gradient(45deg, ${color} 0 1px, transparent 1px 9px)`;
-    case 'lightUp':
-      return `repeating-linear-gradient(135deg, ${color} 0 1px, transparent 1px 9px)`;
-    case 'darkGrid':
-    case 'lightGrid': {
-      const step = pattern === 'darkGrid' ? 4 : 7;
-      return `repeating-linear-gradient(0deg, ${color} 0 1px, transparent 1px ${step}px), repeating-linear-gradient(90deg, ${color} 0 1px, transparent 1px ${step}px)`;
-    }
-    case 'darkTrellis':
-    case 'lightTrellis': {
-      const step = pattern === 'darkTrellis' ? 6 : 9;
-      return `repeating-linear-gradient(45deg, ${color} 0 1px, transparent 1px ${step}px), repeating-linear-gradient(135deg, ${color} 0 1px, transparent 1px ${step}px)`;
-    }
-    default:
-      return '';
-  }
-};
-
-/** Translate a `CellFormat` into an inline-style string. Only the subset that
- *  matters for print is included — borders are emitted on the cell itself
- *  so colspan/rowspan merges retain their outline. */
-function inlineCellStyle(
-  fmt: CellFormat | undefined,
-  value: CellValue,
-  showGridlines: boolean,
-  blackAndWhite: boolean,
-  scale = 1,
-  fontEffects = false,
-): string {
-  const parts: string[] = [];
-  if (showGridlines) {
-    // Default hairline grid for unformatted cells. Per-side overrides below.
-    parts.push(`border:${scale}px solid #c8c8c8`);
-  }
-  if (!fmt) return parts.join(';');
-  if (fmt.bold) parts.push('font-weight:600');
-  if (fmt.italic) parts.push('font-style:italic');
-  if (fontEffects && fmt.fontShadow)
-    parts.push(`text-shadow:${scale}px ${scale}px 0 rgba(0,0,0,0.35)`);
-  if (fontEffects && fmt.fontOutline) {
-    parts.push(`-webkit-text-stroke:${0.75 * scale}px currentColor`);
-    parts.push('-webkit-text-fill-color:transparent');
-  }
-  if (fmt.underline || fmt.strike) {
-    const decos: string[] = [];
-    if (fmt.underline) decos.push('underline');
-    if (fmt.strike) decos.push('line-through');
-    parts.push(`text-decoration:${decos.join(' ')}`);
-  }
-  if (fmt.align) {
-    const align =
-      fmt.align === 'centerContinuous'
-        ? 'center'
-        : fmt.align === 'justify' || fmt.align === 'distributed'
-          ? 'justify'
-          : fmt.align === 'fill'
-            ? 'left'
-            : fmt.align;
-    parts.push(`text-align:${align}`);
-  }
-  if (fmt.vAlign) {
-    const v = fmt.vAlign === 'justify' || fmt.vAlign === 'distributed' ? 'middle' : fmt.vAlign;
-    parts.push(`vertical-align:${v}`);
-  }
-  if (fmt.wrap) parts.push('white-space:pre-wrap');
-  else parts.push('white-space:nowrap');
-  if (typeof fmt.indent === 'number' && fmt.indent > 0) {
-    parts.push(`padding-left:${(4 + fmt.indent * 8) * scale}px`);
-  }
-  if (typeof fmt.rotation === 'number' && fmt.rotation !== 0) {
-    parts.push(`transform:rotate(${-fmt.rotation}deg);transform-origin:center`);
-  }
-  if (fmt.textDirection === 'rtl') parts.push('direction:rtl');
-  else if (fmt.textDirection === 'ltr') parts.push('direction:ltr');
-  const formatCode = value.kind === 'number' ? numFmtToFormatCode(fmt.numFmt) : null;
-  const formatColor =
-    formatCode && value.kind === 'number'
-      ? numberFormatPaint(formatCode, value.value).color
-      : undefined;
-  const color = formatColor ?? fmt.color;
-  if (color && !blackAndWhite) parts.push(`color:${color}`);
-  if (fmt.fillGradient && !blackAndWhite) {
-    parts.push(`background:${gradientFillCss(fmt.fillGradient)}`);
-  } else if (fmt.fill && !blackAndWhite) parts.push(`background:${fmt.fill}`);
-  if (fmt.fillPattern && !fmt.fillGradient && !blackAndWhite) {
-    const image = fillPatternCss(fmt.fillPattern, fmt.fillPatternColor);
-    if (image) parts.push(`background-image:${image}`);
-    if (fmt.fillPattern === 'gray125' || fmt.fillPattern === 'gray25') {
-      parts.push(`background-size:${4 * scale}px ${4 * scale}px`);
-    }
-  }
-  if (fmt.fontFamily) {
-    parts.push(
-      `font-family:${safeFontFamily(cellFontFamily(fmt.fontFamily, PRINT_FONT_FALLBACK), cssString)}`,
-    );
-  }
-  if (typeof fmt.fontSize === 'number') parts.push(`font-size:${fmt.fontSize * scale}px`);
-  if (fmt.borders) {
-    const sideToCss = (side: 'top' | 'right' | 'bottom' | 'left'): void => {
-      const b = fmt.borders?.[side];
-      if (!b) return;
-      if (b === true) {
-        parts.push(`border-${side}:${scale}px solid #000`);
-        return;
-      }
-      const width =
-        b.style === 'thick'
-          ? 2
-          : b.style === 'medium'
-            ? 1.5
-            : b.style === 'double'
-              ? 3
-              : b.style === 'dashed' || b.style === 'mediumDashed' || b.style === 'dashDot'
-                ? 1
-                : b.style === 'dotted'
-                  ? 1
-                  : 1;
-      const style =
-        b.style === 'double'
-          ? 'double'
-          : b.style === 'dashed' || b.style === 'mediumDashed' || b.style === 'dashDot'
-            ? 'dashed'
-            : 'solid';
-      parts.push(
-        `border-${side}:${width * scale}px ${style} ${blackAndWhite ? '#000' : (b.color ?? '#000')}`,
-      );
-    };
-    sideToCss('top');
-    sideToCss('right');
-    sideToCss('bottom');
-    sideToCss('left');
-  }
-  return parts.join(';');
-}
-
-/** Build the @page CSS string for a given setup. Browsers honour orientation
- *  and (for print preview / PDF) the size keyword. */
-/** Context used to expand header/footer field codes into concrete text. */
-export interface HeaderFooterContext {
-  sheetName: string;
-  fileName: string;
-  date: string;
-  time: string;
-}
-
-/**
- * Expand an Excel header/footer field string into a CSS `content` value for a
- * `@page` margin box. Static codes (`&D` date, `&T` time, `&F` file, `&A` sheet)
- * become quoted literals; page-relative codes (`&P` page, `&N` pages) become
- * `counter(page)` / `counter(pages)` so the browser fills the real numbers on
- * every printed page. `&&` is a literal ampersand; formatting codes (`&B`,
- * `&"font"`, size runs, section markers) are stripped. Returns `''` when the
- * field is empty.
- */
-export function headerFieldToCssContent(raw: string, ctx: HeaderFooterContext): string {
-  if (!raw) return '';
-  const parts: string[] = [];
-  let buf = '';
-  const flush = (): void => {
-    if (buf) {
-      parts.push(cssString(buf));
-      buf = '';
-    }
-  };
-  for (let i = 0; i < raw.length; i += 1) {
-    const ch = raw[i] ?? '';
-    if (ch !== '&') {
-      buf += ch;
-      continue;
-    }
-    const next = raw[i + 1] ?? '';
-    const upper = next.toUpperCase();
-    if (next === '&') {
-      buf += '&';
-      i += 1;
-    } else if (upper === 'P' || upper === 'N') {
-      flush();
-      parts.push(upper === 'P' ? 'counter(page)' : 'counter(pages)');
-      i += 1;
-      // Drop an Excel page offset like `&P+1` — CSS counters cannot offset.
-      const rest = raw.slice(i + 1);
-      const off = /^[+-]\d+/.exec(rest);
-      if (off) i += off[0].length;
-    } else if (upper === 'D') {
-      buf += ctx.date;
-      i += 1;
-    } else if (upper === 'T') {
-      buf += ctx.time;
-      i += 1;
-    } else if (upper === 'F') {
-      buf += ctx.fileName;
-      i += 1;
-    } else if (upper === 'A') {
-      buf += ctx.sheetName;
-      i += 1;
-    } else if (next === '"') {
-      // &"font name" — skip the quoted font spec entirely.
-      const close = raw.indexOf('"', i + 2);
-      i = close >= 0 ? close : i + 1;
-    } else if (/[0-9]/.test(next)) {
-      // &nn font-size run — drop the digits.
-      let j = i + 1;
-      while (j < raw.length && /[0-9]/.test(raw[j] ?? '')) j += 1;
-      i = j - 1;
-    } else {
-      // Single-letter formatting / section code (&B, &I, &U, &L, &C, &R, &Z…).
-      i += 1;
-    }
-  }
-  flush();
-  return parts.length ? parts.join(' ') : '';
-}
-
-function buildPageRule(setup: PageSetup, ctx: HeaderFooterContext, native?: Pagination): string {
-  const size = native
-    ? `${native.paper.widthPt}pt ${native.paper.heightPt}pt`
-    : `${PAPER_DIMENSIONS[setup.paperSize] ?? 'A4'} ${setup.orientation}`;
-  const m = native
-    ? {
-        top: `${native.margins.topIn * 72}pt`,
-        right: `${native.margins.rightIn * 72}pt`,
-        bottom: `${native.margins.bottomIn * 72}pt`,
-        left: `${native.margins.leftIn * 72}pt`,
-      }
-    : (() => {
-        const margins = effectivePrintMargins(setup);
-        return {
-          top: `${margins.top}in`,
-          right: `${margins.right}in`,
-          bottom: `${margins.bottom}in`,
-          left: `${margins.left}in`,
-        };
-      })();
-  const boxes: [string, string | undefined][] = [
-    ['top-left', setup.headerLeft],
-    ['top-center', setup.headerCenter],
-    ['top-right', setup.headerRight],
-    ['bottom-left', setup.footerLeft],
-    ['bottom-center', setup.footerCenter],
-    ['bottom-right', setup.footerRight],
-  ];
-  const marginBoxes = boxes
-    .map(([box, raw]) => {
-      const content = headerFieldToCssContent(raw ?? '', ctx);
-      if (!content) return '';
-      return `@${box} { content: ${content}; font-size: 9pt; color: #555; white-space: pre; }`;
-    })
-    .filter(Boolean)
-    .join(' ');
-  const base = `@page { size: ${size}; margin: ${m.top} ${m.right} ${m.bottom} ${m.left};`;
-  return marginBoxes ? `${base} ${marginBoxes} }` : `${base} }`;
 }
 
 /** Snapshot of one cell ready to render. We collect into an intermediate map
