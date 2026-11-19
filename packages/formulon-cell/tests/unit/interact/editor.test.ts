@@ -1739,6 +1739,18 @@ describe('InlineEditor', () => {
       surface.cancel();
     });
 
+    it('notifies once per commit on a protected cell, with no console warning besides', () => {
+      const { onValidation, surface } = openGuarded();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      setProtectedSheet(store, 0, true);
+
+      surface.commit('none');
+      expect(onValidation).toHaveBeenCalledTimes(1);
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+      surface.cancel();
+    });
+
     it('words a failed write through the localized refusal path', () => {
       const { onValidation, surface } = openGuarded();
       wb.setText = () => {
@@ -2044,7 +2056,10 @@ describe('InlineEditor', () => {
 
       expect(fillEditor.isActive()).toBe(true);
       expect(onValidation).toHaveBeenCalledWith(
-        expect.objectContaining({ severity: 'stop', message: expect.stringContaining('100,000') }),
+        expect.objectContaining({
+          severity: 'stop',
+          refusal: expect.objectContaining({ reasonKey: 'tooManyCellsChanged' }),
+        }),
       );
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
       dispose();

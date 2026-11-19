@@ -33,6 +33,8 @@ export const permissionReasonsKo: PermissionReasonsStrings = {
     operationDenied: '이 작업은 허용되지 않습니다.',
     affectedRangeMalformed: '영향을 받는 범위가 올바르지 않습니다.',
     affectedRangeTooLarge: '영향을 받는 범위가 너무 큽니다.',
+    tooManyCellsChanged:
+      '이 작업이 너무 많은 셀을 변경할 수 있습니다. 더 작은 범위를 선택하고 다시 시도하세요.',
     hostCopyDisabled: '호스트 정책에 따라 복사가 비활성화되어 있습니다.',
     boundedViewportStructural: '표시 영역이 제한되어 있어 이 구조 변경 작업은 사용할 수 없습니다.',
     restrictedEmbedding: '제한된 임베딩에서는 사용할 수 없습니다.',

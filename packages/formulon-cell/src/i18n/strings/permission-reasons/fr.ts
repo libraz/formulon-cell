@@ -36,6 +36,8 @@ export const permissionReasonsFr: PermissionReasonsStrings = {
     operationDenied: "Cette opération n'est pas autorisée.",
     affectedRangeMalformed: "La plage concernée n'est pas valide.",
     affectedRangeTooLarge: 'La plage concernée est trop grande.',
+    tooManyCellsChanged:
+      'Cette action modifierait un trop grand nombre de cellules. Sélectionnez un ensemble plus petit de cellules et réessayez.',
     hostCopyDisabled: "La copie est désactivée par la stratégie de l'hôte.",
     boundedViewportStructural:
       "Cette opération structurelle n'est pas disponible avec une zone d'affichage limitée.",

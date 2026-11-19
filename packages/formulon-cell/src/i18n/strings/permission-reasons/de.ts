@@ -36,6 +36,8 @@ export const permissionReasonsDe: PermissionReasonsStrings = {
     operationDenied: 'Dieser Vorgang ist nicht zulässig.',
     affectedRangeMalformed: 'Der betroffene Bereich ist ungültig.',
     affectedRangeTooLarge: 'Der betroffene Bereich ist zu groß.',
+    tooManyCellsChanged:
+      'Hierdurch würden zu viele Zellen geändert. Wählen Sie einen kleineren Bereich aus, und versuchen Sie es noch mal.',
     hostCopyDisabled: 'Das Kopieren ist durch die Richtlinie des Hosts deaktiviert.',
     boundedViewportStructural:
       'Dieser strukturelle Vorgang ist bei einem begrenzten Anzeigebereich nicht verfügbar.',

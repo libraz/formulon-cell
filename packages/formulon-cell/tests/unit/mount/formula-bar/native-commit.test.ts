@@ -135,6 +135,40 @@ describe('mount/formula-bar — native commit result', () => {
     harness.detach();
   });
 
+  it('notifies once on a protected cell without a validation callback', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const harness = attachFormulaBarHarness(sheet, undefined);
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 0 });
+    harness.fxInput.focus();
+    harness.fxInput.dispatchEvent(new FocusEvent('focus'));
+    harness.fxInput.value = 'denied';
+    harness.fxInput.dispatchEvent(new Event('input'));
+    setProtectedSheet(sheet.instance.store, 0, true, { workbook: sheet.workbook });
+
+    expect(harness.controller.commitFx('none')).toBe(false);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+    harness.detach();
+  });
+
+  it('adds no console warning to the alert on a protected cell', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const onValidation = vi.fn();
+    const harness = attachFormulaBarHarness(sheet, onValidation);
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 0 });
+    harness.fxInput.focus();
+    harness.fxInput.dispatchEvent(new FocusEvent('focus'));
+    harness.fxInput.value = 'denied';
+    harness.fxInput.dispatchEvent(new Event('input'));
+    setProtectedSheet(sheet.instance.store, 0, true, { workbook: sheet.workbook });
+
+    expect(harness.controller.commitFx('none')).toBe(false);
+    expect(onValidation).toHaveBeenCalledTimes(1);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+    harness.detach();
+  });
+
   it('returns false for a protected default-mounted cell and keeps the edit state intact', () => {
     const onValidation = vi.fn();
     const harness = attachFormulaBarHarness(sheet, onValidation);

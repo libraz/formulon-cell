@@ -525,11 +525,19 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): Ch
 
   const resolved = resolveTransactionController(deps, action === 'all');
   if (resolved.mismatch)
-    return refusedBatch({ code: 'invalid', reason: 'the commands do not belong to this store' });
+    return refusedBatch({
+      code: 'invalid',
+      reason: 'the commands do not belong to this store',
+      reasonKey: 'codeInvalid',
+    });
   const plan = buildPlan(store, workbook);
   if (!plan) {
     if (resolved.ephemeral) resolved.controller?.dispose();
-    return refusedBatch({ code: 'invalid', reason: 'the selection cannot be cleared' });
+    return refusedBatch({
+      code: 'invalid',
+      reason: 'the selection cannot be cleared',
+      reasonKey: 'codeInvalid',
+    });
   }
 
   const controller = resolved.controller;

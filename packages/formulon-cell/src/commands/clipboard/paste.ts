@@ -57,7 +57,8 @@ export function pasteTSV(
     r1: origin.row + rows.length - 1,
     c1: origin.col + pastedCols - 1,
   };
-  if (!rangeWritable(state, pasteArea)) return refusedBatch({ code: 'protected' });
+  if (!rangeWritable(state, pasteArea))
+    return refusedBatch({ code: 'protected', reasonKey: 'codeProtected' });
   if (blockPivotEdit(wb, pasteArea, 'paste'))
     return refusedBatch({ code: 'protected', reason: pivotGuardAlert(wb, 'paste').message });
   if (blockDataTableEdit(wb, pasteArea))

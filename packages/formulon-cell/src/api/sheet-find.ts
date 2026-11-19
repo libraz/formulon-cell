@@ -7,6 +7,7 @@ import {
 import { coerceInput, inputLocaleForWorkbook, workbookDate1904 } from '../commands/coerce-input.js';
 import { applySubstitution, type FindOptions, matcherFor } from '../commands/find.js';
 import { appliedBatch, refusedBatch } from '../commands/interaction-policy.js';
+import { engineRefusalReasonKey } from '../commands/permission-reasons.js';
 import { isFormulonError } from '../engine/result.js';
 import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
 import type { ChangeBatchResult } from './change-batch.js';
@@ -196,6 +197,7 @@ function replaceAll(ctx: SheetContext, options: ReplaceCellsOptions): ChangeBatc
       addr: { sheet: sheet.index, row: at.row, col: at.col },
       code: 'invalid',
       reason: error.message,
+      reasonKey: engineRefusalReasonKey(error.parseError),
     });
   }
   const { changed } = tracked;

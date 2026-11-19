@@ -9,6 +9,7 @@ import {
 import { dataTableCellAmong, dataTableGuardAlert } from '../commands/data-table-guard.js';
 import type { CellBatchOperation } from '../commands/interaction-policy.js';
 import { mergeAt } from '../commands/merge.js';
+import type { RefusalLike } from '../commands/permission-reasons.js';
 import { isCellWritable } from '../commands/protection.js';
 import { normalizeR1C1Formula, shiftFormulaRefs } from '../commands/refs.js';
 import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
@@ -31,9 +32,11 @@ export interface SelectionInputBatch {
 
 const MAX_SELECTION_INPUT_CELLS = 100_000;
 
-/** Shown when {@link buildSelectionInputBatch} refuses a selection. */
-export const SELECTION_INPUT_LIMIT_MESSAGE =
-  'The selection cannot be filled together. A fill can include at most 100,000 unique cells.';
+/** The refusal shown when {@link buildSelectionInputBatch} refuses a selection. */
+export const SELECTION_INPUT_LIMIT_REFUSAL: RefusalLike = {
+  code: 'effectTooLarge',
+  reasonKey: 'tooManyCellsChanged',
+};
 
 const validRange = (range: Range): boolean =>
   Number.isSafeInteger(range.sheet) &&

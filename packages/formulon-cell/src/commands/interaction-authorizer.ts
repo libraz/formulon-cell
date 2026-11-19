@@ -486,7 +486,7 @@ export class InteractionAuthorizer {
       }
     } catch (error) {
       return error instanceof Error
-        ? { allowed: false, code: 'invalid', reason: error.message }
+        ? deny('invalid', 'restrictionCallbackFailed', { reason: error.message })
         : deny('invalid', 'restrictionCallbackFailed');
     }
     return decision;

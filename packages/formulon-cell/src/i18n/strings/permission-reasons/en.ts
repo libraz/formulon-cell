@@ -33,6 +33,7 @@ export const permissionReasonsEn: PermissionReasonsStrings = {
     operationDenied: 'This operation is not allowed.',
     affectedRangeMalformed: 'The affected range is invalid.',
     affectedRangeTooLarge: 'The affected range is too large.',
+    tooManyCellsChanged: 'This would change too many cells. Select a smaller range and try again.',
     hostCopyDisabled: 'Copying is disabled by the host policy.',
     boundedViewportStructural: 'This structural operation is unavailable with a bounded viewport.',
     restrictedEmbedding: 'Unavailable in restricted embedding.',

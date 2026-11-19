@@ -236,9 +236,13 @@ export class InteractionController {
 
   execute(command: CellBatchCommand): ChangeBatchResult {
     if (this.disposed)
-      return this.rejectResult([{ code: 'invalid', reason: 'controller is disposed' }]);
+      return this.rejectResult([
+        { code: 'invalid', reason: 'controller is disposed', reasonKey: 'controllerDisposed' },
+      ]);
     if (command.type !== 'cellBatch' || !CELL_OPERATIONS.has(command.operation)) {
-      return this.rejectResult([{ code: 'invalid', reason: 'unknown cell batch command' }]);
+      return this.rejectResult([
+        { code: 'invalid', reason: 'unknown cell batch command', reasonKey: 'codeInvalid' },
+      ]);
     }
     if (command.changes.length === 0) return appliedBatch([], null);
 
@@ -246,7 +250,9 @@ export class InteractionController {
     try {
       wb = this.getWb();
     } catch {
-      return this.rejectResult([{ code: 'invalid', reason: 'workbook is unavailable' }]);
+      return this.rejectResult([
+        { code: 'invalid', reason: 'workbook is unavailable', reasonKey: 'workbookUnavailable' },
+      ]);
     }
     const state = this.store.getState();
     const inputLocale = inputLocaleForWorkbook(wb);
@@ -349,13 +355,17 @@ export class InteractionController {
     options: ApplyChangesOptions = {},
   ): ChangeBatchResult {
     if (this.disposed)
-      return this.rejectResult([{ code: 'invalid', reason: 'controller is disposed' }]);
+      return this.rejectResult([
+        { code: 'invalid', reason: 'controller is disposed', reasonKey: 'controllerDisposed' },
+      ]);
     if (changes.length === 0) return this.emptyResult();
     let wb: WorkbookHandle;
     try {
       wb = this.getWb();
     } catch {
-      return this.rejectResult([{ code: 'invalid', reason: 'workbook is unavailable' }]);
+      return this.rejectResult([
+        { code: 'invalid', reason: 'workbook is unavailable', reasonKey: 'workbookUnavailable' },
+      ]);
     }
     const state = this.store.getState();
     const inputLocale = inputLocaleForWorkbook(wb);
@@ -373,7 +383,11 @@ export class InteractionController {
         );
         change = { ...hostChange, addr } as CellChangeInput;
       } catch (error) {
-        rejections.push({ code: 'invalid', reason: (error as Error).message });
+        rejections.push({
+          code: 'invalid',
+          reason: (error as Error).message,
+          reasonKey: 'codeInvalid',
+        });
         continue;
       }
       // Host refreshes address the physical workbook and may intentionally
@@ -485,24 +499,55 @@ export class InteractionController {
       !Number.isInteger(addr.row) ||
       !Number.isInteger(addr.col)
     ) {
-      return { rejection: { addr, code: 'invalid', reason: 'cell address must be integral' } };
+      return {
+        rejection: {
+          addr,
+          code: 'invalid',
+          reason: 'cell address must be integral',
+          reasonKey: 'codeInvalid',
+        },
+      };
     }
     if (addr.sheet < 0 || addr.row < 0 || addr.col < 0) {
-      return { rejection: { addr, code: 'outOfBounds', reason: 'cell address is negative' } };
+      return {
+        rejection: {
+          addr,
+          code: 'outOfBounds',
+          reason: 'cell address is negative',
+          reasonKey: 'cellOutsideWorkbook',
+        },
+      };
     }
     if (!isWorkbookAddress(wb, addr)) {
-      return { rejection: { addr, code: 'outOfBounds', reason: 'cell is outside the workbook' } };
+      return {
+        rejection: {
+          addr,
+          code: 'outOfBounds',
+          reason: 'cell is outside the workbook',
+          reasonKey: 'cellOutsideWorkbook',
+        },
+      };
     }
     const merged = mergeCellsFor(state, addr);
     if (merged === null) {
       return {
-        rejection: { addr, code: 'effectTooLarge', reason: 'merged cell range exceeds the limit' },
+        rejection: {
+          addr,
+          code: 'effectTooLarge',
+          reason: 'merged cell range exceeds the limit',
+          reasonKey: 'mergedRangeTooLarge',
+        },
       };
     }
     const target = mergeAnchorFor(state, addr);
     if (!isWorkbookAddress(wb, target)) {
       return {
-        rejection: { addr, code: 'outOfBounds', reason: 'merge anchor is outside the workbook' },
+        rejection: {
+          addr,
+          code: 'outOfBounds',
+          reason: 'merge anchor is outside the workbook',
+          reasonKey: 'cellOutsideWorkbook',
+        },
       };
     }
     if (respectNavigationBounds) {
@@ -513,6 +558,7 @@ export class InteractionController {
             addr,
             code: 'outOfBounds',
             reason: 'cell or its merged anchor is outside the configured bounds',
+            reasonKey: 'cellOutsideBounds',
           },
         };
       }
@@ -528,7 +574,14 @@ export class InteractionController {
     if ('input' in change) {
       const input = coerceInputForCell(state, target, change.input, inputLocale, wb);
       if (input.kind === 'number' && !Number.isFinite(input.value)) {
-        return { rejection: { addr, code: 'invalid', reason: 'number value must be finite' } };
+        return {
+          rejection: {
+            addr,
+            code: 'invalid',
+            reason: 'number value must be finite',
+            reasonKey: 'codeInvalid',
+          },
+        };
       }
       const prepared = this.patchFromCoerced(target, input);
       const validation =
@@ -543,10 +596,24 @@ export class InteractionController {
     }
     const formula = change.formula === undefined ? null : change.formula;
     if (formula !== null && typeof formula !== 'string') {
-      return { rejection: { addr, code: 'invalid', reason: 'formula must be a string or null' } };
+      return {
+        rejection: {
+          addr,
+          code: 'invalid',
+          reason: 'formula must be a string or null',
+          reasonKey: 'codeInvalid',
+        },
+      };
     }
     if (change.value.kind === 'number' && !Number.isFinite(change.value.value)) {
-      return { rejection: { addr, code: 'invalid', reason: 'number value must be finite' } };
+      return {
+        rejection: {
+          addr,
+          code: 'invalid',
+          reason: 'number value must be finite',
+          reasonKey: 'codeInvalid',
+        },
+      };
     }
     const validation =
       directCellFormat(state, target)?.validation ?? validationAt(state.format, target);
@@ -900,7 +967,7 @@ export class InteractionController {
         ]);
       }
       const reason = error instanceof Error ? error.message : 'cell patch failed';
-      return this.rejectResult([{ code: 'invalid', reason }]);
+      return this.rejectResult([{ code: 'invalid', reason, reasonKey: 'valueNotWritten' }]);
     }
   }
 
@@ -950,7 +1017,7 @@ export class InteractionController {
 
   /** A refused batch writes nothing and reports the one refusal that decided it. */
   private rejectResult(rejected: readonly CellRefusal[]): ChangeBatchResult {
-    const result = refusedBatch(rejected[0] ?? { code: 'invalid' });
+    const result = refusedBatch(rejected[0] ?? { code: 'invalid', reasonKey: 'codeInvalid' });
     this.notifySubscribers(result);
     return result;
   }

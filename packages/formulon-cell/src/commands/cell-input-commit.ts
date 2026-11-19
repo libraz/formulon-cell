@@ -30,7 +30,7 @@ import { mergeAnchorFor, mergeCellsFor } from './interaction-effects.js';
 import type { FormulaSpan } from './interaction-policy.js';
 import type { RefusalLike } from './permission-reasons.js';
 import { pivotGuardAlert } from './pivot-guard.js';
-import { isCellWritable, warnProtected } from './protection.js';
+import { isCellWritable } from './protection.js';
 
 export type CellInputOperation = 'valueEdit' | 'formulaEdit';
 
@@ -199,12 +199,15 @@ export function commitCellInput({
       return {
         status: 'rejected',
         operation,
-        alert: { severity: 'stop', message: 'merged cell range exceeds the limit' },
+        alert: {
+          severity: 'stop',
+          message: 'merged cell range exceeds the limit',
+          refusal: { code: 'effectTooLarge', reasonKey: 'mergedRangeTooLarge' },
+        },
       };
     }
-    const protectedCell = mergeCells.find((cell) => !isCellWritable(state, cell));
-    if (protectedCell) {
-      warnProtected(protectedCell);
+    // The presenting surface raises the alert; the commit only refuses.
+    if (mergeCells.some((cell) => !isCellWritable(state, cell))) {
       return {
         status: 'rejected',
         operation,

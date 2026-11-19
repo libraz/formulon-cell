@@ -1088,7 +1088,11 @@ const fillBatch = (wb: WorkbookHandle, fill: () => Range | null): ChangeBatchRes
   const { value, changed } = wb.trackChangedCells(fill);
   return value
     ? appliedBatch(changed, value)
-    : refusedBatch({ code: 'invalid', reason: 'the fill wrote nothing' });
+    : refusedBatch({
+        code: 'invalid',
+        reason: 'the fill wrote nothing',
+        reasonKey: 'cellsNotFilled',
+      });
 };
 
 /** Shared "Fill" ribbon split-button action. Covers flash-fill, directional

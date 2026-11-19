@@ -45,6 +45,7 @@ export const PERMISSION_REASONS = {
   cellsNotFilled: 'the selected cells could not be filled',
   affectedRangeMalformed: 'affected range is malformed',
   affectedRangeTooLarge: 'affected range exceeds the authorization bound',
+  tooManyCellsChanged: 'the selection holds more cells than one entry can fill',
   hostCopyDisabled: 'Copy is disabled by the host policy.',
   boundedViewportStructural: 'This structural operation is unavailable with a bounded viewport.',
   restrictedEmbedding: 'Unavailable in restricted embedding',

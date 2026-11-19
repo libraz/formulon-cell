@@ -700,7 +700,11 @@ const pasteBatch = (
   const { value, changed } = wb.trackChangedCells(paste);
   return value
     ? appliedBatch(changed, value.writtenRange)
-    : refusedBatch({ code: 'invalid', reason: 'the paste was refused' });
+    : refusedBatch({
+        code: 'invalid',
+        reason: 'the paste was refused',
+        reasonKey: 'codeInvalid',
+      });
 };
 
 /**

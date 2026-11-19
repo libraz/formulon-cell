@@ -33,6 +33,8 @@ export const permissionReasonsJa: PermissionReasonsStrings = {
     operationDenied: 'この操作は許可されていません。',
     affectedRangeMalformed: '対象の範囲が無効です。',
     affectedRangeTooLarge: '対象の範囲が大きすぎます。',
+    tooManyCellsChanged:
+      'この操作で変更されるセルの数が多すぎます。選ぶ範囲を小さくして、もう一度お試しください。',
     hostCopyDisabled: 'ホストのポリシーによりコピーは無効になっています。',
     boundedViewportStructural: '表示範囲が制限されているため、この構造変更は使用できません。',
     restrictedEmbedding: '制限された埋め込み環境では使用できません。',

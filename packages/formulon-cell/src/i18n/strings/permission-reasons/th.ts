@@ -33,6 +33,7 @@ export const permissionReasonsTh: PermissionReasonsStrings = {
     operationDenied: 'ไม่อนุญาตให้ดำเนินการนี้',
     affectedRangeMalformed: 'ช่วงที่ได้รับผลกระทบไม่ถูกต้อง',
     affectedRangeTooLarge: 'ช่วงที่ได้รับผลกระทบใหญ่เกินไป',
+    tooManyCellsChanged: 'การดำเนินการนี้จะเปลี่ยนแปลงเซลล์มากเกินไป ให้เลือกช่วงที่มีขนาดเล็กลงแล้วลองอีกครั้ง',
     hostCopyDisabled: 'การคัดลอกถูกปิดใช้งานโดยนโยบายของโฮสต์',
     boundedViewportStructural: 'ไม่สามารถใช้การดำเนินการเชิงโครงสร้างนี้ได้เมื่อพื้นที่แสดงผลถูกจำกัด',
     restrictedEmbedding: 'ไม่พร้อมใช้งานในการฝังที่ถูกจำกัด',

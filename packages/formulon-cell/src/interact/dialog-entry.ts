@@ -47,6 +47,7 @@ export const INSTANCE_API_COMMENT_ENTRY: DialogEntry = instanceApiEntry('newComm
 export const PASTE_SPECIAL_UNAVAILABLE: ChangeBatchResult = refusedBatch({
   code: 'invalid',
   reason: 'Paste Special is not available',
+  reasonKey: 'notBuiltInCommand',
 });
 
 /** The entry of a Paste Special open or apply through the public instance methods. */

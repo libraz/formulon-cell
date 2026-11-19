@@ -28,11 +28,13 @@ export const selectRange = (
 
 export const attachFormulaBarHarness = (
   sheet: MountedStubSheet,
-  onValidation: (outcome: {
-    severity: 'stop' | 'warning' | 'information';
-    title?: string;
-    message: string;
-  }) => void,
+  onValidation:
+    | ((outcome: {
+        severity: 'stop' | 'warning' | 'information';
+        title?: string;
+        message: string;
+      }) => void)
+    | undefined,
   store: SpreadsheetStore = sheet.instance.store,
   getWorkbook: () => WorkbookHandle = () => sheet.workbook,
   cancelBindingEditor: () => void = () => {},

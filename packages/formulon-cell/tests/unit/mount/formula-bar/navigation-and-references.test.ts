@@ -680,7 +680,7 @@ describe('mount/formula-bar — edit lifecycle', () => {
     expect(onValidation).toHaveBeenCalledWith(
       expect.objectContaining({
         severity: 'stop',
-        message: expect.stringContaining('100,000 unique cells'),
+        message: 'This would change too many cells. Select a smaller range and try again.',
       }),
     );
     expect(sheet.workbook.getValue(active)).toEqual({ kind: 'blank' });

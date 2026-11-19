@@ -75,7 +75,7 @@ import {
 } from './navigation-policy.js';
 import {
   buildSelectionInputBatch,
-  SELECTION_INPUT_LIMIT_MESSAGE,
+  SELECTION_INPUT_LIMIT_REFUSAL,
   writeSelectionInput,
 } from './selection-input.js';
 import { advanceAfterCommit, type CommitAdvance } from './selection-navigation.js';
@@ -490,7 +490,7 @@ export class InlineEditor {
     if (controller) {
       const batch = buildSelectionInputBatch(s, raw, anchor);
       if (!batch) {
-        this.deps.onValidation?.({ severity: 'stop', message: SELECTION_INPUT_LIMIT_MESSAGE });
+        this.deps.onValidation?.(refusalAlert(SELECTION_INPUT_LIMIT_REFUSAL));
         return;
       }
       const { changes, operation } = batch;
@@ -523,7 +523,7 @@ export class InlineEditor {
     }
     const written = writeSelectionInput(this.deps.wb, this.deps.store, s, raw, anchor);
     if (written.status === 'limitExceeded') {
-      this.deps.onValidation?.({ severity: 'stop', message: SELECTION_INPUT_LIMIT_MESSAGE });
+      this.deps.onValidation?.(refusalAlert(SELECTION_INPUT_LIMIT_REFUSAL));
       return;
     }
     if (written.status === 'rejected') {

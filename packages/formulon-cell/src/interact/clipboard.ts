@@ -472,7 +472,11 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     const state = store.getState();
     const internal = liveInternalFor(state, text);
     const none = {
-      result: refusedBatch({ code: 'invalid', reason: 'the paste was refused' }),
+      result: refusedBatch({
+        code: 'invalid',
+        reason: 'the paste was refused',
+        reasonKey: 'codeInvalid',
+      }),
       activation: null,
     };
     return pasteWrite(

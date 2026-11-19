@@ -543,6 +543,7 @@ export class SpreadsheetInstance {
     if (rows.length * width > MAX_CSV_CELLS) {
       return refusedBatch({
         code: 'effectTooLarge',
+        reasonKey: 'affectedRangeTooLarge',
         reason: `importCsv: ${rows.length * width} cells exceed the limit of ${MAX_CSV_CELLS}`,
       });
     }

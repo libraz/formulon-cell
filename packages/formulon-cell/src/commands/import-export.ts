@@ -96,7 +96,7 @@ export function importCSV(
   const refused = firstRefusedCell(state, rows, origin);
   if (refused) {
     warnProtected(refused);
-    return refusedBatch({ addr: refused, code: 'protected' });
+    return refusedBatch({ addr: refused, code: 'protected', reasonKey: 'codeProtected' });
   }
   const inputLocale = options.locale ?? inputLocaleForWorkbook(wb);
   const csvFormulas = rows

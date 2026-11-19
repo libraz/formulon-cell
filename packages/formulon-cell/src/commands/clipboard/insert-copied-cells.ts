@@ -72,7 +72,11 @@ const insertedBatch = (
   const { value, changed } = wb.trackChangedCells(insert);
   return value
     ? appliedBatch(changed, value.writtenRange)
-    : refusedBatch({ code: 'invalid', reason: 'the insertion was refused' });
+    : refusedBatch({
+        code: 'invalid',
+        reason: 'the insertion was refused',
+        reasonKey: 'codeInvalid',
+      });
 };
 
 /** Insert Copied (Cut) Cells of a block at the active cell, shifting cells `direction`. */

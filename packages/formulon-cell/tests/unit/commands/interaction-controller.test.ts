@@ -9,10 +9,15 @@ import {
   type InteractionPolicy,
   viewerPolicy,
 } from '../../../src/commands/interaction-policy.js';
+import {
+  localizedDecisionReason,
+  type RefusalLike,
+} from '../../../src/commands/permission-reasons.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { addrKey, MAX_COL, MAX_ROW } from '../../../src/engine/address.js';
 import { type Addr, type CellValue, type Range, ValueKind } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { dictionaries } from '../../../src/i18n/strings.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const A1 = { sheet: 0, row: 0, col: 0 } as const;
@@ -66,7 +71,7 @@ describe('InteractionController', () => {
     return { store, history, controller, workbook };
   }
 
-  const edit = (addr: typeof A1, input: string) => ({
+  const edit = (addr: { sheet: number; row: number; col: number }, input: string) => ({
     type: 'cellBatch' as const,
     operation: 'valueEdit' as const,
     origin: 'editor' as const,
@@ -87,6 +92,32 @@ describe('InteractionController', () => {
     expect(host.status).toBe('refused');
     expect(host.rejections[0]?.code).toBe('readOnly');
     expect(wb.getValue(A1)).toEqual({ kind: 'blank' });
+  });
+
+  it("gives the controller's own refusals a built-in reason key that localizes", async () => {
+    const { controller: service } = await createController();
+    const refusals = [
+      service.execute({
+        type: 'cellBatch',
+        operation: 'valueEdit',
+        origin: 'editor',
+        changes: [{ addr: A1, value: { kind: 'number', value: Number.NaN }, formula: null }],
+      }),
+      service.execute({ ...edit(A1, '1'), operation: 'bogus' as 'valueEdit' }),
+      service.execute(edit({ sheet: 0, row: -1, col: 0 }, '1')),
+      service.execute(edit({ sheet: 0, row: 1.5, col: 0 }, '1')),
+    ];
+    for (const result of refusals) {
+      const [rejection] = result.rejections;
+      expect(result.status).toBe('refused');
+      expect(rejection?.reasonKey).toBeDefined();
+      expect(localizedDecisionReason(rejection as RefusalLike, dictionaries.ja)).not.toBe(
+        rejection?.reason,
+      );
+    }
+    service.dispose();
+    const disposed = service.execute(edit(A1, '1')).rejections[0];
+    expect(disposed?.reasonKey).toBe('controllerDisposed');
   });
 
   it('keeps automatic hyperlink authorization to one non-formula cell and both write permissions', async () => {

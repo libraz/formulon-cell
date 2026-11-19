@@ -65,7 +65,7 @@ import {
 } from '../interact/navigation-policy.js';
 import {
   buildSelectionInputBatch,
-  SELECTION_INPUT_LIMIT_MESSAGE,
+  SELECTION_INPUT_LIMIT_REFUSAL,
   writeSelectionInput,
 } from '../interact/selection-input.js';
 import { advanceAfterCommit, type CommitAdvance } from '../interact/selection-navigation.js';
@@ -748,7 +748,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     const raw = correctTypedEntry(store, fxInput.value);
     const batch = buildSelectionInputBatch(state, raw, anchor);
     if (!batch) {
-      showCommitFailure(SELECTION_INPUT_LIMIT_MESSAGE);
+      showCommitFailure(localizedDecisionReason(SELECTION_INPUT_LIMIT_REFUSAL, getStrings()));
       return;
     }
     const controller = interactionControllerFor(store);
@@ -756,7 +756,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       // The direct path serves only hosts without a registered controller.
       const written = writeSelectionInput(wb(), store, state, raw, anchor);
       if (written.status === 'limitExceeded') {
-        showCommitFailure(SELECTION_INPUT_LIMIT_MESSAGE);
+        showCommitFailure(localizedDecisionReason(SELECTION_INPUT_LIMIT_REFUSAL, getStrings()));
         return;
       }
       if (written.status === 'rejected') {

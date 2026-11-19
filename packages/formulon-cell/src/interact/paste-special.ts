@@ -223,7 +223,11 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
     const state = store.getState();
     const destination = resolvePasteDestination(state, snap, transpose);
     if (destination && deferForAllowedRangeUnlock(store, [destination], retry)) {
-      return refusedBatch({ code: 'protected', reason: 'the destination waits for its password' });
+      return refusedBatch({
+        code: 'protected',
+        reason: 'the destination waits for its password',
+        reasonKey: 'cellProtected',
+      });
     }
     const ctx = { store, history, ...entry };
     const result = pasteBatchWrite(
@@ -232,7 +236,7 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
         ? { destination: null }
         : { destination, cutSource: snap.mode === 'cut' ? snap.range : null },
       () => {
-        let written = refusedBatch({ code: 'invalid' });
+        let written = refusedBatch({ code: 'invalid', reasonKey: 'codeInvalid' });
         recordFormatChange(history, store, () => {
           written = paste();
         });

@@ -32,6 +32,7 @@ export const permissionReasonsZh: PermissionReasonsStrings = {
     operationDenied: '不允许此操作。',
     affectedRangeMalformed: '受影响的区域无效。',
     affectedRangeTooLarge: '受影响的区域过大。',
+    tooManyCellsChanged: '此操作更改的单元格太多。请选择较小的区域，然后再试。',
     hostCopyDisabled: '宿主策略已禁用复制。',
     boundedViewportStructural: '在受限视口下无法进行此结构性操作。',
     restrictedEmbedding: '在受限的嵌入环境中不可用。',
