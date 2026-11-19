@@ -519,6 +519,13 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
     'block',
   ),
   shell(
+    'interact.macDefineNameDialog',
+    'interact/mac-define-name-dialog.ts',
+    'createMacDefineNameDialog',
+    'mac.namedRangeDialog',
+    'block',
+  ),
+  shell(
     'interact.macSlicerDialog',
     'interact/mac-slicer-dialog.ts',
     'attachMacSlicerDialog',

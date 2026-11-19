@@ -826,7 +826,11 @@ describe('interact/dialog-shell', () => {
   });
 
   it('keeps migrated dialog error/focus handling centralized in dialog-shell', () => {
-    for (const file of ['src/interact/hyperlink-dialog.ts', 'src/interact/named-range-dialog.ts']) {
+    for (const file of [
+      'src/interact/hyperlink-dialog.ts',
+      'src/interact/mac-define-name-dialog.ts',
+      'src/interact/named-range-dialog.ts',
+    ]) {
       const source = readFileSync(join(process.cwd(), file), 'utf8');
       expect(source).toContain('showDialogError(');
       expect(source).toContain('clearDialogError(');
@@ -921,6 +925,7 @@ describe('interact/dialog-shell', () => {
     for (const file of [
       'src/interact/comment-dialog.ts',
       'src/interact/format-dialog-view.ts',
+      'src/interact/mac-define-name-dialog.ts',
       'src/interact/named-range-dialog.ts',
       'src/interact/page-setup-dialog.ts',
       'src/interact/workbook-objects.ts',
