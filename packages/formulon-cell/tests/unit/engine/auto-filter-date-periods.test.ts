@@ -1,7 +1,8 @@
 import { DynamicFilterType, FilterKind } from '@libraz/formulon';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DATE_PERIODS } from '../../../src/commands/date-periods.js';
-import { applyConditionFilter, recordFilterChange } from '../../../src/commands/filter.js';
+import { applyConditionFilter } from '../../../src/commands/filter.js';
+import { recordFilterChange } from '../../../src/commands/filter-history.js';
 import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/address.js';
 import {

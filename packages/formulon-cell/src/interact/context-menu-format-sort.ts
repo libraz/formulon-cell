@@ -1,13 +1,12 @@
 import { formatHasContent } from '../commands/current-region.js';
 import {
   applyValueFilter,
-  distinctFilterItemsResult,
-  filterValueKey,
   inferAutoFilterRange,
   reapplyFilters,
   resetFilterCriteria,
 } from '../commands/filter.js';
 import { filterUseWrite } from '../commands/filter-actions.js';
+import { distinctFilterItemsResult, filterValueKey } from '../commands/filter-items.js';
 import { activeFilterRange } from '../commands/filter-ranges.js';
 import {
   cycleBorders,

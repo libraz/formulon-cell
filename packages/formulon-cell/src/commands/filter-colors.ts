@@ -1,9 +1,9 @@
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
-import { evaluateConditional } from '../render/conditional.js';
+import { type ConditionalCellOverlay, evaluateConditional } from '../render/conditional.js';
+import type { FilterColorSpec } from '../store/store.js';
 import type { ConditionalIconRef } from '../store/types/conditional-rule.js';
 import type { State } from '../store/types.js';
-import { cellColorKey, NO_COLOR } from './filter.js';
 
 /** What a column's "By color" pop-ups offer: the cell fills, font colours and conditional
  *  formatting icons its data rows show, each once, in row order, and whether a row has no fill
@@ -43,4 +43,35 @@ export function columnColorChoices(state: State, range: Range, col: number): Col
     noFill: fills.has(NO_COLOR),
     automaticFont: fonts.has(NO_COLOR),
   };
+}
+
+export const normalizeColorKey = (color: string): string => color.trim().toLocaleLowerCase();
+
+/** The colour key of a cell with no fill (No Fill) or no font colour of its own (Automatic). */
+export const NO_COLOR = 'none';
+
+/** The key a colour filter or sort level matches in a cell: its fill or font colour, lower-cased, or
+ *  `NO_COLOR` when it has none. */
+export const cellColorKey = (
+  fmt: { fill?: string; color?: string } | undefined,
+  kind: 'cellColor' | 'fontColor',
+): string => {
+  const actual = kind === 'cellColor' ? fmt?.fill : fmt?.color;
+  return actual ? normalizeColorKey(actual) : NO_COLOR;
+};
+
+export function colorMatches(
+  state: State,
+  sheet: number,
+  row: number,
+  col: number,
+  color: FilterColorSpec,
+  icons: ReadonlyMap<string, ConditionalCellOverlay> | null,
+): boolean {
+  const key = addrKey({ sheet, row, col });
+  if (color.kind === 'cellIcon') {
+    const overlay = icons?.get(key);
+    return overlay?.iconKind === color.icon.set && overlay.iconSlot === color.icon.slot;
+  }
+  return cellColorKey(state.format.formats.get(key), color.kind) === color.color;
 }

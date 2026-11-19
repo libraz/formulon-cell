@@ -2,12 +2,8 @@
 
 import { ComparisonOperator, type Value, ValueKind } from '@libraz/formulon';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  applyAdvancedFilter,
-  applyConditionFilter,
-  distinctFilterItems,
-  distinctFilterItemsResult,
-} from '../../src/commands/filter.js';
+import { applyAdvancedFilter, applyConditionFilter } from '../../src/commands/filter.js';
+import { distinctFilterItems, distinctFilterItemsResult } from '../../src/commands/filter-items.js';
 import { removeDuplicates, sortRange } from '../../src/commands/sort.js';
 import { hydrateAutoFilterFromEngine } from '../../src/engine/auto-filter-sync.js';
 import { WorkbookHandle } from '../../src/engine/workbook-handle.js';

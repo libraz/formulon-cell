@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { applyColorFilter, NO_COLOR, setAutoFilter } from '../../../src/commands/filter.js';
+import { applyColorFilter, setAutoFilter } from '../../../src/commands/filter.js';
+import { NO_COLOR } from '../../../src/commands/filter-colors.js';
 import { sortRange } from '../../../src/commands/sort.js';
 import { hydrateAutoFilterFromEngine } from '../../../src/engine/auto-filter-sync.js';
 import { hydrateLayoutFromEngine } from '../../../src/engine/layout-sync.js';

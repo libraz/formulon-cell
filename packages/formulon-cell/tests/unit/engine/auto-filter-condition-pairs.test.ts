@@ -1,6 +1,7 @@
 import { ComparisonOperator, DynamicFilterType, FilterKind } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
-import { applyConditionFilter, type ConditionFilterOptions } from '../../../src/commands/filter.js';
+import { applyConditionFilter } from '../../../src/commands/filter.js';
+import type { ConditionFilterOptions } from '../../../src/commands/filter-conditions.js';
 import { addrKey } from '../../../src/engine/address.js';
 import {
   autoFilterXmlFromState,

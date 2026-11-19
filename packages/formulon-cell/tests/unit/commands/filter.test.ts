@@ -8,13 +8,13 @@ import {
   applyValueFilter,
   clearFilter,
   copyAdvancedFilterResult,
-  distinctFilterItems,
   filterBySelectedCellValue,
   inferAutoFilterRange,
   reapplyFilters,
-  recordFilterChange,
   setAutoFilter,
 } from '../../../src/commands/filter.js';
+import { recordFilterChange } from '../../../src/commands/filter-history.js';
+import { distinctFilterItems } from '../../../src/commands/filter-items.js';
 import { History } from '../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {

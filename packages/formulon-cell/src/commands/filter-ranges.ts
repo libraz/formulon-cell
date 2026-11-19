@@ -96,3 +96,12 @@ export const hiddenFilterButtonTest =
   (state: Pick<State, 'ui' | 'data'>) =>
   (row: number, col: number): boolean =>
     filterButtonHidden(state, state.data.sheetIndex, row, col);
+
+const MAX_EXACT_FILTER_ROWS = 100_000;
+
+export const dataRowCount = (range: Range): number => Math.max(0, range.r1 - range.r0);
+
+export const canEvaluateFilterRange = (range: Range): boolean =>
+  dataRowCount(range) <= MAX_EXACT_FILTER_ROWS;
+
+export const rowInRange = (row: number, range: Range): boolean => row > range.r0 && row <= range.r1;

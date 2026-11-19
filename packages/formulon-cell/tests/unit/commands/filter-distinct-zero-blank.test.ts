@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { distinctFilterItems } from '../../../src/commands/filter.js';
+import { distinctFilterItems } from '../../../src/commands/filter-items.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 

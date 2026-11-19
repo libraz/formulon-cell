@@ -19,18 +19,15 @@ import {
   datePeriodOfDynamicType,
   datePeriodXmlType,
 } from '../commands/date-periods.js';
-import {
-  distinctValues,
-  isFilterComparisonOp,
-  NO_COLOR,
-  normalizeColorKey,
-} from '../commands/filter.js';
+import { NO_COLOR, normalizeColorKey } from '../commands/filter-colors.js';
+import { isFilterComparisonOp } from '../commands/filter-conditions.js';
 import {
   columnDateSerials,
   dateGroupItemsXml,
   dateGroupsForVisible,
   serialInDateGroups,
 } from '../commands/filter-date-groups.js';
+import { distinctValues } from '../commands/filter-items.js';
 import type { HiddenIndices } from '../store/row-visibility.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type {

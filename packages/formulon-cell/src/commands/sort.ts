@@ -18,13 +18,8 @@ import { recordCommentChange } from './comment.js';
 import { DEFAULT_COMMENT_AUTHOR } from './comment-author.js';
 import { allCustomLists } from './custom-lists.js';
 import { blockDataTableEdit } from './data-table-guard.js';
-import {
-  cellColorKey,
-  filterRangeForSort,
-  inferAutoFilterRange,
-  normalizeColorKey,
-  setFilterSort,
-} from './filter.js';
+import { filterRangeForSort, inferAutoFilterRange, setFilterSort } from './filter.js';
+import { cellColorKey, normalizeColorKey } from './filter-colors.js';
 import { filterRangeAt } from './filter-ranges.js';
 import { shiftFormulaRefs } from './formula-refs.js';
 import type { History } from './history.js';

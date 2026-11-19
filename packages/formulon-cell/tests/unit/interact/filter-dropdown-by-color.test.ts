@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { NO_COLOR } from '../../../src/commands/filter.js';
+import { NO_COLOR } from '../../../src/commands/filter-colors.js';
 import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/address.js';
 import { en } from '../../../src/i18n/strings.js';

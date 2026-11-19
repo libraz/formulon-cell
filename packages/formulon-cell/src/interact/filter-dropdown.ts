@@ -14,18 +14,21 @@ import {
   applyColorFilter,
   applyConditionFilter,
   applyValueFilter,
-  type ConditionFilterOp,
-  type ConditionFilterOptions,
-  type DistinctFilterFailureReason,
-  distinctFilterItemsResult,
-  type FilterValueItem,
-  isFilterComparisonOp,
-  NO_COLOR,
   resetFilterCriteria,
 } from '../commands/filter.js';
 import { filterUseWrite } from '../commands/filter-actions.js';
-import { columnColorChoices } from '../commands/filter-colors.js';
+import { columnColorChoices, NO_COLOR } from '../commands/filter-colors.js';
+import {
+  type ConditionFilterOp,
+  type ConditionFilterOptions,
+  isFilterComparisonOp,
+} from '../commands/filter-conditions.js';
 import { columnDateSerials } from '../commands/filter-date-groups.js';
+import {
+  type DistinctFilterFailureReason,
+  distinctFilterItemsResult,
+  type FilterValueItem,
+} from '../commands/filter-items.js';
 import type { History } from '../commands/history.js';
 import { parseDateTimeInput } from '../commands/input-grammar.js';
 import { sortRangeWithHistory } from '../commands/sort.js';

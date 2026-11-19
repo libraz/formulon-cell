@@ -74,7 +74,7 @@ import type { CellRecord } from './cell-shift.js';
 import { isMacChrome } from './chrome-platform.js';
 import { applyPatchesAtomic } from './clipboard/apply-patches-atomic.js';
 import { alertDataTableEdit, axisEditSplitsDataTable } from './data-table-guard.js';
-import { recordFilterChange } from './filter.js';
+import { recordFilterChange } from './filter-history.js';
 import { filterVisibleRowRuns } from './filter-visible.js';
 import { collectAllFormulas, type FormulaRecord } from './formula-records.js';
 import { adjustFormulaForRowColEdit } from './formula-refs.js';

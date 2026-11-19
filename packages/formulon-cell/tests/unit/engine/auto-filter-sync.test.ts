@@ -6,10 +6,10 @@ import {
   applyConditionFilter,
   applyFilterColumns,
   applyValueFilter,
-  filterValueKey,
   reapplyFilters,
-  recordFilterChange,
 } from '../../../src/commands/filter.js';
+import { recordFilterChange } from '../../../src/commands/filter-history.js';
+import { filterValueKey } from '../../../src/commands/filter-items.js';
 import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/address.js';
 import {

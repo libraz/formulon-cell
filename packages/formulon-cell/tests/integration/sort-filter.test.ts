@@ -1,11 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import {
-  applyFilter,
-  clearFilter,
-  distinctValues,
-  setAutoFilter,
-} from '../../src/commands/filter.js';
+import { applyFilter, clearFilter, setAutoFilter } from '../../src/commands/filter.js';
+import { distinctValues } from '../../src/commands/filter-items.js';
 import { sortRange } from '../../src/commands/sort.js';
 import { mutators } from '../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../test-utils/index.js';

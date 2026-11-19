@@ -6,7 +6,7 @@ import {
   authorizedWriteOr,
   authorizeWrite,
 } from './authorized-write.js';
-import { recordFilterChange } from './filter.js';
+import { recordFilterChange } from './filter-history.js';
 import type { History } from './history.js';
 import type { InteractionOrigin, OperationEffect } from './interaction-policy.js';
 

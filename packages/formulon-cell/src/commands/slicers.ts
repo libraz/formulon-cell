@@ -5,12 +5,9 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SlicerSpec, type SpreadsheetStore } from '../store/store.js';
 import { authorizedWrite, authorizeWrite } from './authorized-write.js';
 import { drawingLocked } from './drawing-lock.js';
-import {
-  applyValueFilter,
-  distinctValues,
-  recordFilterChange,
-  resetFilterCriteria,
-} from './filter.js';
+import { applyValueFilter, resetFilterCriteria } from './filter.js';
+import { recordFilterChange } from './filter-history.js';
+import { distinctValues } from './filter-items.js';
 import { History } from './history.js';
 import type { OperationIntent } from './interaction-policy.js';
 import { type ObjectActionContext, objectChangeAllowed, objectIntents } from './object-actions.js';
