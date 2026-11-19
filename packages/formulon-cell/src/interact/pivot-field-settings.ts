@@ -4,7 +4,7 @@ import {
   workbookDate1904,
 } from '../commands/coerce-input.js';
 import { parseDateTimeInput } from '../commands/input-grammar.js';
-import type { PivotSourceField } from '../commands/pivot-table.js';
+import type { PivotSourceField } from '../commands/pivot-cache-source.js';
 import {
   PIVOT_SHOW_AS_BASE_NEXT,
   PIVOT_SHOW_AS_BASE_PREVIOUS,

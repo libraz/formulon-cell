@@ -1,7 +1,10 @@
 import { createAccessibilityStatus } from '../commands/accessibility-check.js';
 import { staleValuesMarked } from '../commands/error-indicators.js';
 import type { History } from '../commands/history.js';
-import { finishPivotReportUpdate, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
+import {
+  finishPivotReportUpdate,
+  refreshPivotReportsAfterEdit,
+} from '../commands/pivot-report-update.js';
 import type { PrinterProfile } from '../commands/printer-profile.js';
 import {
   clearSessionIllustration,

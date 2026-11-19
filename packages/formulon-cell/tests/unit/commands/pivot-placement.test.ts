@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
+import { refreshPivotReportsAfterEdit } from '../../../src/commands/pivot-report-update.js';
+import { executeRibbonPivotTableAction } from '../../../src/commands/pivot-ribbon-action.js';
 import {
   createPivotTableAtPlacement,
-  executeRibbonPivotTableAction,
   pivotSourceForSelection,
-  refreshPivotReportsAfterEdit,
 } from '../../../src/commands/pivot-table.js';
 import { setWorkbookStructureProtected } from '../../../src/commands/protection.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';

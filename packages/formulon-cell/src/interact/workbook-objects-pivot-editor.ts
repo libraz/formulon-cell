@@ -1,7 +1,8 @@
 import type { History } from '../commands/history.js';
 import { type PivotAuthorization, pivotReportRange } from '../commands/pivot-actions.js';
+import { pivotCacheFieldIsNumeric } from '../commands/pivot-cache-source.js';
 import { applyPivotEdit, type PivotEditField } from '../commands/pivot-edit.js';
-import { deletePivotTables, pivotCacheFieldIsNumeric } from '../commands/pivot-table.js';
+import { deletePivotTables } from '../commands/pivot-table.js';
 import { formatA1Cell, parseA1Atom } from '../engine/address.js';
 import type { PivotDefinition } from '../engine/pivot-definition.js';
 import {

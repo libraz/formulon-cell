@@ -6,12 +6,12 @@ import {
   pivotReportRange,
   pivotWrite,
 } from '../commands/pivot-actions.js';
+import { recreatePivotTable } from '../commands/pivot-recreate.js';
 import {
-  PIVOT_NEW_SHEET_ANCHOR,
-  recreatePivotTable,
   refreshPivotReportsAfterEdit,
   reloadSheetIfShown,
-} from '../commands/pivot-table.js';
+} from '../commands/pivot-report-update.js';
+import { PIVOT_NEW_SHEET_ANCHOR } from '../commands/pivot-table.js';
 import { addSheet, moveSheet } from '../commands/sheet-mutate.js';
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Range } from '../engine/types.js';

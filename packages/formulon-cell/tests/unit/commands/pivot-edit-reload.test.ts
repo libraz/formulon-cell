@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  createPivotTableFromRange,
-  refreshPivotReportsAfterEdit,
-} from '../../../src/commands/pivot-table.js';
+import { refreshPivotReportsAfterEdit } from '../../../src/commands/pivot-report-update.js';
+import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
 import { pivotStyleLayer } from '../../../src/engine/pivot-style.js';
 import { PivotAggregation } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';

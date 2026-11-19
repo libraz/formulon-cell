@@ -1,4 +1,4 @@
-import type { PivotSourceField } from '../commands/pivot-table.js';
+import type { PivotSourceField } from '../commands/pivot-cache-source.js';
 import type { PivotAggregation } from '../engine/types.js';
 import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
 import {

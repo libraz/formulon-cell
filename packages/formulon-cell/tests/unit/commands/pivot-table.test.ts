@@ -1,12 +1,12 @@
 import { type PivotWorksheetSourceInput, StatusCode } from '@libraz/formulon';
 import { describe, expect, it } from 'vitest';
 import {
-  createPivotTableFromRange,
-  executeRibbonPivotTableAction,
   refreshPivotCacheFromRange,
   refreshPivotTable,
   refreshPivotTableFromRange,
-} from '../../../src/commands/pivot-table.js';
+} from '../../../src/commands/pivot-cache-source.js';
+import { executeRibbonPivotTableAction } from '../../../src/commands/pivot-ribbon-action.js';
+import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
 import { formatA1Range } from '../../../src/engine/address.js';
 import {
   type CellValue,

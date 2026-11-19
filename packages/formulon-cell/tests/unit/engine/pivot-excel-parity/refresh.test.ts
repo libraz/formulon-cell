@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { refreshPivotTable } from '../../../../src/commands/pivot-table.js';
+import { refreshPivotTable } from '../../../../src/commands/pivot-cache-source.js';
 import { resolveXfForFormat } from '../../../../src/engine/cell-xf-writeback.js';
 import { formatCodeToNumFmt } from '../../../../src/engine/format-writeback.js';
 import { column, columnFormats, loadFixture, pivotGrid } from './fixture.js';

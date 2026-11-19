@@ -1,9 +1,9 @@
 import type { History } from '../commands/history.js';
+import type { PivotSourceField } from '../commands/pivot-cache-source.js';
 import {
   createPivotTableAtPlacement,
   nextPivotTableName,
   type PivotPlacement,
-  type PivotSourceField,
   pivotSourceForSelection,
   readPivotSource,
 } from '../commands/pivot-table.js';

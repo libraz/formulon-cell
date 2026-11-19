@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { PivotSourceField } from '../../../src/commands/pivot-table.js';
+import type { PivotSourceField } from '../../../src/commands/pivot-cache-source.js';
 import { PivotAggregation, PivotShowValuesAs } from '../../../src/engine/types.js';
 import { createPivotFieldAreas } from '../../../src/interact/pivot-table-field-areas.js';
 import { createDialogSelect } from '../../../src/toolbar/dialogs/form-controls.js';

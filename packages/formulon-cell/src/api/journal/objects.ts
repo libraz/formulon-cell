@@ -7,7 +7,7 @@ import type {
   TableStyleOptions,
 } from '@libraz/formulon';
 import { pivotFilterBlockRows } from '../../commands/pivot-actions.js';
-import { recreatePivotTable } from '../../commands/pivot-table.js';
+import { recreatePivotTable } from '../../commands/pivot-recreate.js';
 import { captureSlicerRestore } from '../../engine/slicer-sync.js';
 import type { Addr } from '../../engine/types.js';
 import type { CellSnapshot } from '../../engine/workbook-handle.js';

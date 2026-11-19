@@ -6,7 +6,7 @@ import { filterUseAllowed } from '../commands/filter-actions.js';
 import { activeFilterRange } from '../commands/filter-ranges.js';
 import type { History } from '../commands/history.js';
 import type { InteractionOperation } from '../commands/interaction-policy.js';
-import { refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
+import { refreshPivotReportsAfterEdit } from '../commands/pivot-report-update.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   autofitPivotTableColumns,
-  createPivotTableFromRange,
   refreshPivotReportsAfterEdit,
   settlePivotAnchor,
-} from '../../../src/commands/pivot-table.js';
+} from '../../../src/commands/pivot-report-update.js';
+import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
 import { buildPivotStyleLayer, pivotStyleLayer } from '../../../src/engine/pivot-style.js';
 import { PivotAggregation, PivotAxis } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';

@@ -1,9 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { restorePivotFieldLayout } from '../../../src/commands/pivot-edit.js';
-import {
-  createPivotTableFromRange,
-  recreatePivotTable,
-} from '../../../src/commands/pivot-table.js';
+import { recreatePivotTable } from '../../../src/commands/pivot-recreate.js';
+import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 
 const ROWS: (string | number)[][] = [

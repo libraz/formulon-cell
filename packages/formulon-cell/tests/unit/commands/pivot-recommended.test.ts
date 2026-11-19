@@ -1,9 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
-import {
-  createPivotTableFromRange,
-  executeRibbonPivotTableAction,
-} from '../../../src/commands/pivot-table.js';
+import { executeRibbonPivotTableAction } from '../../../src/commands/pivot-ribbon-action.js';
+import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
 import { PivotAxis } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';

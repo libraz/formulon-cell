@@ -1,10 +1,8 @@
 import '../../api/setup-dom.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { workbookHandleOf, workbookOf } from '../../../src/api/workbook.js';
-import {
-  createPivotTableFromRange,
-  executeRibbonPivotTableAction,
-} from '../../../src/commands/pivot-table.js';
+import { executeRibbonPivotTableAction } from '../../../src/commands/pivot-ribbon-action.js';
+import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
 import { PivotAggregation, PivotReportLayout } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { mount } from '../../../src/index.js';

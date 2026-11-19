@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { PivotSourceField } from '../../../src/commands/pivot-table.js';
+import type { PivotSourceField } from '../../../src/commands/pivot-cache-source.js';
 import { en } from '../../../src/i18n/strings.js';
 import { renderPivotFieldSettingsPanel } from '../../../src/interact/pivot-field-settings.js';
 import { createPivotFieldAreas } from '../../../src/interact/pivot-table-field-areas.js';

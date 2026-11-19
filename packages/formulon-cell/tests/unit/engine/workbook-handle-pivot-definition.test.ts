@@ -2,11 +2,9 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import {
-  createPivotTableFromRange,
-  executeRibbonPivotTableAction,
-  refreshPivotTable,
-} from '../../../src/commands/pivot-table.js';
+import { refreshPivotTable } from '../../../src/commands/pivot-cache-source.js';
+import { executeRibbonPivotTableAction } from '../../../src/commands/pivot-ribbon-action.js';
+import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
 import { PivotAggregation, PivotAxis, PivotReportLayout } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';

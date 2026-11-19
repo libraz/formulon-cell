@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
-import { createPivotTableFromRange, settlePivotAnchor } from '../../../src/commands/pivot-table.js';
+import { settlePivotAnchor } from '../../../src/commands/pivot-report-update.js';
+import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
 import { PivotAxis } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';

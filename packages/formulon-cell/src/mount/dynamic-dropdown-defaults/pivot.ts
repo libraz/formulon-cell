@@ -8,7 +8,7 @@ import {
   type PivotRef,
   pivotLayoutState,
 } from '../../commands/pivot-layout.js';
-import { refreshPivotReportsAfterEdit } from '../../commands/pivot-table.js';
+import { refreshPivotReportsAfterEdit } from '../../commands/pivot-report-update.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import { PivotReportLayout } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';

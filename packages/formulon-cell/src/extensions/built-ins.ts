@@ -19,7 +19,10 @@
 
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import type { History } from '../commands/history.js';
-import { finishPivotReportUpdate, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
+import {
+  finishPivotReportUpdate,
+  refreshPivotReportsAfterEdit,
+} from '../commands/pivot-report-update.js';
 import {
   clearSessionIllustration,
   duplicateSessionIllustration,

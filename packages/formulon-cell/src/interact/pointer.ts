@@ -32,7 +32,8 @@ import {
 import { movePageBreak, resizePrintArea, setPageSetup } from '../commands/page-setup.js';
 import { pageSetupWrite } from '../commands/page-setup-actions.js';
 import { paginationFor } from '../commands/pagination.js';
-import { pivotTableAtRange, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
+import { refreshPivotReportsAfterEdit } from '../commands/pivot-report-update.js';
+import { pivotTableAtRange } from '../commands/pivot-table.js';
 import { blockedByProtection, deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { layoutAllowed, layoutWrite } from '../commands/row-col-actions.js';
 import {

@@ -1,7 +1,7 @@
 import type { History } from '../commands/history.js';
 import { pivotFilterBlockRows } from '../commands/pivot-actions.js';
 import { keepingCollapsedItems } from '../commands/pivot-edit.js';
-import { refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
+import { refreshPivotReportsAfterEdit } from '../commands/pivot-report-update.js';
 import { addrKey } from '../engine/address.js';
 import { pivotItemText } from '../engine/pivot-cell-kind.js';
 import { PivotSortOrder } from '../engine/types.js';

@@ -19,7 +19,7 @@ import type {
 } from '../commands/interaction-policy.js';
 import { mergeAt } from '../commands/merge.js';
 import { pivotReportEffects, pivotWrite } from '../commands/pivot-actions.js';
-import { refreshPivotTable } from '../commands/pivot-table.js';
+import { refreshPivotTable } from '../commands/pivot-cache-source.js';
 import { deferForAllowedRangeUnlock, noteChangePermitted } from '../commands/protection.js';
 import { executeNoteVisibilityAction } from '../commands/ribbon-comment.js';
 import { runColumnWidthDialog, runRowHeightDialog } from '../commands/row-col-dimension.js';

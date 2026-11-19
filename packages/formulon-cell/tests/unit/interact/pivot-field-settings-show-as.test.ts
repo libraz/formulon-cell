@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { PivotSourceField } from '../../../src/commands/pivot-table.js';
+import type { PivotSourceField } from '../../../src/commands/pivot-cache-source.js';
 import {
   PIVOT_SHOW_AS_BASE_NEXT,
   PIVOT_SHOW_AS_BASE_PREVIOUS,

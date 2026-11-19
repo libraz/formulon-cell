@@ -4,7 +4,7 @@ import { hyperlinkAt, isFollowableHyperlinkTarget } from '../../commands/hyperli
 import {
   executeRibbonPivotTableAction,
   type RibbonPivotTableAction,
-} from '../../commands/pivot-table.js';
+} from '../../commands/pivot-ribbon-action.js';
 import {
   isCellWritable,
   runAfterAllowedRangeUnlock,

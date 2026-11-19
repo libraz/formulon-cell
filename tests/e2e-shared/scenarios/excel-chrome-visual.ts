@@ -154,7 +154,7 @@ const createChannelReport = (page: Page): Promise<void> =>
       { row: 0, col: 6 },
     );
     if (!made.ok) throw new Error(`pivot creation failed: ${made.reason}`);
-    w.__fcProbes['commands/pivot-table'].finishPivotReportUpdate(store, workbook);
+    w.__fcProbes['commands/pivot-report-update'].finishPivotReportUpdate(store, workbook);
     w.__fcInst.history.clear();
   });
 

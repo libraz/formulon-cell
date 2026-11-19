@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, type SpreadsheetInstance } from '../../../src/api/spreadsheet/instance.js';
 import { workbookHandleOf } from '../../../src/api/workbook.js';
 import { History } from '../../../src/commands/history.js';
-import { finishPivotReportUpdate } from '../../../src/commands/pivot-table.js';
+import { finishPivotReportUpdate } from '../../../src/commands/pivot-report-update.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
 import { openPivotOptions } from '../../../src/interact/pivot-options-dialog.js';

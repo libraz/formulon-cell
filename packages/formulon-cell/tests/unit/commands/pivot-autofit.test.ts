@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { computeAutofitColWidth } from '../../../src/commands/autofit-measurement.js';
-import {
-  autofitPivotTableColumns,
-  createPivotTableFromRange,
-} from '../../../src/commands/pivot-table.js';
+import { autofitPivotTableColumns } from '../../../src/commands/pivot-report-update.js';
+import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
 import { PivotAggregation } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';

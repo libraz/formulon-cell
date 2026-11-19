@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createPivotTableFromRange,
-  refreshPivotReportsAfterEdit,
-} from '../../../src/commands/pivot-table.js';
+import { refreshPivotReportsAfterEdit } from '../../../src/commands/pivot-report-update.js';
+import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
 import { addrKey } from '../../../src/engine/address.js';
 import { PIVOT_CELL_KIND } from '../../../src/engine/pivot-cell-kind.js';
 import { pivotStyleLayer } from '../../../src/engine/pivot-style.js';
