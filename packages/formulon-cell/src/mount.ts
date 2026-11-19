@@ -112,12 +112,7 @@ import {
   attachSheetTabsController,
   type SheetTabsController,
 } from './mount/sheet-tabs-controller.js';
-import {
-  type MountToolbarOptions,
-  mountToolbar,
-  type ToolbarInstance,
-  type ToolbarInstanceRef,
-} from './mount/toolbar.js';
+import { type MountToolbarOptions, mountToolbar, type ToolbarInstance } from './mount/toolbar.js';
 import type { MountOptions, ScreenClipResult, SpreadsheetInstance } from './mount/types.js';
 import { GridRenderer } from './render/grid.js';
 import { createSpreadsheetStore, mutators } from './store/store.js';
@@ -129,7 +124,6 @@ export type {
   MountToolbarOptions,
   RibbonDisplayMode,
   ToolbarInstance,
-  ToolbarInstanceRef,
 } from './mount/toolbar.js';
 export { RIBBON_HOST_MENU_FIRST_COMMANDS } from './mount/toolbar.js';
 export type {
@@ -192,7 +186,7 @@ function throwCleanupErrors(errors: unknown[]): void {
 export const Spreadsheet = {
   mountToolbar(
     host: HTMLElement,
-    instance: ToolbarInstanceRef,
+    instance: SpreadsheetInstance,
     opts: MountToolbarOptions,
   ): ToolbarInstance {
     return mountToolbar(host, instance, opts);

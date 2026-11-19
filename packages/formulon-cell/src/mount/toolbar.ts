@@ -274,17 +274,10 @@ export interface MountToolbarOptions {
   onCommand?: (id: string, applied: boolean) => void;
 }
 
-/** Either a directly held instance or a late-bound getter — useful when the
- *  spreadsheet mount is async and the toolbar shell needs to render its empty
- *  state synchronously. The getter is re-invoked on every dispatch so the
- *  toolbar always reaches the current instance. */
-export type ToolbarInstanceRef = SpreadsheetInstance | (() => SpreadsheetInstance | null);
-
 export interface ToolbarInstance {
   readonly host: HTMLElement;
-  /** The current spreadsheet instance, or `null` when mounted with a deferred
-   *  getter that hasn't been satisfied yet. */
-  readonly instance: SpreadsheetInstance | null;
+  /** The spreadsheet instance the toolbar was mounted on. */
+  readonly instance: SpreadsheetInstance;
   /** Full re-render of the ribbon shell. Costly — only call on topology
    *  changes (tab switch, collapse toggle, backstage open). State changes
    *  inside the active panel should ride on `instance.store.subscribe`. */
@@ -369,7 +362,7 @@ export function runRibbonCommand(instance: SpreadsheetInstance, id: string): boo
 
 export function mountToolbar(
   host: HTMLElement,
-  instance: ToolbarInstanceRef,
+  instance: SpreadsheetInstance,
   opts: MountToolbarOptions,
 ): ToolbarInstance {
   if (!host) throw new Error('Spreadsheet.mountToolbar: host element required');
@@ -377,17 +370,13 @@ export function mountToolbar(
     throw new Error('Spreadsheet.mountToolbar: instance ref required');
   }
 
-  const getInstance: () => SpreadsheetInstance | null =
-    typeof instance === 'function'
-      ? (instance as () => SpreadsheetInstance | null)
-      : () => instance;
-  const initialInstance = getInstance();
+  const getInstance = (): SpreadsheetInstance => instance;
   const previousPlatform = host.dataset.fcPlatform;
   const previousLanguage = host.getAttribute('lang');
   const inheritedPlatform =
     host.dataset.fcPlatform ??
     host.closest<HTMLElement>('.fc-host')?.dataset.fcPlatform ??
-    initialInstance?.host.dataset.fcPlatform;
+    instance.host.dataset.fcPlatform;
   const platformOverride = opts.platform !== undefined;
   const ribbonTabsOverride = opts.ribbonTabs !== undefined;
   let platform = resolveSpreadsheetPlatform(
@@ -399,15 +388,10 @@ export function mountToolbar(
     p === 'mac' ? EXCEL365_MAC_RIBBON_TABS : EXCEL365_STANDARD_RIBBON_TABS;
   let defaultRibbonTabs: readonly RibbonTab[] = opts.ribbonTabs ?? platformRibbonTabs(platform);
 
-  // Probe once at mount-time for language inference and the initial subscribe.
-  // The toolbar continues to work if the probe returns null (deferred mount);
-  // in that case lang falls back to opts.lang or 'ja' and the store subscription
-  // is attached lazily on the first call to `attachStoreSubscription`.
   const unregisterOverlayOwner = registerOverlayOwner(host, () => getInstance()?.host ?? null);
 
   const langOverride = opts.lang;
-  let lang: ToolbarLang =
-    opts.lang ?? (initialInstance ? toolbarLangForLocale(initialInstance.i18n.locale) : 'ja');
+  let lang: ToolbarLang = opts.lang ?? toolbarLangForLocale(instance.i18n.locale);
   host.lang = lang;
   const screenTips = attachRibbonScreenTips({
     host,
@@ -1222,12 +1206,7 @@ export function mountToolbar(
     { event: 'mousedown', capture: false },
   );
 
-  // Re-project active-state on any store mutation. When the toolbar is
-  // mounted with a deferred getter we may not have an instance yet — track
-  // the last subscribed instance and re-bind whenever the getter starts
-  // returning a different one. The caller is expected to trigger at least one
-  // `tb.rerender()` after `getInstance()` becomes non-null so the binding
-  // attaches; in practice playground does this in its boot path.
+  // Re-project active-state on any store mutation.
   let unsubStore: (() => void) | null = null;
   let unsubPolicy: (() => void) | null = null;
   let unsubFunctionHistory: (() => void) | null = null;
@@ -1245,11 +1224,15 @@ export function mountToolbar(
     if (opts.menuText === undefined) menuText = toolbarMenuText(lang);
     displayOptionsText = ribbonDisplayText(lang);
     rebuildLocalizedDefaults();
+    renderApi.dispose();
     renderApi = createRibbonRenderer();
     renderToolbar();
   };
   const ensureStoreSubscription = (): void => {
-    if (syncInstanceDefaults()) renderApi = createRibbonRenderer();
+    if (syncInstanceDefaults()) {
+      renderApi.dispose();
+      renderApi = createRibbonRenderer();
+    }
     const current = getInstance();
     if (current === subscribedInstance) {
       syncInheritedPlatform(current);
@@ -1358,6 +1341,7 @@ export function mountToolbar(
       return dropdownsApi;
     },
     dispose: () => {
+      renderApi.dispose();
       screenTips.detach();
       ribbonFit.detach();
       unregisterOverlayOwner();

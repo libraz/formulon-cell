@@ -149,3 +149,39 @@ describe('Mac Home cell styles gallery responsive states', () => {
     ).toContain('display: none');
   });
 });
+
+describe('Mac Home cell styles gallery teardown', () => {
+  it('stops listening to the store once the owner disposes it', async () => {
+    const store = createSpreadsheetStore();
+    let live = 0;
+    const subscribe = store.subscribe.bind(store);
+    store.subscribe = ((listener: Parameters<typeof subscribe>[0]) => {
+      live += 1;
+      const off = subscribe(listener);
+      return () => {
+        live -= 1;
+        off();
+      };
+    }) as typeof store.subscribe;
+    const inst = {
+      host: document.createElement('div'),
+      store,
+      history: new History(),
+      workbook: null,
+    } as unknown as SpreadsheetInstance;
+    const gallery = createMacCellStylesGallery({
+      lang: 'ja',
+      getInst: () => inst,
+      arrow: document.createElement('button'),
+      menu: null,
+    });
+    document.body.appendChild(gallery);
+    await Promise.resolve();
+    expect(live).toBe(1);
+    gallery.dispose();
+    expect(live).toBe(0);
+    gallery.dispose();
+    expect(live).toBe(0);
+    gallery.remove();
+  });
+});

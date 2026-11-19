@@ -211,6 +211,8 @@ export interface RenderRibbonCtx {
 
 export interface RenderRibbonApi {
   renderRibbon: () => void;
+  /** Releases what the rendered ribbon holds outside its DOM (store subscriptions). */
+  dispose: () => void;
   playgroundFeatureFlags: () => FeatureFlags;
   legacyCommandIds: Record<string, string>;
   RIBBON_SPLIT_BUTTON_COMMANDS: ReadonlySet<string>;
@@ -475,9 +477,16 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
     return () => factory(commandId, { mac: profile === 'excel365Mac' });
   };
 
+  let stripDisposers: Array<() => void> = [];
+  const dispose = (): void => {
+    for (const release of stripDisposers) release();
+    stripDisposers = [];
+  };
+
   const renderRibbon = (): void => {
     const ribbonRoot = ctx.ribbonRoot;
     if (!ribbonRoot) return;
+    dispose();
     const ribbonText = ctx.ribbonText;
     const activeRibbonTab = ctx.state.getActiveTab();
     const ribbonDisplayMode = ctx.state.getDisplayMode();
@@ -590,14 +599,14 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
           const submenu = ribbonSubmenuFactoryFor(c.id, profile);
           if (profile === 'excel365Mac' && c.id === 'cellStyles') {
             // The Mac Home tab embeds the cell-styles gallery; the button becomes its more arrow.
-            tools.appendChild(
-              createMacCellStylesGallery({
-                lang: ctx.ribbonLang,
-                getInst: ctx.getInst,
-                arrow: b,
-                menu: submenu?.() ?? null,
-              }),
-            );
+            const gallery = createMacCellStylesGallery({
+              lang: ctx.ribbonLang,
+              getInst: ctx.getInst,
+              arrow: b,
+              menu: submenu?.() ?? null,
+            });
+            stripDisposers.push(gallery.dispose);
+            tools.appendChild(gallery);
             continue;
           }
           if (c.id === 'pivotQuickStyles') {
@@ -699,6 +708,7 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
 
   return {
     renderRibbon,
+    dispose,
     playgroundFeatureFlags,
     legacyCommandIds: LEGACY_COMMAND_IDS,
     RIBBON_SPLIT_BUTTON_COMMANDS: SPLIT_BUTTON_COMMANDS,

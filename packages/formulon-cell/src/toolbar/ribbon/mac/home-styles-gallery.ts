@@ -38,11 +38,16 @@ export interface MacCellStylesGalleryOptions {
   menu: HTMLElement | null;
 }
 
+/** The strip element; `dispose` releases its store subscription and is safe to call twice. */
+export type MacCellStylesGallery = HTMLDivElement & { dispose: () => void };
+
 /**
  * The Home tab's live cell-styles strip: the leading styles as swatches that
  * apply on click, with the cell-styles button as the more arrow.
  */
-export const createMacCellStylesGallery = (opts: MacCellStylesGalleryOptions): HTMLDivElement => {
+export const createMacCellStylesGallery = (
+  opts: MacCellStylesGalleryOptions,
+): MacCellStylesGallery => {
   const { lang, getInst, arrow, menu } = opts;
   const labels = dictionaries[lang].cellStylesGallery.styles;
   const wrap = document.createElement('div');
@@ -102,6 +107,7 @@ export const createMacCellStylesGallery = (opts: MacCellStylesGalleryOptions): H
   };
   syncActive();
   const inst = getInst();
+  let dispose = (): void => {};
   if (inst) {
     // The ribbon re-renders often; drop the subscription once this strip has left the page.
     // The strip is attached by its caller right after creation, so the first check waits a tick.
@@ -114,10 +120,14 @@ export const createMacCellStylesGallery = (opts: MacCellStylesGalleryOptions): H
       settled = true;
       if (!wrap.isConnected) unsubscribe();
     });
+    dispose = () => {
+      dispose = () => {};
+      unsubscribe();
+    };
   }
 
   arrow.classList.add('fc-tb__cellstyle-gallery-arrow');
   wrap.append(grid, arrow);
   if (menu) wrap.appendChild(menu);
-  return wrap;
+  return Object.assign(wrap, { dispose: () => dispose() });
 };
