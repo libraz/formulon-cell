@@ -31,7 +31,6 @@ import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { bodyBandOrigin, layoutForView, rangeRects } from '../render/geometry.js';
 import { selectionRangeList } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { showDimensionDialog } from '../toolbar/dialogs/dimension.js';
@@ -64,7 +63,7 @@ import type {
 } from './context-menu-options.js';
 import { createContextMenuPermissions } from './context-menu-permissions.js';
 import { pivotMenuTarget, runContextMenuPivotItem } from './context-menu-pivot.js';
-import { placeMacMenu } from './context-menu-placement.js';
+import { keyboardMenuPoint, placeMacMenu, placeSubmenu } from './context-menu-placement.js';
 import {
   buildCellEntries,
   buildColEntries,
@@ -96,16 +95,11 @@ import { openCommentDialogFrom } from './dialog-entry.js';
 import { focusSheet } from './dialog-focus.js';
 import { withDialogAnchor } from './dialog-placement.js';
 import { overlayPortalFor } from './overlay-portal.js';
-import { panelSize, placePanel, VIEWPORT_PANEL_PAD, viewportSize } from './overlay-position.js';
+import { placePanel } from './overlay-position.js';
 import { createPivotNumberFormatPicker } from './pivot-field-settings-dialog.js';
 
-/** Distance from a Mac submenu's top edge to the centre of its first row. */
-const MAC_SUB_ROW_CENTER = 18;
 /** Grace period before a submenu closes, so the pointer can cross sibling rows into it. */
 const SUBMENU_CLOSE_DELAY_MS = 260;
-/** How far a non-Mac submenu overlaps its parent row horizontally and sits above it. */
-const SUB_OVERLAP_PX = 2;
-const SUB_TOP_OFFSET_PX = 4;
 /** Parking spot for a panel being measured before it is placed. */
 const OFFSCREEN_PX = '-9999px';
 
@@ -495,17 +489,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     sub.style.display = 'block';
     sub.style.left = OFFSCREEN_PX;
     sub.style.top = OFFSCREEN_PX;
-    const r = parentBtn.getBoundingClientRect();
-    const { width: sw } = panelSize(sub);
-    const viewport = viewportSize(ownerDocument);
-    // The desktop submenu overlaps its parent by the panel padding and centres its
-    // first row on the parent row.
-    const mac = isMacPlatform();
-    let x = mac ? r.right : r.right - SUB_OVERLAP_PX;
-    if (x + sw > viewport.width - VIEWPORT_PANEL_PAD) {
-      x = mac ? r.left - sw : r.left - sw + SUB_OVERLAP_PX;
-    }
-    placePanel(sub, x, mac ? r.top + r.height / 2 - MAC_SUB_ROW_CENTER : r.top - SUB_TOP_OFFSET_PX);
+    placeSubmenu(sub, parentBtn.getBoundingClientRect(), isMacPlatform());
     openSub = { id, parentBtn };
     parentBtn.setAttribute('aria-expanded', 'true');
     parentBtn.classList.add('fc-ctxmenu__item--open');
@@ -901,7 +885,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     if (e.key !== 'ContextMenu' && !(e.key === 'F10' && e.shiftKey)) return;
     e.preventDefault();
     const active = store.getState().selection.active;
-    const { x, y } = keyboardMenuPoint();
+    const { x, y } = keyboardMenuPoint(store.getState(), hitHost);
     show(
       x,
       y,
@@ -911,67 +895,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       },
       e,
     );
-  };
-
-  /** Position keyboard-opened menus from the active cell's visible geometry.
-   *  The cell layout is local to the grid; the host rect converts it to client
-   *  coordinates before the shared overlay positioning handles clamping and
-   *  any transformed portal. */
-  const keyboardMenuPoint = (): { x: number; y: number } => {
-    const state = store.getState();
-    const layout = layoutForView(state);
-    const viewport = state.viewport;
-    const gridRect = hitHost.getBoundingClientRect();
-    const fallback = (): { x: number; y: number } => {
-      const origin = bodyBandOrigin(layout, viewport);
-      return { x: gridRect.left + origin.x, y: gridRect.top + origin.y };
-    };
-
-    if (
-      !Number.isFinite(gridRect.left) ||
-      !Number.isFinite(gridRect.top) ||
-      gridRect.width <= 0 ||
-      gridRect.height <= 0
-    ) {
-      return fallback();
-    }
-
-    const active = state.selection.active;
-    if (active.sheet !== state.data.sheetIndex) return fallback();
-
-    const activeRange = {
-      r0: active.row,
-      r1: active.row,
-      c0: active.col,
-      c1: active.col,
-    };
-    const merge = mergeAt(state, active);
-    const fragments = rangeRects(layout, viewport, merge ?? activeRange).filter(
-      (rect) => rect.w > 0 && rect.h > 0,
-    );
-    if (fragments.length === 0) return fallback();
-
-    // `rangeRects` clips to the viewport, so this stays bounded for a far-away row.
-    const activeCell = merge
-      ? rangeRects(layout, viewport, activeRange).find((rect) => rect.w > 0 && rect.h > 0)
-      : fragments[0];
-
-    const fragment = activeCell
-      ? fragments.find(
-          (rect) =>
-            activeCell.x + activeCell.w / 2 >= rect.x &&
-            activeCell.x + activeCell.w / 2 <= rect.x + rect.w &&
-            activeCell.y + activeCell.h / 2 >= rect.y &&
-            activeCell.y + activeCell.h / 2 <= rect.y + rect.h,
-        )
-      : undefined;
-    const visibleFragment = fragment ?? fragments[0];
-    if (!visibleFragment) return fallback();
-
-    return {
-      x: gridRect.left + visibleFragment.x + (layout.rtl ? visibleFragment.w : 0),
-      y: gridRect.top + visibleFragment.y + visibleFragment.h,
-    };
   };
 
   const insideMenu = (target: EventTarget | null): boolean =>
