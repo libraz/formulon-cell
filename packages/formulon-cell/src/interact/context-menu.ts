@@ -34,8 +34,12 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { selectionRangeList } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { showDimensionDialog } from '../toolbar/dialogs/dimension.js';
-import { isMenuItemDisabled, onPointerArrive, projectDisabledState } from '../toolbar/menu-a11y.js';
+import { isMenuItemDisabled, onPointerArrive } from '../toolbar/menu-a11y.js';
 import { canReadClipboard, createContextMenuClipboard } from './context-menu-clipboard.js';
+import {
+  createContextMenuDisabledState,
+  setContextMenuItemDisabled,
+} from './context-menu-disabled-state.js';
 import {
   contextItemIds,
   contextItemToRenderEntry,
@@ -264,8 +268,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   let activePivotAddr: Addr | null = null;
   let activeEvent: MouseEvent | KeyboardEvent | null = null;
   const activeItemSources = new Map<string, ContextMenuItem>();
-  let explicitDisabledSources = new WeakSet<ContextMenuItem>();
-  let policyDisabledSources = new WeakSet<ContextMenuItem>();
+  const disabledState = createContextMenuDisabledState({ decisionForItem, decisionReason });
 
   const cancelSubClose = (): void => {
     if (subCloseTimer != null) {
@@ -337,31 +340,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
 
   const isMacPlatform = (): boolean => isMacHost(host);
 
-  /** Disable a button on behalf of the host policy, remembering that the policy did it. */
-  const markPolicyDisabled = (
-    btn: HTMLButtonElement,
-    decision: ReturnType<typeof decisionForItem>,
-  ): void => {
-    btn.dataset.policyDisabled = 'true';
-    setContextMenuItemDisabled(btn, true, decisionReason(decision));
-  };
-
-  /** Disabled state for a plain item or a submenu parent built from `source`: an explicit
-   *  disable keeps its own reason, and a policy denial is remembered either way. */
-  const applySourceDisabledState = (
-    btn: HTMLButtonElement,
-    source: ContextMenuItem | undefined,
-  ): void => {
-    const gated = !!(source?.builtIn || source?.command);
-    if (source && explicitDisabledSources.has(source)) {
-      if (gated && !decisionForItem(source).allowed) btn.dataset.policyDisabled = 'true';
-      setContextMenuItemDisabled(btn, true, source.disabledReason ?? null);
-    } else if (source && gated) {
-      const decision = decisionForItem(source);
-      if (!decision.allowed) markPolicyDisabled(btn, decision);
-    }
-  };
-
   const activePanel = (): HTMLElement => (focusPanel === 'sub' ? sub : root);
 
   const panelItems = (panel: HTMLElement): HTMLButtonElement[] =>
@@ -404,36 +382,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       canExecute,
       permission: canExecute,
     };
-  };
-
-  const decorateContextItems = (items: readonly ContextMenuItem[]): ContextMenuItem[] =>
-    items.map((item) => {
-      const children = item.children ? decorateContextItems(item.children) : undefined;
-      if (item.disabled) {
-        const decorated = children ? { ...item, children } : item;
-        if (explicitDisabledSources.has(item)) explicitDisabledSources.add(decorated);
-        return decorated;
-      }
-      const decision = item.builtIn || item.command ? decisionForItem(item) : null;
-      if (decision && !decision.allowed) {
-        const decorated = {
-          ...item,
-          ...(children ? { children } : {}),
-          disabled: true,
-          disabledReason: decisionReason(decision) ?? undefined,
-        };
-        policyDisabledSources.add(decorated);
-        if (explicitDisabledSources.has(item)) explicitDisabledSources.add(decorated);
-        return decorated;
-      }
-      return children ? { ...item, children } : item;
-    });
-
-  const markExplicitDisabledSources = (items: readonly ContextMenuItem[]): void => {
-    for (const item of items) {
-      if (item.disabled && !policyDisabledSources.has(item)) explicitDisabledSources.add(item);
-      if (item.children) markExplicitDisabledSources(item.children);
-    }
   };
 
   const focusMenuItem = (idx: number): void => {
@@ -513,7 +461,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       const source = entry.source;
       if (source) activeItemSources.set(entry.id, source);
       const btn = createContextSubmenuButton(entry, ownerDocument);
-      applySourceDisabledState(btn, source);
+      disabledState.applySource(btn, source);
       onPointerArrive(btn, () => {
         if (isMenuItemDisabled(btn)) {
           if (panel === 'root' && openSub && openSub.parentBtn !== btn) scheduleSubClose();
@@ -540,7 +488,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     if (disabledIds.has(entry.id)) {
       setContextMenuItemDisabled(btn, true, strings.contextMenu.pasteSpecialRequiresCopiedCells);
     } else {
-      applySourceDisabledState(btn, source);
+      disabledState.applySource(btn, source);
     }
     btn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -600,7 +548,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       const pressed = pressedById[item.id];
       if (pressed !== undefined) btn.setAttribute('aria-pressed', String(pressed));
       const decision = decisionForItem(item.id);
-      if (!decision.allowed) markPolicyDisabled(btn, decision);
+      if (!decision.allowed) disabledState.markPolicyDisabled(btn, decision);
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -620,8 +568,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     root.replaceChildren();
     submenuChildren.clear();
     activeItemSources.clear();
-    explicitDisabledSources = new WeakSet<ContextMenuItem>();
-    policyDisabledSources = new WeakSet<ContextMenuItem>();
+    disabledState.reset();
     pasteBtnRef = null;
     const mac = isMacPlatform();
     const activeAddr = store.getState().selection.active;
@@ -732,7 +679,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         }),
     );
     const defaultItems = entries.map(menuEntryToContextItem);
-    let visibleItems = decorateContextItems(defaultItems);
+    let visibleItems = disabledState.decorate(defaultItems);
     const builtInOptions = options?.mode === 'builtIn' ? options : undefined;
     if (builtInOptions?.items) {
       visibleItems = selectBuiltInItems(visibleItems, new Set(builtInOptions.items));
@@ -752,7 +699,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     } else {
       visibleItems = sanitizeContextItems(visibleItems);
     }
-    markExplicitDisabledSources(visibleItems);
+    disabledState.markExplicit(visibleItems);
     if (composedContext) activeContext = composedContext;
     const renderEntries = visibleItems.map(contextItemToRenderEntry);
     const visibleRootIds = contextItemIds(visibleItems);
@@ -1022,16 +969,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         const source = id ? activeItemSources.get(id) : undefined;
         if (!id || (!source && !isBuiltinItemId(id))) continue;
         const decision = source ? decisionForItem(source) : decisionForItem(id as ItemId);
-        if (!decision.allowed) {
-          markPolicyDisabled(button, decision);
-        } else if (button.dataset.policyDisabled === 'true') {
-          delete button.dataset.policyDisabled;
-          if (source && explicitDisabledSources.has(source)) {
-            setContextMenuItemDisabled(button, true, source.disabledReason ?? null);
-          } else {
-            setContextMenuItemDisabled(button, false, null);
-          }
-        }
+        disabledState.refresh(button, source, decision);
       }
     }
   };
@@ -1348,14 +1286,4 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     hide();
   };
   return detach;
-}
-
-function setContextMenuItemDisabled(
-  button: HTMLButtonElement,
-  disabled: boolean,
-  reason: string | null,
-): void {
-  projectDisabledState(button, disabled, reason, {
-    datasetKey: 'disabledReason',
-  });
 }
