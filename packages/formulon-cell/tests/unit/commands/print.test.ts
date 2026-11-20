@@ -1084,3 +1084,23 @@ describe('end-of-sheet comments heading', () => {
     expect(html).not.toContain(en.pageSetup.comments);
   });
 });
+
+describe('buildPrintDocument merge extent', () => {
+  it('widens the printed table to the bottom-right of a merge past the last value cell', async () => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    setText(store, wb, 0, 0, 'A');
+    setText(store, wb, 2, 1, 'M');
+    // B3:D6 — bottom-right (row 5, col 3) lies beyond every value cell.
+    mutators.mergeRange(store, { sheet: 0, r0: 2, c0: 1, r1: 5, c1: 3 });
+
+    const doc = buildLocalDocument(wb, store, 0);
+    expect((doc.html.match(/<tr[\s>]/g) ?? []).length).toBe(6);
+    expect(doc.html).toContain('colspan="3"');
+    expect(doc.html).toContain('rowspan="4"');
+    // Row 0 renders A plus the blank columns up to D; the merge anchor row owns B..D.
+    const firstRow = doc.html.match(/<tr[\s>][\s\S]*?<\/tr>/)?.[0] ?? '';
+    expect((firstRow.match(/<td[\s>]/g) ?? []).length).toBe(4);
+    wb.dispose();
+  });
+});

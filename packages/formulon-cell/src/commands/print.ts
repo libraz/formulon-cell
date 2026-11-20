@@ -325,8 +325,6 @@ export function buildPrintDocument(
   const spanByAnchor = new Map<string, { rowspan: number; colspan: number }>();
   for (const [, range] of state.merges.byAnchor) {
     if (range.sheet !== sheet) continue;
-    if (range.r1 > maxRow) maxRow = range.r1;
-    if (range.c1 > maxCol) maxCol = range.c1;
     spanByAnchor.set(`${range.r0}:${range.c0}`, {
       rowspan: range.r1 - range.r0 + 1,
       colspan: range.c1 - range.c0 + 1,
