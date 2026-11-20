@@ -1,7 +1,12 @@
 import type { PivotDefinition } from '../engine/pivot-definition.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { PivotFilterSpec, Range } from '../engine/types.js';
-import { PivotAggregation, PivotAxis, PivotShowValuesAs, PivotSortOrder } from '../engine/types.js';
+import {
+  type PivotAggregation,
+  PivotAxis,
+  type PivotShowValuesAs,
+  PivotSortOrder,
+} from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -23,6 +28,7 @@ import {
   refreshFailure,
   writePivotCacheWorksheetSource,
 } from './pivot-cache-source.js';
+import { pivotFieldRoles, resolvePivotFieldPlan, valueFieldFormat } from './pivot-field-plan.js';
 import { recreatePivotTable } from './pivot-recreate.js';
 import { finishPivotReportUpdate, reloadSheetIfShown } from './pivot-report-update.js';
 import { addSheet, moveSheet, removeSheet } from './sheet-mutate.js';
@@ -34,20 +40,6 @@ export interface PivotFieldItemVisibility {
   itemName: string;
   visible: boolean;
 }
-
-/** Show-as kinds that yield a ratio; the desktop app formats them "0.00%". */
-const PERCENT_SHOW_AS: ReadonlySet<PivotShowValuesAs> = new Set([
-  PivotShowValuesAs.PercentOfRow,
-  PivotShowValuesAs.PercentOfCol,
-  PivotShowValuesAs.PercentOfTotal,
-  PivotShowValuesAs.PercentOf,
-  PivotShowValuesAs.PercentDifferenceFrom,
-  PivotShowValuesAs.PercentOfParentRow,
-  PivotShowValuesAs.PercentOfParentCol,
-  PivotShowValuesAs.PercentOfParent,
-  PivotShowValuesAs.PercentOfRunningTotal,
-]);
-const PERCENT_FORMAT = '0.00%';
 
 export interface PivotValueFieldSettings {
   fieldName: string;
@@ -160,65 +152,9 @@ export function createPivotTableFromRange(
     return { ok: false, reason };
   };
   const fields = pivotCacheSourceFields(wb, cacheId);
-  if (fields.length < 2) return refuse('invalid-range');
-  const byName = new Map(fields.map((f) => [f.name, f]));
-  const rowField = byName.get(opts.rowField);
-  const columnField = opts.columnField ? byName.get(opts.columnField) : undefined;
-  const filterFieldNames = Array.from(
-    new Set(
-      (opts.filterFields && opts.filterFields.length > 0
-        ? opts.filterFields
-        : opts.filterField
-          ? [opts.filterField]
-          : []
-      ).filter(Boolean),
-    ),
-  );
-  const filterFields = filterFieldNames.map((name) => byName.get(name));
-  const pivotFilterFields = new Set((opts.pivotFilters ?? []).map((filter) => filter.fieldName));
-  const valueFieldNames = Array.from(
-    new Set(
-      (opts.valueFields && opts.valueFields.length > 0
-        ? opts.valueFields
-        : [opts.valueField]
-      ).filter(Boolean),
-    ),
-  );
-  const valueFields = valueFieldNames.map((name) => byName.get(name));
-  const valueFieldSettings = new Map(
-    (opts.valueFieldSettings ?? []).map((settings) => [settings.fieldName, settings]),
-  );
-  const filterItemFields = new Set((opts.filterItems ?? []).map((item) => item.fieldName));
-  const emptyReport =
-    !opts.rowField &&
-    valueFieldNames.length === 0 &&
-    !opts.columnField &&
-    filterFieldNames.length === 0;
-  // Rows and columns with no values: the layout Recommended PivotTables inserts.
-  const layoutOnly =
-    rowField !== undefined && columnField !== undefined && valueFieldNames.length === 0;
-  if (
-    (!emptyReport && !layoutOnly && (!rowField || valueFields.length === 0)) ||
-    (opts.rowField && !rowField) ||
-    valueFields.some((field) => field === undefined) ||
-    (opts.columnField && !columnField) ||
-    filterFields.some((field) => field === undefined) ||
-    Array.from(filterItemFields).some((name) => !filterFieldNames.includes(name)) ||
-    Array.from(pivotFilterFields).some(
-      (name) => name !== rowField?.name && name !== columnField?.name,
-    ) ||
-    (rowField !== undefined && rowField.name === columnField?.name) ||
-    Array.from(valueFieldSettings.values()).some(
-      (settings) =>
-        settings.showAsBaseField !== undefined &&
-        settings.showAsBaseField !== rowField?.name &&
-        settings.showAsBaseField !== columnField?.name,
-    ) ||
-    filterFields.some((field) => field?.name === rowField?.name) ||
-    (columnField !== undefined && filterFields.some((field) => field?.name === columnField.name))
-  ) {
-    return refuse('invalid-field');
-  }
+  const plan = resolvePivotFieldPlan(fields, opts);
+  if (typeof plan === 'string') return refuse(plan);
+  const { rowField, columnField, filterFields, valueFields, valueFieldSettings } = plan;
 
   const pivotIndex = wb.createPivotTable(
     opts.destination.sheet,
@@ -249,15 +185,7 @@ export function createPivotTableFromRange(
 
   // Pivot field i binds to cache field i, so every cache field is added in
   // order; the ones the report does not use are then taken off their axis.
-  const roles = new Map<string, PivotAxis>();
-  if (rowField) roles.set(rowField.name, PivotAxis.Row);
-  if (columnField) roles.set(columnField.name, PivotAxis.Col);
-  for (const filterField of filterFields) {
-    if (filterField) roles.set(filterField.name, PivotAxis.Page);
-  }
-  for (const valueField of valueFields) {
-    if (valueField && !roles.has(valueField.name)) roles.set(valueField.name, PivotAxis.Value);
-  }
+  const roles = pivotFieldRoles(plan);
   const roleSteps = {
     [PivotAxis.Row]: 'row-field',
     [PivotAxis.Col]: 'col-field',
@@ -346,16 +274,7 @@ export function createPivotTableFromRange(
   for (const valueField of valueFields) {
     if (!valueField) return failAfterPivot('value-field');
     const settings = valueFieldSettings.get(valueField.name);
-    const aggregation =
-      settings?.aggregation ??
-      opts.aggregation ??
-      (valueField.numeric ? PivotAggregation.Sum : PivotAggregation.Count);
-    const numberFormat =
-      settings?.numberFormat?.trim() ||
-      opts.valueNumberFormat?.trim() ||
-      (settings?.showValuesAs !== undefined && PERCENT_SHOW_AS.has(settings.showValuesAs)
-        ? PERCENT_FORMAT
-        : undefined);
+    const { aggregation, numberFormat } = valueFieldFormat(valueField, settings, opts);
 
     // Left unnamed, the engine names the field from the workbook profile.
     const dataField = wb.addPivotDataField(opts.destination.sheet, pivotIndex, {
