@@ -228,7 +228,8 @@ describe.skipIf(!canLoadWasm())('tracked conditional-format round-trip', () => {
           negativeFill: { kind: 1, argb: 0xffc00000 },
           border: { kind: 1, argb: 0xff1f1f1f },
           negativeBorder: { kind: 1, argb: 0xff7f0000 },
-          axisColor: { kind: 1, argb: 0xff404040 },
+          // A bar with no axis saves without its axis colour, so the reload reads the default.
+          axisColor: { kind: 1, argb: 0xff000000 },
           direction: 1,
         });
       } finally {
