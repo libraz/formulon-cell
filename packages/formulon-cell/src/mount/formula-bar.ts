@@ -384,11 +384,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
         if (suspended) {
           // Go inert without finishEditing: a newer owner may already hold the store.
           suspended = false;
-          draftHistory.clear();
-          fxEditing = false;
-          editingAnchor = null;
-          commitRejected = false;
-          fxBaseline = fxInput.value;
+          goInert();
         }
       },
     });
@@ -1208,16 +1204,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     }
     if (commitRejected || commitDeferred) return;
     if (fxInput.value !== fxBaseline) commitFx('none');
-    else {
-      pointNavigation = null;
-      arrowMode = 'edit';
-      fxEditing = false;
-      clearHistoryInput();
-      draftHistory.clear();
-      refreshActions();
-      clearFxRefs();
-      closeFormulaHelpers();
-    }
+    else finishEditing();
   };
 
   const insertRefAtCaret = (ref: string, options?: { phase: 'start' | 'update' }): void => {
