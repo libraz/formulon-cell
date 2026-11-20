@@ -20,8 +20,8 @@ const PERCENT_FORMAT = '0.00%';
 export interface PivotFieldPlan {
   rowField: PivotSourceField | undefined;
   columnField: PivotSourceField | undefined;
-  filterFields: (PivotSourceField | undefined)[];
-  valueFields: (PivotSourceField | undefined)[];
+  filterFields: PivotSourceField[];
+  valueFields: PivotSourceField[];
   valueFieldSettings: Map<string, PivotValueFieldSettings>;
 }
 
@@ -44,7 +44,9 @@ export function resolvePivotFieldPlan(
       ).filter(Boolean),
     ),
   );
-  const filterFields = filterFieldNames.map((name) => byName.get(name));
+  const filterFields = filterFieldNames
+    .map((name) => byName.get(name))
+    .filter((field): field is PivotSourceField => field !== undefined);
   const pivotFilterFields = new Set((opts.pivotFilters ?? []).map((filter) => filter.fieldName));
   const valueFieldNames = Array.from(
     new Set(
@@ -54,7 +56,9 @@ export function resolvePivotFieldPlan(
       ).filter(Boolean),
     ),
   );
-  const valueFields = valueFieldNames.map((name) => byName.get(name));
+  const valueFields = valueFieldNames
+    .map((name) => byName.get(name))
+    .filter((field): field is PivotSourceField => field !== undefined);
   const valueFieldSettings = new Map(
     (opts.valueFieldSettings ?? []).map((settings) => [settings.fieldName, settings]),
   );
@@ -70,9 +74,9 @@ export function resolvePivotFieldPlan(
   if (
     (!emptyReport && !layoutOnly && (!rowField || valueFields.length === 0)) ||
     (opts.rowField && !rowField) ||
-    valueFields.some((field) => field === undefined) ||
+    valueFields.length !== valueFieldNames.length ||
     (opts.columnField && !columnField) ||
-    filterFields.some((field) => field === undefined) ||
+    filterFields.length !== filterFieldNames.length ||
     Array.from(filterItemFields).some((name) => !filterFieldNames.includes(name)) ||
     Array.from(pivotFilterFields).some(
       (name) => name !== rowField?.name && name !== columnField?.name,
@@ -84,8 +88,8 @@ export function resolvePivotFieldPlan(
         settings.showAsBaseField !== rowField?.name &&
         settings.showAsBaseField !== columnField?.name,
     ) ||
-    filterFields.some((field) => field?.name === rowField?.name) ||
-    (columnField !== undefined && filterFields.some((field) => field?.name === columnField.name))
+    filterFields.some((field) => field.name === rowField?.name) ||
+    (columnField !== undefined && filterFields.some((field) => field.name === columnField.name))
   ) {
     return 'invalid-field';
   }
@@ -99,10 +103,10 @@ export function pivotFieldRoles(plan: PivotFieldPlan): Map<string, PivotAxis> {
   if (rowField) roles.set(rowField.name, PivotAxis.Row);
   if (columnField) roles.set(columnField.name, PivotAxis.Col);
   for (const filterField of filterFields) {
-    if (filterField) roles.set(filterField.name, PivotAxis.Page);
+    roles.set(filterField.name, PivotAxis.Page);
   }
   for (const valueField of valueFields) {
-    if (valueField && !roles.has(valueField.name)) roles.set(valueField.name, PivotAxis.Value);
+    if (!roles.has(valueField.name)) roles.set(valueField.name, PivotAxis.Value);
   }
   return roles;
 }

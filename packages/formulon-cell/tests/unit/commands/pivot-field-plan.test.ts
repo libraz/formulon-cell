@@ -78,6 +78,7 @@ describe('createPivotTableFromRange field refusals', () => {
     ['a value field that does not exist', { valueField: 'Nope' }],
     ['a missing name among several value fields', { valueFields: ['Amt', 'Nope'] }],
     ['a filter field that does not exist', { filterField: 'Nope' }],
+    ['a plural filter list naming a missing field', { filterFields: ['Channel', 'Nope'] }],
     ['an unknown columnField', { columnField: 'Nope' }],
     ['an unknown rowField', { rowField: 'Nope' }],
     ['a row field with no value field', { valueField: '' }],

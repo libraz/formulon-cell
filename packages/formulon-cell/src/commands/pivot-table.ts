@@ -242,7 +242,6 @@ export function createPivotTableFromRange(
   }
 
   for (const filterField of filterFields) {
-    if (!filterField) return failAfterPivot('filter-field');
     const filterPivotField = pivotFieldByName.get(filterField.name) as number;
     const filterItems = opts.filterItems?.filter((entry) => entry.fieldName === filterField.name);
     if (
@@ -272,7 +271,6 @@ export function createPivotTableFromRange(
   if (columnField) baseFieldIndexes.set(columnField.name, colPivotField);
 
   for (const valueField of valueFields) {
-    if (!valueField) return failAfterPivot('value-field');
     const settings = valueFieldSettings.get(valueField.name);
     const { aggregation, numberFormat } = valueFieldFormat(valueField, settings, opts);
 
