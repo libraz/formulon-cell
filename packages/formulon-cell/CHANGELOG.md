@@ -78,6 +78,7 @@ versioning is [SemVer](https://semver.org/).
 
 ### Added
 
+- `BuildPrintDocumentOptions.strings` localizes headings `buildPrintDocument` prints; the end-of-sheet comments heading uses `pageSetup.comments` and defaults to the default locale.
 - `mount(host, options)` mounts a spreadsheet and returns a `SpreadsheetInstance`. The `Workbook` and `Sheet` facade (`Workbook.createDefault`, `Workbook.load` and `workbook.sheet(ref)`) is how a host reads and writes a workbook, from cell values and formats to tables, pivots, charts and drawings. Their types are exported from the root entry.
 - Facade types for charts, drawings and shapes, pivots and pivot caches, tables and sheet references, OOXML parts, CSV and protection options, file losses and save results, and workbook changes: `Chart`, `Drawing`, `Shape`, `Pivot`, `PivotRef`, `PivotCacheRef`, `TableRef`, `SheetRef`, `SheetOoxml`, `WorkbookOoxml`, `ExportCsvOptions`, `ImportCsvOptions`, `ProtectOptions`, `FileLoss`, `SaveOptions`, `SaveResult`, `WorkbookChange`, `WorkbookEvents`, `WorkbookOptions` and `ChangeOrigin`.
 - Instance types: `Audit`, `Commands`, `Extensions`, `FormulaHints`, `Viewport`, `CommandId`, `DialogId`, `DialogOptions`, the event types `CellEvent`, `ErrorEvent`, `WorkbookEvent` and `SpreadsheetInstanceEvents`, and `FormulaHint`, `HostProviders`, `RibbonToolbarConfig`, `SheetPrintDocument`, `SpreadsheetPatch`, `BatchCell` and `Disposer`.

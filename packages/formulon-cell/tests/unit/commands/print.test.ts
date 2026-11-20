@@ -19,6 +19,7 @@ import {
 import { MAX_COL } from '../../../src/engine/address.js';
 import { syncPageSetupToEngine } from '../../../src/engine/print-sync.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { en, ja } from '../../../src/i18n/strings.js';
 import {
   createSpreadsheetStore,
   defaultPageSetup,
@@ -568,7 +569,7 @@ describe('buildPrintDocument', () => {
     expect(displayed).toContain('First &lt;note&gt;');
     expect(displayed).toContain('Second note');
     expect(displayed).not.toContain('Outside area');
-    expect(displayed).not.toContain('Comments and Notes');
+    expect(displayed).not.toContain('Comments and notes');
 
     setPageSetup(wb, store, { comments: 'endOfSheet' });
     const endOfSheet = buildLocalDocument(wb, store, 0).html;
@@ -1057,5 +1058,29 @@ describe('printSheet', () => {
     expect(mac).toContain('text-shadow');
     expect(mac).toContain('-webkit-text-stroke');
     wb.dispose();
+  });
+});
+
+describe('end-of-sheet comments heading', () => {
+  const endOfSheetHtml = async (options: BuildPrintDocumentOptions = {}): Promise<string> => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    setText(store, wb, 0, 0, 'A');
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { comment: 'Note body' });
+    setPageSetup(wb, store, { comments: 'endOfSheet' });
+    const html = buildLocalDocument(wb, store, 0, undefined, options).html;
+    wb.dispose();
+    return html;
+  };
+
+  it('uses the default locale heading when no strings are passed', async () => {
+    const html = await endOfSheetHtml();
+    expect(html).toContain(`<h2>${en.pageSetup.comments}</h2>`);
+  });
+
+  it('uses the passed locale heading instead of the English one', async () => {
+    const html = await endOfSheetHtml({ strings: ja });
+    expect(html).toContain(`<h2>${ja.pageSetup.comments}</h2>`);
+    expect(html).not.toContain(en.pageSetup.comments);
   });
 });

@@ -19,6 +19,7 @@ import type { CellValue } from '../engine/types.js';
 // browser's print pipeline is the entire export path.
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { directCellFormat } from '../store/direct-format.js';
 import { hiddenRowsOf } from '../store/row-visibility.js';
 import {
@@ -82,11 +83,15 @@ export interface BuildPrintDocumentOptions {
   /** Print the Outline and Shadow font effects, which only the Mac profile
    *  draws. */
   fontEffects?: boolean;
+  /** UI strings for printed headings; defaults to the default locale. */
+  strings?: Strings;
 }
 
 export interface PrintSheetOptions {
   printerProfiles?: readonly PrinterProfile[];
   printerProfileId?: string;
+  /** UI strings for printed headings; defaults to the default locale. */
+  strings?: Strings;
 }
 
 /** Refuse a print request before it can allocate a sheet-sized HTML table. */
@@ -767,9 +772,10 @@ export function buildPrintDocument(
     time: now.toLocaleTimeString(),
   };
 
+  const strings = options.strings ?? defaultStrings;
   const commentsHtml =
     setup.comments === 'endOfSheet' && commentEntries.length
-      ? `<section class="fc-print__comments"><h2>Comments and Notes</h2><table><tbody>${commentEntries
+      ? `<section class="fc-print__comments"><h2>${escapeHtml(strings.pageSetup.comments)}</h2><table><tbody>${commentEntries
           .map(
             (entry) =>
               `<tr><th>${formatA1Cell(entry.row, entry.col)}</th><td>${escapeHtml(
@@ -952,6 +958,7 @@ export function buildSheetPrintDocument(
   return buildPrintDocument(wb, store, sheet, title, {
     printableBounds,
     fontEffects: isMacHost(host),
+    strings: options.strings,
   });
 }
 

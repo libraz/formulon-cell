@@ -892,7 +892,11 @@ export const Spreadsheet = {
         store.getState().data.sheetIndex,
         host,
         mode === 'pdf' ? strings.ribbon.pdf : strings.ribbon.print,
-        { printerProfiles: printers.getProfiles(), printerProfileId: printers.getProfileId() },
+        {
+          printerProfiles: printers.getProfiles(),
+          printerProfileId: printers.getProfileId(),
+          strings,
+        },
       );
     const instance: SpreadsheetInstance = {
       host,
