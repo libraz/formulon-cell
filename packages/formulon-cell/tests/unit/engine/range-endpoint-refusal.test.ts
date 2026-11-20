@@ -30,8 +30,7 @@ const refusal = (fn: () => void): FormulonError => {
 };
 
 describe('range operator endpoints', () => {
-  // Waits for the engine to refuse a value-returning function as a `:` endpoint.
-  it.fails('refuses a function call as the right endpoint', async () => {
+  it('refuses a function call as the right endpoint', async () => {
     await withSheet((sheet) => {
       const text = '=A9:IFERROR(A2:A4,0)';
       const error = refusal(() => sheet.setFormula('B1', text));
@@ -44,8 +43,7 @@ describe('range operator endpoints', () => {
     });
   });
 
-  // Waits for the engine to refuse a value-returning function as a `:` endpoint.
-  it.fails('refuses a function call as the left endpoint', async () => {
+  it('refuses a function call as the left endpoint', async () => {
     await withSheet((sheet) => {
       const text = '=SORT(A2:A4):A9';
       const error = refusal(() => sheet.setFormula('B1', text));

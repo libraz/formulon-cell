@@ -45,8 +45,7 @@ describe('conditional-format sqref on load', () => {
     ]);
   });
 
-  // Waits for tiling sqref pieces to read back as one joined range.
-  it.fails('reads tiling pieces "A1:A5 A6:A10" back as one joined range', async () => {
+  it('reads tiling pieces "A1:A5 A6:A10" back as one joined range', async () => {
     expect(await rangesOf('A1:A5 A6:A10')).toEqual([
       { firstRow: 0, firstCol: 0, lastRow: 9, lastCol: 0 },
     ]);

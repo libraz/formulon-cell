@@ -254,14 +254,14 @@ describe.skipIf(!canLoadWasm())('workbook save', () => {
 });
 
 describe.skipIf(!canLoadWasm())('workbook save refused by the .xlsb writer', () => {
-  /** A protected range with a security descriptor on Sheet2, which `.xlsb` cannot hold. */
+  /** A protected range with a security descriptor on Sheet2, whose SDDL is kept as given, which `.xlsb` cannot hold. */
   const refusedWorkbook = async (): Promise<WorkbookHandle> => {
     const wb = await WorkbookHandle.createDefault();
     wb.addSheet('Sheet2');
     wb.addProtectedRange(1, {
       name: 'Edit',
       ranges: 'A1:B2',
-      securityDescriptor: 'O:WDG:WDD:(A;;CC;;;WD)',
+      securityDescriptor: 'D:(A;;GA;;;S-1-5-21-1-2-3-500)',
     });
     return wb;
   };
