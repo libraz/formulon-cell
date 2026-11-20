@@ -34,16 +34,13 @@ export function resolvePivotFieldPlan(
   const byName = new Map(fields.map((f) => [f.name, f]));
   const rowField = byName.get(opts.rowField);
   const columnField = opts.columnField ? byName.get(opts.columnField) : undefined;
-  const filterFieldNames = Array.from(
-    new Set(
-      (opts.filterFields && opts.filterFields.length > 0
-        ? opts.filterFields
-        : opts.filterField
-          ? [opts.filterField]
-          : []
-      ).filter(Boolean),
-    ),
-  );
+  const filterFieldNames = (
+    opts.filterFields && opts.filterFields.length > 0
+      ? opts.filterFields
+      : opts.filterField
+        ? [opts.filterField]
+        : []
+  ).filter(Boolean);
   const filterFields = filterFieldNames
     .map((name) => byName.get(name))
     .filter((field): field is PivotSourceField => field !== undefined);
@@ -73,7 +70,6 @@ export function resolvePivotFieldPlan(
     rowField !== undefined && columnField !== undefined && valueFieldNames.length === 0;
   if (
     (!emptyReport && !layoutOnly && (!rowField || valueFields.length === 0)) ||
-    (opts.rowField && !rowField) ||
     valueFields.length !== valueFieldNames.length ||
     (opts.columnField && !columnField) ||
     filterFields.length !== filterFieldNames.length ||
