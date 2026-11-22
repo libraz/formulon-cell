@@ -71,6 +71,9 @@ jobs:
       - name: Run unit tests with coverage
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
+          # Coverage instrumentation on a shared runner runs the full-mount
+          # tests several times slower than a local run.
+          FC_TEST_TIMEOUT_SCALE: '3'
         run: yarn workspace @libraz/formulon-cell test:coverage
 
       - name: Upload coverage to Codecov
@@ -112,7 +115,7 @@ jobs:
       - run: yarn install --immutable
 
       - name: Install ${{ matrix.browser }}
-        run: yarn workspace @formulon-cell/${{ matrix.app }} exec playwright install --with-deps ${{ matrix.browser }}
+        run: yarn playwright install --with-deps ${{ matrix.browser }}
 
       # CI runs every spec on every app; local runs narrow the secondary app (tests/e2e-shared/adapter-specs.ts).
       - name: Run e2e

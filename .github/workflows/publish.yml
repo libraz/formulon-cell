@@ -40,6 +40,8 @@ jobs:
       - name: Run unit tests
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
+          # A shared runner is several times slower than a local run on the full-mount tests.
+          FC_TEST_TIMEOUT_SCALE: '3'
         run: yarn test --run
 
       - name: Prepare packages for publish
