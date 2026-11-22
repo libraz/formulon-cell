@@ -1,7 +1,7 @@
 {
   "name": "@libraz/formulon-cell",
-  "version": "0.14.0",
-  "description": "Spreadsheet UI for the formulon WASM calc engine — extension-based, i18n-aware, theme-tokenized, and desktop-spreadsheet-style.",
+  "version": "0.15.0",
+  "description": "Excel-like spreadsheet component for the browser: canvas grid, formula bar, ribbon and sheet tabs, calculated by the Formulon WASM engine.",
   "type": "module",
   "license": "Apache-2.0",
   "author": "libraz",
@@ -10,7 +10,7 @@
     "url": "git+https://github.com/libraz/formulon-cell.git",
     "directory": "packages/formulon-cell"
   },
-  "homepage": "https://github.com/libraz/formulon-cell",
+  "homepage": "https://formulon.libraz.net/cell/",
   "bugs": "https://github.com/libraz/formulon-cell/issues",
   "keywords": [
     "spreadsheet",
@@ -21,7 +21,12 @@
     "headless-ui",
     "datagrid",
     "wasm",
-    "i18n"
+    "i18n",
+    "excel",
+    "excel-like",
+    "spreadsheet-component",
+    "webassembly",
+    "formulon"
   ],
   "exports": {
     ".": {
@@ -80,10 +85,11 @@
     "test:coverage": "vitest run --coverage --config vitest.config.ts"
   },
   "dependencies": {
-    "@libraz/formulon": "0.18.0",
+    "@libraz/formulon": "0.19.0",
     "zustand": "^5"
   },
   "devDependencies": {
+    "@libraz/gridsmith": "github:libraz/gridsmith#commit=9a8978a31ee8b48a3ad5b611fea2479c478f9604",
     "@vitest/coverage-v8": "5.1.0",
     "happy-dom": "21.0.4",
     "typescript": "6.0.3",

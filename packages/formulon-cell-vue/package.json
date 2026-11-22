@@ -1,7 +1,7 @@
 {
   "name": "@libraz/formulon-cell-vue",
-  "version": "0.14.0",
-  "description": "Vue 3 component + composables for @libraz/formulon-cell.",
+  "version": "0.15.0",
+  "description": "Excel-like spreadsheet component for Vue 3: component and composables for @libraz/formulon-cell.",
   "type": "module",
   "license": "Apache-2.0",
   "author": "libraz",
@@ -10,14 +10,19 @@
     "url": "git+https://github.com/libraz/formulon-cell.git",
     "directory": "packages/formulon-cell-vue"
   },
-  "homepage": "https://github.com/libraz/formulon-cell",
+  "homepage": "https://formulon.libraz.net/cell/",
   "bugs": "https://github.com/libraz/formulon-cell/issues",
   "keywords": [
     "spreadsheet",
     "vue",
     "workbook",
     "datagrid",
-    "formulon-cell"
+    "formulon-cell",
+    "excel",
+    "excel-like",
+    "vue3",
+    "xlsx",
+    "formula"
   ],
   "exports": {
     ".": {

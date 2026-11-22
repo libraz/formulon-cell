@@ -1,7 +1,7 @@
 {
   "name": "@libraz/formulon-cell-react",
-  "version": "0.14.0",
-  "description": "React 18+ component + hooks for @libraz/formulon-cell.",
+  "version": "0.15.0",
+  "description": "Excel-like spreadsheet component for React 18+: component and hooks for @libraz/formulon-cell.",
   "type": "module",
   "license": "Apache-2.0",
   "author": "libraz",
@@ -10,14 +10,19 @@
     "url": "git+https://github.com/libraz/formulon-cell.git",
     "directory": "packages/formulon-cell-react"
   },
-  "homepage": "https://github.com/libraz/formulon-cell",
+  "homepage": "https://formulon.libraz.net/cell/",
   "bugs": "https://github.com/libraz/formulon-cell/issues",
   "keywords": [
     "spreadsheet",
     "react",
     "workbook",
     "datagrid",
-    "formulon-cell"
+    "formulon-cell",
+    "excel",
+    "excel-like",
+    "react-component",
+    "xlsx",
+    "formula"
   ],
   "exports": {
     ".": {
