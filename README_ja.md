@@ -10,7 +10,7 @@
 [![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-2563eb)](https://formulon.libraz.net/ja/cell/)
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://formulon.libraz.net/ja/cell/demo)
 
-**formulon-cell は、デスクトップ版 Excel に合わせて作っている Web アプリ向けの表計算コンポーネントです。** DOM 要素、React コンポーネント、Vue コンポーネントのどれにでもマウントでき、Canvas 描画のグリッドに数式バー、リボン、シートタブ、コンテキストメニュー、ダイアログが付きます。計算は [formulon](https://github.com/libraz/formulon)（WebAssembly にコンパイルした C++ の計算エンジン）が受け持ちます。セルの描画、ダイアログ、キーボードショートカット、クリップボードの挙動は、機能ごとに Excel のデスクトップ版と突き合わせ、違いがあれば直しています。
+**formulon-cell は、デスクトップ版 Excel に合わせて作っている Web アプリ向けの Excel ライクな表計算コンポーネントです。** DOM 要素、React コンポーネント、Vue コンポーネントのどれにでもマウントでき、Canvas 描画のグリッドに数式バー、リボン、シートタブ、コンテキストメニュー、ダイアログが付きます。計算は [formulon](https://github.com/libraz/formulon)（WebAssembly にコンパイルした C++ の計算エンジン）が受け持ちます。セルの描画、ダイアログ、キーボードショートカット、クリップボードの挙動は、機能ごとに Excel のデスクトップ版と突き合わせ、違いがあれば直しています。
 
 🧪 **[デモ](https://formulon.libraz.net/ja/cell/demo)** &nbsp;·&nbsp; 📖 **[ドキュメント](https://formulon.libraz.net/ja/cell/)** &nbsp;·&nbsp; **[インストール](https://formulon.libraz.net/ja/cell/install)**
 
@@ -144,6 +144,7 @@ policy を設定すると、操作の分類がないリボンコマンドは無�
 - **学ぶ** — [デモ](https://formulon.libraz.net/ja/cell/demo) · [インストール](https://formulon.libraz.net/ja/cell/install) · [埋め込みと利用例](https://formulon.libraz.net/ja/cell/embedding)
 - **ガイド** — [リボンツールバー](https://formulon.libraz.net/ja/cell/toolbar) · [モーダルとダイアログ](https://formulon.libraz.net/ja/cell/modals) · [グラフ](https://formulon.libraz.net/ja/cell/charts) · [テーマ](https://formulon.libraz.net/ja/cell/theming) · [国際化](https://formulon.libraz.net/ja/cell/i18n) · [言語の切り替え](https://formulon.libraz.net/ja/cell/language-switching) · [プラットフォームと Mac UI](https://formulon.libraz.net/ja/cell/platform) · [React / Vue](https://formulon.libraz.net/ja/cell/frameworks) · [バンドラの設定](https://formulon.libraz.net/ja/cell/bundler)
 - **リファレンス** — [設定オプション](https://formulon.libraz.net/ja/cell/options) · [拡張](https://formulon.libraz.net/ja/cell/extensions) · [ホストとの連携](https://formulon.libraz.net/ja/cell/host-integration)
+- **関連** — [Formulon](https://formulon.libraz.net/ja/)：Excel 365 の計算エンジン（WASM、Python、ネイティブ） · [formulon-mcp](https://formulon.libraz.net/ja/mcp/)：AI エージェントにワークブック操作ツールを渡す MCP サーバー
 
 ## 含まないもの（Non-goals）
 

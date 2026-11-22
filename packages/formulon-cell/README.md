@@ -9,7 +9,7 @@
 [![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-blue)](https://formulon.libraz.net/cell/)
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://formulon.libraz.net/cell/demo)
 
-**A working spreadsheet for any web page, no framework required.** Mount it into a DOM element and you get a canvas-rendered grid with chrome built to match desktop Excel (formula bar, ribbon, sheet tabs, context menu) over the [formulon](https://github.com/libraz/formulon) WASM calc engine. Features are composed from UI profiles and extension factories, and locales and themes swap at runtime without re-mounting.
+**An Excel-like spreadsheet component for any web page, no framework required.** Mount it into a DOM element and you get a canvas-rendered grid with chrome built to match desktop Excel (formula bar, ribbon, sheet tabs, context menu) over the [formulon](https://github.com/libraz/formulon) WASM calc engine. Features are composed from UI profiles and extension factories, and locales and themes swap at runtime without re-mounting.
 
 Try it in the [live demo](https://formulon.libraz.net/cell/demo).
 
@@ -121,6 +121,7 @@ AutoCorrect corrects typed text on entry. The built-in lists hold only the deskt
 - [React / Vue](https://formulon.libraz.net/cell/frameworks)
 - [Theming](https://formulon.libraz.net/cell/theming)
 - [Language and labels](https://formulon.libraz.net/cell/i18n)
+- **Related** — [Formulon](https://formulon.libraz.net/): Excel 365 calculation engine (WASM, Python, native) · [formulon-mcp](https://formulon.libraz.net/mcp/): MCP server that gives AI agents workbook tools
 
 ## License
 

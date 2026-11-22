@@ -10,7 +10,7 @@
 [![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-2563eb)](https://formulon.libraz.net/cell/)
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://formulon.libraz.net/cell/demo)
 
-**formulon-cell is a spreadsheet component for web apps, built to match desktop Excel.** It mounts into a DOM node, a React component or a Vue component and renders a canvas grid with the formula bar, ribbon, sheet tabs, context menu and dialogs; formulas run in [formulon](https://github.com/libraz/formulon), a C++ calc engine compiled to WebAssembly. Cell rendering, dialogs, keyboard shortcuts and clipboard behaviour are compared against the Excel desktop app one feature at a time, and corrected where they differ.
+**formulon-cell is an Excel-like spreadsheet component for web apps, built to match desktop Excel.** It mounts into a DOM node, a React component or a Vue component and renders a canvas grid with the formula bar, ribbon, sheet tabs, context menu and dialogs; formulas run in [formulon](https://github.com/libraz/formulon), a C++ calc engine compiled to WebAssembly. Cell rendering, dialogs, keyboard shortcuts and clipboard behaviour are compared against the Excel desktop app one feature at a time, and corrected where they differ.
 
 🧪 **[Live demo](https://formulon.libraz.net/cell/demo)** &nbsp;·&nbsp; 📖 **[Documentation](https://formulon.libraz.net/cell/)** &nbsp;·&nbsp; **[Getting started](https://formulon.libraz.net/cell/install)**
 
@@ -144,6 +144,7 @@ The documentation lives at [formulon.libraz.net/cell](https://formulon.libraz.ne
 - **Learn** — [Live demo](https://formulon.libraz.net/cell/demo) · [Getting started](https://formulon.libraz.net/cell/install) · [Embedding and use cases](https://formulon.libraz.net/cell/embedding)
 - **Guides** — [Ribbon toolbar](https://formulon.libraz.net/cell/toolbar) · [Modals and dialogs](https://formulon.libraz.net/cell/modals) · [Charts](https://formulon.libraz.net/cell/charts) · [Theming](https://formulon.libraz.net/cell/theming) · [Internationalization](https://formulon.libraz.net/cell/i18n) · [Language switching](https://formulon.libraz.net/cell/language-switching) · [Platform and Mac UI](https://formulon.libraz.net/cell/platform) · [React / Vue](https://formulon.libraz.net/cell/frameworks) · [Bundler setup](https://formulon.libraz.net/cell/bundler)
 - **Reference** — [Options](https://formulon.libraz.net/cell/options) · [Extensions](https://formulon.libraz.net/cell/extensions) · [Host integration](https://formulon.libraz.net/cell/host-integration)
+- **Related** — [Formulon](https://formulon.libraz.net/): Excel 365 calculation engine (WASM, Python, native) · [formulon-mcp](https://formulon.libraz.net/mcp/): MCP server that gives AI agents workbook tools
 
 ## Non-goals
 

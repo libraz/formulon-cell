@@ -9,7 +9,7 @@
 [![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-blue)](https://formulon.libraz.net/ja/cell/)
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://formulon.libraz.net/ja/cell/demo)
 
-**フレームワークなしで、Web ページに表計算を組み込めます。** DOM 要素にマウントすると、Canvas 描画のグリッドと、デスクトップ版 Excel に合わせた UI（数式バー、リボン、シートタブ、コンテキストメニュー）が表示され、計算は [formulon](https://github.com/libraz/formulon) の WASM エンジンが受け持ちます。機能は UI プロファイルと拡張ファクトリで組み合わせ、ロケールとテーマは再マウントせずに切り替えられます。
+**フレームワークなしで、Web ページに Excel ライクな表計算コンポーネントを組み込めます。** DOM 要素にマウントすると、Canvas 描画のグリッドと、デスクトップ版 Excel に合わせた UI（数式バー、リボン、シートタブ、コンテキストメニュー）が表示され、計算は [formulon](https://github.com/libraz/formulon) の WASM エンジンが受け持ちます。機能は UI プロファイルと拡張ファクトリで組み合わせ、ロケールとテーマは再マウントせずに切り替えられます。
 
 [デモ](https://formulon.libraz.net/ja/cell/demo) でブラウザ上ですぐに試せます。
 
@@ -121,6 +121,7 @@ CSV出力にはロケールと区切り文字を指定できます。例: `wb.sh
 - [React / Vue](https://formulon.libraz.net/ja/cell/frameworks)
 - [テーマ](https://formulon.libraz.net/ja/cell/theming)
 - [言語と表示文言](https://formulon.libraz.net/ja/cell/i18n)
+- **関連** — [Formulon](https://formulon.libraz.net/ja/)：Excel 365 の計算エンジン（WASM、Python、ネイティブ） · [formulon-mcp](https://formulon.libraz.net/ja/mcp/)：AI エージェントにワークブック操作ツールを渡す MCP サーバー
 
 ## ライセンス
 

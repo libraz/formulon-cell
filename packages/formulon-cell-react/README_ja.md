@@ -9,7 +9,7 @@
 [![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-blue)](https://formulon.libraz.net/ja/cell/)
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://formulon.libraz.net/ja/cell/demo)
 
-**React のツリーに表計算を組み込めます。** `<Spreadsheet>` と `<SpreadsheetToolbar>` は [`@libraz/formulon-cell`](https://www.npmjs.com/package/@libraz/formulon-cell) を包むコンポーネントで、Canvas 描画のグリッドとデスクトップ版 Excel に合わせた UI を、[formulon](https://github.com/libraz/formulon) の WASM エンジンの上で動かします。props の変更はコアの命令型 API で反映するため、キャンバスは再マウントされず、選択状態、フォーカス、イベント購読はそのまま残ります。
+**React 向けの Excel ライクな表計算コンポーネントです。** `<Spreadsheet>` と `<SpreadsheetToolbar>` は [`@libraz/formulon-cell`](https://www.npmjs.com/package/@libraz/formulon-cell) を包むコンポーネントで、Canvas 描画のグリッドとデスクトップ版 Excel に合わせた UI を、[formulon](https://github.com/libraz/formulon) の WASM エンジンの上で動かします。props の変更はコアの命令型 API で反映するため、キャンバスは再マウントされず、選択状態、フォーカス、イベント購読はそのまま残ります。
 
 [デモ](https://formulon.libraz.net/ja/cell/demo) でブラウザ上ですぐに試せます。
 
@@ -100,6 +100,7 @@ import '@libraz/formulon-cell/styles/toolbar.css';
 - [テーマ](https://formulon.libraz.net/ja/cell/theming)
 - [言語と表示文言](https://formulon.libraz.net/ja/cell/i18n)
 - [変更履歴](https://github.com/libraz/formulon-cell/blob/main/packages/formulon-cell/CHANGELOG.md)（このパッケージの変更もコアと同じファイルに記載しています）
+- **関連** — [Formulon](https://formulon.libraz.net/ja/)：Excel 365 の計算エンジン（WASM、Python、ネイティブ） · [formulon-mcp](https://formulon.libraz.net/ja/mcp/)：AI エージェントにワークブック操作ツールを渡す MCP サーバー
 
 ## ライセンス
 

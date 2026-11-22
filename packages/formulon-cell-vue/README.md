@@ -9,7 +9,7 @@
 [![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-blue)](https://formulon.libraz.net/cell/)
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://formulon.libraz.net/cell/demo)
 
-**A working spreadsheet in a Vue app.** `<Spreadsheet>` and `SpreadsheetToolbar` wrap [`@libraz/formulon-cell`](https://www.npmjs.com/package/@libraz/formulon-cell), a canvas-rendered grid with chrome built to match desktop Excel, over the [formulon](https://github.com/libraz/formulon) WASM calc engine. Prop changes go through the core imperative API, so the canvas is never re-mounted and selection, focus, and event subscriptions survive.
+**An Excel-like spreadsheet component for Vue.** `<Spreadsheet>` and `SpreadsheetToolbar` wrap [`@libraz/formulon-cell`](https://www.npmjs.com/package/@libraz/formulon-cell), a canvas-rendered grid with chrome built to match desktop Excel, over the [formulon](https://github.com/libraz/formulon) WASM calc engine. Prop changes go through the core imperative API, so the canvas is never re-mounted and selection, focus, and event subscriptions survive.
 
 Try it in the [live demo](https://formulon.libraz.net/cell/demo).
 
@@ -102,6 +102,7 @@ See [Embedding and use cases](https://formulon.libraz.net/cell/embedding) for vi
 - [Theming](https://formulon.libraz.net/cell/theming)
 - [Language and labels](https://formulon.libraz.net/cell/i18n)
 - [Changelog](https://github.com/libraz/formulon-cell/blob/main/packages/formulon-cell/CHANGELOG.md) (this package's changes are listed with the core's)
+- **Related** — [Formulon](https://formulon.libraz.net/): Excel 365 calculation engine (WASM, Python, native) · [formulon-mcp](https://formulon.libraz.net/mcp/): MCP server that gives AI agents workbook tools
 
 ## License
 

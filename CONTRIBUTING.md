@@ -87,8 +87,6 @@ Nothing in this section asks anything of you; read it when a checklist item or a
 - The stub engine leaves formula evaluation, recalculation and xlsx round-trip incomplete on purpose. Falling back to it silently would show a sheet that looks loaded and computes nothing.
 - Each locale table is typed as the full string set, so a string added to one locale and not the others fails `yarn typecheck`.
 - Ribbon icons are composed from shared tokens and primitives rather than literal path data, which keeps stroke widths and optical sizes consistent across the set.
-- `ci.yml` does not run the end-to-end tests; they run locally.
-- A pull request to `develop` does not start `ci.yml`; the maintainer runs the same checks before merging.
 
 ## Reporting issues
 
