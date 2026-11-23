@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { defaultStrings } from '../../../src/i18n/strings.js';
 import { attachQuickAnalysis } from '../../../src/interact/quick-analysis.js';
+import { layoutForView, rangeRects } from '../../../src/render/geometry.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
 import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
@@ -416,5 +417,81 @@ describe('attachQuickAnalysis', () => {
     expect(quickCss).not.toContain('border-radius: var(--fc-radius-md, 6px);');
     expect(quickCss).not.toContain('background: var(--fc-accent-soft');
     expect(css).not.toContain('box-shadow: var(--fc-shadow-2)');
+  });
+
+  describe('launcher placement in a host with chrome above the grid', () => {
+    const GRID_TOP = 140;
+    const GRID_LEFT = 0;
+
+    const rectAt = (left: number, top: number, width: number, height: number): DOMRect =>
+      ({
+        left,
+        top,
+        width,
+        height,
+        right: left + width,
+        bottom: top + height,
+        x: left,
+        y: top,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    const mountGrid = (width: number, height: number): HTMLElement => {
+      const grid = document.createElement('div');
+      grid.className = 'fc-host__grid';
+      host.appendChild(grid);
+      host.getBoundingClientRect = () => rectAt(0, 0, 1000, GRID_TOP + height + 40);
+      grid.getBoundingClientRect = () => rectAt(GRID_LEFT, GRID_TOP, width, height);
+      Object.defineProperty(host, 'clientWidth', { configurable: true, value: 1000 });
+      Object.defineProperty(host, 'clientHeight', {
+        configurable: true,
+        value: GRID_TOP + height + 40,
+      });
+      Object.defineProperty(grid, 'clientWidth', { configurable: true, value: width });
+      Object.defineProperty(grid, 'clientHeight', { configurable: true, value: height });
+      return grid;
+    };
+
+    it('anchors the button just outside the selection corner in grid space, not host space', () => {
+      mountGrid(800, 600);
+      setRange(store, 0, 0, 4, 2);
+      const handle = attachQuickAnalysis({ host, store, wb, strings: defaultStrings });
+      const state = store.getState();
+      const rects = rangeRects(layoutForView(state), state.viewport, state.selection.range);
+      const corner = rects[rects.length - 1];
+      if (!corner) throw new Error('selection has no visible rect');
+      const button = host.querySelector<HTMLButtonElement>('.fc-quick__button');
+
+      expect(button?.hidden).toBe(false);
+      expect(button?.style.top).toBe(`${GRID_TOP + corner.y + corner.h + 3}px`);
+      expect(button?.style.left).toBe(`${GRID_LEFT + corner.x + corner.w + 3}px`);
+      handle.detach();
+    });
+
+    it('clamps the button inside the grid when the selection runs past its bottom edge', () => {
+      mountGrid(800, 120);
+      setRange(store, 0, 0, 30, 2);
+      const handle = attachQuickAnalysis({ host, store, wb, strings: defaultStrings });
+      const button = host.querySelector<HTMLButtonElement>('.fc-quick__button');
+
+      expect(button?.style.top).toBe(`${GRID_TOP + 120 - 26}px`);
+      handle.detach();
+    });
+
+    it('opens the panel below the selection in grid space', () => {
+      mountGrid(800, 600);
+      setRange(store, 0, 0, 4, 2);
+      const handle = attachQuickAnalysis({ host, store, wb, strings: defaultStrings });
+      handle.open();
+      const state = store.getState();
+      const rects = rangeRects(layoutForView(state), state.viewport, state.selection.range);
+      const corner = rects[rects.length - 1];
+      if (!corner) throw new Error('selection has no visible rect');
+
+      expect(host.querySelector<HTMLElement>('.fc-quick')?.style.top).toBe(
+        `${GRID_TOP + corner.y + corner.h + 8}px`,
+      );
+      handle.detach();
+    });
   });
 });

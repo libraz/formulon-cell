@@ -15,6 +15,7 @@ import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
+import { GRID_SELECTOR } from './dialog-focus.js';
 import { markSurface, openerOf, returnFocus } from './dialog-shell.js';
 import { clamp } from './overlay-position.js';
 
@@ -77,19 +78,39 @@ function actionDisabledReason(strings: Strings, action: QuickAnalysisAction): st
   return key ? strings.quickAnalysis.disabledReasons[key] : null;
 }
 
+interface GridBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** The grid's padding box in host coordinates; range rects are grid-local. */
+function gridBox(host: HTMLElement): GridBox {
+  const grid = host.querySelector<HTMLElement>(GRID_SELECTOR);
+  if (!grid) return { x: 0, y: 0, w: host.clientWidth, h: host.clientHeight };
+  const g = grid.getBoundingClientRect();
+  const h = host.getBoundingClientRect();
+  return {
+    x: g.left - h.left - host.clientLeft + grid.clientLeft,
+    y: g.top - h.top - host.clientTop + grid.clientTop,
+    w: grid.clientWidth,
+    h: grid.clientHeight,
+  };
+}
+
 function positionPanel(host: HTMLElement, root: HTMLElement, store: SpreadsheetStore): void {
   const s = store.getState();
   const rects = rangeRects(layoutForView(s), s.viewport, s.selection.range);
   const anchor = rects[rects.length - 1];
   const rtl = s.ui.rightToLeft === true;
+  const box = gridBox(host);
   const panelW = root.offsetWidth || 280;
   const panelH = root.offsetHeight || 240;
   const left = anchor
-    ? rtl
-      ? trailingEdgeX(anchor, true) - 8 - panelW
-      : trailingEdgeX(anchor, false) + 8
+    ? box.x + (rtl ? trailingEdgeX(anchor, true) - 8 - panelW : trailingEdgeX(anchor, false) + 8)
     : host.clientWidth / 2 - panelW / 2;
-  const top = anchor ? anchor.y + anchor.h + 8 : host.clientHeight / 2 - panelH / 2;
+  const top = anchor ? box.y + anchor.y + anchor.h + 8 : host.clientHeight / 2 - panelH / 2;
   root.style.left = `${clamp(left, 8, host.clientWidth - panelW - 8)}px`;
   root.style.top = `${clamp(top, 8, host.clientHeight - panelH - 8)}px`;
 }
@@ -184,9 +205,10 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
     button.title = strings.quickAnalysis.title;
     button.setAttribute('aria-label', strings.quickAnalysis.title);
     const rtl = state.ui.rightToLeft === true;
+    const box = gridBox(host);
     const anchorX = rtl ? trailingEdgeX(anchor, true) - 25 : trailingEdgeX(anchor, false) + 3;
-    button.style.left = `${clamp(anchorX, 4, host.clientWidth - 26)}px`;
-    button.style.top = `${clamp(anchor.y + anchor.h + 3, 4, host.clientHeight - 26)}px`;
+    button.style.left = `${box.x + clamp(anchorX, 4, box.w - 26)}px`;
+    button.style.top = `${box.y + clamp(anchor.y + anchor.h + 3, 4, box.h - 26)}px`;
   };
 
   const close = (restoreFocus = false): void => {
