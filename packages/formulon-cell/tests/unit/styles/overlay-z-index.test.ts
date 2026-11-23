@@ -118,7 +118,9 @@ describe('overlay z-index tiers', () => {
     const drawings = cssBlockFor(overlayCss, '.fc-drawings');
     expect(drawings).toContain(`z-index: var(--fc-z-drawing, ${expectedTierValues.drawing});`);
     expect(drawings).toContain('pointer-events: none;');
-    expect(drawings).not.toMatch(/overflow|clip|contain:/);
+    // Clipping to the cell area forms no stacking context; containment would.
+    expect(drawings).toContain('overflow: clip;');
+    expect(drawings).not.toMatch(/contain:/);
     expect(cssBlockFor(overlayCss, '.fc-charts')).not.toMatch(
       /z-index:|transform:|opacity:|filter:|isolation:/,
     );

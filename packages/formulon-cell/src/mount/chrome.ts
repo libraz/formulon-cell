@@ -307,7 +307,11 @@ export function createMountChrome({
     }
   };
 
-  sheetSurface.appendChild(grid);
+  // Drawings sit beside the grid in this frame, so they are clipped to the cell area, not the sheet tabs.
+  const gridFrame = document.createElement('div');
+  gridFrame.className = 'fc-host__grid-frame';
+  gridFrame.appendChild(grid);
+  sheetSurface.appendChild(gridFrame);
   host.appendChild(sheetWorkspace);
   host.appendChild(a11yLive);
   setChromeAttached('formulabar', flags.formulaBar === true);

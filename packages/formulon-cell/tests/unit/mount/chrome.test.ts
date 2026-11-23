@@ -111,12 +111,12 @@ describe('mount/chrome — preset → DOM coverage', () => {
   it('draws charts and pictures over the grid rather than over the formula bar', async () => {
     const sheet = await mountStubSheet();
     try {
-      const surface = sheet.host.querySelector<HTMLElement>('.fc-host__sheet-surface');
+      const frame = sheet.host.querySelector<HTMLElement>('.fc-host__grid-frame');
       const grid = sheet.host.querySelector<HTMLElement>('.fc-host__grid');
-      expect(surface?.firstElementChild).toBe(grid);
-      // Cell positions are measured from the grid's corner, which is the surface's.
+      expect(frame?.firstElementChild).toBe(grid);
+      // Cell positions are measured from the grid's corner, which is the frame's.
       const drawings = sheet.host.querySelector('.fc-drawings');
-      expect(drawings?.parentElement).toBe(surface);
+      expect(drawings?.parentElement).toBe(frame);
       expect(sheet.host.querySelector('.fc-charts')?.parentElement).toBe(drawings);
       expect(sheet.host.querySelector('.fc-illustrations')?.parentElement).toBe(drawings);
     } finally {
@@ -145,7 +145,7 @@ describe('mount/chrome — preset → DOM coverage', () => {
       }
       const gridIdentity = grid;
       expect(dock.hidden).toBe(true);
-      expect(grid.parentElement).toBe(surface);
+      expect(grid.parentElement?.parentElement).toBe(surface);
       expect(surface.parentElement).toBe(workspace);
       expect(dock.parentElement).toBe(workspace);
       expect(a11yLive.parentElement).toBe(sheet.host);
@@ -182,7 +182,7 @@ describe('mount/chrome — preset → DOM coverage', () => {
         throw new Error('Missing reattached chrome.');
       }
       expect(finalGrid).toBe(gridIdentity);
-      expect(finalGrid.parentElement).toBe(surface);
+      expect(finalGrid.parentElement?.parentElement).toBe(surface);
       expect(formulabar.parentElement).toBe(sheet.host);
       expect(viewbar.parentElement).toBe(sheet.host);
       expect(sheetbar.parentElement).toBe(surface);
@@ -330,5 +330,20 @@ describe('mount/chrome — lifecycle', () => {
     const source = readFileSync(join(root, 'src/mount/chrome.ts'), 'utf8');
     expect(source).toContain('createHostButton({');
     expect(source).not.toContain("document.createElement('button')");
+  });
+});
+
+describe('drawing layer bounds', () => {
+  it('keeps the drawing layer out of the sheet tab bar so drawings clip at the cell area', async () => {
+    const sheet = await mountStubSheet({ features: { sheetTabs: true } });
+    try {
+      const drawings = sheet.host.querySelector<HTMLElement>('.fc-drawings');
+      const sheetbar = sheet.host.querySelector<HTMLElement>('.fc-host__sheetbar');
+      expect(drawings).toBeTruthy();
+      expect(sheetbar).toBeTruthy();
+      expect(drawings?.parentElement?.contains(sheetbar ?? null)).toBe(false);
+    } finally {
+      sheet.dispose();
+    }
   });
 });

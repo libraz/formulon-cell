@@ -158,6 +158,8 @@
     position: absolute;
     inset: 0;
     z-index: var(--fc-z-drawing, 16777004);
+    /* Drawings never paint over the sheet tabs or the status bar. */
+    overflow: clip;
     pointer-events: none;
   }
 
