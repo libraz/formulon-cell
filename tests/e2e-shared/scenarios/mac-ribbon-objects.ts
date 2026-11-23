@@ -174,11 +174,10 @@ export async function runMacInsertGalleryScenario(page: Page): Promise<void> {
   await sp.clickRibbon('mac.insert.shapes');
   await expect(menu.locator('.fc-tb__visual-tile')).toHaveCount(7);
   await expect(menu.locator('.fc-tb__visual-tile svg')).toHaveCount(7);
-  // The saved file has no line end, so the engine-backed Arrow tile stays disabled.
-  await expect(menu.locator('[data-ribbon-command="mac.insert.shapeArrow"]')).toBeDisabled();
+  await expect(menu.locator('.fc-tb__visual-tile:disabled')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
-  const kinds = ['Line', 'Rectangle', 'RoundedRectangle', 'Oval', 'Triangle', 'Diamond'];
+  const kinds = ['Line', 'Arrow', 'Rectangle', 'RoundedRectangle', 'Oval', 'Triangle', 'Diamond'];
   for (const kind of kinds) {
     // Inserting a shape selects it and switches to the Shape Format tab.
     await selectRibbonTab(page, 'insert');
@@ -192,12 +191,28 @@ export async function runMacInsertGalleryScenario(page: Page): Promise<void> {
       const { store } = w.__fcProbes['mount/internals'].spreadsheetInternals(w.__fcInst);
       return store.getState().illustrations.illustrations.map((item) => item.shape);
     });
-  await expect
-    .poll(shapes)
-    .toEqual(['line', 'rectangle', 'rounded-rectangle', 'oval', 'triangle', 'diamond']);
+  const inserted = ['line', 'arrow', 'rectangle', 'rounded-rectangle', 'oval', 'triangle'];
+  await expect.poll(shapes).toEqual([...inserted, 'diamond']);
+  // The arrow saves as a straight connector with an end only at its tail.
+  const saved = await page.evaluate(async () => {
+    const w = window as unknown as { __fcInst: SpreadsheetInstance; __fcProbes: E2eProbes };
+    const { WorkbookHandle } = w.__fcProbes['engine/workbook-handle'];
+    const workbook = await WorkbookHandle.loadBytes(w.__fcInst.workbook.save().bytes);
+    try {
+      return workbook.listShapes(0).map((shape) => ({
+        preset: shape.presetGeometry,
+        head: shape.line?.headEnd != null,
+        tail: shape.line?.tailEnd != null,
+      }));
+    } finally {
+      workbook.dispose();
+    }
+  });
+  expect(saved[1]).toEqual({ preset: 'straightConnector1', head: false, tail: true });
+  expect(saved.filter((shape) => shape.tail)).toHaveLength(1);
   await page.locator('.fc-host__grid').focus();
   await page.keyboard.press('Meta+z');
-  await expect.poll(shapes).toEqual(['line', 'rectangle', 'rounded-rectangle', 'oval', 'triangle']);
+  await expect.poll(shapes).toEqual(inserted);
   await sp.expectNoConsoleErrors();
 }
 

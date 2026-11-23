@@ -68,7 +68,6 @@ const ACCEPTED: Readonly<
   'fr/formulas/3': { kind: 'extra', ours: { chromium: 215, webkit: 215 }, desktop: 325 },
   'fr/view/5': { kind: 'extra', ours: { chromium: 42, webkit: 42 }, desktop: 48 },
   'de/formulas/3': { kind: 'extra', ours: { chromium: 97, webkit: 97 }, desktop: 406.5 },
-  'de/view/5': { kind: 'extra', ours: { chromium: 42, webkit: 42 }, desktop: 48 },
   'ja/insert/1': { kind: 'extra', ours: { chromium: 64.5 }, desktop: 48 },
   'ja/insert/11': { kind: 'extra', ours: { chromium: 89.3 }, desktop: 77 },
   'de/formulas/0': { kind: 'wide', ours: { chromium: 816, webkit: 816 }, desktop: 354.5 },

@@ -177,14 +177,15 @@ export async function runStartupFont(
       dispose();
     };
   });
-  // Changing the UI language keeps authored fonts until a new book is created.
+  // A UI language switch shows that language's theme face for the theme-linked
+  // Normal font; its size stays as authored until a new book is created.
   expect(
     await page.evaluate(() => {
       const probe = window as unknown as FontProbeWindow;
       return probe.__fcProbes['api/workbook'].workbookHandleOf(probe.__fcInst.workbook)
         .workbookDisplayFont;
     }),
-  ).toEqual(expected.font);
+  ).toEqual({ name: STARTUP[platform][nextLocale].font.name, size: expected.font.size });
   await page
     .locator(platform === 'mac' ? '.demo__quick .demo__brand-mark' : '[data-ribbon-tab="file"]')
     .click();

@@ -87,7 +87,8 @@ export async function runExcelDataBarAppearanceScenario(
   await expect(borderStyle).toHaveValue('solid');
   await expect(border).toHaveValue('#003366');
   await expect(negativeBorder).toHaveValue('#990000');
-  await expect(axisColor).toHaveValue('#006600');
+  // A bar with no axis saves without its axis colour, as Excel does, so the reload reads the default.
+  await expect(axisColor).toHaveValue('#000000');
   await expect(axisColor).toBeDisabled();
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 800 });

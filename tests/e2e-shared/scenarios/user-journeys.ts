@@ -543,7 +543,8 @@ export async function runXlsbRefusalScenario(page: Page): Promise<void> {
     const added = handle.addProtectedRange(1, {
       name: 'Edit',
       ranges: 'A1:B2',
-      securityDescriptor: 'O:WDG:WDD:(A;;CC;;;WD)',
+      // The protected-DACL flag (`D:P`) is outside the descriptor form the .xlsb records encode.
+      securityDescriptor: 'O:WDG:WDD:P(A;;CC;;;WD)',
     });
     if (!added) throw new Error('protected range not added');
   });
@@ -620,7 +621,7 @@ export async function runXlsbRefusalScenario(page: Page): Promise<void> {
               .map((range) => [range.name, range.securityDescriptor]);
           }),
         )
-        .toEqual([['Edit', 'O:WDG:WDD:(A;;CC;;;WD)']]);
+        .toEqual([['Edit', 'O:WDG:WDD:P(A;;CC;;;WD)']]);
       await reopened.expectNoConsoleErrors();
     } finally {
       await fresh.close();

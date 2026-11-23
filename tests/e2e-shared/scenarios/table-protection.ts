@@ -34,7 +34,7 @@ const REFRESH_MENU_JA = [
   ['refresh-all', 'すべて更新', false],
   ['refresh-status', 'データ更新の状況', true],
   ['cancel-refresh', '更新のキャンセル', true],
-  ['connection-properties', '接続のプロパティ…', true],
+  ['connection-properties', '接続のプロパティ...', true],
 ] as const;
 
 const readWorkbookState = (page: Page) =>

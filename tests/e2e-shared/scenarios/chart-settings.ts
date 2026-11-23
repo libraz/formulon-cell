@@ -564,8 +564,10 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(connectors).toHaveCount(4);
   await expect(connectors.first()).toHaveAttribute('stroke', '#225588');
-  // Preset dashes scale with the line width (ECMA-376 Part 1, 20.1.10.48): dash 4w, space 3w at width 3.
-  await expect(connectors.first()).toHaveAttribute('stroke-dasharray', '12 9');
+  // Preset dashes scale with the line width (ECMA-376 Part 1, 20.1.10.48): dash 4w, space 3w
+  // at the 3 pt series line, drawn 4 px wide.
+  await expect(connectors.first()).toHaveAttribute('stroke-width', '4');
+  await expect(connectors.first()).toHaveAttribute('stroke-dasharray', '16 12');
   await expect(points).toHaveCount(6);
 
   // A blank Costs value for Feb breaks that series' line until blanks span.

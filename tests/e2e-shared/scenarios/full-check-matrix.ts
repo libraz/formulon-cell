@@ -919,6 +919,15 @@ const runClipboardFlow = async (page: Page, row: FullCheckRow): Promise<void> =>
       }),
     )
     .toBe('copy');
+  // Theme-linked faces follow the switched language, so the paste is judged
+  // against the sources and payload as they read after the switch.
+  const switchedSourceFonts = await readNativeFonts(page, sourceAddresses);
+  expect(switchedSourceFonts.map((font) => font.size)).toEqual([15, 17, 19]);
+  const switchedSnapshotFonts = await readClipboardSnapshotFonts(page, [
+    { row: 0, col: 3 },
+    { row: 0, col: 4 },
+    { row: 1, col: 3 },
+  ]);
   await page.evaluate(() =>
     (window as unknown as ProbeWindow).__fcInst?.dialogs.open('pasteSpecial'),
   );
@@ -958,12 +967,12 @@ const runClipboardFlow = async (page: Page, row: FullCheckRow): Promise<void> =>
   ];
   await expect
     .poll(async () => (await readNativeFonts(page, pastedAddresses)).map((font) => font.size))
-    .toEqual(sourceFonts.slice(0, 3).map((font) => font.size));
+    .toEqual(switchedSourceFonts.map((font) => font.size));
   const pastedFonts = await readNativeFonts(page, pastedAddresses);
   for (let index = 0; index < sourceLabels.length; index += 1) {
-    const sourceFont = sourceFonts[index];
+    const sourceFont = switchedSourceFonts[index];
     const pastedFont = pastedFonts[index];
-    const snapshotFont = snapshotFonts[index];
+    const snapshotFont = switchedSnapshotFonts[index];
     const sourceLabel = sourceLabels[index];
     if (!sourceFont || !pastedFont || !snapshotFont || !sourceLabel) {
       throw new Error('full-check clipboard paste produced an incomplete inherited-font matrix');

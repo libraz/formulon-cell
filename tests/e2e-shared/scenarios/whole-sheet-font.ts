@@ -101,12 +101,16 @@ export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac')
   await page.keyboard.press('Enter');
   expect(await nativeSize(0, 1)).toBe(18);
 
-  const reloadedFonts = await page.evaluate(async () => {
+  // A file carries no profile, so the reload states the Japanese one it was saved under.
+  const reloadedFonts = await page.evaluate(async (reloadPlatform) => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
     const { WorkbookHandle } = (window as unknown as { __fcProbes: E2eProbes }).__fcProbes[
       'engine/workbook-handle'
     ];
-    const reloaded = await WorkbookHandle.loadBytes(instance.workbook.save().bytes);
+    const reloaded = await WorkbookHandle.loadBytes(instance.workbook.save().bytes, {
+      locale: 'ja',
+      platform: reloadPlatform,
+    });
     try {
       const cells: [number, number][] = [
         [0, 0],
@@ -123,7 +127,7 @@ export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac')
     } finally {
       reloaded.dispose();
     }
-  });
+  }, platform);
   expect(reloadedFonts).toEqual([
     { size: 24, name: '游ゴシック' },
     { size: 18, name: '游ゴシック' },
