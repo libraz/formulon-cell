@@ -335,6 +335,8 @@ export class GridRenderer {
     // after the native format epoch settles. Later ones wait for that pass.
     if (this.rafId) return;
     if (this.cssWidth > 0 && this.cssHeight > 0) this.resizeViewport();
+    // The viewport callback may have scheduled the frame already.
+    if (this.rafId) return;
     this.rafId = requestAnimationFrame(() => {
       try {
         this.resizeViewport();

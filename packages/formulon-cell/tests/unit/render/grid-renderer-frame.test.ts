@@ -42,7 +42,7 @@ interface Harness {
   sizeWrites: () => number;
 }
 
-function harness(withViewport = true): Harness {
+function harness(withViewport = true, onSize?: () => void): Harness {
   const state = createSpreadsheetStore().getState();
   let viewportCalls = 0;
   let sizeWrites = 0;
@@ -78,6 +78,7 @@ function harness(withViewport = true): Harness {
     onViewportSize: withViewport
       ? () => {
           viewportCalls += 1;
+          onSize?.();
         }
       : undefined,
   });
@@ -112,6 +113,24 @@ describe('GridRenderer frame work', () => {
     h.renderer.invalidate();
     expect(h.viewportCalls() - before).toBeLessThanOrEqual(1);
     h.renderer.dispose();
+  });
+
+  it('keeps one frame pending when the viewport callback invalidates re-entrantly', () => {
+    const cancelled = new Set<number>();
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => cancelled.add(id));
+    let reenter = false;
+    const h = harness(true, () => {
+      if (!reenter) return;
+      reenter = false;
+      h.renderer.invalidate();
+    });
+    h.renderer.resize();
+    for (const cb of rafQueue.splice(0)) cb(0);
+    reenter = true;
+    h.renderer.invalidate();
+    expect(rafQueue).toHaveLength(1);
+    h.renderer.dispose();
+    expect([...cancelled]).toEqual([1]);
   });
 
   it('resolves the platform profile once per paint', () => {
