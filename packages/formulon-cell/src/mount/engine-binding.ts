@@ -106,11 +106,18 @@ const FACADE_HYDRATORS: Readonly<Record<FacadeChangeKind, readonly SliceHydrator
   ],
   comments: [hydrateCommentsAndHyperlinksFromEngine],
   threadedComments: [hydrateThreadedCommentsFromEngine],
+  // An engine insert/delete moves every range-anchored object, as the command path re-reads them.
   layout: [
     (wb, store, sheet) => mutators.replaceCells(store, wb.cells(sheet)),
     hydrateLayoutFromEngine,
     hydrateMergesFromEngine,
     hydrateCellFormatsFromEngine,
+    hydrateCommentsAndHyperlinksFromEngine,
+    hydrateThreadedCommentsFromEngine,
+    hydrateConditionalRulesFromEngine,
+    hydrateValidationsFromEngine,
+    (wb, store) => hydrateTableOverlaysFromEngine(wb, store),
+    hydrateAutoFilterFromEngine,
   ],
   view: [
     (wb, store) => hydrateViewStateFromEngine(wb, store, { followActiveSheet: false }),
