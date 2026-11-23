@@ -104,4 +104,15 @@ describe('facade layout writes keep the store in step with the engine', () => {
     instance.workbook.sheet(0).setRowHeight('2', 80);
     expect(pictureBox().h).toBeGreaterThan(before.h ?? 0);
   });
+  it('shows a slicer added through the public facade in the store', () => {
+    const slicer = instance.workbook.sheet(0).addSlicer('Sales', 'Region', {
+      anchor: { kind: AnchorKind.TwoCell, fromRow: 5, fromCol: 3, toRow: 12, toCol: 5 },
+    });
+    expect(slicer).toBeDefined();
+    expect(store.getState().slicers.slicers).toHaveLength(1);
+    expect(store.getState().slicers.slicers[0]).toMatchObject({
+      tableName: 'Sales',
+      column: 'Region',
+    });
+  });
 });
