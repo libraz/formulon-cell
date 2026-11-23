@@ -3100,4 +3100,16 @@ describe('attachSessionCharts', () => {
     expect(current()?.xAxis?.labelPosition).toBe('none');
     handle.detach();
   });
+  it('colours each slice of a column chart changed to a pie', () => {
+    put([
+      ['Month', 'Sales'],
+      ['Jan', 10],
+      ['Feb', 20],
+      ['Mar', 30],
+    ]);
+    const chart = create(range(0, 0, 3, 1), { kind: 'column', seriesDirection: 'columns' });
+    const updated = updateSessionChart(store, chart.id, { kind: 'pie' }, null, wb);
+    expect(updated?.kind).toBe('pie');
+    expect(updated?.varyColors).toBe(true);
+  });
 });

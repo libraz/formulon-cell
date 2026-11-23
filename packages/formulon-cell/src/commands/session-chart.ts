@@ -179,9 +179,14 @@ const withoutSeriesColors = (
 ): ChartSeriesStyleSpec[] | undefined => styles?.map((style) => withoutSeriesColor(kind, style));
 
 /** `current` with the fields of `patch` replaced. A palette replaces the
- *  explicit series colours it would otherwise lose to. */
+ *  explicit series colours it would otherwise lose to; a type change leaves
+ *  vary-colours to the engine's default for the new type. */
 const patchedSpec = (current: ChartSpec, patch: Partial<ChartSpec>): ChartSpec => {
-  const next: ChartSpec = { ...current, ...patch };
+  const retyped =
+    patch.kind !== undefined && patch.kind !== current.kind && patch.varyColors === undefined;
+  const merged: ChartSpec = { ...current, ...patch };
+  const { varyColors: _inherited, ...withoutVary } = merged;
+  const next: ChartSpec = retyped ? withoutVary : merged;
   return patch.palette !== undefined && patch.seriesStyles === undefined
     ? { ...next, seriesStyles: withoutSeriesColors(next.kind, current.seriesStyles) }
     : next;
