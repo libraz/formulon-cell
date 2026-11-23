@@ -8,6 +8,7 @@ import { TEMPORARY_SHEET_VIEW_ID } from '../../commands/sheet-views.js';
 import { createColorPalette, themeColorColumns } from '../../components/color-palette.js';
 import { addrKey } from '../../engine/address.js';
 import { onOutsidePress } from '../../interact/outside-press.js';
+import { placePanel } from '../../interact/overlay-position.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { projectValueName } from '../menu-a11y.js';
 import { type NumberFormatAction, numberFormatSample } from '../number-format.js';
@@ -309,8 +310,6 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
       list.setAttribute('aria-label', command.title);
       list.tabIndex = -1;
       const anchorRect = button.getBoundingClientRect();
-      list.style.left = `${Math.round(anchorRect.left)}px`;
-      list.style.top = `${Math.round(anchorRect.bottom + 3)}px`;
       list.style.minWidth = `${Math.round(anchorRect.width)}px`;
       const current = currentRibbonControlValue(command.id);
       const options = ribbonOptionsForCommand(command, current);
@@ -431,6 +430,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
         }
       });
       wrap.appendChild(list);
+      placePanel(list, anchorRect.left, anchorRect.bottom + 3);
       const selectedIndex = Math.max(
         0,
         Array.from(list.querySelectorAll<HTMLButtonElement>('[role="option"]')).findIndex(
@@ -558,9 +558,6 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
         },
       });
       flyout.appendChild(palette.el);
-      const anchorRect = button.getBoundingClientRect();
-      flyout.style.left = `${Math.round(anchorRect.left)}px`;
-      flyout.style.top = `${Math.round(anchorRect.bottom + 3)}px`;
       flyout.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') return;
         event.preventDefault();
@@ -568,6 +565,8 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
         button.focus({ preventScroll: true });
       });
       wrap.appendChild(flyout);
+      const anchorRect = button.getBoundingClientRect();
+      placePanel(flyout, anchorRect.left, anchorRect.bottom + 3);
       palette.focus();
       if (outsidePressTimer !== null) clearTimeout(outsidePressTimer);
       outsidePressTimer = setTimeout(() => {

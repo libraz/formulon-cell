@@ -107,3 +107,49 @@ describe('ribbon select focus after dispatch', () => {
     },
   );
 });
+
+describe('ribbon select and colour popups in a contained host', () => {
+  const rect = (left: number, top: number, width: number, height: number): DOMRect =>
+    ({ left, top, width, height, right: left + width, bottom: top + height }) as DOMRect;
+
+  it.each(['fontSize', 'fillColor'] as const)(
+    'places the %s popup relative to a host with containment',
+    (id) => {
+      const command = buildRibbonModel('en')
+        .find((tab) => tab.id === 'home')
+        ?.groups.flatMap((group) => group.commands)
+        .find((c) => c.id === id);
+      if (!command) throw new Error(`${id} unavailable`);
+      const ribbon = createSelectColorRibbon({
+        ribbonLang: 'en',
+        ribbonText: dictionaries.en.ribbon,
+        pageScaleText: { automatic: 'Automatic', page: 'Page', pages: 'Pages' },
+        getInst: () => null,
+        currentRibbonControlValue: () => (id === 'fontSize' ? '11' : '#000000'),
+        applyRibbonControl: () => {},
+        shouldShowFontOption: () => true,
+        createRibbonIcon: () => null,
+      });
+      const host = document.createElement('div');
+      host.style.contain = 'strict';
+      host.getBoundingClientRect = () => rect(300, 200, 900, 500);
+      const control =
+        id === 'fontSize' ? ribbon.createRibbonSelect(command) : ribbon.createRibbonColor(command);
+      host.append(control);
+      document.body.append(host);
+      cleanups.push(() => {
+        ribbon.closeOpenRibbonDropdowns();
+        host.remove();
+      });
+      const trigger = control.querySelector<HTMLButtonElement>(
+        '.fc-tb__rb-dd__btn, .fc-tb__rb-color__btn',
+      );
+      if (!trigger) throw new Error('trigger unavailable');
+      trigger.getBoundingClientRect = () => rect(700, 230, 60, 24);
+      trigger.click();
+      const popup = control.querySelector<HTMLElement>('.fc-tb__rb-dd__list, .fc-tb__color-flyout');
+      expect(popup?.style.left).toBe('400px');
+      expect(popup?.style.top).toBe('57px');
+    },
+  );
+});

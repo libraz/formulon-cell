@@ -8,7 +8,7 @@ import type { DialogEntry } from '../../interact/dialog-entry.js';
 import type { RibbonFillAction } from '../../commands/fill.js';
 import type { TableVariant } from '../../commands/format-as-table.js';
 import type { WorkbookThemePresetId } from '../../engine/workbook-theme-presets.js';
-import { clamp, viewportSize } from '../../interact/overlay-position.js';
+import { clamp, placePanel, viewportSize } from '../../interact/overlay-position.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import type { SessionChartKind } from '../../store/store.js';
 import type { SessionShapeKind } from '../illustration-types.js';
@@ -594,9 +594,9 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
       ? belowTop
       : Math.max(pad, buttonRect.top - Math.min(menuHeight, availableHeight) - gap);
     menu.style.position = 'fixed';
-    menu.style.left = `${Math.round(left)}px`;
-    menu.style.top = `${Math.round(top)}px`;
     applyVerticalViewportLimit(menu, menuHeight, availableHeight || height - pad * 2);
+    // Converts to the containing block when a host ancestor has containment or a transform.
+    placePanel(menu, left, top, { pad });
   };
 
   const openDynamicRibbonDropdown = (

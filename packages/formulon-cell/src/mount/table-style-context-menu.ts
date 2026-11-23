@@ -8,6 +8,7 @@ import {
 } from '../commands/table-style-actions.js';
 import { focusOpenerOrSheet, focusSheet } from '../interact/dialog-focus.js';
 import { onOutsidePress } from '../interact/outside-press.js';
+import { placePanel } from '../interact/overlay-position.js';
 import { focusMenuItem, handleMenuKeydown, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { menuSeparator, menuTextChip } from '../toolbar/ribbon/menus/general.js';
 import type { SpreadsheetInstance } from './types.js';
@@ -115,8 +116,6 @@ export function attachTableStyleContextMenu(
     menu.className = 'fc-tb__menu fc-tb__tablestyle-ctx';
     menu.setAttribute('role', 'menu');
     menu.style.position = 'fixed';
-    menu.style.left = `${event.clientX}px`;
-    menu.style.top = `${event.clientY}px`;
     const button = (
       action: Action,
       label: string,
@@ -153,6 +152,7 @@ export function attachTableStyleContextMenu(
       ),
     );
     host.appendChild(menu);
+    placePanel(menu, event.clientX, event.clientY);
     open = { menu, restore: item };
     detachOutside = onOutsidePress(
       document,

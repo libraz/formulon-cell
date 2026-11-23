@@ -226,7 +226,7 @@ describe('toolbar/ribbon menu primitives', () => {
 
     expect(dynamicDropdownsSource).toContain('const applyVerticalViewportLimit');
     expect(dynamicDropdownsSource).toContain('viewportSize()');
-    expect(dynamicDropdownsSource).toContain('import { clamp, viewportSize }');
+    expect(dynamicDropdownsSource).toContain('import { clamp, placePanel, viewportSize }');
     expect(dynamicDropdownsSource.match(/window\.innerWidth/g) ?? []).toHaveLength(0);
     expect(dynamicDropdownsSource.match(/window\.innerHeight/g) ?? []).toHaveLength(0);
     expect(dynamicDropdownsSource.match(/style\.overflowY/g) ?? []).toHaveLength(2);
