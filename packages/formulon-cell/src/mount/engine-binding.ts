@@ -106,7 +106,8 @@ const FACADE_HYDRATORS: Readonly<Record<FacadeChangeKind, readonly SliceHydrator
   ],
   comments: [hydrateCommentsAndHyperlinksFromEngine],
   threadedComments: [hydrateThreadedCommentsFromEngine],
-  // An engine insert/delete moves every range-anchored object, as the command path re-reads them.
+  // An engine insert/delete or a track resize moves and resizes every range-anchored object, as
+  // the command path re-reads them.
   layout: [
     (wb, store, sheet) => mutators.replaceCells(store, wb.cells(sheet)),
     hydrateLayoutFromEngine,
@@ -118,6 +119,9 @@ const FACADE_HYDRATORS: Readonly<Record<FacadeChangeKind, readonly SliceHydrator
     hydrateValidationsFromEngine,
     (wb, store) => hydrateTableOverlaysFromEngine(wb, store),
     hydrateAutoFilterFromEngine,
+    hydrateImagesFromEngine,
+    hydrateChartsFromEngine,
+    (wb, store) => hydrateSlicersFromEngine(wb, store),
   ],
   view: [
     (wb, store) => hydrateViewStateFromEngine(wb, store, { followActiveSheet: false }),

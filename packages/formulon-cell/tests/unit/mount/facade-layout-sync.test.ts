@@ -1,4 +1,4 @@
-import { CellShift, FilterKind } from '@libraz/formulon';
+import { AnchorKind, CellShift, FilterKind } from '@libraz/formulon';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, type SpreadsheetInstance } from '../../../src/api/spreadsheet/instance.js';
 import { spreadsheetInternals } from '../../../src/mount/internals.js';
@@ -74,5 +74,34 @@ describe('facade layout writes keep the store in step with the engine', () => {
     });
     t.applyAutoFilter();
     expect([...store.getState().layout.hiddenRows].sort()).toEqual([2, 3]);
+  });
+  const PNG = Uint8Array.from(
+    atob(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    ),
+    (c) => c.charCodeAt(0),
+  );
+  const addTwoCellPicture = () =>
+    instance.workbook.sheet(0).addPicture(PNG, {
+      anchor: { kind: AnchorKind.TwoCell, fromRow: 1, fromCol: 1, toRow: 2, toCol: 2 },
+    });
+  const pictureBox = () => {
+    const item = store.getState().illustrations.illustrations.find((i) => i.kind === 'image');
+    return { w: item?.w, h: item?.h };
+  };
+
+  it('resizes a two-cell picture when a facade column width change widens its cell', () => {
+    addTwoCellPicture();
+    const before = pictureBox();
+    instance.workbook.sheet(0).setColumnWidth('B', 40);
+    expect(pictureBox().w).toBeGreaterThan(before.w ?? 0);
+    expect(pictureBox().h).toBe(before.h);
+  });
+
+  it('resizes a two-cell picture when a facade row height change grows its cell', () => {
+    addTwoCellPicture();
+    const before = pictureBox();
+    instance.workbook.sheet(0).setRowHeight('2', 80);
+    expect(pictureBox().h).toBeGreaterThan(before.h ?? 0);
   });
 });
