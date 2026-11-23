@@ -816,4 +816,20 @@ describe('attachSessionIllustrations', () => {
       handle.detach();
     });
   });
+
+  it('stretches a picture to fill its box, as the spreadsheet draws a picture fill', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    mutators.upsertIllustration(store, {
+      id: 'image-stretch',
+      kind: 'image',
+      sheet: 0,
+      src: 'data:image/png;base64,image',
+    });
+    const handle = attachSessionIllustrations({ host, store });
+    expect(host.querySelector<HTMLImageElement>('img')?.style.objectFit).toBe('fill');
+    handle.detach();
+    host.remove();
+  });
 });
