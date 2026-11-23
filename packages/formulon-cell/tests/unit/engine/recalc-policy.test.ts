@@ -159,3 +159,27 @@ describe('recalc change event', () => {
     wb.dispose();
   });
 });
+
+describe('manual calc mode display text', () => {
+  it('draws the held value, not one computed past the last recalc', async () => {
+    const wb = await newWb();
+    const C2: Addr = { sheet: 0, row: 1, col: 2 };
+    const D2: Addr = { sheet: 0, row: 1, col: 3 };
+    wb.setNumber({ sheet: 0, row: 1, col: 0 }, 600);
+    wb.setNumber({ sheet: 0, row: 1, col: 1 }, 3);
+    wb.setFormula(C2, '=A2*B2');
+    wb.setFormula(D2, '=C2*1.1');
+    wb.setCalcMode(1);
+
+    wb.setNumber({ sheet: 0, row: 1, col: 1 }, 5);
+
+    expect(numberAt(wb, C2)).toBe(1800);
+    expect(wb.getDisplayText(0, 1, 2)).toBe('1800');
+    expect(wb.getDisplayText(0, 1, 3)).toBe('1980');
+    expect(numberAt(wb, C2)).toBe(1800);
+
+    wb.recalc();
+    expect(wb.getDisplayText(0, 1, 2)).toBe('3000');
+    wb.dispose();
+  });
+});
