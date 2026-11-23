@@ -119,6 +119,7 @@ export const workbookChromeEn: WorkbookChromeStrings = {
   commandRefusal: {
     tooLarge: 'Selection is too large.',
     engineFailed: 'Can’t complete this action.',
+    featureDisabled: 'This command is turned off for this spreadsheet.',
   },
   mountError: {
     title: 'Spreadsheet engine unavailable',

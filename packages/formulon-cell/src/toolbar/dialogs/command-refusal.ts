@@ -2,12 +2,13 @@ import { isMacHost } from '../../extensions/ui-options.js';
 import type { Strings } from '../../i18n/strings.js';
 import { showMessage } from './prompt.js';
 
-/** A command that refused to run: its range was too large, the engine could not carry it out, or
+/** A command that refused to run: its range was too large, the engine could not carry it out, its host feature is off, or
  *  the selected picture or shape cannot be copied (one fixed in place, a locked shape, or a shape
  *  that keeps a paint as saved). */
 export type CommandRefusalReason =
   | 'too-large'
   | 'engine-failed'
+  | 'feature-disabled'
   | 'drawing-fixed-position'
   | 'shape-locked'
   | 'shape-paint-kept';
@@ -19,6 +20,8 @@ export const commandRefusalMessage = (reason: CommandRefusalReason, strings: Str
       return strings.commandRefusal.tooLarge;
     case 'engine-failed':
       return strings.commandRefusal.engineFailed;
+    case 'feature-disabled':
+      return strings.commandRefusal.featureDisabled;
     case 'shape-locked':
       return strings.workbookObjects.shapeLocked;
     case 'shape-paint-kept':

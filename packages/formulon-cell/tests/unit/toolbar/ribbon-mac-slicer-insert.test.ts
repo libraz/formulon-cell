@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { formatAsTable } from '../../../src/commands/format-as-table.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { en } from '../../../src/i18n/strings.js';
 import { mutators } from '../../../src/store/store.js';
 import { openMacSlicerDialog } from '../../../src/toolbar/ribbon/mac/actions.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
@@ -65,5 +66,20 @@ describe('Insert Slicer through the shared dialog', () => {
     expect(document.querySelector('[data-mac-slicer-error]')?.textContent).toContain(
       'could not be inserted',
     );
+  });
+});
+
+describe('Insert Slicer with features.slicer off', () => {
+  afterEach(() => document.body.replaceChildren());
+
+  it('tells the user the feature is off instead of opening a dialog that cannot insert', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    const sheet = await mountStubSheet({ locale: 'en', workbook });
+    openMacSlicerDialog(sheet.instance, { commandId: 'tableInsertSlicer' });
+    expect(document.querySelector('[role="alertdialog"] .fc-tb__dlg__message')?.textContent).toBe(
+      en.commandRefusal.featureDisabled,
+    );
+    expect(document.querySelector<HTMLElement>('.fc-macslicerdlg')?.hidden).toBe(true);
+    sheet.dispose();
   });
 });

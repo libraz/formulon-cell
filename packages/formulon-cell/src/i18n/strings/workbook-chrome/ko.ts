@@ -120,6 +120,7 @@ export const workbookChromeKo: WorkbookChromeStrings = {
   commandRefusal: {
     tooLarge: '선택 범위가 너무 큽니다.',
     engineFailed: '이 작업을 완료할 수 없습니다.',
+    featureDisabled: '이 스프레드시트에서는 이 명령이 꺼져 있습니다.',
   },
   mountError: {
     title: '스프레드시트 엔진을 사용할 수 없음',

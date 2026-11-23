@@ -122,6 +122,7 @@ export const workbookChromeFr: WorkbookChromeStrings = {
   commandRefusal: {
     tooLarge: 'La sélection est trop grande.',
     engineFailed: 'Impossible de terminer cette action.',
+    featureDisabled: 'Cette commande est désactivée pour cette feuille de calcul.',
   },
   mountError: {
     title: 'Moteur de feuille de calcul indisponible',

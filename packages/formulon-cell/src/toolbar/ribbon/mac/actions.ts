@@ -35,6 +35,7 @@ import {
 import { attachMacWorkbookStatistics } from '../../../interact/mac-workbook-statistics.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
 import type { SlicerSpec } from '../../../store/store.js';
+import { showCommandRefusal } from '../../dialogs/command-refusal.js';
 import {
   disposeMacAutomationDialogs,
   openMacAutomationGallery,
@@ -133,6 +134,21 @@ export const openMacSlicerDialog = (
   options?: MacSlicerOpenOptions,
 ): void => {
   createMacRibbonActions(instance);
+  openSlicerDialog(instance, options);
+};
+
+/** Opens the Insert Slicer dialog, or tells the user the feature is off: the dialog's insert
+ *  step needs the slicer feature and would otherwise fail silently. */
+const openSlicerDialog = (instance: SpreadsheetInstance, options?: MacSlicerOpenOptions): void => {
+  if (!instance.features.slicer) {
+    void showCommandRefusal({
+      host: instance.host,
+      strings: instance.i18n.strings,
+      title: instance.i18n.strings.slicer.addSlicer,
+      reason: 'feature-disabled',
+    });
+    return;
+  }
   SLICER_DIALOGS.get(instance)?.open(options);
 };
 
@@ -215,7 +231,7 @@ export function createMacRibbonActions(instance: SpreadsheetInstance): MacRibbon
     'mac.insert.sparkline.line': () => sparkline.open(undefined, 'line'),
     'mac.insert.sparkline.column': () => sparkline.open(undefined, 'column'),
     'mac.insert.sparkline.winLoss': () => sparkline.open(undefined, 'win-loss'),
-    'mac.insert.slicer': () => slicer.open(),
+    'mac.insert.slicer': () => openSlicerDialog(instance),
     'mac.formulas.insertFunction': () => instance.openFunctionArguments(),
     'mac.formulas.recent': () => formulaCategory(instance, 'recent'),
     'mac.formulas.financial': () => formulaCategory(instance, 'financial'),

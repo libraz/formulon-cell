@@ -119,6 +119,7 @@ export const workbookChromeTh: WorkbookChromeStrings = {
   commandRefusal: {
     tooLarge: 'ส่วนที่เลือกใหญ่เกินไป',
     engineFailed: 'ไม่สามารถดำเนินการนี้ให้เสร็จสมบูรณ์',
+    featureDisabled: 'คำสั่งนี้ถูกปิดสำหรับสเปรดชีตนี้',
   },
   mountError: {
     title: 'กลไกสเปรดชีตไม่พร้อมใช้งาน',

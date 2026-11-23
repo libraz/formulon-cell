@@ -126,6 +126,8 @@ export interface WorkbookChromeStrings {
   commandRefusal: {
     tooLarge: string;
     engineFailed: string;
+    /** A command whose host feature is switched off. */
+    featureDisabled: string;
   };
   mountError: {
     title: string;

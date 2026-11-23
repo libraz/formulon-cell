@@ -122,6 +122,7 @@ export const workbookChromeDe: WorkbookChromeStrings = {
   commandRefusal: {
     tooLarge: 'Markierung ist zu groß.',
     engineFailed: 'Diese Aktion kann nicht abgeschlossen werden.',
+    featureDisabled: 'Dieser Befehl ist für diese Tabelle deaktiviert.',
   },
   mountError: {
     title: 'Tabellenkalkulations-Engine nicht verfügbar',
