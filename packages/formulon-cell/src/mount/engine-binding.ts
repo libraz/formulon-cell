@@ -126,7 +126,8 @@ const FACADE_HYDRATORS: Readonly<Record<FacadeChangeKind, readonly SliceHydrator
   ],
   names: [],
   table: [(wb, store) => hydrateTableOverlaysFromEngine(wb, store), hydrateAutoFilterFromEngine],
-  autoFilter: [hydrateAutoFilterFromEngine],
+  // Applying a filter hides rows in the engine's row layout.
+  autoFilter: [hydrateAutoFilterFromEngine, hydrateLayoutFromEngine],
   drawing: [
     hydrateImagesFromEngine,
     hydrateChartsFromEngine,

@@ -1,4 +1,4 @@
-import { CellShift } from '@libraz/formulon';
+import { CellShift, FilterKind } from '@libraz/formulon';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, type SpreadsheetInstance } from '../../../src/api/spreadsheet/instance.js';
 import { spreadsheetInternals } from '../../../src/mount/internals.js';
@@ -48,5 +48,31 @@ describe('facade layout writes keep the store in step with the engine', () => {
   it('moves the table overlay back when rows are deleted from it', () => {
     instance.workbook.sheet(0).deleteRows(2, 2);
     expect(tableRange()).toMatchObject({ r0: 0, r1: 3 });
+  });
+
+  it('hides the rows a facade AutoFilter excludes once it is applied', () => {
+    const s = instance.workbook.sheet(0);
+    s.setValues('F1', [
+      ['Item', 'State'],
+      ['a', 'Shipped'],
+      ['b', 'Open'],
+      ['c', 'Open'],
+    ]);
+    s.setAutoFilter({
+      range: 'F1:G4',
+      columns: [{ columnOffset: 1, kind: FilterKind.Values, values: ['Shipped'] }],
+    });
+    s.applyAutoFilter();
+    expect([...store.getState().layout.hiddenRows].sort()).toEqual([2, 3]);
+  });
+
+  it('hides the rows a table AutoFilter excludes once it is applied', () => {
+    const t = instance.workbook.table('Sales');
+    t.setAutoFilter({
+      range: 'A1:B4',
+      columns: [{ columnOffset: 0, kind: FilterKind.Values, values: ['East'] }],
+    });
+    t.applyAutoFilter();
+    expect([...store.getState().layout.hiddenRows].sort()).toEqual([2, 3]);
   });
 });
