@@ -1,6 +1,6 @@
 {
   "name": "@libraz/formulon-cell",
-  "version": "0.15.2",
+  "version": "0.15.3",
   "description": "Excel-like spreadsheet component for the browser: canvas grid, formula bar, ribbon and sheet tabs, calculated by the Formulon WASM engine.",
   "type": "module",
   "license": "Apache-2.0",

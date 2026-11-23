@@ -4,6 +4,19 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## 0.15.3 — 2026-11-23
+
+`@libraz/formulon-cell-react` and `@libraz/formulon-cell-vue` are released at the same version.
+
+### Fixed
+
+- Charts and drawings: pictures, charts and slicers follow a column width or row height changed through `Sheet.setColumnWidth` and `setRowHeight`.
+- Charts and drawings: a picture stretches to fill its box instead of being letterboxed inside it.
+- Slicers: a slicer panel sits at its anchor in the grid instead of being offset over the ribbon and formula bar.
+- Slicers: an anchored slicer panel takes its anchor's size instead of the floating panel's minimum width.
+- Ribbon: `ribbon({ activeTab: 'tableDesign' })` opens Table Design when the selection is in a table at mount, and falls back to Home rather than File when it is not.
+- Ribbon: Insert Slicer explains that the command is turned off when the slicer feature is disabled, instead of doing nothing.
+
 ## 0.15.2 — 2026-11-23
 
 `@libraz/formulon-cell-react` and `@libraz/formulon-cell-vue` are released at the same version.
