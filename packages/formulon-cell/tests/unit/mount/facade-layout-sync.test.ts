@@ -115,4 +115,27 @@ describe('facade layout writes keep the store in step with the engine', () => {
       column: 'Region',
     });
   });
+  const spanB2 = () =>
+    instance.workbook.sheet(0).addPicture(PNG, {
+      anchor: { kind: AnchorKind.TwoCell, fromRow: 1, fromCol: 1, toRow: 2, toCol: 2 },
+    });
+  const colBPx = () => {
+    const { layout } = store.getState();
+    return layout.colWidths.get(1) ?? layout.defaultColWidth;
+  };
+
+  it('sizes a B2 picture to the store width of column B after a facade width change', () => {
+    spanB2();
+    instance.workbook.sheet(0).setColumnWidth('B', 40);
+    expect(colBPx()).toBeGreaterThan(150);
+    expect(pictureBox().w).toBe(colBPx());
+  });
+
+  it('keeps a B2 picture at the store width of column B when a picture update re-hydrates it', () => {
+    const picture = spanB2();
+    instance.workbook.sheet(0).setColumnWidth('B', 40);
+    instance.workbook.sheet(0).setRowHeight('2', 80);
+    picture.update({ description: 'resized' });
+    expect(pictureBox().w).toBe(colBPx());
+  });
 });
