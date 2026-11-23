@@ -434,7 +434,8 @@ export function createColorPalette(options: ColorPaletteOptions): ColorPaletteHa
       syncColorPaletteSelection(root, color);
     },
     focus(): void {
-      swatches[selectedIndex()]?.focus();
+      // The opener has already placed the palette; focusing must not scroll the host.
+      swatches[selectedIndex()]?.focus({ preventScroll: true });
     },
   };
 }
