@@ -44,6 +44,12 @@ export const styleFor = (spec: ChartSpec, seriesId: string): ChartSeriesStyleSpe
 const colorOnly = (color: string | undefined): ChartFillSpec | undefined =>
   color === undefined ? undefined : { color };
 
+const withoutColor = (fill: ChartFillSpec | undefined): ChartFillSpec | undefined => {
+  if (fill === undefined) return undefined;
+  const { color: _color, ...rest } = fill;
+  return rest;
+};
+
 /** Resolve point overrides field-by-field so a point can change only its fill color. */
 export const resolveChartStyle = (
   spec: ChartSpec,
@@ -62,6 +68,8 @@ export const resolveChartStyle = (
   const paletteIndex = varyColors
     ? (originalPointIndex ?? originalSeriesIndex)
     : originalSeriesIndex;
+  // A pie or doughnut that varies colours by point takes the palette sequence over a series fill when the file states it.
+  const sliced = spec.varyColors === true && (spec.kind === 'pie' || spec.kind === 'doughnut');
   const color =
     palette[((paletteIndex % palette.length) + palette.length) % palette.length] ??
     DEFAULT_THEME_ACCENTS[0] ??
@@ -110,7 +118,7 @@ export const resolveChartStyle = (
   }
   return {
     color,
-    fill: mergeFill(seriesStyle?.fill, pointStyle?.fill),
+    fill: mergeFill(sliced ? withoutColor(seriesStyle?.fill) : seriesStyle?.fill, pointStyle?.fill),
     line: mergeLine(seriesStyle?.line, pointStyle?.line),
     marker,
   };
