@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   FormulaDraftHistory,
   type FormulaDraftSnapshot,
+  recordPointNavigation,
 } from '../../../src/interact/formula-draft-history.js';
 
 const snapshot = (
@@ -43,6 +44,35 @@ describe('FormulaDraftHistory', () => {
 
     expect(history.undo()).toEqual(snapshot('=1+'));
     expect(history.redo()).toEqual(snapshot('=1+A4:C5', 10, 'point'));
+  });
+
+  it('keeps a reference group open when the caret reads back with a platform direction', () => {
+    const history = new FormulaDraftHistory(snapshot('=SUM()+7', 5));
+    recordPointNavigation(
+      history,
+      snapshot('=SUM()+7', 5),
+      { value: '=SUM(E2)+7', caret: 7 },
+      'point',
+    );
+    // Chromium and WebKit outside macOS report a collapsed caret as 'forward'.
+    history.observeSelection({ ...snapshot('=SUM(E2)+7', 7, 'point'), direction: 'forward' });
+    recordPointNavigation(
+      history,
+      { ...snapshot('=SUM(E2)+7', 7, 'point'), direction: 'forward' },
+      { value: '=SUM(E2:H2)+7', caret: 10 },
+      'point',
+    );
+
+    expect(history.undo()).toEqual(snapshot('=SUM()+7', 5));
+  });
+
+  it('ends a reference group when the selection extends in another direction', () => {
+    const history = new FormulaDraftHistory(snapshot('=1+'));
+    history.beginGroup(snapshot('=1+'), 'reference');
+    history.updateGroup({ ...snapshot('=1+C4', 3, 'point'), end: 5 }, 'reference');
+    history.observeSelection({ ...snapshot('=1+C4', 3, 'point'), end: 5, direction: 'backward' });
+
+    expect(history.hasActiveGroup).toBe(false);
   });
 
   it('records an IME composition once and folds the final composition input into it', () => {

@@ -110,6 +110,7 @@ Requires `@libraz/formulon` 0.19.0. `@libraz/formulon-cell-react` and `@libraz/f
 - Insert Slicer adds every chosen field as one undo step and targets only the active table; a refused slicer click leaves focus on its alert.
 - A hyperlink or note removed through the workbook API leaves the grid too; double-clicked Format Painter stays on; sheet names shaped like references or numbers are quoted in the Mac Subtotal and Consolidate dialogs.
 - A data validation rule whose formula the engine respells is still checked by the engine.
+- Formula editing: one undo takes back a reference picked with the arrow keys or the pointer as a whole in browsers on Windows and Linux, as it does on macOS.
 - The print document's end-of-sheet comments heading follows the UI strings.
 - Controls that would do nothing are no longer offered: Draw tab Pen and Eraser without a drawing hook, and context-menu items whose dialog is turned off.
 

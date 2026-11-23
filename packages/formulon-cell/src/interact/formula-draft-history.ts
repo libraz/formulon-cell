@@ -66,11 +66,12 @@ const cloneTransaction = (transaction: Transaction): Transaction => ({
   after: cloneSnapshot(transaction.after),
 });
 
+// A collapsed caret has no direction; browsers report it as 'none' or 'forward' by platform.
 const sameSnapshot = (a: FormulaDraftSnapshot, b: FormulaDraftSnapshot): boolean =>
   a.value === b.value &&
   a.start === b.start &&
   a.end === b.end &&
-  a.direction === b.direction &&
+  (a.start === a.end || a.direction === b.direction) &&
   a.mode === b.mode;
 
 /** A snapshot with the caret collapsed at `caret`. */
