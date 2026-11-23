@@ -160,4 +160,34 @@ describe('overlay z-index tiers', () => {
       expect(value, String(value)).toBeLessThanOrEqual(2 ** 24);
     }
   });
+
+  it('layers ribbon dropdowns over the in-grid surfaces that share the host stacking context', () => {
+    // The ribbon mounts inside the isolated .fc-host, so its menus compete with the
+    // Quick Analysis launcher, in-grid panels and drawings by tier, not by a local number.
+    expect(cssBlockFor(overlayCss, '.fc-quick__button')).toContain(
+      `z-index: var(--fc-z-grid, ${expectedTierValues.grid});`,
+    );
+    const toolbarCss = walkCss(resolve(styleRoot, '../toolbar')).join('\n');
+    const macCss = readFileSync(resolve(styleRoot, '../platform-mac.css'), 'utf8');
+    const popover = `var(--fc-z-popover, ${expectedTierValues.popover})`;
+    for (const selector of [
+      '.fc-tb__submenu',
+      '.fc-tb__rb-dd__list',
+      '.fc-tb__merge-menu',
+      '.fc-tb__command-menu',
+      '.fc-tb__ribbon-shell--peek > .fc-tb__ribbon:not([hidden])',
+    ]) {
+      expect(cssBlockFor(toolbarCss, selector), selector).toContain(`z-index: ${popover};`);
+    }
+    for (const selector of [
+      '.fc-tb__menu.fc-tb__tablestyle-ctx',
+      '.fc-tb__ribbon-shell--peek .fc-tb__ribbon-display',
+    ]) {
+      expect(cssBlockFor(toolbarCss, selector), selector).toContain(
+        `z-index: calc(${popover} + 1);`,
+      );
+    }
+    expect(cssBlockFor(macCss, '> .fc-tb__ribbon-tools')).toContain(`z-index: ${popover};`);
+    expect([toolbarCss, macCss].join('\n')).not.toMatch(/z-index:\s*(?:40|80|9\d);/);
+  });
 });

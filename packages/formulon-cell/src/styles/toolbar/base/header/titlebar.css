@@ -73,7 +73,7 @@
     top: calc(100% + 6px);
     right: 0;
     left: 0;
-    z-index: 40;
+    z-index: var(--fc-z-popover, 16777040);
     overflow: hidden;
     border: 1px solid var(--fc-tb-ribbon-line);
     border-radius: 4px;

@@ -12,7 +12,7 @@
   .fc-tb__menu,
   .fc-tb__submenu {
     position: absolute;
-    z-index: 90;
+    z-index: var(--fc-z-popover, 16777040);
     min-width: 216px;
     padding: 3px 0;
     border: 1px solid var(--fc-tb-ribbon-line);
@@ -33,7 +33,7 @@
 
   /* A gallery item's context menu opens at the pointer, over the open gallery. */
   .fc-tb__menu.fc-tb__tablestyle-ctx {
-    z-index: 95;
+    z-index: calc(var(--fc-z-popover, 16777040) + 1);
   }
 
   .fc-tb__menu:not([hidden]),

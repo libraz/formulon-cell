@@ -106,7 +106,7 @@
   .fc-tb__color-flyout,
   .fc-tb__merge-menu {
     position: fixed;
-    z-index: 90;
+    z-index: var(--fc-z-popover, 16777040);
     border: 1px solid #c8c8c8;
     border-radius: 3px;
     background: var(--fc-tb-ribbon-bg, #ffffff);

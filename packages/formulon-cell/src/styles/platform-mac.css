@@ -2265,7 +2265,7 @@
     .fc-tb__ribbon-group--collapsed.fc-tb__ribbon-group--open
     > .fc-tb__ribbon-tools {
     position: fixed;
-    z-index: 90;
+    z-index: var(--fc-z-popover, 16777040);
     display: flex;
     flex-wrap: wrap;
     box-sizing: border-box;

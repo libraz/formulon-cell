@@ -419,12 +419,12 @@
     top: 100%;
     right: 0;
     left: 0;
-    z-index: 90;
+    z-index: var(--fc-z-popover, 16777040);
     box-shadow: 0 6px 14px rgba(0, 0, 0, 0.13);
   }
 
   /* The display-options menu opens over the peeking ribbon, not under it. */
   .fc-tb__ribbon-shell--peek .fc-tb__ribbon-display {
-    z-index: 91;
+    z-index: calc(var(--fc-z-popover, 16777040) + 1);
   }
 }
