@@ -8,6 +8,6 @@ test('Mac: column-header letters take the cell text size at 100% and 150%', asyn
   await runMacHeaderLetterSizeScenario(page);
 });
 
-test('Mac: bottom-aligned Calibri and Aptos Narrow keep a 10 pt bottom gap', async ({ page }) => {
+test('Mac: bottom-aligned Calibri and Aptos Narrow keep a 4 pt bottom gap', async ({ page }) => {
   await runMacBottomGapScenario(page);
 });

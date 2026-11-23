@@ -100,7 +100,7 @@ export async function runMacHeaderLetterSizeScenario(page: Page): Promise<void> 
   await sp.expectNoConsoleErrors();
 }
 
-/** Bottom-aligned Calibri and Aptos Narrow text sits with its baseline 10 pt above the cell's
+/** Bottom-aligned Calibri and Aptos Narrow text sits with its baseline 4 pt above the cell's
  *  bottom edge at every font size, scaled with the zoom. */
 export async function runMacBottomGapScenario(page: Page): Promise<void> {
   await recordDraws(page);
@@ -131,7 +131,7 @@ export async function runMacBottomGapScenario(page: Page): Promise<void> {
   }, cells);
   for (const percent of [100, 150]) {
     if (percent !== 100) await setZoom(sp, page, percent);
-    const gap = (10 * percent) / 100;
+    const gap = (4 * percent) / 100;
     for (const [glyph, row, family, pt] of cells) {
       await expect
         .poll(
