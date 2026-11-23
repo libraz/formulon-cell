@@ -278,11 +278,15 @@ export function mountToolbar(
   // Objects added in the current task: an insert or paste selects the object it adds.
   const freshObjectIds = new Set<string>();
   const isContextualTab = (tab: RibbonTab): boolean => CONTEXTUAL_RIBBON_TABS.includes(tab);
+  // A contextual tab requested at mount, opened once the selection makes it visible.
+  let requestedContextualTab: RibbonTab | null =
+    opts.activeTab && isContextualTab(opts.activeTab) ? opts.activeTab : null;
 
   const rehomeActiveTabForPlatform = (): void => {
     const available = opts.ribbonTabs ?? defaultRibbonTabs;
     if (available.includes(activeTab) || contextualTabs.includes(activeTab)) return;
-    activeTab = available[0] ?? 'home';
+    activeTab =
+      isContextualTab(activeTab) && available.includes('home') ? 'home' : (available[0] ?? 'home');
   };
   rehomeActiveTabForPlatform();
 
@@ -349,10 +353,15 @@ export function mountToolbar(
       freshObjectIds.add(id);
     }
     const next = state ? selectedObjectTabs(state) : NO_CONTEXTUAL_TABS;
+    let openRequested = false;
+    if (state && requestedContextualTab) {
+      openRequested = next.includes(requestedContextualTab);
+      if (!openRequested) requestedContextualTab = null;
+    }
     const selectedId = state?.ui.selectedObject?.id;
     const inserted =
       next !== NO_CONTEXTUAL_TABS && selectedId !== undefined && freshObjectIds.delete(selectedId);
-    if (next === contextualTabs && !inserted) return false;
+    if (next === contextualTabs && !inserted && !openRequested) return false;
     // Mac Excel switches to the table tab as the active cell enters a table.
     const enteredTable =
       adopt &&
@@ -361,7 +370,11 @@ export function mountToolbar(
       !contextualTabs.includes('tableDesign');
     contextualTabs = next;
     const previousTab = activeTab;
-    if (enteredTable && !inserted) {
+    if (openRequested && requestedContextualTab) {
+      if (!isContextualTab(activeTab)) contextualReturnTab = activeTab;
+      activeTab = requestedContextualTab;
+      requestedContextualTab = null;
+    } else if (enteredTable && !inserted) {
       if (!isContextualTab(activeTab)) contextualReturnTab = activeTab;
       activeTab = 'tableDesign';
     } else if (inserted) {

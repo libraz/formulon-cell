@@ -317,4 +317,26 @@ describe('Table Design tab of the ribbon', () => {
     expect(command('tableConvertRange').disabled).toBe(true);
     tb.dispose();
   });
+
+  it('opens a requested Table Design tab at mount when the selection is in a table', () => {
+    makeTable();
+    mutators.setActive(store(), { sheet: 0, row: 1, col: 1 });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      helpers: stubHelpers(),
+      activeTab: 'tableDesign',
+    });
+    expect(tabIds()).toContain('tableDesign');
+    expect(tb.getActiveTab()).toBe('tableDesign');
+    tb.dispose();
+  });
+
+  it('falls back to Home when the requested Table Design tab is not available', () => {
+    mutators.setActive(store(), { sheet: 0, row: 8, col: 8 });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      helpers: stubHelpers(),
+      activeTab: 'tableDesign',
+    });
+    expect(tb.getActiveTab()).toBe('home');
+    tb.dispose();
+  });
 });
