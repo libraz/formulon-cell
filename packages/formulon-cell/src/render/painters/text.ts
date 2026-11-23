@@ -205,10 +205,11 @@ export const shrinkFontSizeToFit = (
 };
 
 /** Bottom gap, in points, from the baseline to the cell's bottom edge for
- *  fonts whose placement was measured: constant across sizes and row heights. */
+ *  fonts whose placement was measured: constant across sizes and row heights.
+ *  Calibri 11 pt in a 24 pt row lands 4 pt above the paint bounds at 50-200%. */
 const BOTTOM_GAP_PT: Record<string, number> = {
-  calibri: 10,
-  'aptos narrow': 10,
+  calibri: 4,
+  'aptos narrow': 4,
 };
 
 /** Bottom-aligned baseline rise above the cell's bottom edge, `slope * size +
