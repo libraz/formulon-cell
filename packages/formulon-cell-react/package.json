@@ -1,6 +1,6 @@
 {
   "name": "@libraz/formulon-cell-react",
-  "version": "0.15.1",
+  "version": "0.15.2",
   "description": "Excel-like spreadsheet component for React 18+: component and hooks for @libraz/formulon-cell.",
   "type": "module",
   "license": "Apache-2.0",

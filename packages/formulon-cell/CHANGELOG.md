@@ -4,6 +4,24 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## 0.15.2 — 2026-11-23
+
+`@libraz/formulon-cell-react` and `@libraz/formulon-cell-vue` are released at the same version.
+
+### Fixed
+
+- PivotTables: the field list stays closed after its close button until Field List turns it back on; Field List shows as pressed while the list is open and hides it on a second click.
+- Tables: the totals row, banding and other range-anchored objects follow rows and cells inserted or deleted through `Sheet.insertCells`, `insertRows` and `deleteRows`.
+- Filtering: an AutoFilter applied through the workbook facade (`setAutoFilter` then `applyAutoFilter` on a sheet or table) hides the excluded rows in the grid.
+- Charts: pie and doughnut charts that vary colours by point colour each slice, including a chart changed to a pie or doughnut through Change Chart Type.
+- Charts and drawings: charts, pictures and shapes are clipped to the cell area, so they no longer cover the sheet tabs or the status bar.
+- Rendering: under a dark theme, automatic text on a filled cell (table stripes, cell, conditional-format and PivotTable style fills) draws in the workbook's dark text colour.
+- Rendering: a conditional-format fill paints on a blank cell inside the rule's range, including a cell opened by an insert-and-shift.
+- Quick Analysis: the button and panel sit just outside the selection's bottom-right corner instead of over the column headers; the button hides while a chart or picture is selected; the panel widens so a long-label tab row is not clipped.
+- Ribbon: dropdowns, lists and colour palettes open above charts, shapes and grid controls, and open at their button inside a host that uses CSS containment or a transform; opening a colour palette no longer scrolls the host.
+- Chrome: the status bar zoom controls and the name box text stay clear in a narrow host, and a squeezed aggregate no longer shows a clipped character beside the filter count.
+- API: `viewport.scrollTo(ref)` scrolls the target cell into view instead of only moving the active cell.
+
 ## 0.15.1 — 2026-11-23
 
 `@libraz/formulon-cell-react` and `@libraz/formulon-cell-vue` are released at the same version.
