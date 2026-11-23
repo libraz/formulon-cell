@@ -558,12 +558,14 @@ export function paintCells(
       const filterHeader =
         filterRanges.some((fr) => fr.r0 === r && c >= fr.c0 && c <= fr.c1) &&
         !filterButtonHidden(state, data.sheetIndex, r, c);
-      // Render-worthy when there's data, a merge anchor, a static fill, or a
-      // sparkline/table host — all reasons to paint into an otherwise blank cell.
+      const overlay = conditional.get(key);
+      // Render-worthy when there's data, a merge anchor, a static or conditional
+      // fill, or a sparkline/table host — all reasons to paint into a blank cell.
       if (
         !cell &&
         !isActive &&
         !isMergeAnchor &&
+        !overlay?.fill &&
         !hasCellFill(engineFmt) &&
         !engineFmt?.borders &&
         !hasCellFill(fmt) &&
@@ -583,7 +585,6 @@ export function paintCells(
       const isInRange = rangeContainsAddr(rng, cellAddr);
       const isInExtraRange = extras?.some((extra) => rangeContainsAddr(extra, cellAddr));
 
-      const overlay = conditional.get(key);
       const baseFmt: typeof fmt =
         engineFmt || styleFmt || fmt
           ? {

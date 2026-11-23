@@ -191,3 +191,48 @@ describe('grid conditional-format viewport includes actual visible axes', () => 
     },
   );
 });
+
+describe('grid conditional-format fill on a cell with no content', () => {
+  it('paints the fill of a matching rule on a truly blank cell', () => {
+    const store = createSpreadsheetStore();
+    const rule: ConditionalRule = {
+      kind: 'blanks',
+      range: { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 3 },
+      apply: { fill: conditionalFill },
+    };
+    store.setState((state) => ({
+      ...state,
+      viewport: { ...state.viewport, rowStart: 0, rowCount: 6, colStart: 0, colCount: 6 },
+      conditional: { ...state.conditional, rules: [rule] },
+    }));
+    const state = store.getState();
+    const view = { ...state, layout: layoutForView(state) };
+    const rows = buildRowLayout(view.layout, view.viewport);
+    const cols = buildColLayout(view.layout, view.viewport);
+    const spy = canvasSpy();
+    paintCells(
+      {
+        ctx: spy.ctx,
+        wb: null,
+        locale: 'en-US',
+        getDisplay: undefined,
+        sheetBackgroundImage: null,
+        fontEffects: false,
+        conditionalCache: createConditionalCache(),
+      },
+      view,
+      theme,
+      cols,
+      rows,
+    );
+    const painted = spy.fills.filter(({ style }) => style === conditionalFill);
+    const rect = cellRectIn(view.layout, cols, rows, 2, 2);
+    expect(painted.map(({ rect: r }) => r)).toContainEqual([
+      rect.x - 1,
+      rect.y - 1,
+      rect.w + 1,
+      rect.h + 1,
+    ]);
+    expect(painted).toHaveLength(9);
+  });
+});
