@@ -4,6 +4,15 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## 0.15.1 — 2026-11-23
+
+`@libraz/formulon-cell-react` and `@libraz/formulon-cell-vue` are released at the same version.
+
+### Fixed
+
+- Rendering: bottom-aligned text in Calibri and Aptos Narrow sits 4 pt above the cell's bottom edge, so it no longer clips against the row above in default-height rows.
+- Rendering: a viewport resize that invalidates the grid again keeps a single frame pending, so no frame paints after the spreadsheet is disposed.
+
 ## 0.15.0 — 2026-11-23
 
 Requires `@libraz/formulon` 0.19.0. `@libraz/formulon-cell-react` and `@libraz/formulon-cell-vue` are released at the same version. For the engine's own record, enum and error-model changes, see the engine's "Upgrading from 0.18 to 0.19" guide (`docs/releases/upgrading-0.19.md` in the formulon repository).
