@@ -525,3 +525,62 @@ describe('Quick Analysis button while an object is selected', () => {
     handle.detach();
   });
 });
+
+describe('Quick Analysis panel width', () => {
+  afterEach(() => {
+    while (document.body.firstChild) document.body.removeChild(document.body.firstChild);
+  });
+
+  it('widens the panel to fit a tab row longer than its default width', async () => {
+    const host = document.createElement('div');
+    Object.defineProperty(host, 'clientWidth', { configurable: true, get: () => 800 });
+    Object.defineProperty(host, 'clientHeight', { configurable: true, get: () => 600 });
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    const wb = await newWb();
+    seed(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 0, col: 1, value: 2 },
+    ]);
+    setRange(store, 0, 0, 0, 1);
+    const scrollW = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollWidth');
+    const clientW = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+    const offsetW = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth');
+    const isTabs = (el: Element) => el.classList.contains('fc-quick__tabs');
+    const isRoot = (el: Element) => el.classList.contains('fc-quick');
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+      configurable: true,
+      get(this: HTMLElement) {
+        return isTabs(this) ? 319 : 0;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get(this: HTMLElement) {
+        return isTabs(this) ? 306 : 0;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+      configurable: true,
+      get(this: HTMLElement) {
+        return isRoot(this) ? 320 : 0;
+      },
+    });
+    try {
+      const handle = attachQuickAnalysis({ host, store, wb, strings: defaultStrings });
+      handle.open();
+      const root = host.querySelector<HTMLElement>('.fc-quick');
+      expect(root?.style.width).toBe('333px');
+      handle.detach();
+    } finally {
+      for (const [key, desc] of [
+        ['scrollWidth', scrollW],
+        ['clientWidth', clientW],
+      ] as const) {
+        if (desc) Object.defineProperty(HTMLElement.prototype, key, desc);
+        else delete (HTMLElement.prototype as unknown as Record<string, unknown>)[key];
+      }
+      if (offsetW) Object.defineProperty(HTMLElement.prototype, 'offsetWidth', offsetW);
+    }
+  });
+});

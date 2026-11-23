@@ -99,7 +99,18 @@ function gridBox(host: HTMLElement): GridBox {
   };
 }
 
+/** Widen the panel just enough that its tab row fits, within the host; long locales overflow 320px. */
+function fitTabRow(host: HTMLElement, root: HTMLElement): void {
+  root.style.removeProperty('width');
+  const tabs = root.querySelector<HTMLElement>('.fc-quick__tabs');
+  if (!tabs) return;
+  const overflow = tabs.scrollWidth - tabs.clientWidth;
+  if (overflow <= 0) return;
+  root.style.width = `${Math.min(root.offsetWidth + overflow, host.clientWidth - 16)}px`;
+}
+
 function positionPanel(host: HTMLElement, root: HTMLElement, store: SpreadsheetStore): void {
+  fitTabRow(host, root);
   const s = store.getState();
   const rects = rangeRects(layoutForView(s), s.viewport, s.selection.range);
   const anchor = rects[rects.length - 1];
