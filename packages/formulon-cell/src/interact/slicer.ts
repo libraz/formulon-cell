@@ -96,6 +96,10 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
       return;
     }
     const frame = sessionPosition(store, spec.nativeAnchor);
+    // The anchor alone sizes the panel, border included, as it does a chart.
+    root.style.boxSizing = 'border-box';
+    root.style.minWidth = '0px';
+    root.style.maxWidth = 'none';
     root.style.left = `${frame.x}px`;
     root.style.top = `${frame.y}px`;
     root.style.width = `${frame.w}px`;

@@ -223,6 +223,35 @@ describe('attachSlicer', () => {
     handle.detach();
   });
 
+  it('sizes an anchored panel to its anchor alone, past the floating panel width limits', () => {
+    const handle = attachSlicer({ host, store, getWb: () => wb });
+    mutators.addSlicer(store, {
+      id: 'narrow',
+      tableName: 'Sales',
+      column: 'Region',
+      selected: [],
+      nativeAnchor: {
+        kind: AnchorKind.TwoCell,
+        editAs: AnchorEditAs.TwoCell,
+        fromRow: 0,
+        fromCol: 4,
+        fromRowOffsetEmu: 0,
+        fromColOffsetEmu: 0,
+        toRow: 9,
+        toCol: 6,
+        toRowOffsetEmu: 0,
+        toColOffsetEmu: 0,
+        widthEmu: 0,
+        heightEmu: 0,
+      },
+    });
+    const panel = host.querySelector<HTMLElement>('.fc-slicer');
+    expect(panel?.style.minWidth).toBe('0px');
+    expect(panel?.style.maxWidth).toBe('none');
+    expect(panel?.style.boxSizing).toBe('border-box');
+    handle.detach();
+  });
+
   it('draws panels in the drawing root of the grid layer, like charts and pictures', () => {
     const layer = document.createElement('div');
     host.appendChild(layer);
