@@ -50,6 +50,7 @@
     background: color-mix(in srgb, var(--fc-statusbar-fg-strong, CanvasText) 8%, transparent);
   }
 
+  /* Spaced by margin, not padding: a collapsed box must not paint a clipped first glyph. */
   .fc-host__statusbar-aggs {
     flex: 1 1 0;
     text-align: center;
@@ -63,7 +64,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 0 10px;
+    margin: 0 10px;
   }
 
   .fc-host__statusbar-aggs:hover {

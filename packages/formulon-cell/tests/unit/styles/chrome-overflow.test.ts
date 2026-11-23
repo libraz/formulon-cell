@@ -51,3 +51,13 @@ describe('name box text overflow', () => {
     expect(tag.display).not.toBe('inline-flex');
   });
 });
+
+describe('status bar aggregates squeezed to nothing', () => {
+  const css = read('src/styles/core/surface/statusbar.css');
+
+  it('spaces the aggregates with margin, so no glyph shows in a padding sliver once they collapse', () => {
+    const aggs = rule(css, '.fc-host__statusbar-aggs');
+    expect(aggs.padding).toBeUndefined();
+    expect(aggs.margin).toBe('0 10px');
+  });
+});
