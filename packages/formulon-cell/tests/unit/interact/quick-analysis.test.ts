@@ -6,7 +6,11 @@ import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js'
 import { defaultStrings } from '../../../src/i18n/strings.js';
 import { attachQuickAnalysis } from '../../../src/interact/quick-analysis.js';
 import { layoutForView, rangeRects } from '../../../src/render/geometry.js';
-import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
+import {
+  createSpreadsheetStore,
+  mutators,
+  type SpreadsheetStore,
+} from '../../../src/store/store.js';
 import { sheetFocusTarget } from '../../test-utils/sheet-focus.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -493,5 +497,31 @@ describe('attachQuickAnalysis', () => {
       );
       handle.detach();
     });
+  });
+});
+
+describe('Quick Analysis button while an object is selected', () => {
+  afterEach(() => {
+    while (document.body.firstChild) document.body.removeChild(document.body.firstChild);
+  });
+
+  it('hides the button when a chart takes the selection and shows it again when it leaves', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    const wb = await newWb();
+    seed(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 0, col: 1, value: 2 },
+    ]);
+    setRange(store, 0, 0, 0, 1);
+    const handle = attachQuickAnalysis({ host, store, wb, strings: defaultStrings });
+    const button = host.querySelector<HTMLButtonElement>('.fc-quick__button');
+    expect(button?.hidden).toBe(false);
+    mutators.setSelectedObject(store, { id: 'chart-1', name: 'Chart 1' });
+    expect(button?.hidden).toBe(true);
+    mutators.setSelectedObject(store, null);
+    expect(button?.hidden).toBe(false);
+    handle.detach();
   });
 });

@@ -190,7 +190,8 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
 
   const positionButton = (): void => {
     const state = store.getState();
-    if (isWholeBandSelection()) {
+    // A selected chart or picture is not a cell range to analyse.
+    if (isWholeBandSelection() || state.ui.selectedObject !== null) {
       button.hidden = true;
       close(false);
       return;
