@@ -150,7 +150,11 @@ describe('visible row/col counts', () => {
       getBoundingClientRect: () => ({ width: HEADER_W + 610, height: HEADER_H + 250 }),
     } as unknown as HTMLElement;
     const canvas = {
-      getContext: () => ({}) as CanvasRenderingContext2D,
+      // Resizing paints, so the context must accept any drawing call.
+      getContext: () =>
+        new Proxy({} as Record<string | symbol, unknown>, {
+          get: (t, k) => (k in t ? t[k] : () => ({ width: 0, addColorStop() {} })),
+        }) as unknown as CanvasRenderingContext2D,
       style: {},
     } as unknown as HTMLCanvasElement;
     const renderer = new GridRenderer({

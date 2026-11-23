@@ -141,6 +141,17 @@ describe('GridRenderer frame work', () => {
     expect(h.host.closest.mock.calls.length).toBeLessThanOrEqual(1);
     h.renderer.dispose();
   });
+
+  it('repaints in the same frame when a resize clears the backing store', () => {
+    const h = harness(false);
+    const paint = vi.spyOn(h.renderer as unknown as { paint(): void }, 'paint');
+    h.renderer.resize();
+    expect(paint).toHaveBeenCalledTimes(1);
+    paint.mockClear();
+    h.renderer.resize();
+    expect(paint).not.toHaveBeenCalled();
+    h.renderer.dispose();
+  });
 });
 
 describe('GridRenderer device pixel ratio', () => {

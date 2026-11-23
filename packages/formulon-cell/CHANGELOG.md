@@ -17,6 +17,7 @@ versioning is [SemVer](https://semver.org/).
 - Charts and drawings: charts, pictures and shapes are clipped to the cell area, so they no longer cover the sheet tabs or the status bar.
 - Rendering: under a dark theme, automatic text on a filled cell (table stripes, cell, conditional-format and PivotTable style fills) draws in the workbook's dark text colour.
 - Rendering: a conditional-format fill paints on a blank cell inside the rule's range, including a cell opened by an insert-and-shift.
+- Rendering: the grid no longer flashes black for a frame when its host changes size after the first paint.
 - Quick Analysis: the button and panel sit just outside the selection's bottom-right corner instead of over the column headers; the button hides while a chart or picture is selected; the panel widens so a long-label tab row is not clipped.
 - Ribbon: dropdowns, lists and colour palettes open above charts, shapes and grid controls, and open at their button inside a host that uses CSS containment or a transform; opening a colour palette no longer scrolls the host.
 - Chrome: the status bar zoom controls and the name box text stay clear in a narrow host, and a squeezed aggregate no longer shows a clipped character beside the filter count.

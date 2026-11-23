@@ -259,12 +259,15 @@ export class GridRenderer {
     const pxW = Math.round(this.cssWidth * this.dpr);
     const pxH = Math.round(this.cssHeight * this.dpr);
     // Assigning either dimension clears the backing store, so only on change.
+    const cleared = this.canvas.width !== pxW || this.canvas.height !== pxH;
     if (this.canvas.width !== pxW) this.canvas.width = pxW;
     if (this.canvas.height !== pxH) this.canvas.height = pxH;
     this.canvas.style.width = `${this.cssWidth}px`;
     this.canvas.style.height = `${this.cssHeight}px`;
     this.watchResolution();
     this.resizeViewport();
+    // An opaque cleared canvas composites black, so refill it before this frame ends.
+    if (cleared) this.paint();
     this.invalidate();
   }
 
