@@ -56,6 +56,8 @@ export function defineDemoAppConfig(app: DemoApp) {
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
+    // Hosted runners take about three times as long per test as a workstation.
+    timeout: process.env.CI ? 90_000 : 30_000,
     // Two workers: local machines are shared, and CI runners have four vCPUs.
     workers: 2,
     reporter: process.env.CI ? [['github'], ['list']] : 'list',

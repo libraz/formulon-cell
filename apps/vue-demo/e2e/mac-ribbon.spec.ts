@@ -74,6 +74,8 @@ test('Mac: Chart galleries preserve selected chart kinds and history', async ({ 
   await runMacChartKindScenario(page);
 });
 test('Mac: Charts group cells keep their drawn size at every fit stage', async ({ page }) => {
+  // Which group takes a stage at 1280 follows macOS system-font text widths.
+  test.skip(process.platform !== 'darwin', 'Ribbon fit stages follow macOS font metrics.');
   await runMacChartCellGeometryScenario(page);
 });
 test('Mac: Subtotal inserts calculated groups in one undoable operation', async ({ page }) => {
