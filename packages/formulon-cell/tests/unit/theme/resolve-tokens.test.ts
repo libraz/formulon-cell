@@ -3,7 +3,11 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { type ResolvedTheme, resolveTheme } from '../../../src/theme/resolve.js';
+import {
+  type ResolvedTheme,
+  resolveTheme,
+  WORKBOOK_TEXT_COLOR,
+} from '../../../src/theme/resolve.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -169,5 +173,24 @@ describe('theme/resolve — selected header tokens', () => {
     expect(theme.headerActiveBar).toBe('transparent');
     expect(theme.headerFgActiveWeight).toBe(400);
     host.remove();
+  });
+});
+
+describe('theme/resolve — fill text token', () => {
+  it('follows the automatic text colour unless a theme sets it', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    host.style.setProperty('--fc-cell-auto-fg', '#123456');
+    expect(resolveTheme(host).cellFillAutoFg).toBe('#123456');
+    host.style.setProperty('--fc-cell-fill-auto-fg', 'workbook-text');
+    expect(resolveTheme(host).cellFillAutoFg).toBe(WORKBOOK_TEXT_COLOR);
+    host.remove();
+  });
+
+  it('takes the workbook text in the dark theme and the automatic colour in the light ones', () => {
+    const css = (name: string) => readFileSync(join(root, `src/styles/${name}.css`), 'utf8');
+    expect(css('theme-ink')).toContain(`--fc-cell-fill-auto-fg: ${WORKBOOK_TEXT_COLOR};`);
+    expect(css('theme-paper')).toContain('--fc-cell-fill-auto-fg: var(--fc-cell-auto-fg);');
+    expect(css('theme-contrast')).toContain('--fc-cell-fill-auto-fg: var(--fc-cell-auto-fg);');
   });
 });

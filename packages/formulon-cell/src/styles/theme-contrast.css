@@ -36,6 +36,7 @@
     --fc-cell-bool-fg: #0033cc;
     --fc-cell-num-fg: #000000;
     --fc-cell-auto-fg: #000000;
+    --fc-cell-fill-auto-fg: var(--fc-cell-auto-fg);
 
     --fc-header-fg: #000000;
     --fc-header-fg-active: #0033cc;

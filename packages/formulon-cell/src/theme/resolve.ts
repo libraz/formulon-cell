@@ -14,6 +14,9 @@ export interface ResolvedTheme {
   fgStrong: string;
   /** Automatic colour of cell text and borders. */
   cellAutoFg: string;
+  /** Automatic text colour on a cell that paints a fill: a CSS colour, or
+   *  {@link WORKBOOK_TEXT_COLOR} for the workbook's Text 1. */
+  cellFillAutoFg: string;
   rule: string;
   ruleStrong: string;
   /** Freeze-pane divider. */
@@ -95,6 +98,10 @@ const num = (s: string, fallback: number): number => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+/** `--fc-cell-fill-auto-fg` value that draws automatic text on a fill in the
+ *  workbook's Text 1 (dk1), the colour automatic means in the file format. */
+export const WORKBOOK_TEXT_COLOR = 'workbook-text';
+
 export function resolveTheme(host: HTMLElement): ResolvedTheme {
   const cs = getComputedStyle(host);
   const v = (k: string, d = ''): string => cs.getPropertyValue(k).trim() || d;
@@ -108,6 +115,7 @@ export function resolveTheme(host: HTMLElement): ResolvedTheme {
   const headerRule = v('--fc-header-rule', rule);
   const headerFg = v('--fc-header-fg', '#6f6a5d');
   const outlineButtonBorder = v('--fc-outline-button-border', ruleStrong);
+  const cellAutoFg = v('--fc-cell-auto-fg', fgStrong);
   return {
     bg: v('--fc-bg', '#faf7f1'),
     bgRail,
@@ -118,7 +126,8 @@ export function resolveTheme(host: HTMLElement): ResolvedTheme {
     fgMute: v('--fc-fg-mute', '#6f6a5d'),
     fgFaint: v('--fc-fg-faint', '#a8a294'),
     fgStrong,
-    cellAutoFg: v('--fc-cell-auto-fg', fgStrong),
+    cellAutoFg,
+    cellFillAutoFg: v('--fc-cell-fill-auto-fg', cellAutoFg),
 
     rule,
     ruleStrong,

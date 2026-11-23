@@ -29,6 +29,7 @@ const theme: ResolvedTheme = {
   cellFormulaFg: '#333',
   cellNumFg: '#000',
   cellAutoFg: '#000',
+  cellFillAutoFg: '#000',
   cellBoolFg: '#060',
   hoverStripe: 'rgba(0,0,0,0.04)',
   headerBg: '#eee',

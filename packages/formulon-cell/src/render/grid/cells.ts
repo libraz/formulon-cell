@@ -15,6 +15,7 @@ import { formulaForEdit } from '../../engine/edit-seed.js';
 import { numFmtToFormatCode } from '../../engine/format-writeback.js';
 import { pivotStyleLayer } from '../../engine/pivot-style.js';
 import { makeRangeResolver, type RangeResolver } from '../../engine/range-resolver.js';
+import { cssColorFromArgb } from '../../engine/theme-color.js';
 import type { CellValue } from '../../engine/types.js';
 import { formatCell } from '../../engine/value.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
@@ -187,6 +188,9 @@ export function paintCells(
   const wb = cellCtx.wb;
   const pivots = pivotStyleLayer(wb, state);
   const styleFormatAt = styleElementFormatSource(state, wb);
+  const workbookTextArgb = wb?.getTheme?.()?.colors[0];
+  const workbookText =
+    workbookTextArgb === undefined ? undefined : cssColorFromArgb(workbookTextArgb);
   const viewZoom = visualZoom(state.viewport.zoom);
   const pivotButtonSize = pivotFieldButtonSize(cellCtx.fontEffects, viewZoom);
   const pivotButtonLook = cellCtx.fontEffects ? MAC_PIVOT_BUTTON_LOOK : FILTER_BUTTON_LOOK;
@@ -679,6 +683,7 @@ export function paintCells(
             ? numberFormatPaint(formatCode, value.value)
             : null,
         fontEffects: cellCtx.fontEffects,
+        workbookText,
       };
 
       // Static format fill OR overlay fill — both painted via paintCellFill,

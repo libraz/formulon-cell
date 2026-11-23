@@ -53,6 +53,8 @@ export interface CellPaintCtx {
   merged?: boolean;
   /** Lay the text out on whole-point glyph advances (the Mac point model). */
   wholePointAdvances?: boolean;
+  /** The workbook's Text 1 (dk1) as a CSS colour; `#000000` when omitted. */
+  workbookText?: string;
 }
 
 export type TextVAlign = 'top' | 'middle' | 'bottom';

@@ -34,6 +34,8 @@
     --fc-cell-bool-fg: #6dd587;
     --fc-cell-num-fg: var(--fc-fg-strong);
     --fc-cell-auto-fg: var(--fc-fg);
+    /* Authored fills are light-mode colours: their text keeps the workbook's Text 1. */
+    --fc-cell-fill-auto-fg: workbook-text;
 
     --fc-header-fg: #c8c6c4;
     --fc-header-fg-active: #6dd587;

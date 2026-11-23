@@ -74,6 +74,9 @@
     --fc-cell-num-fg: initial;
     /* Automatic colour: cell text and borders without an explicit colour. */
     --fc-cell-auto-fg: initial;
+    /* Automatic text on a cell that paints a fill; `workbook-text` takes the
+     * workbook's Text 1. Defaults to --fc-cell-auto-fg. */
+    --fc-cell-fill-auto-fg: initial;
 
     /* === HEADER RAIL === */
     /* Idle column letter / row number text. */

@@ -34,6 +34,7 @@
     /* Spreadsheet automatic colour: text of every kind and borders paint pure
      * black. */
     --fc-cell-auto-fg: #000000;
+    --fc-cell-fill-auto-fg: var(--fc-cell-auto-fg);
     --fc-cell-error-fg: var(--fc-cell-auto-fg);
     --fc-cell-formula-fg: var(--fc-cell-auto-fg);
     --fc-cell-bool-fg: var(--fc-cell-auto-fg);

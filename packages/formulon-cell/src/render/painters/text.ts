@@ -10,7 +10,7 @@ import { splitFontFamily } from '../../format/font-family.js';
 import { intlFormatterCache } from '../../format/intl-cache.js';
 import { convertKana } from '../../format/kana.js';
 import type { CellFormat } from '../../store/store.js';
-import type { ResolvedTheme } from '../../theme/resolve.js';
+import { type ResolvedTheme, WORKBOOK_TEXT_COLOR } from '../../theme/resolve.js';
 import type { Rect } from '../geometry.js';
 import {
   cellLinePitch,
@@ -20,6 +20,7 @@ import {
   wholePointPadX,
 } from '../text-metrics.js';
 import { cellTextHorizontalMetrics, graphemes, wrapText } from '../text-wrap.js';
+import { hasCellFill } from './cell.js';
 import type { CellPaintCtx, TextMetricsBox, TextVAlign } from './types.js';
 
 function canvasTextAlign(align: CellFormat['align'] | undefined): CanvasTextAlign | null {
@@ -505,6 +506,24 @@ function paintStackedText(
   });
 }
 
+/** Text 1 of the default workbook theme. */
+const DEFAULT_WORKBOOK_TEXT = '#000000';
+
+/** Colour of automatic cell text. On a painted fill it is the theme's
+ *  fill-text colour, which may defer to the workbook's Text 1: automatic
+ *  means Text 1 in the file format, and an authored fill is drawn for it. */
+export function automaticTextColor(
+  theme: Pick<ResolvedTheme, 'cellAutoFg' | 'cellNumFg' | 'cellFillAutoFg'>,
+  format: CellFormat | undefined,
+  isNumeric: boolean,
+  workbookText = DEFAULT_WORKBOOK_TEXT,
+): string {
+  if (hasCellFill(format)) {
+    return theme.cellFillAutoFg === WORKBOOK_TEXT_COLOR ? workbookText : theme.cellFillAutoFg;
+  }
+  return isNumeric ? theme.cellNumFg : theme.cellAutoFg;
+}
+
 export function paintCellText({
   ctx,
   bounds,
@@ -525,6 +544,7 @@ export function paintCellText({
   rowBaselineFont,
   merged = false,
   wholePointAdvances = false,
+  workbookText,
 }: CellPaintCtx): void {
   const hyperlinkDisplay = format?.hyperlinkDisplay ?? '';
   if (value.kind === 'blank' && !formula && displayOverride == null && !hyperlinkDisplay) return;
@@ -598,9 +618,7 @@ export function paintCellText({
           ? theme.cellErrorFg
           : isBool
             ? theme.cellBoolFg
-            : isNumeric
-              ? theme.cellNumFg
-              : theme.cellAutoFg;
+            : automaticTextColor(theme, format, isNumeric, workbookText);
 
   let align: CanvasTextAlign;
   if (format?.align) {
