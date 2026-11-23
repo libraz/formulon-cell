@@ -91,3 +91,30 @@ describe('viewport option', () => {
     expect(instance?.viewport.options).toEqual(viewport);
   });
 });
+
+describe('viewport.scrollTo', () => {
+  let instance: SpreadsheetInstance;
+  let cleanup: () => void;
+
+  beforeEach(async () => {
+    installDomStubs();
+    let host: HTMLElement;
+    ({ host, cleanup } = createHostElement());
+    instance = await mount(host);
+  });
+  afterEach(() => {
+    instance.dispose();
+    cleanup();
+    uninstallDomStubs();
+  });
+
+  it('brings an off-screen target into view, not only the active cell', () => {
+    const store = spreadsheetInternals(instance).store;
+    mutators.setViewportSize(store, 10, 5);
+    instance.viewport.scrollTo('A26');
+    const s = store.getState();
+    expect(s.selection.active).toMatchObject({ row: 25, col: 0 });
+    expect(s.viewport.rowStart).toBeLessThanOrEqual(25);
+    expect(s.viewport.rowStart + s.viewport.rowCount - 1).toBeGreaterThanOrEqual(25);
+  });
+});

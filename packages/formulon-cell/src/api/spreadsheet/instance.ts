@@ -38,7 +38,7 @@ import type { BorderDrawHandle } from '../../interact/border-draw.js';
 import type { ClipboardHandle } from '../../interact/clipboard.js';
 import { focusSheet } from '../../interact/dialog-focus.js';
 import type { FormatPainterHandle } from '../../interact/format-painter.js';
-import type { ViewportOptions } from '../../interact/navigation-policy.js';
+import { scrollActiveIntoView, type ViewportOptions } from '../../interact/navigation-policy.js';
 import { shareSpreadsheetInternals, spreadsheetInternals } from '../../mount/internals.js';
 import { runRibbonCommand } from '../../mount/toolbar.js';
 import type { MountToolbarOptions, ToolbarInstance } from '../../mount/toolbar-types.js';
@@ -1246,6 +1246,7 @@ export async function mount(
         const target = currentLegacy();
         const addr = addrOf(ref);
         mutators.setActive(target.store, addr);
+        scrollActiveIntoView(target.store, addr);
       },
       get zoomPercent() {
         const target = currentLegacy();
