@@ -223,6 +223,18 @@ describe('attachSlicer', () => {
     handle.detach();
   });
 
+  it('draws panels in the drawing root of the grid layer, like charts and pictures', () => {
+    const layer = document.createElement('div');
+    host.appendChild(layer);
+    const handle = attachSlicer({ host, layer, store, getWb: () => wb });
+    handle.addSlicer({ tableName: 'Sales', column: 'Region' });
+    const panel = host.querySelector<HTMLElement>('.fc-slicer');
+    expect(panel?.parentElement?.classList.contains('fc-drawings')).toBe(true);
+    expect(panel?.parentElement?.parentElement).toBe(layer);
+    handle.detach();
+    expect(layer.querySelector('.fc-drawings')).toBeNull();
+  });
+
   it('localizes the blank chip while preserving its empty filter key', () => {
     seedCell(store, 0, 4, 0, { kind: 'blank' });
     const blankWb = makeFakeWb({

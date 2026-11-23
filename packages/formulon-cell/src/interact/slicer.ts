@@ -19,11 +19,15 @@ import type { SlicerSpec, SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionChipButton } from './chip-button.js';
 import { appendDialogButton } from './dialog-shell.js';
+import { acquireDrawingRoot } from './session-illustrations.js';
 
 export interface SlicerDeps {
   /** Element the floating panels attach to. Each panel is appended as a
    *  child of `host` so theme variables and focus scope are inherited. */
   host: HTMLElement;
+  /** The element the panels are drawn over, whose top-left corner is the grid's;
+   *  panels then share the `.fc-drawings` root of charts and pictures. Defaults to `host`. */
+  layer?: HTMLElement;
   store: SpreadsheetStore;
   /** Lazy workbook getter — keeps a fresh reference even when `setWorkbook`
    *  swaps the engine. */
@@ -81,6 +85,7 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
   const { host, store, getWb, history } = deps;
   let strings = deps.strings ?? defaultStrings;
   const panels = new Map<string, PanelEntry>();
+  const drawings = deps.layer ? acquireDrawingRoot(deps.layer) : null;
 
   /** Position a panel: from its anchor when it has one, so it scrolls with the
    *  sheet like other drawings, else at its stored offset. */
@@ -131,7 +136,7 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
     body.setAttribute('aria-label', spec.column);
 
     root.append(header, body);
-    host.appendChild(root);
+    (drawings?.root ?? host).appendChild(root);
 
     const onClear = (): void => {
       setSlicerSelectionAction(slicerContext('editor', 'slicerClear'), spec.id, []);
@@ -357,6 +362,7 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
       unsub();
       for (const entry of panels.values()) entry.dispose();
       panels.clear();
+      drawings?.release();
     },
     setStrings(next): void {
       strings = next;

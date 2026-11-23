@@ -803,6 +803,7 @@ export const slicer = (): Extension =>
     setup(ctx: BuiltInExtensionContext) {
       const handle = attachSlicer({
         host: ctx.host,
+        layer: ctx.grid.parentElement ?? ctx.host,
         store: ctx.store,
         getWb: () => ctx.workbook,
         history: ctx.history as History,

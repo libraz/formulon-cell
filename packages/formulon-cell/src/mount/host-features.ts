@@ -797,6 +797,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         if (s.slicer) return;
         s.slicer = attachSlicer({
           host: input.host,
+          layer: input.grid.parentElement ?? input.host,
           store: input.store,
           getWb: input.wb,
           history: input.history,
