@@ -24,9 +24,7 @@
   }
 
   .fc-host__formulabar-tag {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    display: block;
     width: 100%;
     min-width: 0;
     height: var(--fc-formulabar-namebox-height);
@@ -50,6 +48,7 @@
     letter-spacing: 0;
     font-size: 12px;
     text-align: center;
+    text-overflow: ellipsis;
     outline: 0;
     cursor: text;
   }

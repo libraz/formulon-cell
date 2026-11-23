@@ -17,8 +17,13 @@
     flex: 0 0 auto;
   }
 
+  /* Gives way only after the aggregates have collapsed, so the zoom cluster stays visible. */
   .fc-host__statusbar-left {
-    flex: 0 0 auto;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .fc-host__statusbar-filter {
@@ -46,7 +51,7 @@
   }
 
   .fc-host__statusbar-aggs {
-    flex: 1 1 auto;
+    flex: 1 1 0;
     text-align: center;
     cursor: pointer;
     color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
