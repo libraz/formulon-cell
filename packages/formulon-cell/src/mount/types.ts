@@ -237,6 +237,9 @@ export interface SpreadsheetInstance {
   ): boolean;
   openPivotFieldList(sheetIndex: number, pivotIndex: number): boolean;
   openActivePivotFieldList(): boolean;
+  /** Close the PivotTable field list and keep it closed when the selection
+   *  moves onto a report, until it is opened again. */
+  hidePivotFieldList(): void;
   /** Open the PivotTable Field dialog on the field of the active cell: a value
    *  cell's data field, or a label's row, column or filter field. False when the
    *  active cell names no field. Ribbon command id `pivotFieldSettings`. */

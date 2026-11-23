@@ -342,6 +342,7 @@ export const projectMacRibbonState = (
   const toggleStates: Readonly<Record<string, boolean>> = {
     'mac.formulas.watch': instance.store.getState().ui.watchPanelOpen,
     objectSelectionPane: instance.store.getState().ui.workbookObjectsOpen,
+    pivotFieldList: instance.store.getState().ui.pivotFieldListOpen,
     'mac.view.formulaBar': instance.store.getState().ui.formulaBarVisible,
     // The page-layout rulers are always on in this host; Zoom to Selection is a
     // toggle the desktop never leaves pressed.

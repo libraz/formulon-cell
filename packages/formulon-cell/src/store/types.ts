@@ -311,6 +311,8 @@ export interface UiSlice {
   /** Visibility flag for the Workbook Objects panel in its general (selection
    *  pane) use; false while it shows a PivotTable field list. Session-only. */
   workbookObjectsOpen: boolean;
+  /** Visibility flag for the PivotTable field list. Session-only. */
+  pivotFieldListOpen: boolean;
   /** Visibility flag for the Mac Comments pane. Session-only. */
   commentsPaneOpen: boolean;
   /** Whether the host shows the formula bar, as the toolbar last set it. */

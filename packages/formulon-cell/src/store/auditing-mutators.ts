@@ -86,6 +86,13 @@ export const auditingMutators = {
     );
   },
 
+  /** Record whether the PivotTable field list is open. */
+  setPivotFieldListOpen(store: SpreadsheetStore, open: boolean): void {
+    store.setState((s) =>
+      s.ui.pivotFieldListOpen === open ? s : { ...s, ui: { ...s.ui, pivotFieldListOpen: open } },
+    );
+  },
+
   /** Show or hide the Mac Comments pane. */
   setCommentsPaneOpen(store: SpreadsheetStore, open: boolean): void {
     store.setState((s) =>

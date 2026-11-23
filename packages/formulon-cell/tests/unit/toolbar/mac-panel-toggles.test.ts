@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { Spreadsheet } from '../../../src/mount.js';
 import { mutators } from '../../../src/store/store.js';
 import { projectMacRibbonState } from '../../../src/toolbar/ribbon/mac/state-projection.js';
+import { projectRibbonActiveState } from '../../../src/toolbar/ribbon-active-state.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
 
 describe('Mac ribbon panel toggles', () => {
@@ -81,6 +82,56 @@ describe('Mac ribbon panel toggles', () => {
       expect(tb.applyCommand('objectSelectionPane')).toBe(true);
       expect(instance.store.getState().ui.workbookObjectsOpen).toBe(false);
       expect(instance.host.querySelector<HTMLElement>('.fc-objects')?.hidden).toBe(true);
+    } finally {
+      tb.dispose();
+      host.remove();
+    }
+  });
+  it('shows Field List pressed while the PivotTable field list is open', async () => {
+    sheet = await mountStubSheet({
+      workbook: await WorkbookHandle.createDefault({ preferStub: true }),
+      locale: 'ja',
+    });
+    const { instance } = sheet;
+    const { host, button } = ribbonButton('pivotFieldList');
+    const text = { background: 'Background', sheetBackgroundClear: 'Delete Background' };
+    projectMacRibbonState(host, instance);
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    mutators.setPivotFieldListOpen(instance.store, true);
+    projectMacRibbonState(host, instance);
+    expect(button.getAttribute('aria-pressed')).toBe('true');
+    mutators.setPivotFieldListOpen(instance.store, false);
+    projectRibbonActiveState(host, instance, text);
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    mutators.setPivotFieldListOpen(instance.store, true);
+    projectRibbonActiveState(host, instance, text);
+    expect(button.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('hides the open PivotTable field list on a second Field List click', async () => {
+    sheet = await mountStubSheet({
+      workbook: await WorkbookHandle.createDefault({ preferStub: true }),
+      locale: 'ja',
+    });
+    const { instance } = sheet;
+    const openList = vi.spyOn(instance, 'openActivePivotFieldList').mockReturnValue(true);
+    const hideList = vi.spyOn(instance, 'hidePivotFieldList');
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const tb = Spreadsheet.mountToolbar(host, instance, {});
+    try {
+      for (const id of ['pivotFieldList', 'pivotFieldListView']) {
+        openList.mockClear();
+        hideList.mockClear();
+        mutators.setPivotFieldListOpen(instance.store, false);
+        expect(tb.applyCommand(id)).toBe(true);
+        expect(openList).toHaveBeenCalledTimes(1);
+        expect(hideList).not.toHaveBeenCalled();
+        mutators.setPivotFieldListOpen(instance.store, true);
+        expect(tb.applyCommand(id)).toBe(true);
+        expect(hideList).toHaveBeenCalledTimes(1);
+        expect(openList).toHaveBeenCalledTimes(1);
+      }
     } finally {
       tb.dispose();
       host.remove();

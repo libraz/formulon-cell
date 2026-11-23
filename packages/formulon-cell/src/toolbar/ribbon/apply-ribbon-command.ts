@@ -427,7 +427,9 @@ const applyGenericRibbonCommand = (
       });
       return true;
     case 'pivotFieldList':
-      i.openActivePivotFieldList();
+      // Field List is a toggle: a second click hides the open list.
+      if (i.store.getState().ui.pivotFieldListOpen) i.hidePivotFieldList();
+      else i.openActivePivotFieldList();
       runtime.focusSheet();
       return true;
     case 'pivotOptions':

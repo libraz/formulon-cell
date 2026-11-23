@@ -509,6 +509,10 @@ export const projectRibbonActiveState = (
     const viewMode = RIBBON_VIEW_MODES[command];
     projectPressedState(button, viewMode ? active.workbookView === viewMode : Boolean(active[key]));
   }
+  const fieldListOpen = instance.store.getState().ui.pivotFieldListOpen;
+  for (const command of ['pivotFieldList', 'pivotFieldListView']) {
+    for (const button of buttons.get(command) ?? []) projectPressedState(button, fieldListOpen);
+  }
 
   const sheetBackground = host.querySelector<HTMLButtonElement>(
     '[data-ribbon-command="sheetBackground"]',

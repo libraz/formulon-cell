@@ -177,11 +177,12 @@ export function attachWorkbookObjectsPanel(
     syncTaskpaneDock(dock);
   };
 
-  // The store mirrors the panel's general (selection pane) open state, so the
-  // ribbon toggle follows every open and close path; a field list is not it.
+  // The store mirrors which of the panel's two uses is open, so each ribbon
+  // toggle follows every open and close path.
   const syncOpenFlag = (): void => {
     if (deps.store) {
       mutators.setWorkbookObjectsOpen(deps.store, open && activePivotFieldListKey === '');
+      mutators.setPivotFieldListOpen(deps.store, open && activePivotFieldListKey !== '');
     }
   };
 
@@ -200,6 +201,12 @@ export function attachWorkbookObjectsPanel(
     ) {
       returnFocus(focusTarget, root, host);
     }
+  };
+
+  // Hide Field List: closed, and kept closed when the selection moves onto a report.
+  const hidePivotFieldList = (): void => {
+    pivotFieldListHidden = true;
+    close();
   };
 
   const item = (label: string, value: string | number): HTMLDivElement => {
@@ -425,7 +432,9 @@ export function attachWorkbookObjectsPanel(
       ariaLabel: t.close,
       baseClass: 'fc-objects__close',
     });
-    closeBtn.addEventListener('click', () => close(false));
+    closeBtn.addEventListener('click', () =>
+      activeFieldListPivot ? hidePivotFieldList() : close(false),
+    );
     header.append(title, headerActions);
     root.appendChild(header);
 
@@ -771,10 +780,7 @@ export function attachWorkbookObjectsPanel(
       return true;
     },
     isPivotFieldListOpen: () => open && activePivotFieldListKey.length > 0,
-    hidePivotFieldList: () => {
-      pivotFieldListHidden = true;
-      close();
-    },
+    hidePivotFieldList,
     isPivotFieldListHidden: () => pivotFieldListHidden,
     close,
     refresh,

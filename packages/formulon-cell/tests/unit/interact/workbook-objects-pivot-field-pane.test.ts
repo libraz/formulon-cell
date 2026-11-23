@@ -405,6 +405,39 @@ describe('PivotTable Fields pane', () => {
     wb.dispose();
   });
 
+  it('stays hidden after its close button until it is shown again', async () => {
+    const wb = await setup();
+    const store = createSpreadsheetStore();
+    const handle = attachWorkbookObjectsPanel({
+      getLocale: () => 'en-US',
+      store,
+      host,
+      wb,
+      strings: en,
+      history: null,
+    });
+    expect(handle.openPivotFieldList(0, 0)).toBe(true);
+    expect(store.getState().ui.pivotFieldListOpen).toBe(true);
+    host.querySelector<HTMLButtonElement>('.fc-objects__close')?.click();
+    expect(handle.isPivotFieldListOpen()).toBe(false);
+    expect(handle.isPivotFieldListHidden()).toBe(true);
+    expect(store.getState().ui.pivotFieldListOpen).toBe(false);
+    expect(handle.openPivotFieldList(0, 0)).toBe(true);
+    expect(handle.isPivotFieldListHidden()).toBe(false);
+    handle.detach();
+    wb.dispose();
+  });
+
+  it('leaves the hidden state alone when the object list is closed', async () => {
+    const wb = await setup();
+    const { handle } = open(wb);
+    handle.open();
+    host.querySelector<HTMLButtonElement>('.fc-objects__close')?.click();
+    expect(handle.isPivotFieldListHidden()).toBe(false);
+    handle.detach();
+    wb.dispose();
+  });
+
   it('opens the selection list, not the last field list, from the general open', async () => {
     const wb = await setup();
     const { handle } = open(wb, undefined, ja);

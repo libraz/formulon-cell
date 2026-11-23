@@ -89,7 +89,8 @@ export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInsta
   chartSelectData: (i) => i.openChartSettings('selectData'),
   chartFormatSelection: (i) => i.openChartSettings('styles'),
   pivotFieldListView: (i) => {
-    if (!i.openActivePivotFieldList()) i.openWorkbookObjects();
+    if (i.store.getState().ui.pivotFieldListOpen) i.hidePivotFieldList();
+    else if (!i.openActivePivotFieldList()) i.openWorkbookObjects();
   },
   sparklineAxisDialog: (i) => void openSparklineAxisDialog(i),
 };

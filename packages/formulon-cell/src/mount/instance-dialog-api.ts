@@ -59,6 +59,7 @@ export type InstanceDialogApi = Pick<
   | 'openChartSettings'
   | 'openPivotFieldList'
   | 'openActivePivotFieldList'
+  | 'hidePivotFieldList'
   | 'openPivotOptions'
   | 'openPivotFieldSettings'
   | 'openPivotTableDialog'
@@ -294,6 +295,16 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
         featureState.workbookObjects?.openPivotFieldList(pivot.sheetIndex, pivot.pivotIndex) ??
         false
       );
+    },
+    hidePivotFieldList() {
+      const userObjects = getUserHandle('workbookObjects') as
+        | (ExtensionHandle & { hidePivotFieldList?: () => void })
+        | undefined;
+      if (userObjects?.hidePivotFieldList) {
+        userObjects.hidePivotFieldList();
+        return;
+      }
+      featureState.workbookObjects?.hidePivotFieldList();
     },
     openPivotFieldSettings() {
       if (!permits('pivot')) return false;
